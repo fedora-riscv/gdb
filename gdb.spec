@@ -45,15 +45,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 # ------------------------------------------
 
-# Fix watchpoint support.
-#Broken: Patch5: gdb-6.1post-watchpoint-fix.patch
-# Thread fix.
-#Broken: Patch6: gdb-6.1post-thread-fix.patch
-# Fix to allow using libunwind 0.97 and up.
-#Broken: Patch8: gdb-6.1post-libunwind.patch
-# Fix to support applications calling clone directly
-#Broken: Patch9: gdb-6.1post-linlwp-aug2004.patch
-
 ####### ABI fixes and updates
 #Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 #Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
@@ -67,12 +58,6 @@ Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
 
-# Add java inferior call support
-#Broken: Patch71: gdb-6.1post-java-infcall-aug2004.patch
-# Add support for manually loaded/unloaded shlibs.
-#Broken: Patch72: gdb-6.1post-unload-aug2004.patch
-# Fix stepping in threads
-#Broken: Patch73: gdb-6.1post-thread-step-sep2004.patch
 # Add threaded watchpoint support
 #Broken: Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
 # Fix for thread_db_get_lwp
@@ -146,6 +131,8 @@ Patch110: gdb-6.3-ppc64abi-20040621.patch
 # correct symbol is found.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
+# Fix stepping in threads
+Patch112: gdb-6.3-thread-step-20041207.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -191,6 +178,7 @@ and printing their data.
 %patch109 -p1
 %patch110 -p1
 %patch111 -p1
+%patch112 -p1
 
 %patch50 -p1
 
