@@ -57,8 +57,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
-# Fix for caching thread lwps for linux
-Patch77: gdb-6.1post-lwp-cache-oct2004.patch
 # Fix for allowing macros to continue after backtrace errors
 Patch78: gdb-6.1post-backtrace-nov2004.patch
 # Fix to expose multiple constructors to end-user
@@ -139,6 +137,9 @@ Patch117: gdb-6.3-removebp-20041130.patch
 # --readnever option.
 Patch118: gdb-6.3-gstack-20041123.patch
 
+# Fix for caching thread lwps for linux
+Patch119: gdb-6.3-lwp-cache-20041216.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -190,10 +191,10 @@ and printing their data.
 %patch116 -p1
 %patch117 -p1
 %patch118 -p1
+%patch119 -p1
 
 %patch50 -p1
 
-%patch77 -p1
 %patch78 -p1
 %patch79 -p1
 
