@@ -1,10 +1,13 @@
+%define cvsversion 5.1.90_20020404
+
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.1.1
-Release: 0.1
+Version: 5.1.90CVS
+Release: 4
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
+#Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb+dejagnu-%{cvsversion}.tar.bz2
 Patch1: gdb-5.1-threadfpufix.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
@@ -17,8 +20,9 @@ and other languages, by executing them in a controlled fashion and
 printing their data.
 
 %prep
-%setup -q 
-%patch1 -p1 -b .threadfpupatch
+%setup -q -n gdb+dejagnu-%{cvsversion}
+rm -fr gdb/gdbserver
+#patch1 -p1 -b .threadfpupatch
 
 cat > gdb/version.in << _FOO
 Red Hat Linux (%{version}-%{release})
@@ -86,6 +90,18 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-4
+- Update to current
+
+* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-3
+- Update to current
+
+* Wed Mar 20 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-2
+- Update to current
+
+* Wed Mar 13 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-1
+- Update to current 5.2 branch 
+
 * Thu Jan 24 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.1-1
 - 5.1.1
 - add URL
