@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.40
+Release: 1.%{cvsdate}.41
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -46,7 +46,7 @@ Patch13: gdb-6.1post-sig-step-aug2004.patch
 Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
-Patch20: gdb-6.1post-abi-ppc64-jun2004.patch
+Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
 Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
