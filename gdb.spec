@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.18
+Release: 1.%{cvsdate}.19
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -58,6 +58,7 @@ Patch37: gdb-6.1post-test-bigcore-jun2004.patch
 Patch38: gdb-6.1post-test-sigbpt-jun2004.patch
 Patch39: gdb-6.1post-test-annota-jun2004.patch
 Patch40: gdb-6.1post-test-attach-jun2004.patch
+Patch41: gdb-6.1post-test-self-jul2004.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -121,6 +122,7 @@ printing their data.
 %patch38 -p1
 %patch39 -p1
 %patch40 -p1
+%patch41 -p1
 
 %patch50 -p1
 %patch51 -p1
@@ -307,6 +309,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jul 30 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.18.1
+- Fix the tests where gdb debugs itself, as to not copy
+  the executable to xgdb.
+
 * Mon Jul 26 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.18
 - Add Pie patches back in.
 
