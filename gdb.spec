@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.26
+Release: 1.%{cvsdate}.27
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -23,6 +23,8 @@ Obsoletes: gdb64
 Patch0: gdb-6.1post-ChangeLog.patch
 # ChangeLogs patches for testsuite.
 Patch1: gdb-6.1post-ChangeLog-testsuite.patch
+# ChangeLogs patches for doc.
+Patch2: gdb-6.1post-ChangeLog-doc.patch
 ####### start patches from the previous RPM.
 # New test to see if libunwind is used. (Red Hat specific)
 Patch3: gdb-6.1post-libunwind-tst.patch
@@ -80,6 +82,8 @@ Patch60: gdb-6.1post-o-largefile-jul2004.patch
 Patch70: gdb-6.1post-symtab-bob-jul2004.patch
 # Add java inferior call support
 Patch71: gdb-6.1post-java-infcall-aug2004.patch
+# Add support for manually loaded/unloaded shlibs.
+Patch72: gdb-6.1post-unload-aug2004.patch
 
 # Fix panic when stepping an solib call
 Patch80: gdb-6.1post-infcall-step-jul2004.patch
@@ -108,6 +112,7 @@ printing their data.
 # Apply patches defined above.
 %patch0 -p1 
 %patch1 -p1 
+%patch2 -p1 
 %patch3 -p1 
 %patch4 -p1
 %patch5 -p1
@@ -145,6 +150,7 @@ printing their data.
 %patch60 -p1
 %patch70 -p1
 %patch71 -p1
+%patch72 -p1
 %patch80 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
@@ -324,8 +330,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Aug 30 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.27
+- Add support for breakpoints in manually loaded/unloaded shared libs.
+  (bugzilla 128618)
+
 * Mon Aug 30 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.26
-- Add java inferior call support
+- Add java inferior call support.
 
 * Mon Aug 30 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.25
 - Convert "main" the function descriptor, into an address.
