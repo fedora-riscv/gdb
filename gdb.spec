@@ -40,7 +40,6 @@ Obsoletes: gdb64
 #N/A: Patch2: gdb-6.1post-ChangeLog-doc.patch
 ####### start patches from the previous RPM.
 # Silence gcc warnings.
-#N/A: Patch4: gdb-6.1post-gccwarn.patch
 
 ####### end patches from the previous RPM.
 
@@ -62,10 +61,8 @@ Patch9: broken.patch
 Patch10: broken.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
 Patch12: gdb-6.1post-sig-x86-jun2004.patch
-#Merged: Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
-#Merged: Patch18: gdb-6.1post-abi-i386unwind-nov2004.patch
 #Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 Patch19: broken.patch
 #Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
@@ -78,12 +75,11 @@ Patch23: broken.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
-#Merged: Patch27: gdb-6.1post-abi-s390rewrite-oct2004.patch
 Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
-#Merged: Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
+#Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
+Patch29: broken.patch
 
 ###### Testsuite merge, fixes, and local RH hack
-#Merged: Patch30: gdb-6.1post-test-merge-20040923.patch
 # Work around out-of-date dejagnu that does not have kfail
 Patch31: gdb-6.1post-test-rh-kfail.patch
 # Match Red Hat version info
@@ -193,7 +189,6 @@ and printing their data.
 # Apply patches defined above.
 #%patch0 -p1 
 #%patch2 -p1 
-#%patch4 -p1
 %patch5 -p1
 %patch6 -p1
 %patch8 -p1
@@ -201,9 +196,7 @@ and printing their data.
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
-#%patch14 -p1
 
-#%patch18 -p1
 %patch19 -p1
 %patch20 -p1
 %patch21 -p1
@@ -212,11 +205,9 @@ and printing their data.
 %patch24 -p1
 %patch25 -p1
 %patch26 -p1
-#%patch27 -p1
 %patch28 -p1
-#%patch29 -p1
+%patch29 -p1
 
-#%patch30 -p1
 %patch31 -p1
 %patch32 -p1
 %patch33 -p1
