@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.14
+Release: 0.15
 
 License: GPL
 Group: Development/Debuggers
@@ -171,6 +171,9 @@ Patch137: gdb-6.3-movedir-20050125.patch
 # Fix to support unwinding syscalls in ia64 corefiles
 Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
 
+# Tolerate DW_AT_type referencing <0>.
+Patch139: gdb-6.3-dwattype0-20050201.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -242,6 +245,7 @@ and printing their data.
 %patch136 -p1
 %patch137 -p1
 %patch138 -p1
+%patch139 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -410,6 +414,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Feb 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.15
+- Tolerate DW_AT_type referencing <0> and instead of generating an
+  error, treat as unknown type.
+- Bugzilla 144852.
+
 * Thu Feb  3 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.14
 - Separate out test patches.
 
