@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.27
+Release: 1.%{cvsdate}.28
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -69,6 +69,7 @@ Patch38: gdb-6.1post-test-sigbpt-jun2004.patch
 Patch39: gdb-6.1post-test-annota-jun2004.patch
 Patch40: gdb-6.1post-test-attach-jun2004.patch
 Patch41: gdb-6.1post-test-self-jul2004.patch
+Patch42: gdb-6.1post-test-unload-aug2004.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -142,6 +143,7 @@ printing their data.
 %patch39 -p1
 %patch40 -p1
 %patch41 -p1
+%patch42 -p1
 
 %patch50 -p1
 %patch51 -p1
@@ -330,6 +332,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Aug 31 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.28
+- Add test case for bugzilla 128618 fix.
+
 * Mon Aug 30 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.27
 - Add support for breakpoints in manually loaded/unloaded shared libs.
   (bugzilla 128618)
