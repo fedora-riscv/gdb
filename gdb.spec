@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.6
+Release: 0.7
 
 License: GPL
 Group: Development/Debuggers
@@ -154,6 +154,9 @@ Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 # Add PPC .symbols to min-symtable.
 Patch129: gdb-6.3-ppcdotsym-20050120.patch
 
+# Add PPC .symbols to min-symtable.
+Patch130: gdb-6.3-ctorline-20050120.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -222,6 +225,7 @@ and printing their data.
 %patch127 -p1
 %patch128 -p1
 %patch129 -p1
+%patch130 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -390,6 +394,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 20 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.7
+- Fix to allow breaking by line in both the in-charge and
+  not-in-charge ctor/dtor.
+- Bugzilla 117826
+
 * Thu Jan 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.6
 - Rebuild.
 
