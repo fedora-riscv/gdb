@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.54
+Release: 1.%{cvsdate}.55
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -106,6 +106,8 @@ Patch79: gdb-6.1post-constructor-nov2004.patch
 
 # Fix panic when stepping an solib call
 Patch80: gdb-6.1post-infcall-step-jul2004.patch
+# Fix ia64 backtrace
+Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -180,6 +182,7 @@ printing their data.
 %patch78 -p1
 %patch79 -p1
 %patch80 -p1
+%patch81 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -348,6 +351,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Nov 22 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.55
+- Multiple ia64 backtrace fixes.  Bugzilla 125157
+
 * Thu Nov 11 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.54
 - Bump up release number
 
