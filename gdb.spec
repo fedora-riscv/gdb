@@ -74,16 +74,12 @@ Patch19: broken.patch
 #Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
 Patch20: broken.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
-#Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
-Patch22: broken.patch
 #Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 Patch23: broken.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
 Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
-#Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
-Patch29: broken.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 # Get selftest working with sep-debug-info
@@ -161,6 +157,7 @@ Patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
 Patch87: gdb-6.1post-remove-bp-nov2004.patch
 
 # Add fixes starting at 100
+Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -192,6 +189,8 @@ and printing their data.
 %patch1 -p1
 %patch2 -p1
 
+%patch100 -p1
+
 # Apply patches defined above.
 %patch5 -p1
 %patch6 -p1
@@ -204,7 +203,6 @@ and printing their data.
 %patch19 -p1
 %patch20 -p1
 %patch21 -p1
-%patch22 -p1
 %patch23 -p1
 %patch24 -p1
 %patch25 -p1
