@@ -134,6 +134,9 @@ Patch114: gdb-6.3-ia64-backtrace-20041213.patch
 # Fix to ensure types are visible
 Patch115: gdb-6.3-type-fix-20041213.patch
 
+# Fix to display base constructors from list and breakpoint commands
+Patch116: gdb-6.3-linespec-20041213.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -182,6 +185,7 @@ and printing their data.
 %patch113 -p1
 %patch114 -p1
 %patch115 -p1
+%patch116 -p1
 
 %patch50 -p1
 
