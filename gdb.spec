@@ -1,7 +1,7 @@
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 Version: 5.2.1
-Release: 2
+Release: 3
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
@@ -18,7 +18,8 @@ printing their data.
 
 %prep
 %setup -q 
-%patch0 -p1
+%patch0 -p1 
+
 rm -fr gdb/gdbserver
 
 cat > gdb/version.in << _FOO
@@ -87,6 +88,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Aug 21 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-3
+- Add changelogs to the previous patch
+
 * Wed Aug 14 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-2
 - Add some patches from Elena Zannoni <ezannoni@redhat.com>
 
