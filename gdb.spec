@@ -1,107 +1,108 @@
-%define cvsdate 20021129
+%define cvsdate 20030710
 # Define this if you want to skip the strip step and preserve debug info.
 # Useful for testing. 
 #define __spec_install_post /usr/lib/rpm/brp-compress || :
 Summary: A GNU source-level debugger for C, C++ and other languages.
+%ifarch ppc64
+Name: gdb64
+%else
 Name: gdb
+%endif
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 5.3 branchpoint.
-Version: 5.3post
-Release: 0.%{cvsdate}.29
+Version: 5.3.90
+Release: 0.%{cvsdate}.41
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20021129.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb+dejagnu-5.3.90_20030710.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 
 # ChangeLogs patches.
-Patch0: gdb-5.3post-ChangeLog.patch
+Patch0: gdb-5.3.90-ChangeLog.patch
 # ChangeLogs patches for testsuite.
-Patch1: gdb-5.3post-ChangeLog-testsuite.patch
-# misc patch from previous release, w/o the changes to lin-lwp.c, to avoid
-# conflicts with the nptl changes (on i386). (Jim Blandy and Kevin Buettner).
-Patch2: gdb-5.3post-misc-p1.patch
-# s390 ABI patch, not yet into upstream sources.
-Patch3: gdb-5.3post-s390-may2002.patch
-# Patch to disable -Werror on a few files, and fix some Makefile dependencies.
-# (Elena Zannoni).
-Patch4: gdb-5.3post-warnings-dec2002.patch
-# Separate debug info patch. (Jim Blandy and Alex Larsson).
-Patch5: gdb-5.3post-dbg-dec2002.patch
-# Patch to accept empty args with --args (Andreas Schwab).
-Patch6: gdb-5.3post-args-jan2003.patch
-# patch to lin-lwp.c to bring it in sync with sources.redhat.com version.
-Patch7: gdb-5.3post-sync.patch
-# patch from Jeff Johnston (jjohnstn@redhat.com) with
-# all the fixes for NPTL, hopefully architecture neutral.
-Patch8: gdb-5.3post-all-thread-jan2003.patch
-# patch to fix the until command and add advance command (ezannoni@redhat.com).
-Patch9: gdb-5.3post-until-jan2003.patch
-# patch to ignore NOBITS .eh_frame section in debug info (ezannoni@redhat.com).
-Patch10: gdb-5.3post-dwarf2-jan2003.patch
-# patch to cleanup gfi engine on rerun (mludvig@suse.com).
-Patch11: gdb-5.3post-cfi-jan2003.patch
-# patch to fix ui out errors (ezannoni@redhat.com, kevinb@redhat.com).
-Patch12: gdb-5.3post-uiout-feb2003.patch
-# patch to use the correct include file in s390-nat.c (ezannoni@redhat.com).
-Patch13: gdb-5.3post-s390-feb2003.patch
-# patch to expedite execution of testsuite when gdb gets internal
-# error (jimb@redhat.com).
-Patch14: gdb-5.3post-interr-feb2003.patch
+Patch1: gdb-5.3.90-ChangeLog-testsuite.patch
+# bring the current snapshot in sync with the head of the gdb-6 branch
+Patch2: gdb-5.3.90-sync-20030806.patch
+####### start patches from the previous RPM.
+# patch from previous release (Jim Blandy).
+Patch3: gdb-5.3.90-symtab.patch
 # New TLS specific tests (ezannoni@redhat.com).
-Patch15: gdb-5.3post-tlstst-feb2003.patch
-# various cleanups for the gdb.threads tests
-# (drow@mvista.com, ezannoni@redhat.com).
-Patch16: gdb-5.3post-thrtst-feb2003.patch
-# Patch to deal with .debug_ranges (rth@redhat.com, ezannoni@redhat.com,
-# drow@mvista.com)
-Patch17: gdb-5.3post-dw2ranges-feb2003.patch
-# From jjohnstn@redhat.com
-Patch18: gdb-5.3post-bug81732-feb2003.patch
-# Fix for mi-ptreads tests (mec@shout.net). 
-Patch19: gdb-5.3post-mipthreads-feb2003.patch
-# Fix for dealing with files with stabs debug info, but no line info. 
-# (jjohnstn@redhat.com, ezannoni@redhat.com).
-Patch20: gdb-5.3post-stabfix-feb2003.patch
-# Fix for gdb core dump on disassembly. (ezannoni@redhat.com).
-Patch21: gdb-5.3post-s390dis-feb2003.patch
-# Fix for new kernel behavior with attach and SIGSTOP (ezannoni@redhat.com).
-Patch22: gdb-5.3post-attach-feb2003.patch
-# From jjohnstn@redhat.com
-Patch23: gdb-5.3post-jj-lwp3.patch
-# Some misc testsuite cleanups. (ezannoni@redhat.com)
-Patch24: gdb-5.3post-tests-feb2003.patch
-# Update copyright year in version.
-Patch25: gdb-5.3post-copyright-feb2003.patch
-# Fix to make run-time check for tkill syscall.
-Patch26: gdb-5.3post-jj-lwp4.patch
-# A few misc fixes for x86-64
-Patch27: gdb-5.3post-x86-64-mar2003.patch
-# Fixes for testsuite problems
-Patch28: gdb-5.3post-tests-mar2003.patch
-# More fixes for testsuite problems
-Patch29: gdb-5.3post-tests2-mar2003.patch
-# Inferior func call fixes for x86-64
-Patch30: gdb-5.3post-x86-64-2-mar2003.patch
-# Fix for handling create/death events
-Patch31: gdb-5.3post-threaddb-mar2003.patch
-# Fixes for some testsuite failures
-Patch32: gdb-5.3post-misc-mar2003.patch
-# Fixes for s390 prologue analysis.
-Patch33: gdb-5.3post-s390prologue-mar2003.patch
-# Fixes for disassembling code in threaded apps and core files.
-Patch34: gdb-5.3post-disas-mar2003.patch
-# Fixes for disassemble memory corruption.
-Patch35: gdb-5.3post-disas2-mar2003.patch
-# S/390: help GDB find structs returned by inferior calls.
-Patch36: gdb-5.3post-s390-frame-align-mar2003.patch
-# S/390: Detect end of frame chain
-Patch37: gdb-5.3post-s390-stack-end-mar2003.patch
-# Make test suite recover from various failures
-Patch38: gdb-5.3post-tests3-mar2003.patch
-# Print Java strings correctly.
-Patch39: gdb-5.3post-java-mar2003.patch
-# Script to invoke gdb and execute a gcore command.
-Patch40: gdb-5.3post-gcore-script.patch
+Patch4: gdb-5.3.90-tlstst.patch
+# selftest.exp version check (Red Hat specific)
+Patch5: gdb-5.3.90-selftest.patch
+# Fix for ia64 watchpoint checking. 
+Patch6: gdb-5.3.90-ia64-watchpoint.patch
+####### end patches from the previous RPM.
+# Patch to finish ppc64 support. (jimb@redhat.com)
+# Should be soon obsoleted by a new FSF snapshot
+Patch7: gdb-5.3.90-ppc64-jul2003.patch
+# Patch to redefine the setup_kfail and kfail procedures in the testsuite. 
+# Kfail was introduced in dejagnu-1.4.3 and we still use dejagnu-1.4.2
+Patch8: gdb-5.3.90-kfail-jul2003.patch
+# Remove one case in completion.exp, completing on Makefile, which is not
+# always there.
+Patch9: gdb-5.3.90-completion-tst-jul2003.patch
+# Patch to escape correctly full pathnames in testsuite.
+Patch10: gdb-5.3.90-tsts-jul2003.patch
+# Patch to match the proper target triplet for xfails. (Red Hat specific)
+Patch11: gdb-5.3.90-signals-tst-jul2003.patch
+# Patch to remove config.h use in pthreads.c test.
+Patch12: gdb-5.3.90-pthreads-tst-jul2003.patch
+# Patch to add i386 support to x86-64
+Patch13: gdb-5.3.90-x86i386base-aug2003.patch
+# Patch to undeprecate ia64.
+Patch14: gdb-5.3.90-ia64-undeprecated-aug2003.patch
+# Patch to print libthread_db version, and enable
+Patch15: gdb-5.3.90-threadver-aug2003.patch
+# Patch to support ia64 in gdb.asm testsuite
+Patch16: gdb-5.3.90-ia64-inc-asm-testsuite-aug2003.patch
+# Patch to fix problem with reading separate debug info files.
+Patch17: gdb-5.3.90-symfile-aug2003.patch
+# Patch to handle new output from gdb in relocate.exp.
+Patch18: gdb-5.3.90-relocatetst-aug2003.patch
+# Patch to fix the info files for the annotation docs.
+Patch19: gdb-5.3.90-annotate-aug2003.patch
+# Patch to fix ia64 unwinding of pc.
+Patch20: gdb-5.3.90-ia64-unwind-pc-aug2003.patch
+# Patch to accept slightly different output in testsuite.
+Patch21: gdb-5.3.90-annota2-tst-aug2003.patch
+# Multiple patches for ia64.
+Patch22: gdb-5.3.90-ia64-latest-aug2003.patch
+# Patch to accept instruction reordering due to optimization when
+# stepping through code.
+Patch23: gdb-5.3.90-selftest-aug2003.patch
+# Accept multiple outputs from backtrace.
+Patch24: gdb-5.3.90-linuxdp-tst-aug2003.patch
+# Skip x86 and ppc64 redzone
+Patch25: gdb-5.3.90-redzone-aug2003.patch
+# ptrace i386 TLS on x86-64
+Patch26: gdb-5.3.90-x86i386tls-aug2003.patch
+# new unit test for separate debug info.
+Patch27: gdb-5.3.90-sepdebug-tst-aug2003.patch
+# Don't use old deprecated macro.
+Patch28: gdb-5.3.90-miregs-sep2003.patch
+# ChangeLog for mi patches.
+Patch29: gdb-5.3.90-ChangeLog-mi.patch
+# Get around CFI and GCC probs
+Patch30: gdb-5.3.90-cfi4gcc-sep2003.patch
+# Fix PPC32 use-struct-convention
+Patch31: gdb-5.3.90-ppc32usestruct-sep2003.patch
+# Fix problems with gdb exiting when an error occurs while quitting
+Patch32: gdb-5.3.90-killed-sep2003.patch
+# Fix ppc32 push_dummy_call
+Patch33: gdb-5.3.90-ppc32pushdummycall-sep2003.patch
+# Hack around ppc64's messed up msymbol table
+Patch34: gdb-5.3.90-ppc64msymbolbphack-sep2003.patch
+# Fix ppc64 function return (round 1 of ???)
+Patch35: gdb-5.3.90-ppc64returnvalue-sep2003.patch
+# Fix ppc32 return values
+Patch36: gdb-5.3.90-ppc32returnvalue-sep2003.patch
+# Fix ppc64 function calls
+Patch37: gdb-5.3.90-ppc64pushdummycall-sep2003.patch
+# Fix quit_force
+Patch38: gdb-5.3.90-killed2-sep2003.patch
+# Fix problem with gcore on single threads programs.
+Patch39: gdb-5.3.90-gcore-sep2003.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
 Prereq: info
@@ -113,7 +114,7 @@ printing their data.
 
 %prep
 # This allows the tarball name to be different from our version-release name.
-%setup -q -n gdb+dejagnu-%{cvsdate}
+%setup -q -n gdb+dejagnu-%{version}_%{cvsdate}
 
 # Apply patches defined above.
 %patch0 -p1 
@@ -146,17 +147,16 @@ printing their data.
 %patch27 -p1 
 %patch28 -p1 
 %patch29 -p1 
-%patch30 -p1 
-%patch31 -p1 
-%patch32 -p1 
-%patch33 -p1 
-%patch34 -p1 
-%patch35 -p1 
-%patch36 -p1 
-%patch37 -p1 
-%patch38 -p1 
-%patch39 -p1 
-%patch40 -p1 
+%patch30 -p1
+%patch31 -p1
+%patch32 -p1
+%patch33 -p1
+%patch34 -p1
+%patch35 -p1
+%patch36 -p1
+%patch37 -p1
+%patch38 -p1
+%patch39 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -171,10 +171,12 @@ rm -fr dejagnu tcl expect
 
 %build
 
+# Identify the build directory with the version of gdb as well as
+# the architecture, to allow for mutliple versions to be installed and built.
 cd ..
-rm -fr build-%{_target_platform}
-mkdir build-%{_target_platform}
-cd build-%{_target_platform}
+rm -fr gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
+mkdir gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
+cd gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
 
 # FIXME: The configure option
 # --enable-gdb-build-warnings=,-Werror below can conflict with
@@ -185,14 +187,12 @@ cd build-%{_target_platform}
 
 export CFLAGS="$RPM_OPT_FLAGS"
 
-# Only i386 builds with -Werror because other platforms get host header
-# files conflicts.
 enable_build_warnings=""
-%ifarch %{ix86} alpha ia64 ppc s390 s390x x86-64
+%ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
-$RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/configure \
+$RPM_BUILD_DIR/gdb+dejagnu-%{version}_%{cvsdate}/configure \
 	--prefix=%{_prefix} \
 	--sysconfdir=%{_sysconfdir} \
 	--mandir=%{_mandir} \
@@ -206,29 +206,34 @@ make info
 
 # For now do testing only on these platforms. The testsuite on x86_64 is not
 # in good shape.
-# FIXME disable alpha, ia64, s390, s390x, and ppc tests for moment.
-#ifarch %{ix86} alpha ppc ia64
-%ifarch %{ix86} 
+%ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
 make -k check || :
+test -r gdb.log && cat gdb.log | bzip2 -1 | uuencode gdb-%{_target_platform}.log.bz2 || :
 cd ../..
 echo ====================TESTING END=====================
 %endif
 
 cd ..
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
-cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/NEWS $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}
+cp $RPM_BUILD_DIR/gdb+dejagnu-%{version}_%{cvsdate}/gdb/NEWS $RPM_BUILD_DIR/gdb+dejagnu-%{version}_%{cvsdate}
 
 %install
-cd ../build-%{_target_platform}
+cd ../gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
 rm -rf $RPM_BUILD_ROOT
 
 %makeinstall
 
 # install the gcore script in /usr/bin
-cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
+cp $RPM_BUILD_DIR/gdb+dejagnu-%{version}_%{cvsdate}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
+
+#FIXME: For the moment, rename the gdb binary to gdb64 on the ppc64
+#architecture.
+%ifarch ppc64
+mv $RPM_BUILD_ROOT%{_prefix}/bin/gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdb64
+%endif
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -251,6 +256,8 @@ rm -rf $RPM_BUILD_ROOT
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
 
+[ -f %{_infodir}/annotate.info ]	&& /sbin/install-info %{_infodir}/annotate.info %{_infodir}/dir || :
+[ -f %{_infodir}/annotate.info.gz ]	&& /sbin/install-info %{_infodir}/annotate.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/gdb.info ]		&& /sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir || :
 [ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/gdbint.info ]         && /sbin/install-info %{_infodir}/gdbint.info %{_infodir}/dir || :
@@ -262,6 +269,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %preun
 if [ $1 = 0 ]; then
+	[ -f %{_infodir}/annotate.info ]	&& /sbin/install-info --delete %{_infodir}/annotate.info %{_infodir}/dir  || :
+	[ -f %{_infodir}/annotate.info.gz ]	&& /sbin/install-info --delete %{_infodir}/annotate.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info --delete %{_infodir}/gdb.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdbint.info ]          && /sbin/install-info --delete %{_infodir}/gdbint.info %{_infodir}/dir  || :
@@ -278,6 +287,7 @@ fi
 /usr/bin/*
 %{_libdir}/libmmalloc.a*
 %{_mandir}/*/*
+%{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
 %{_infodir}/stabs.info*
@@ -286,6 +296,196 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Oct 15 2003 Elena Zannoni <ezannoni@redhat.com>	0.20030710.41
+- Bump up version number.
+
+* Wed Sep 24 2003 Elena Zannoni <ezannoni@redhat.com>	0.20030710.40
+- Fix problem with gcore and single threaded programs. (bugzilla 103531)
+
+* Mon Sep 22 2003 Jeff Johnston <jjohnstn@redhat.com>	0.20030710.39
+- Fix call to quit_target from quit_force.
+
+* Sun Sep 21 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.38
+- Fix PPC64 push dummy call.
+- Re-fix PPC64 return value (had wrong / old patch).
+
+* Sat Sep 20 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.37
+- Fix PPC32 return values.
+
+* Sat Sep 20 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.36
+- Rewrite ppc64 retun value methods so that they (hopefully)
+match the SysV spec.
+- Enable ppc64 testsuite.
+
+* Thu Sep 18 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.35
+- Hack around problem "break main" vs "break .main" when there is
+only a minimal ppc64 symbol table.  The former is a function descriptor
+and not where you want the breakpoint to go.  Only convert descriptors
+to pointers when the address is in the ".opd" section.
+
+* Wed Sep 17 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.34
+- Fix ppc32 push_dummy_call.
+
+* Tue Sep 16 2003 Andrew Cagney <cagney@redhat.com>	0.20030710.33
+- Pack gdb.sum and gdb.log using uuencode and bzip.
+
+* Tue Sep 16 2003 Jeff Johnston <jjohnstn@redhat.com>   0.20030710.32
+- Catch errors when quitting so exit of gdb still occurs.
+
+* Mon Sep 15 2003 Andrew Cagney <cagney@redhat.com>     0.20030710.31
+- Fix ppc32 use_struct_convention.
+
+* Thu Sep 11 2003 Andrew Cagney <cagney@redhat.com>     0.20030710.30
+- Mods to dwarf2-frame.c to work around a lack of GCC/CFI info.
+
+* Thu Sep 11 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.29
+- Bump up version number.
+
+* Wed Sep 10 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.28
+- Fix a core dump with MI.
+- Add new ChangeLog patch for mi changes.
+
+* Thu Sep 04 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.27
+- Change the name of the package to gdb64 in ppc64 case.
+
+* Tue Aug 26 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.26
+- Add testcase for separate debug info.
+
+* Tue Aug 26 2003 Andrew Cagney <cagney@redhat.com>     0.20030710.25
+- fix i386 on x86-64 TLS
+- add "base-aug2003" suffix to older x86i386 patch
+
+* Tue Aug 26 2003 Andrew Cagney <cagney@redhat.com>     0.20030710.24
+- skip the ppc64 and x86-64 frame redzone.
+ 
+* Fri Aug 22 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.23
+- Relax one testcase in selftest.exp a bit.
+- Accept different output as well in thread bt (platform dependent).
+- Enable testsuite run for ia64, ppc, s390 and s390x. They are in
+  reasonably good shape.
+
+* Thu Aug 21 2003 Jeff Johnston  <jjohnstn@redhat.com>  0.20030710.22
+- Multiple ia64 fixes.
+- Fix ia64 printing of function pointers.
+- Fix ia64 prologue examination to ignore predicated insns if we
+  haven't found the return address yet.
+- Skip dump.exp testcase for ia64
+
+* Thu Aug 21 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.21
+- Bump release number.
+
+* Wed Aug 20 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.20
+- Relax pattern in annota2.exp test.
+
+* Wed Aug 20 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.19
+- rename gdb binary to gdb64 for ppc64 platform.
+
+* Tue Aug 19 2003 Jeff Johnston  <jjohnstn@redhat.com>  0.20030710.18
+- Fix ia64 pc unwinding to include psr slot.
+ 
+* Mon Aug 18 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.17
+- Fix info installation for annotate.texi. (Bugzilla 102521)
+ 
+* Fri Aug 15 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.16
+- revamp tls tests a bit.
+- Handle new output from gdb in relocate.exp
+
+* Wed Aug 13 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.15
+- Fix problem for processing of separate debug info files.
+
+* Wed Aug 13 2003 Jeff Johnston  <jjohnstn@redhat.com>   0.20030710.14
+- add ia64.inc file for testing ia64 in gdb.asm testsuite
+
+* Fri Aug 8 2003 Andrew Cagney  <cagney@redhat.com>   0.20030710.13
+- print the libthread_db library path, print when threads are enabled
+
+* Thu Aug 7 2003 Andrew Cagney  <cagney@redhat.com>   0.20030710.12
+- "cat" the test log into the build log
+
+* Wed Aug 06 2003 Jeff Johnston  <jjohnstn@redhat.com>  0.20030710.11
+- modernize ia64 gdb to use new frame model
+- remove/replace deprecated interfaces used by ia64 gdb
+
+* Wed Aug 06 2003 Andrew Cagney  <cagney@redhat.com>   0.20030710.10
+- Sync to gdb-5.3.90-sync-20030806.patch.
+
+* Wed Jul 29 2003 Andrew Cagney  <cagney@redhat.com>   0.20030710.9
+- add x86-64 i386 fixes
+
+* Tue Jul 29 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.8
+- Fix some tests by xfailing the correct target triplet for RedHat.
+- Remove include of config.h from pthreads.c testcases.
+
+* Mon Jul 28 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.7
+- Fix some test failures, by escaping correctly.
+
+* Thu Jul 24 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.6
+- Remove one testcase that is redundant.
+
+* Wed Jul 23 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.5
+- Bump up release number.
+
+* Wed Jul 23 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.4
+- Bring in sync with current head of gdb-6 branch.
+- Remove linespec patch, because included in the new sync patch.
+
+* Fri Jul 18 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.3
+- Add patch to avoid gdb segfault with bad debug info.
+- Change location of build tree to avoid conflicts with older versions
+  possibly installed.
+
+* Thu Jul 17 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.2
+- Add patch to synchronize the current snapshot with the gdb-6 branch head.
+- Remove some patches that are includd in such diff.
+- Enable tests on AMD64 as well.
+
+* Fri Jul 11 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20030710.1
+- Import new gdb snapshot.
+- Revamp gdb.spec. Get rid of patches that apply to older versions.
+- Add patches for ppc64 support, kfail and make gdb more robust in copingi
+  with bad debug info.
+
+* Wed Jul 02 2003 Jeff Johnston  <jjohnstn@redhat.com>  1.20021129.39
+- Fix bug with ia64 checking of hardware breakpoints.
+
+* Mon Jun 30 2003 Elena Zannoni  <ezannoni@redhat.com>  1.20021129.38
+- Add necessary function for NPTL support on x86-64.
+
+* Wed Jun 04 2003 Elliot Lee <sopwith@redhat.com>
+- rebuilt
+
+* Wed Jun 04 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20021129.37
+* Tue Jun 03 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20021129.36
+- Enable warnings for x86_64, not x86-64.
+- Fix warnings from infptrace.c and dwarfread.c.
+- Print error message only when reading separate debug info really
+  doesn't work (jimb@redhat.com).
+
+* Fri May 23 2003 Elena Zannoni  <ezannoni@redhat.com>  0.20021129.35
+- Fixes for fetching and storing access registers on s390x (jimb@redhat.com).
+  Bugzilla 91455.
+
+* Wed May 21 2003 Jeff Johnston  <jjohnstn@redhat.com>  0.20021129.34
+- Do not generate error on detach failure.  Bugzilla 90900.
+
+* Thu May 8 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.33
+- New tests for asm on s390x (jimb@redhat.com). Bugzilla 90503.
+- Fixes for prologue analysis on s390x (jimb@redhat.com). Bugzilla 90506.
+- bfd fix for 64-bit platforms (jimb@redhat.com).
+- Disable ppc64 builds until we have a port.
+
+* Thu May 1 2003 Jeff Johnston  <jjohnstn@redhat.com>  0.20021129.32
+- Add ia64 support to the float.exp testcase.
+
+* Thu May 1 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.31
+- Clean up the tls tests some more.
+- Fix problem with non US-eng locale. Bugzilla bug 88823.
+
+* Wed Apr 30 2003 Jeff Johnston <jjohnstn@redhat.com>  0.20021129.30
+- Fix ia64 prologue skipping.
+- Fix ia64 line table.
+- Fix setting of prev_pc in infrun.c.
+
 * Mon Mar 31 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.29
 - Include the gcore script, as gdb_gcore.sh and install it in
   /usr/bin as gcore.
