@@ -1,19 +1,87 @@
 %define cvsdate 20021129
+# Define this if you want to skip the strip step and preserve debug info.
+# Useful for testing. 
+#define __spec_install_post /usr/lib/rpm/brp-compress || :
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 5.3 branchpoint.
 Version: 5.3post
-Release: 0.%{cvsdate}.2
+Release: 0.%{cvsdate}.18
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20021129.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
-Patch0: gdb-5.3post-misc.patch
+
+# gdb-5.3post-misc.patch
+# misc patch from previous release, w/o the changes to lin-lwp.c, to avoid
+# conflicts with the nptl changes (on i386). (Jim Blandy and Kevin Buettner).
+Patch0: gdb-5.3post-misc-p1.patch
+# s390 ABI patch, not yet into upstream sources.
 Patch1: gdb-5.3post-s390-may2002.patch
-Patch2: gdb-5.3post-alpha-nov2002.patch
-Patch3: gdb-5.3post-ia64-dec2002.patch
-Patch4: gdb-5.3post-ppc-dec2002.patch
+# Patch to disable -Werror on a few files, and fix some Makefile dependencies.
+# (Elena Zannoni).
+Patch2: gdb-5.3post-warnings-dec2002.patch
+# Separate debug info patch. (Jim Blandy and Alex Larsson).
+Patch3: gdb-5.3post-dbg-dec2002.patch
+# Patch to accept empty args with --args (Andreas Schwab).
+Patch4: gdb-5.3post-args-jan2003.patch
+# patch to lin-lwp.c to bring it in sync with sources.redhat.com version.
+Patch5: gdb-5.3post-sync.patch
+# patch from Jeff Johnston (jjohnstn@redhat.com) to lin-lwp.c for
+# nptl support. Applied for i386 only. (Still WIP).
+#Patch6: gdb-5.3post-jj-lwp.patch
+#Patch6: gdb-5.3post-jj-lwp2.patch
+# all the fixes for NPTL, hopefully architecture neutral.
+Patch6: gdb-5.3post-all-thread-jan2003.patch
+# old misc patch from Kevin Buettner and Jim Blandy for lin-lwp.c and i386
+# only (applies on top of Jeff Johnston patch).
+# this is now included in the big thread patch.
+#Patch7: gdb-5.3post-misc-p2.patch
+# patch from Jeff Johnston (jjohnstn@redhat.com) for nptl support
+# (applied for i386 only).
+#Patch8: gdb-5.3post-jjohnstn-thread.patch
+# patch to fix the until command and add advance command (ezannoni@redhat.com).
+Patch9: gdb-5.3post-until-jan2003.patch
+# cumulative ChangeLogs patches.
+Patch10: gdb-5.3post-ChangeLog-all.patch
+# patch to ignore NOBITS .eh_frame section in debug info (ezannoni@redhat.com).
+Patch11: gdb-5.3post-dwarf2-jan2003.patch
+# patch to cleanup gfi engine on rerun (mludvig@suse.com).
+Patch12: gdb-5.3post-cfi-jan2003.patch
+# patch to fix ui out errors (ezannoni@redhat.com, kevinb@redhat.com).
+Patch13: gdb-5.3post-uiout-feb2003.patch
+# patch to use the correct include file in s390-nat.c (ezannoni@redhat.com).
+Patch14: gdb-5.3post-s390-feb2003.patch
+# patch to expedite execution of testsuite when gdb gets internal
+# error (jimb@redhat.com).
+Patch15: gdb-5.3post-interr-feb2003.patch
+# New TLS specific tests (ezannoni@redhat.com).
+Patch16: gdb-5.3post-tlstst-feb2003.patch
+# various cleanups for the gdb.threads tests
+# (drow@mvista.com, ezannoni@redhat.com).
+Patch17: gdb-5.3post-thrtst-feb2003.patch
+# Patch to deal with .debug_ranges (rth@redhat.com, ezannoni@redhat.com,
+# drow@mvista.com)
+Patch18: gdb-5.3post-dw2ranges-feb2003.patch
+# From jjohnstn@redhat.com
+Patch19: gdb-5.3post-bug81732-feb2003.patch
+# Fix for mi-ptreads tests (mec@shout.net). 
+Patch20: gdb-5.3post-mipthreads-feb2003.patch
+# Fix for dealing with files with stabs debug info, but no line info. 
+# (jjohnstn@redhat.com, ezannoni@redhat.com).
+Patch21: gdb-5.3post-stabfix-feb2003.patch
+# Fix for gdb core dump on disassembly. (ezannoni@redhat.com).
+Patch22: gdb-5.3post-s390dis-feb2003.patch
+# Fix for new kernel behavior with attach and SIGSTOP (ezannoni@redhat.com).
+Patch23: gdb-5.3post-attach-feb2003.patch
+# From jjohnstn@redhat.com
+Patch24: gdb-5.3post-jj-lwp3.patch
+# Some misc testsuite cleanups. (ezannoni@redhat.com)
+Patch25: gdb-5.3post-tests-feb2003.patch
+# Update copyright year in version.
+Patch26: gdb-5.3post-copyright-feb2003.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
 Prereq: info
 
@@ -32,6 +100,36 @@ printing their data.
 %patch2 -p1 
 %patch3 -p1 
 %patch4 -p1 
+%patch5 -p1 
+%patch6 -p1 
+%ifarch %{ix86}
+# apply the NPTL patches only on i386.
+#patch6 -p1 
+#patch7 -p1 
+#patch8 -p1 
+%endif
+%ifarch alpha ppc ia64 x86_64 s390 s390x
+# apply the rest of the misc patch only.
+#patch7 -p1 
+%endif
+%patch9 -p1 
+%patch10 -p1 
+%patch11 -p1 
+%patch12 -p1 
+%patch13 -p1 
+%patch14 -p1 
+%patch15 -p1 
+%patch16 -p1 
+%patch17 -p1 
+%patch18 -p1 
+%patch19 -p1 
+%patch20 -p1 
+%patch21 -p1 
+%patch22 -p1 
+%patch23 -p1 
+%patch24 -p1 
+%patch25 -p1 
+%patch26 -p1 
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -63,7 +161,7 @@ export CFLAGS="$RPM_OPT_FLAGS"
 # Only i386 builds with -Werror because other platforms get host header
 # files conflicts.
 enable_build_warnings=""
-%ifarch %{ix86}
+%ifarch %{ix86} alpha ia64 ppc s390 s390x
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
@@ -73,6 +171,7 @@ $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/configure \
 	--mandir=%{_mandir} \
 	--infodir=%{_infodir}\
 	$enable_build_warnings \
+        --with-separate-debug-dir=/usr/lib/debug \
     %{_target_platform}
 
 make
@@ -80,7 +179,9 @@ make info
 
 # For now do testing only on these platforms. The testsuite on x86_64 is not
 # in good shape.
-%ifarch %{ix86} alpha ppc ia64
+# FIXME disable alpha, ia64, s390, s390x, and ppc tests for moment.
+#ifarch %{ix86} alpha ppc ia64
+%ifarch %{ix86} 
 echo ====================TESTING=========================
 cd gdb/testsuite
 make -k check || :
@@ -154,6 +255,85 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Feb 24 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.18
+- Update copyright year printed in version.
+
+* Mon Feb 24 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.17
+- Refresh build.
+
+* Mon Feb 24 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.16
+- Add some testsuite cleanups, to avoid spurious test failures.
+
+* Fri Feb 21 2003 Jeff Johnston <jjohnstn@redhat.com>  0.20021129.15
+- Add patch to handle thread exiting when LD_ASSUME_KERNEL=2.4.1 which
+  fixes Bugzilla bug 84217.
+
+* Fri Feb 21 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.14
+- New patch to fix disassembly on s390. Bugzilla bug 84286.
+- New patch for attach/ptrace fix. Bugzilla bug 84220.
+- Reenable tests for x86.
+
+* Thu Feb 20 2003 Jeff Johnston <jjohnstn@redhat.com>  0.20021129.13
+- Add patch for mixed stabs with dwarf2 - bugzilla bug 84253.
+
+* Wed Feb 12 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.12
+- Disable tests also for x86.
+
+* Tue Feb 11 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.11
+- Add patch for mi threads tests.
+- Add patch for dwarf2 debug_ranges section.
+- Add patch for detach bug.
+
+* Mon Feb 10 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.10
+- Add patch for testsuite auto answering internal error queries.
+- Add new TLS tests.
+- Add cleanup patches for thread tests.
+
+* Mon Feb 03 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.9
+- Add new patch for thread support. Apply on all arches.
+- Do not apply old patches, but leave them around for now.
+- Add new patch for dwarf2 debug info reading.
+- Add new patch for dwarf2 cfi engine cleanup.
+- Add new patch for uiout problems.
+- Add new patch for s390 build.
+- Disable tests on all platforms but x86.
+
+* Mon Jan 27 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.8
+- Move all the changelog entries to a single patch.
+- Add tests to the args patch.
+- Add new patch for until command fix (bugzilla Bug 19890).
+- s390 and s390x can be built with -Werror.
+- Run make check for s390 and s390x too.
+- Include an updated version of the thread nptl patch (still WIP).
+
+* Wed Jan 15 2003 Phil Knirsch <pknirsch@redhat.com> 0.20021129.7
+- Apply the 2nd misc patch for s390 and s390x, too.
+
+* Tue Jan 14 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.6
+- Add patches for NPTL support, to be applied on i386 only.
+  (this is still WIP)
+- Split old misc patch in two parts.
+- Temporarily disable testsuite run on alpha.
+
+* Sun Jan 12 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.5
+- Add patch for --args with zero-length arguments. Fix for bug 79833.
+
+* Tue Dec 17 2002 Elliot Lee <sopwith@redhat.com> 0.20021129.4
+- The define directive to rpm is significant even if the line it is 
+  in happens to start with a '#' character. Fixed.
+
+* Fri Dec 13 2002 Elena Zannoni <ezannoni@redhat.com>  0.20021129.3
+- Merge previous patches for warnings into a single one.
+- Add changelogs to patches.
+- Add, but don't use, a macro to avoid stripping.
+
+* Fri Dec  6 2002 Elena Zannoni <ezannoni@redhat.com>
+- Add patch to allow debugging of executables with debug info stored
+  in separate files.
+- Add patch for Makefile dependencies and disable warnings for
+  building thread-db.c.
+- Re-enable building with -Werror for alpha, ia64, ppc.
+
 * Mon Dec  2 2002 Elena Zannoni <ezannoni@redhat.com>
 - Don't pass to gdb an empty build warnings flag, or that will disable warnings
   completely. We want to build using gdb's standard warnings instead.
