@@ -75,8 +75,6 @@ Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 # Get selftest working with sep-debug-info
 #Patch33: gdb-6.1post-test-self-jul2004.patch
 Patch33: broken.patch
-#Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
-Patch37: broken.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -186,7 +184,6 @@ and printing their data.
 %patch28 -p1
 
 %patch33 -p1
-%patch37 -p1
 
 %patch50 -p1
 %patch51 -p1
