@@ -56,12 +56,7 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 ####### ABI fixes and updates
 #Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
-#Broken: Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
-Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 #Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
-Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
-Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
-Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 # Get selftest working with sep-debug-info
@@ -97,12 +92,8 @@ Patch79: gdb-6.1post-constructor-nov2004.patch
 # Add --readnever hack, and gstack script
 #Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 Patch83: gdb-6.1post-gstack-nov2004.patch
-# Add PPC register groups.
-Patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 # No longer a need to set .malloc on ppc64.
 #Broken: Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
-# display and x needed to look for a section symbol.
-Patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
 # Continue removing breakpoints even when failure occurs.
 Patch87: gdb-6.1post-remove-bp-nov2004.patch
 
@@ -110,8 +101,16 @@ Patch87: gdb-6.1post-remove-bp-nov2004.patch
 Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
 Patch101: gdb-6.3-sigx86-20040621.patch
 Patch102: gdb-6.3-sigsymtramp-20040621.patch
-Patch103: gdb-6.3-sigppc-20040621.patch
+Patch103: gdb-6.3-ppcsignals-20040621.patch
 Patch104: gdb-6.3-ppcdotsolib-20041022.patch
+Patch105: gdb-6.3-ppc64syscall-20040622.patch
+Patch106: gdb-6.3-framepczero-20040927.patch
+Patch107: gdb-6.3-ppc64fpscrhack-20041026.patch
+Patch108: gdb-6.3-ppc64section-20041026.patch
+Patch109: gdb-6.3-ppcreggroups-20041124.patch
+Patch110: gdb-6.3-ppc64abi-20040621.patch
+Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
+
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -150,12 +149,13 @@ and printing their data.
 %patch102 -p1
 %patch103 -p1
 %patch104 -p1
-
-%patch21 -p1
-%patch24 -p1
-%patch25 -p1
-%patch26 -p1
-%patch28 -p1
+%patch105 -p1
+%patch106 -p1
+%patch107 -p1
+%patch108 -p1
+%patch109 -p1
+%patch110 -p1
+%patch111 -p1
 
 %patch50 -p1
 
@@ -163,8 +163,6 @@ and printing their data.
 %patch78 -p1
 %patch79 -p1
 %patch83 -p1
-%patch84 -p1
-%patch86 -p1
 %patch87 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
