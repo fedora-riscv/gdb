@@ -186,6 +186,9 @@ Patch142: gdb-6.3-terminal-fix-20050214.patch
 # Fix for unload.exp testcase
 Patch143: gdb-6.3-unload-test-20050216.patch
 
+# Backport addition symfile-mem.o to all GNU/Linux systems.
+Patch144: gdb-6.3-addsymfilemem-20050209.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -262,6 +265,7 @@ and printing their data.
 %patch141 -p1
 %patch142 -p1
 %patch143 -p1
+%patch144 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -430,6 +434,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Feb 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.28
+- Back port patch adding symfile-mem.o to all GNU/Linux builds.
+  Fix BZ 146087.
+
 * Wed Feb 16 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.27
 - Bump up release number.
 
