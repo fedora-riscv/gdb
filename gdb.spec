@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.28
+Release: 0.29
 
 License: GPL
 Group: Development/Debuggers
@@ -434,7 +434,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Mon Feb 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.28
+* Tue Feb 22 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.29
+- Modify gdb-6.3-dwattype0-20050201.patch to check for a zero address
+  and not zero unsnd.  Fix BE 32- vs 64-bit problem.
+
+* Mon Feb 21 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.28
 - Back port patch adding symfile-mem.o to all GNU/Linux builds.
   Fix BZ 146087.
 
