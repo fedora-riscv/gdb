@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.11
+Release: 0.12
 
 License: GPL
 Group: Development/Debuggers
@@ -166,6 +166,9 @@ Patch132: gdb-6.3-dtorfix-20050121.patch
 # Fix for ia64 to prevent SIGSEGV in debugger
 Patch133: gdb-6.3-ia64fix-20050121.patch
 
+# Fix to support executable moving
+Patch134: gdb-6.3-movedir-20050125.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -238,6 +241,7 @@ and printing their data.
 %patch131 -p1
 %patch132 -p1
 %patch133 -p1
+%patch134 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -406,6 +410,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jan 26 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.12
+- Fix to support examining files even when the executable moves
+- Bugzilla 142122
+
 * Wed Jan 26 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.11
 - gdb-6.3-ppcdotsyms-20050126.patch: Backport BFD changes for reading
   synthetic symbols.  Rewrite code reading elf minimal symbols so that
