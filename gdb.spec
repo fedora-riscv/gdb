@@ -98,17 +98,52 @@ Patch83: gdb-6.1post-gstack-nov2004.patch
 Patch87: gdb-6.1post-remove-bp-nov2004.patch
 
 # Add fixes starting at 100
+
+# Just issue a warning when DW_OP_piece.  Stops GDB falling on the
+# floor.
 Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
+
+# Recognize i386 signal trampolines before CFI.  Ensures that signal
+# frames are identified as signal frames.
 Patch101: gdb-6.3-sigx86-20040621.patch
+
+# Don't reject signal trampoline frames that have a [data] symbol
+# associated with them as occures when backtracing through an
+# alt-stack in the data address space.
 Patch102: gdb-6.3-sigsymtramp-20040621.patch
+
+# Add unwinders for PPC and PPC64 signal trampolines.
 Patch103: gdb-6.3-ppcsignals-20040621.patch
+
+# Use convert_from_func_ptr_addr on the solib breakpoint address;
+# simplifies and makes more consistent the logic.
 Patch104: gdb-6.3-ppcdotsolib-20041022.patch
+
+# Better parse 64-bit PPC system call prologues.
 Patch105: gdb-6.3-ppc64syscall-20040622.patch
+
+# Stop a backtrace when a zero PC is encountered.
 Patch106: gdb-6.3-framepczero-20040927.patch
+
+# Hack around broken header files that incorrectly define the FPSCR
+# macro.
 Patch107: gdb-6.3-ppc64fpscrhack-20041026.patch
+
+# Pass the pc's section into the symbol search code; stops the lookup
+# finding a symbol from the wrong section.
 Patch108: gdb-6.3-ppc64section-20041026.patch
+
+# Add PPC register groups so that info registers et.al.; along with
+# register save and restore; work better.  On PPC-64 it was restoring
+# the PS register setting the break-on-branch bit!
 Patch109: gdb-6.3-ppcreggroups-20041124.patch
+
+# Fix up 64-bit PPC inferior function calls so that function
+# parameters are passed correctly.
 Patch110: gdb-6.3-ppc64abi-20040621.patch
+
+# Include the pc's section when doing a symbol lookup so that the
+# correct symbol is found.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
 
