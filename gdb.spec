@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.23
+Release: 1.%{cvsdate}.24
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -46,6 +46,7 @@ Patch9: gdb-6.1post-linlwp-aug2004.patch
 Patch10: gdb-6.1post-sig-ppc-jun2004.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
 Patch12: gdb-6.1post-sig-x86-jun2004.patch
+Patch13: gdb-6.1post-sig-step-aug2004.patch
 
 ####### ABI fixes and updates
 Patch20: gdb-6.1post-abi-ppc64-jun2004.patch
@@ -114,6 +115,7 @@ printing their data.
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
+%patch13 -p1
 
 %patch20 -p1
 %patch21 -p1
@@ -317,6 +319,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Aug 30 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.24
+- Fix single-stepping when a signal is pending, was exiting program.
+  -- needs kernel fix so that ptrace(PT_STEP,SIG) doesn't do a PT_CONT.
+  -- sigstep.exp tests pass with this fix applied.
+
 * Mon Aug 30 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.23
 - Delete some part of gdb-6.1post-test-rh.patch, to avoid confusing
   gdb when testing itself, and loading separate debug info.
