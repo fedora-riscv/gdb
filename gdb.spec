@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.56
+Release: 1.%{cvsdate}.57
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -46,6 +46,7 @@ Patch13: gdb-6.1post-sig-step-aug2004.patch
 Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
+Patch18: gdb-6.1post-abi-i386unwind-nov2004.patch
 Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
@@ -109,6 +110,10 @@ Patch80: gdb-6.1post-infcall-step-jul2004.patch
 # Fix ia64 backtrace
 Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 
+# Add --readnever hack, and gstack script
+patch82: gdb-6.1post-readnever-nov2004.patch
+patch83: gdb-6.1post-gstack-nov2004.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -144,6 +149,7 @@ printing their data.
 %patch13 -p1
 %patch14 -p1
 
+%patch18 -p1
 %patch19 -p1
 %patch20 -p1
 %patch21 -p1
@@ -183,6 +189,8 @@ printing their data.
 %patch79 -p1
 %patch80 -p1
 %patch81 -p1
+%patch82 -p1
+%patch83 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -351,6 +359,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.57
+- Backport i386 prolog parser - better backtraces out of semop().
+- Add option --readnever to suppress the reading of symbolic debug
+  information.
+- Add script gstack.sh, installed as gstack.
+  Bugzilla 136584, 137121
+
 * Mon Nov 22 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.56
 - Bump up release number.
 
