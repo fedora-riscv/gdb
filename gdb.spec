@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.57
+Release: 1.%{cvsdate}.58
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -114,6 +114,9 @@ Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 patch82: gdb-6.1post-readnever-nov2004.patch
 patch83: gdb-6.1post-gstack-nov2004.patch
 
+# Add PPC register groups.
+patch84: gdb-6.1post-ppcreggroups-nov2004.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -191,6 +194,7 @@ printing their data.
 %patch81 -p1
 %patch82 -p1
 %patch83 -p1
+%patch84 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -359,6 +363,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Nov 24 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.58
+- Add rs6000 reggroups; fixes problem of PS register being trashed
+  causing mysterious branch breakpoints.
+
 * Tue Nov 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.57
 - Backport i386 prolog parser - better backtraces out of semop().
 - Add option --readnever to suppress the reading of symbolic debug
