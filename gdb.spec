@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.10
+Release: 0.11
 
 License: GPL
 Group: Development/Debuggers
@@ -151,8 +151,8 @@ Patch127: gdb-6.3-ppccfi-20041104.patch
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 
-# Add PPC .symbols to min-symtable.
-Patch129: gdb-6.3-ppcdotsym-20050120.patch
+# Add synthetic symbols (esp PPC-64 .symbols) to min symtab
+Patch129: gdb-6.3-ppcdotsym-20050126.patch
 
 # Add PPC .symbols to min-symtable.
 Patch130: gdb-6.3-ctorline-20050120.patch
@@ -233,8 +233,7 @@ and printing their data.
 
 %patch127 -p1
 %patch128 -p1
-# Disabled, gives wierd BFD error
-# %patch129 -p1
+%patch129 -p1
 %patch130 -p1
 %patch131 -p1
 %patch132 -p1
@@ -407,6 +406,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jan 26 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.11
+- gdb-6.3-ppcdotsyms-20050126.patch: Backport BFD changes for reading
+  synthetic symbols.  Rewrite code reading elf minimal symbols so that
+  it includes synthetics.
+
 * Fri Jan 21 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.10
 - Fix to prevent resetting unwind kernel table size to invalid value
   when debugging a core file
