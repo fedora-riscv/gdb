@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.41
+Release: 1.%{cvsdate}.42
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -51,6 +51,7 @@ Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
 Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
+Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 Patch30: gdb-6.1post-test-merge-20040923.patch
@@ -137,6 +138,7 @@ printing their data.
 %patch22 -p1
 %patch23 -p1
 %patch24 -p1
+%patch25 -p1
 
 %patch30 -p1
 %patch31 -p1
@@ -245,11 +247,8 @@ ld -v
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
-make -k check RUNTESTFLAGS='\
---ignore bigcore.exp \
---ignore attach-pie \
---ignore asm-source.exp \
-' || :
+# Need to use a single --ignore option, second use overrides first.
+make -k check RUNTESTFLAGS='--ignore bigcore.exp\ attach-pie.exp\ asm-source.exp' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -341,6 +340,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Oct 22 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.42
+- For 64-bit PPC, convert _dl_debug_state descriptor into a code address.
+- Fix --ignore option.
+
 * Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.40
 - Disable attach-pie.exp test, hangs on amd64 without auxv.
 - Move pie tests to pie.
