@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.46
+Release: 1.%{cvsdate}.47
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -46,6 +46,7 @@ Patch13: gdb-6.1post-sig-step-aug2004.patch
 Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
+Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
@@ -139,6 +140,7 @@ printing their data.
 %patch13 -p1
 %patch14 -p1
 
+%patch19 -p1
 %patch20 -p1
 %patch21 -p1
 %patch22 -p1
@@ -351,6 +353,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 09 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.47
+- Enable PPC CFI.
+
 * Mon Nov 08 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.46
 - Bump up release number
 
