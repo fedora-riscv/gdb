@@ -54,6 +54,8 @@ Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
 Patch27: gdb-6.1post-abi-s390rewrite-oct2004.patch
+Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
+Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 Patch30: gdb-6.1post-test-merge-20040923.patch
@@ -143,6 +145,8 @@ printing their data.
 %patch25 -p1
 %patch26 -p1
 %patch27 -p1
+%patch28 -p1
+%patch29 -p1
 
 %patch30 -p1
 %patch31 -p1
@@ -252,7 +256,7 @@ ld -v
 echo ====================TESTING=========================
 cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
-make -k check RUNTESTFLAGS='--ignore bigcore.exp\ attach-pie.exp\ asm-source.exp' || :
+make -k check RUNTESTFLAGS='--ignore bigcore.exp\ attach-pie.exp\ asm-source.exp\ sigstep.exp' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -347,6 +351,9 @@ fi
 * Tue Oct 26 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.43
 - Hack around broken PT_FPSCR defined in headers.
 - Import latest s390 fixes.
+- Disable sigstep.exp - s390 has problems.
+- Use PC's symtab when looking for a symbol.
+- Work around DW_OP_piece.
 
 * Fri Oct 22 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.42
 - For 64-bit PPC, convert _dl_debug_state descriptor into a code address.
