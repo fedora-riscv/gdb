@@ -1,9 +1,9 @@
-%define cvsversion 5.1.90_20020404
+%define cvsversion 5.1.90_20020411
 
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 Version: 5.1.90CVS
-Release: 4
+Release: 5
 License: GPL
 Group: Development/Debuggers
 #Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
@@ -90,6 +90,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-5
+- Update to current
+
 * Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-4
 - Update to current
 
