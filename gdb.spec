@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.5
+Release: 0.6
 
 License: GPL
 Group: Development/Debuggers
@@ -151,6 +151,9 @@ Patch127: gdb-6.3-ppccfi-20041104.patch
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 
+# Add PPC .symbols to min-symtable.
+Patch129: gdb-6.3-ppcdotsym-20050120.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -218,6 +221,7 @@ and printing their data.
 
 %patch127 -p1
 %patch128 -p1
+%patch129 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -386,6 +390,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.6
+- Rebuild.
+
 * Thu Jan 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.5
 - Use bfd_get_synthetic_symtab to read in any synthetic symbols
   such as 64-bit PPC's ".symbol"s.
