@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.61
+Release: 1.%{cvsdate}.62
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -367,6 +367,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Nov 28 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.62
+- Bump version for RHEL4 build.
+
 * Wed Nov 24 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.61
 - For PPC-64, fix search for a symbol (wasn't specifying the section).
 
