@@ -65,9 +65,6 @@ Patch78: gdb-6.1post-backtrace-nov2004.patch
 # Fix to expose multiple constructors to end-user
 Patch79: gdb-6.1post-constructor-nov2004.patch
 
-# Fix panic when stepping an solib call
-# Fix ia64 backtrace
-#Broken: Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 # Add --readnever hack, and gstack script
 #Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 Patch83: gdb-6.1post-gstack-nov2004.patch
@@ -131,6 +128,9 @@ Patch112: gdb-6.3-thread-step-20041207.patch
 # Threaded watchpoint support
 Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
 
+# Multiple patches to ia64 backtrace
+Patch114: gdb-6.3-ia64-backtrace-20041213.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -177,6 +177,7 @@ and printing their data.
 %patch111 -p1
 %patch112 -p1
 %patch113 -p1
+%patch114 -p1
 
 %patch50 -p1
 
