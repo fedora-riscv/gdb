@@ -58,12 +58,6 @@ Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
 
-# Add threaded watchpoint support
-#Broken: Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
-# Fix for thread_db_get_lwp
-#Broken: Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
-# Fix for S/390 watchpoints under threads.
-#Broken: Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
 # Fix for caching thread lwps for linux
 Patch77: gdb-6.1post-lwp-cache-oct2004.patch
 # Fix for allowing macros to continue after backtrace errors
@@ -134,6 +128,9 @@ Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 # Fix stepping in threads
 Patch112: gdb-6.3-thread-step-20041207.patch
 
+# Threaded watchpoint support
+Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -179,6 +176,7 @@ and printing their data.
 %patch110 -p1
 %patch111 -p1
 %patch112 -p1
+%patch113 -p1
 
 %patch50 -p1
 
