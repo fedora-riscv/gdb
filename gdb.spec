@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.24
+Release: 1.%{cvsdate}.26
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -52,6 +52,7 @@ Patch13: gdb-6.1post-sig-step-aug2004.patch
 Patch20: gdb-6.1post-abi-ppc64-jun2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
+Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 Patch30: gdb-6.1post-test-rh.patch
@@ -77,6 +78,8 @@ Patch60: gdb-6.1post-o-largefile-jul2004.patch
 
 # Fix crasher in symtab
 Patch70: gdb-6.1post-symtab-bob-jul2004.patch
+# Add java inferior call support
+Patch71: gdb-6.1post-java-infcall-aug2004.patch
 
 # Fix panic when stepping an solib call
 Patch80: gdb-6.1post-infcall-step-jul2004.patch
@@ -120,6 +123,7 @@ printing their data.
 %patch20 -p1
 %patch21 -p1
 %patch22 -p1
+%patch23 -p1
 
 %patch30 -p1
 %patch31 -p1
@@ -140,6 +144,7 @@ printing their data.
 
 %patch60 -p1
 %patch70 -p1
+%patch71 -p1
 %patch80 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
@@ -319,6 +324,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Aug 30 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.26
+- Add java inferior call support
+
+* Mon Aug 30 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.25
+- Convert "main" the function descriptor, into an address.
+
 * Mon Aug 30 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.24
 - Fix single-stepping when a signal is pending, was exiting program.
   -- needs kernel fix so that ptrace(PT_STEP,SIG) doesn't do a PT_CONT.
