@@ -1,17 +1,24 @@
-%define cvsdate 20040607
-# Define this if you want to skip the strip step and preserve debug info.
-# Useful for testing. 
-#define __spec_install_post /usr/lib/rpm/brp-compress || :
-Summary: A GNU source-level debugger for C, C++ and other languages.
+# Define this if you want to skip the strip step and preserve debug
+# info.  Useful for testing.
+#%define __spec_install_post /usr/lib/rpm/brp-compress || :
+
+Summary: A GNU source-level debugger for C, C++, Java and other languages.
 Name: gdb
-# Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
-Version: 6.1post
-Release: 1.%{cvsdate}.63
+
+# Set version to contents of gdb/version.in.
+Version: 6.3
+
+%define gdb_src gdb-%{version}
+%define gdb_build gdb-%{version}-build-%{_target_platform}
+
+# The release always contains a leading reserved number, start it at 0.
+Release: 0.0.0
+
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
+Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.3.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
-URL: http://sources.redhat.com/gdb/
+URL: http://gnu.org/software/gdb/
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -19,85 +26,116 @@ URL: http://sources.redhat.com/gdb/
 Obsoletes: gdb64
 %endif
 
+# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch
+# and include the ChangeLog.RedHat change-log entry.
+
+# FIXME:
+# Create an empty ChangeLog.RedHat
+
+# ------------------------------------------
+
 # ChangeLogs patches.
-Patch0: gdb-6.1post-ChangeLog.patch
+#N/A: Patch0: gdb-6.1post-ChangeLog.patch
 # ChangeLogs patches for doc.
-Patch2: gdb-6.1post-ChangeLog-doc.patch
+#N/A: Patch2: gdb-6.1post-ChangeLog-doc.patch
 ####### start patches from the previous RPM.
 # Silence gcc warnings.
-Patch4: gdb-6.1post-gccwarn.patch
+#N/A: Patch4: gdb-6.1post-gccwarn.patch
 
 ####### end patches from the previous RPM.
 
 # Fix watchpoint support.
-Patch5: gdb-6.1post-watchpoint-fix.patch
+#Patch5: gdb-6.1post-watchpoint-fix.patch
+Patch5: broken.patch
 # Thread fix.
-Patch6: gdb-6.1post-thread-fix.patch
+#Patch6: gdb-6.1post-thread-fix.patch
+Patch6: broken.patch
 # Fix to allow using libunwind 0.97 and up.
-Patch8: gdb-6.1post-libunwind.patch
+#Patch8: gdb-6.1post-libunwind.patch
+Patch8: broken.patch
 # Fix to support applications calling clone directly
-Patch9: gdb-6.1post-linlwp-aug2004.patch
+#Patch9: gdb-6.1post-linlwp-aug2004.patch
+Patch9: broken.patch
 
 ####### Signal trampoline fixes
-Patch10: gdb-6.1post-sig-ppc-jun2004.patch
+#Patch10: gdb-6.1post-sig-ppc-jun2004.patch
+Patch10: broken.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
 Patch12: gdb-6.1post-sig-x86-jun2004.patch
-Patch13: gdb-6.1post-sig-step-aug2004.patch
-Patch14: gdb-6.1post-sig-infrun-sep2004.patch
+#Merged: Patch13: gdb-6.1post-sig-step-aug2004.patch
+#Merged: Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
-Patch18: gdb-6.1post-abi-i386unwind-nov2004.patch
-Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
-Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
+#Merged: Patch18: gdb-6.1post-abi-i386unwind-nov2004.patch
+#Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
+Patch19: broken.patch
+#Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
+Patch20: broken.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
-Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
-Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
+#Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
+Patch22: broken.patch
+#Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
+Patch23: broken.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
-Patch27: gdb-6.1post-abi-s390rewrite-oct2004.patch
+#Merged: Patch27: gdb-6.1post-abi-s390rewrite-oct2004.patch
 Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
-Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
+#Merged: Patch29: gdb-6.1post-op-piece-warn-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
-Patch30: gdb-6.1post-test-merge-20040923.patch
+#Merged: Patch30: gdb-6.1post-test-merge-20040923.patch
 # Work around out-of-date dejagnu that does not have kfail
 Patch31: gdb-6.1post-test-rh-kfail.patch
 # Match Red Hat version info
 Patch32: gdb-6.1post-test-rh-version.patch
 # Get selftest working with sep-debug-info
-Patch33: gdb-6.1post-test-self-jul2004.patch
+#Patch33: gdb-6.1post-test-self-jul2004.patch
+Patch33: broken.patch
 # Check that libunwind works - new test then fix
 Patch34: gdb-6.1post-test-rh-libunwind.patch
 Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
 # Generate the bigcore file from the running inferior et.al.
-Patch36: gdb-6.1post-test-bigcoresingle-sep2004.patch
-Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
+#Patch36: gdb-6.1post-test-bigcoresingle-sep2004.patch
+Patch36: broken.patch
+#Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
+Patch37: broken.patch
 # Fix comment bug in sigstep.exp
-Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
+#Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
+Patch38: broken.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
-Patch51: gdb-6.1post-pie-jul2004.patch
-Patch52: gdb-6.1post-test-pie-nov2004.patch
+#Patch51: gdb-6.1post-pie-jul2004.patch
+Patch51: broken.patch
+#Patch52: gdb-6.1post-test-pie-nov2004.patch
+Patch52: broken.patch
 
 ##### Bigcore tweak
-Patch60: gdb-6.1post-o-largefile-jul2004.patch
+#Patch60: gdb-6.1post-o-largefile-jul2004.patch
+Patch60: broken.patch
 
 # Fix crasher in symtab
-Patch70: gdb-6.1post-symtab-bob-jul2004.patch
+#Patch70: gdb-6.1post-symtab-bob-jul2004.patch
+Patch70: broken.patch
 # Add java inferior call support
-Patch71: gdb-6.1post-java-infcall-aug2004.patch
+#Patch71: gdb-6.1post-java-infcall-aug2004.patch
+Patch71: broken.patch
 # Add support for manually loaded/unloaded shlibs.
-Patch72: gdb-6.1post-unload-aug2004.patch
+#Patch72: gdb-6.1post-unload-aug2004.patch
+Patch72: broken.patch
 # Fix stepping in threads
-Patch73: gdb-6.1post-thread-step-sep2004.patch
+#Patch73: gdb-6.1post-thread-step-sep2004.patch
+Patch73: broken.patch
 # Add threaded watchpoint support
-Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
+#Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
+Patch74: broken.patch
 # Fix for thread_db_get_lwp
-Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
+#Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
+Patch75: broken.patch
 # Fix for S/390 watchpoints under threads.
-Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
+#Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
+Patch76: broken.patch
 # Fix for caching thread lwps for linux
 Patch77: gdb-6.1post-lwp-cache-oct2004.patch
 # Fix for allowing macros to continue after backtrace errors
@@ -106,20 +144,26 @@ Patch78: gdb-6.1post-backtrace-nov2004.patch
 Patch79: gdb-6.1post-constructor-nov2004.patch
 
 # Fix panic when stepping an solib call
-Patch80: gdb-6.1post-infcall-step-jul2004.patch
+#Patch80: gdb-6.1post-infcall-step-jul2004.patch
+Patch80: broken.patch
 # Fix ia64 backtrace
-Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
+#Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
+Patch81: broken.patch
 # Add --readnever hack, and gstack script
-patch82: gdb-6.1post-readnever-nov2004.patch
-patch83: gdb-6.1post-gstack-nov2004.patch
+#Patch82: gdb-6.1post-readnever-nov2004.patch
+Patch82: broken.patch
+Patch83: gdb-6.1post-gstack-nov2004.patch
 # Add PPC register groups.
-patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
+Patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 # No longer a need to set .malloc on ppc64.
-patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
+#Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
+Patch85: broken.patch
 # display and x needed to look for a section symbol.
-patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
+Patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
 # Continue removing breakpoints even when failure occurs.
-patch87: gdb-6.1post-remove-bp-nov2004.patch
+Patch87: gdb-6.1post-remove-bp-nov2004.patch
+
+# Add fixes starting at 100
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -135,17 +179,22 @@ Prereq: info
 
 %description
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
-and other languages, by executing them in a controlled fashion and
-printing their data.
+Java, and other languages, by executing them in a controlled fashion
+and printing their data.
 
 %prep
-# This allows the tarball name to be different from our version-release name.
-%setup -q -n gdb+dejagnu-%{cvsdate}
+
+# This allows the tarball name to be different from our
+# version-release name.
+
+%setup -q -n %{gdb_src}
 
 # Apply patches defined above.
-%patch0 -p1 
-%patch2 -p1 
-%patch4 -p1
+
+# Apply patches defined above.
+#%patch0 -p1 
+#%patch2 -p1 
+#%patch4 -p1
 %patch5 -p1
 %patch6 -p1
 %patch8 -p1
@@ -209,11 +258,8 @@ cat > gdb/version.in << _FOO
 Red Hat Linux (%{version}-%{release}rh)
 _FOO
 
-# We don't need these. We'll test with the installed versions of
-# expect/dejagnu.
-rm -fr dejagnu tcl expect
-
-# Also remove the info files that are generated in the FSF snapshot process.
+# Remove the info and other generated files added by the FSF release
+# process.
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
 
@@ -227,19 +273,22 @@ rm -f gdb/gdbserver/config.h
 
 %build
 
-# Identify the build directory with the version of gdb as well as
-# the architecture, to allow for mutliple versions to be installed and built.
+# Initially we're in the %{gdb_src} directory.
 cd ..
-rm -fr gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
-mkdir gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
-cd gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
 
-# FIXME: The configure option
-# --enable-gdb-build-warnings=,-Werror below can conflict with
-# user settings. For instance, passing a combination of -Wall and -O0
-# from the file rpmrc will always cause at least one warning, and stop
-# the compilation.
-# The whole configury line needs to be cleaned up.
+# Identify the build directory with the version of gdb as well as the
+# architecture, to allow for mutliple versions to be installed and
+# built.
+
+rm -fr %{gdb_build}
+mkdir %{gdb_build}
+cd %{gdb_build}
+
+# FIXME: The configure option --enable-gdb-build-warnings=,-Werror
+# below can conflict with user settings. For instance, passing a
+# combination of -Wall and -O0 from the file rpmrc will always cause
+# at least one warning, and stop the compilation.  The whole configury
+# line needs to be cleaned up.
 
 export CFLAGS="$RPM_OPT_FLAGS"
 
@@ -248,7 +297,7 @@ enable_build_warnings=""
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
-../gdb+dejagnu-%{cvsdate}/configure \
+../%{gdb_src}/configure \
 	--prefix=%{_prefix} \
 	--sysconfdir=%{_sysconfdir} \
 	--mandir=%{_mandir} \
@@ -303,7 +352,7 @@ cd ..
 cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/NEWS $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}
 
 %install
-cd ../gdb+dejagnu-%{version}_%{cvsdate}-build-%{_target_platform}
+cd ../%{gdb_build}
 rm -rf $RPM_BUILD_ROOT
 
 %makeinstall
@@ -370,6 +419,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Dec 01 2004 Andrew Cagney <cagney@redhat.com>	6.3-0.0
+- Import GDB 6.3, get building, add all patches.
+
 * Tue Nov 30 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.63
 - When removing breakpoints, continue removing breakpoints even if an
   error occurs on the list.
