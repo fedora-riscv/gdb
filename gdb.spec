@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.9
+Release: 1.10
 
 License: GPL
 Group: Development/Debuggers
@@ -204,6 +204,10 @@ Patch148: gdb-6.3-inheritance-20050324.patch
 # Add vsyscall page support for ia64.
 Patch149: gdb-6.3-ia64-vsyscall-20050330.patch
 
+# Print a warning when the separate debug info's CRC doesn't match.
+Patch150: gdb-6.3-test-sepcrc-20050402.patch
+Patch151: gdb-6.3-sepcrc-20050402.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -286,6 +290,8 @@ and printing their data.
 %patch147 -p1
 %patch148 -p1
 %patch149 -p1
+%patch150 -p1
+%patch151 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -454,6 +460,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Apr 2 2005 Andrew Cagney <cagney@redhat.com>   	6.3.0.0-1.10
+- Print a warning when the separate debug info's CRC doen't match;
+  test.
+
 * Wed Mar 30 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.9
 - Bump up release number.
 
