@@ -1,72 +1,45 @@
-%define cvsdate 20040223
+%define cvsdate 20040607
 # Define this if you want to skip the strip step and preserve debug info.
 # Useful for testing. 
 #define __spec_install_post /usr/lib/rpm/brp-compress || :
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-# Daily snapshot of gdb taken from FSF mainline cvs, after the 6.0 branchpoint.
-Version: 6.0post
-Release: 0.%{cvsdate}.19
+# Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
+Version: 6.1post
+Release: 0.%{cvsdate}.2.1
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040223.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
-%ifarch ppc ppc64
+%ifarch ppc64
 Obsoletes: gdb64
 %endif
 
 # ChangeLogs patches.
-Patch0: gdb-6.0post-ChangeLog.patch
+Patch0: gdb-6.1post-ChangeLog.patch
 # ChangeLogs patches for testsuite.
-Patch1: gdb-6.0post-ChangeLog-testsuite.patch
-####### start jumbo mainline patch
-Patch2: gdb-6.0post-sync61-20040308.patch
+Patch1: gdb-6.1post-ChangeLog-testsuite.patch
 ####### start patches from the previous RPM.
-# patch from previous release.
-Patch3: gdb-6.0post-symtab.patch
 # Changes to the testsuite that are Red Hat specific.
-Patch4: gdb-6.0post-testsuite.patch
-# Accept multiple outputs from backtrace.
-Patch5: gdb-6.0post-linuxdp-tst.patch
+Patch2: gdb-6.1post-testsuite.patch
 # New test to see if libunwind is used. (Red Hat specific)
-Patch6: gdb-6.0post-libunwind-tst.patch
+Patch3: gdb-6.1post-libunwind-tst.patch
+# Silence gcc warnings.
+Patch4: gdb-6.1post-gccwarn.patch
 ####### end patches from the previous RPM.
-# Some -Wunused warnings fixes
-Patch7: gdb-6.0post-warnings-feb2004.patch
-# Fix some regressions on x86-64
-Patch8: gdb-6.0post-frame-feb2004.patch
-# 32x64 corefile and thread support
-Patch9: gdb-6.0post-ppc64regsets-mar2004.patch
-# 32x54 register values (zero extend)
-Patch10: gdb-6.0post-ppc64uregs-mar2004.patch
-# Better prologue skipping
-Patch11: gdb-6.0post-ppc64prologue-mar2004.patch
-# Patch to fix new thread recognition
-Patch12: gdb-6.0post-thread-fix-mar2004.patch
-# Patch to add pie support to gdb.
-Patch13: gdb-6.0post-pie-mar2004.patch
-# Specific pie tests
-Patch14:gdb-6.0post-pie-tst-mar2004.patch
-# patch to delete some leftover printfs....
-Patch15: gdb-6.0post-pie2-mar2004.patch
-# Fix some gcc3.4 warnings.
-Patch16: gdb-6.0post-gcc34warn-mar2004.patch
-# Some testsuite fixes (RH specific)
-Patch17: gdb-6.0post-test-mar2004.patch
-# Fix for ia64 info frame
-Patch18: gdb-6.0post-ia64-info-frame-apr2004.patch
-# Fix for threads
-Patch19: gdb-6.0post-thread-fix-apr2004.patch
+# Sync up testsuite, contains i386 KFAIL fixes
+Patch5: gdb-6.1post-testsuite-20040611.patch
+
+BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 
 %ifarch ia64
-BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind
-%else
-BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
+Requires: libunwind >= 0.96-3
 %endif
+ 
 Prereq: info
 
 %description
@@ -85,20 +58,6 @@ printing their data.
 %patch3 -p1 
 %patch4 -p1 
 %patch5 -p1 
-%patch6 -p1 
-%patch7 -p1 
-%patch8 -p1 
-%patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
-%patch13 -p1
-%patch14 -p1
-%patch15 -p1
-%patch16 -p1
-%patch17 -p1
-%patch18 -p1
-%patch19 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -116,6 +75,8 @@ rm -f gdb/doc/*.info-*
 
 # ... and remove the objective-c testcases -- no objective-c
 rm -fr gdb/testsuite/gdb.objc                                                                                
+# ... and remove the ada testcases -- no ada support at all.
+rm -fr gdb/testsuite/gdb.ada                                                                                
 # FIXME: remove gdb/gdbserver/config.h from the snapshot. Suspect a bug
 # in the FSF snapshot process.
 rm -f gdb/gdbserver/config.h
@@ -261,6 +222,23 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jun 11 2004 Andrew Cagney <cagney@redhat.com>	0.200400607.2.1
+- Import latest testsuite changes.  Fixes bogus KFAILs in
+  structs.exp.
+
+* Thu Jun 10 2004 Elena Zannoni <ezannoni@redhat.com>	0.200400607.2
+- Fix Requires and BuildRequires for libunwind dependencies.
+- Add patch to silence gcc3.4 warnings.
+
+* Wed Jun 09 2004 Elena Zannoni <ezannoni@redhat.com>	0.200400607.1
+- New import: revamp everything. Remove all patches for now.
+- Update the Requires and BuildRequires sections.
+- Removed stupid Ada testcases (there is no ada support in gdb yet).
+
+* Mon May 10 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.20
+- Disable PIE again.
+- obsolete gdb64 only if on ppc64.
+
 * Mon May 03 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.19
 - Add -u parameter to build ChangeLog patch.
 
