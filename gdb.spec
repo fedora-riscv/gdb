@@ -51,10 +51,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 #Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 #Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 ###### Testsuite merge, fixes, and local RH hack
-# Get selftest working with sep-debug-info
-#Broken: Patch33: gdb-6.1post-test-self-jul2004.patch
-# Add --readnever hack, and gstack script
-#Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 # No longer a need to set .malloc on ppc64.
 #Broken: Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
 
@@ -147,6 +143,9 @@ Patch123: gdb-6.3-test-pie-20050107.patch
 # Pie support
 Patch124: gdb-6.3-pie-20050110.patch
 
+# Get selftest working with sep-debug-info
+Patch125: gdb-6.3-test-self-20050110.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -207,6 +206,8 @@ and printing their data.
 %patch122 -p1
 %patch123 -p1
 %patch124 -p1
+
+%patch125 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
