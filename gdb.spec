@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.48
+Release: 1.%{cvsdate}.49
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -356,6 +356,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 09 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.49
+- Bump up release number
+
 * Tue Nov 09 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.48
 - Expose $base, $allocate constructors and $delete, $base destructors
   for breakpoints.
