@@ -115,7 +115,7 @@ patch82: gdb-6.1post-readnever-nov2004.patch
 patch83: gdb-6.1post-gstack-nov2004.patch
 
 # Add PPC register groups.
-patch84: gdb-6.1post-ppcreggroups-nov2004.patch
+patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
