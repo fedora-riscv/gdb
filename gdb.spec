@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.12
+Release: 0.13
 
 License: GPL
 Group: Development/Debuggers
@@ -169,6 +169,9 @@ Patch133: gdb-6.3-ia64fix-20050121.patch
 # Fix to support executable moving
 Patch134: gdb-6.3-movedir-20050125.patch
 
+# Fix to support unwinding syscalls in ia64 corefiles
+Patch135: gdb-6.3-ia64-corefile-fix-20050127.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -242,6 +245,7 @@ and printing their data.
 %patch132 -p1
 %patch133 -p1
 %patch134 -p1
+%patch135 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -410,6 +414,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 27 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.13
+- Fix to allow ia64 gdb to backtrace from syscalls in a corefile.
+- Bugzilla 145092.
+
 * Wed Jan 26 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.12
 - Fix to support examining files even when the executable moves
 - Bugzilla 142122
