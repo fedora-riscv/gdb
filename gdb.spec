@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.3
+Release: 1.6
 
 License: GPL
 Group: Development/Debuggers
@@ -198,6 +198,9 @@ Patch146: gdb-6.3-follow-vfork-20050303.patch
 # Fix unexpected compiler warning messages.
 Patch147: gdb-6.3-warnings-20050317.patch
 
+# Fix printing of inherited members
+Patch148: gdb-6.3-inheritance-20050324.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -278,6 +281,7 @@ and printing their data.
 %patch145 -p1
 %patch146 -p1
 %patch147 -p1
+%patch148 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -446,6 +450,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 24 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-1.6
+- Bump up release number.
+
+* Thu Mar 24 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-1.4
+- Fix printing of inherited members of C++ classes.
+- Fix for Bugzilla 146835.
+
 * Tue Mar 22 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-1.3
 - Bump up release number.
 
