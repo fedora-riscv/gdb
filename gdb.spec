@@ -1,35 +1,26 @@
-%define snapdate 20010516
-
-Summary: A GNU source-level debugger for C, C++ and Fortran.
+Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.0rh
-Release: 9
-Copyright: GPL
+Version: 5.1
+Release: 0.71
+License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/gdb+dejagnu-%{snapdate}.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
+Patch0: jakub-gcc31-gdb.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
-BuildRequires: perl 
-%ifnarch ia64
-BuildPrereq: compat-glibc
-%endif
+BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
 Prereq: info
 
 %description
-Gdb is a full featured, command driven debugger. Gdb allows you to
-trace the execution of programs and examine their internal state at
-any time.  Gdb works for C and C++ compiled with the GNU C compiler
-gcc.
-
-If you are going to develop C and/or C++ programs and use the GNU gcc
-compiler, you may want to install gdb to help you debug your
-programs.
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+and other languages, by executing them in a controlled fashion and
+printing their data.
 
 %prep
-%setup -q -n gdb+dejagnu-%{snapdate}
+%setup -q 
+%patch0 -p1 -b .dwarfpatch
 
-#perl -pi -e "s/^VERSION.*$/VERSION=5\.0rh-%{release} Red Hat Linux 7\.1/" gdb/Makefile.in
 cat > gdb/version.in << _FOO
-Red Hat Linux 7.x (%{version}-%{release})
+Red Hat Linux (%{version}-%{release})
 _FOO
 
 
@@ -50,13 +41,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %makeinstall infodir=$RPM_BUILD_ROOT/${_infodir} prefix=$RPM_BUILD_ROOT/usr
 
-
-#make install-info infodir=$RPM_BUILD_ROOT/${_infodir}
 # The above is broken, do this for now:
 mkdir -p $RPM_BUILD_ROOT/%{_infodir}
 cp `find -name "*.info*"` $RPM_BUILD_ROOT/%{_infodir}
-
-
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir $RPM_BUILD_ROOT%{_infodir}/dir.info* 
 
@@ -65,21 +52,25 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir $RPM_BUILD_ROOT%{_infodir}/dir.info*
 rm -f $RPM_BUILD_ROOT%{_infodir}/bfd* $RPM_BUILD_ROOT%{_infodir}/standard*
 rm -rf $RPM_BUILD_ROOT/usr/include/  $RPM_BUILD_ROOT/usr/lib/lib{bfd*,opcodes*}
 
-gzip -9f $RPM_BUILD_ROOT%{_infodir}/*
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
-/sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir
-/sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir
-/sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir
+[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir || :
+[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
+[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info %{_infodir}/mmalloc.info %{_infodir}/dir || :
+[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
+[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info %{_infodir}/stabs.info %{_infodir}/dir  || :
+[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
 
 %preun
 if [ $1 = 0 ]; then
-    /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir
-    /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir
-    /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir
+	[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info --delete %{_infodir}/gdb.info %{_infodir}/dir  || :
+	[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
+	[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info --delete %{_infodir}/mmalloc.info %{_infodir}/dir  || :
+	[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
+	[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info --delete %{_infodir}/stabs.info %{_infodir}/dir  || :
+	[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
 fi
 
 %files
@@ -93,8 +84,58 @@ fi
 
 # don't include the files in include, they are part of binutils
 
-
 %changelog
+* Mon Nov 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-0.71
+- 5.1
+
+* Mon Nov 19 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.94-0.71
+- 5.0.94. Almost there....
+
+* Mon Nov 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.93-2
+- Add patch from jakub@redhat.com to improve handling of DWARF
+
+* Mon Nov 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.93-1
+- 5.0.93 
+- handle missing info pages in post/pre scripts
+
+* Wed Oct 31 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.92-1
+- 5.0.92
+
+* Fri Oct 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.91rh-1
+- New snapshot
+- Use the 5.0.91 versioning from the snapshot
+
+* Wed Oct 17 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-17
+- New snapshot
+
+* Thu Sep 27 2001 Trond Eivind Glomsrød <teg@redhat.com> 
+- New snapshot
+
+* Wed Sep 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-16
+- New snapshot 
+
+* Mon Aug 13 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-15
+- Don't buildrequire compat-glibc (#51690)
+
+* Thu Aug  9 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot, from the stable branch eventually leading to gdb 5.1
+
+* Mon Jul 30 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- s/Copyright/License/
+- Add texinfo to BuildRequires
+
+* Mon Jun 25 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot
+
+* Fri Jun 15 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot
+- Add ncurses-devel to buildprereq
+- Remove perl from buildprereq, as gdb changed the way 
+  version strings are generated
+
+* Thu Jun 14 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot
+
 * Wed May 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
 - New snapshot - this had thread fixes for curing #39070
 - New way of specifying version
