@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.8
+Release: 1.%{cvsdate}.17.1
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -31,6 +31,11 @@ Patch4: gdb-6.1post-gccwarn.patch
 
 ####### end patches from the previous RPM.
 
+# Fix watchpoint support.
+Patch5: gdb-6.1post-watchpoint-fix.patch
+# Thread fix.
+Patch6: gdb-6.1post-thread-fix.patch
+
 ####### Signal trampoline fixes
 Patch10: gdb-6.1post-sig-ppc-jun2004.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
@@ -39,6 +44,7 @@ Patch12: gdb-6.1post-sig-x86-jun2004.patch
 ####### ABI fixes and updates
 Patch20: gdb-6.1post-abi-ppc64-jun2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
+Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 Patch30: gdb-6.1post-test-rh.patch
@@ -50,8 +56,29 @@ Patch35: gdb-6.1post-test-enadisbr-jun2004.patch
 Patch36: gdb-6.1post-test-observer-jun2004.patch
 Patch37: gdb-6.1post-test-bigcore-jun2004.patch
 Patch38: gdb-6.1post-test-sigbpt-jun2004.patch
+Patch39: gdb-6.1post-test-annota-jun2004.patch
+Patch40: gdb-6.1post-test-attach-jun2004.patch
 
+##### VSYSCALL and PIE
+Patch50: gdb-6.1post-vsyscall-jul2004.patch
+Patch51: gdb-6.1post-pie-jul2004.patch
+Patch52: gdb-6.1post-pie-tst-jul2004.patch
+
+##### Bigcore tweak
+Patch60: gdb-6.1post-o-largefile-jul2004.patch
+
+# Fix crasher in symtab
+Patch70: gdb-6.1post-symtab-bob-jul2004.patch
+
+# Fix panic when stepping an solib call
+Patch80: gdb-6.1post-infcall-step-jul2004.patch
+
+%ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
+%else
+#BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
+BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
+%endif
 
 %ifarch ia64
 Requires: libunwind >= 0.96-3
@@ -73,6 +100,8 @@ printing their data.
 %patch1 -p1 
 %patch3 -p1 
 %patch4 -p1
+%patch5 -p1
+%patch6 -p1
 
 %patch10 -p1
 %patch11 -p1
@@ -80,6 +109,7 @@ printing their data.
 
 %patch20 -p1
 %patch21 -p1
+%patch22 -p1
 
 %patch30 -p1
 %patch31 -p1
@@ -90,6 +120,16 @@ printing their data.
 %patch36 -p1
 %patch37 -p1
 %patch38 -p1
+%patch39 -p1
+%patch40 -p1
+
+%patch50 -p1
+%patch51 -p1
+%patch52 -p1
+
+%patch60 -p1
+%patch70 -p1
+%patch80 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -112,6 +152,9 @@ rm -fr gdb/testsuite/gdb.ada
 # FIXME: remove gdb/gdbserver/config.h from the snapshot. Suspect a bug
 # in the FSF snapshot process.
 rm -f gdb/gdbserver/config.h
+
+# FIXME: remove bigcore.exp
+rm -f gdb/testsuite/gdb.base/bigcore.exp
 
 %build
 
@@ -265,6 +308,40 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jul 16 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.17
+- Fix stepping over a no-debug shared-library function.
+- Fix patch vsyscall patch name.
+
+* Thu Jul 8 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.16
+- Update thread code with fix from gdb HEAD
+
+* Wed Jul 7 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.15
+- disable vsyscall
+- import Bob's crasher fix
+- disable bigcore.exp
+
+* Mon Jul 5 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.14
+- Make large corefiles work on systems that require O_LARGEFILE.
+
+* Tue Jun 29 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.13
+- Fix BuildRequires for libunwind on ia64.
+
+* Mon Jun 28 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.12
+- Import wild frame ID patch.  Stops GDB incorrectly matching invalid
+  frame IDs.
+- Disable bigcore on ia64 and amd64.
+
+* Fri Jun 25 2004 Andrew Cagney <cagney@redhat.com>     1.200400607.11
+- Fix testsuite to kill attach process (from corrinna/mainline).
+- Fix build problems with vsyscall patch.
+
+* Fri Jun 25 2004 Andrew Cagney <cagney@redhat.com>     1.200400607.10
+- Fix annotate test messages.
+- Recognize VSYSCALL pages.
+
+* Thu Jun 24 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.9
+- Fix ia64 watchpoint support.
+
 * Wed Jun 23 2004 Andrew Cagney <cagney@redhat.com>     1.200400607.8
 - Do not xfail signals on i387, convert KFAIL to FAIL and not XFAIL.
 
