@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.23
+Release: 0.25
 
 License: GPL
 Group: Development/Debuggers
@@ -180,6 +180,9 @@ Patch140: gdb-6.3-gcore-thread-20050204.patch
 # Fix stepping over thread exit
 Patch141: gdb-6.3-step-thread-exit-20050211.patch
 
+# Prevent gdb from being pushed into background
+Patch142: gdb-6.3-terminal-fix-20050214.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -254,6 +257,7 @@ and printing their data.
 %patch139 -p1
 %patch140 -p1
 %patch141 -p1
+%patch142 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -422,6 +426,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Feb 14 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.25
+- Bump up release number.
+
+* Mon Feb 14 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.24
+- Fix gdb to always grab the terminal before a readline call.
+- Bugzilla 147880
+
 * Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.23
 - Bump up release number.
 
