@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 0.%{cvsdate}.2.1
+Release: 0.%{cvsdate}.2.2
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -142,7 +142,10 @@ ld -v
 echo ====================TESTING=========================
 cd gdb/testsuite
 make -k check || :
-test -r gdb.log && cat gdb.log | bzip2 -1 | uuencode gdb-%{_target_platform}.log.bz2 || :
+for t in sum log; do
+  ln gdb.$t gdb-%{_target_platform}.$t || :
+done
+tar cf - gdb-%{_target_platform}.{sum,log} | bzip2 -1 | uuencode gdb-%{_target_platform}.tar.bz2 || :
 cd ../..
 echo ====================TESTING END=====================
 %endif
@@ -225,6 +228,7 @@ fi
 * Fri Jun 11 2004 Andrew Cagney <cagney@redhat.com>	0.200400607.2.1
 - Import latest testsuite changes.  Fixes bogus KFAILs in
   structs.exp.
+- Uuencode both the .sum and .log test results
 
 * Thu Jun 10 2004 Elena Zannoni <ezannoni@redhat.com>	0.200400607.2
 - Fix Requires and BuildRequires for libunwind dependencies.
