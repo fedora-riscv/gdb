@@ -230,7 +230,8 @@ and printing their data.
 
 %patch127 -p1
 %patch128 -p1
-%patch129 -p1
+# Disabled, gives wierd BFD error
+# %patch129 -p1
 %patch130 -p1
 %patch131 -p1
 %patch132 -p1
@@ -404,6 +405,7 @@ fi
 %changelog
 * Fri Jan 21 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.9
 - When single stepping handle both back-to-back and nested signals.
+- Disable .symbol patch, results in BFD errors.
 
 * Fri Jan 21 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.8
 - Support listing both in-charge and not-in-charge dtors when
