@@ -131,6 +131,9 @@ Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
 # Multiple patches to ia64 backtrace
 Patch114: gdb-6.3-ia64-backtrace-20041213.patch
 
+# Fix to ensure types are visible
+Patch115: gdb-6.3-type-fix-20041213.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -178,6 +181,7 @@ and printing their data.
 %patch112 -p1
 %patch113 -p1
 %patch114 -p1
+%patch115 -p1
 
 %patch50 -p1
 
