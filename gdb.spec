@@ -1,11 +1,10 @@
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.2
-Release: 2a
+Version: 5.2.1
+Release: 1
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
-Patch: gdb-5.2-s390.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
@@ -18,7 +17,7 @@ printing their data.
 
 %prep
 %setup -q 
-%patch -p1
+#patch -p1
 rm -fr gdb/gdbserver
 
 cat > gdb/version.in << _FOO
@@ -87,6 +86,15 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jul 23 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-1
+- 5.2.1
+
+* Mon Jul 22 2002 Florian La Roche <Florian.LaRoche@redhat.de>
+- compile on mainframe
+
+* Mon Jul  8 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-3
+- Rebuild
+
 * Tue May  7 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-2
 - Rebuild
 
