@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.22
+Release: 0.23
 
 License: GPL
 Group: Development/Debuggers
@@ -293,7 +293,7 @@ cd %{gdb_build}
 # at least one warning, and stop the compilation.  The whole configury
 # line needs to be cleaned up.
 
-export CFLAGS="$RPM_OPT_FLAGS -U_FORTIFY_SOURCE"
+export CFLAGS="$RPM_OPT_FLAGS -Wp,-U_FORTIFY_SOURCE"
 
 enable_build_warnings=""
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
@@ -422,7 +422,7 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.22
+* Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.23
 - Bump up release number.
 
 * Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.21
