@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.19
+Release: 1.%{cvsdate}.19.1
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
