@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.18
+Release: 0.20
 
 License: GPL
 Group: Development/Debuggers
@@ -418,6 +418,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Feb 10 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.20
+- Bump up release number.
+
 * Tue Feb 08 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.18
 - Modify previous gcore patch to not use linux_proc_xfer_memory even
   for main thread.
