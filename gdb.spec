@@ -53,8 +53,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 ###### Testsuite merge, fixes, and local RH hack
 # Get selftest working with sep-debug-info
 #Broken: Patch33: gdb-6.1post-test-self-jul2004.patch
-##### VSYSCALL and PIE
-Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
 # Add --readnever hack, and gstack script
@@ -142,6 +140,9 @@ Patch120: gdb-6.3-type-fix-20041213.patch
 # Fix for allowing macros to continue after backtrace errors
 Patch121: gdb-6.3-backtrace-20041216.patch
 
+##### VSYSCALL and PIE
+Patch122: gdb-6.3-vsyscall-20041216.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -196,8 +197,7 @@ and printing their data.
 %patch119 -p1
 %patch120 -p1
 %patch121 -p1
-
-%patch50 -p1
+%patch122 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
