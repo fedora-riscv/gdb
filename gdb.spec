@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.1
+Release: 0.2
 
 License: GPL
 Group: Development/Debuggers
@@ -49,11 +49,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 
 # ------------------------------------------
-
-####### ABI fixes and updates
-#Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
-#Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
-###### Testsuite merge, fixes, and local RH hack
 
 # Add fixes starting at 100
 
@@ -135,7 +130,7 @@ Patch120: gdb-6.3-type-fix-20041213.patch
 # Fix for allowing macros to continue after backtrace errors
 Patch121: gdb-6.3-backtrace-20041216.patch
 
-##### VSYSCALL and PIE
+# VSYSCALL and PIE
 Patch122: gdb-6.3-vsyscall-20041216.patch
 
 # Pie test
@@ -149,6 +144,9 @@ Patch125: gdb-6.3-test-self-20050110.patch
 
 # No longer a need to set .malloc on ppc64.
 Patch126: gdb-6.3-ppcmalloc-20041124.patch
+
+# Enable PPC CFI support.
+Patch127: gdb-6.3-ppccfi-20041104.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -214,6 +212,8 @@ and printing their data.
 %patch125 -p1
 
 %patch126 -p1
+
+%patch127 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -382,6 +382,8 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jan 17 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.2
+- Enable PPC CFI, remove merged ppc patches.
 
 * Wed Jan 12 2005 Elena Zannoni <ezannoni@redhat.com>   6.3.0.0-0.1
                   Andrew Cagney <cagney@redhat.com>	
