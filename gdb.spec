@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.8
+Release: 0.8.1
 
 License: GPL
 Group: Development/Debuggers
@@ -157,8 +157,11 @@ Patch129: gdb-6.3-ppcdotsym-20050120.patch
 # Add PPC .symbols to min-symtable.
 Patch130: gdb-6.3-ctorline-20050120.patch
 
+# Handle nested, and back-to-back signals when stepping.
+Patch131: gdb-6.3-sigrepeats-20050121.patch
+
 # Fix to support multiple destructors just like multiple constructors
-Patch131: gdb-6.3-dtorfix-20050121.patch
+Patch132: gdb-6.3-dtorfix-20050121.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -230,6 +233,7 @@ and printing their data.
 %patch129 -p1
 %patch130 -p1
 %patch131 -p1
+%patch132 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -398,6 +402,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jan 21 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.9
+- When single stepping handle both back-to-back and nested signals.
+
 * Fri Jan 21 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.8
 - Support listing both in-charge and not-in-charge dtors when
   just the dtor name is given.
