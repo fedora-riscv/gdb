@@ -79,7 +79,7 @@ Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
 Patch51: gdb-6.1post-pie-jul2004.patch
-Patch52: gdb-6.1post-test-pie-oct2004.patch
+Patch52: gdb-6.1post-test-pie-nov2004.patch
 
 ##### Bigcore tweak
 Patch60: gdb-6.1post-o-largefile-jul2004.patch
@@ -359,6 +359,15 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.57
+- Backport i386 prolog parser - better backtraces out of semop().
+- Add option --readnever to suppress the reading of symbolic debug
+  information.
+- Add script gstack.sh, installed as gstack.
+  Bugzilla 136584, 137121
+- Add missing files gdb.pie/attach2.c, gdb.pie/break1.c and
+  gdb.pie/Makefile.in along with testsuite/configure stuff for pie.
+
 * Tue Nov 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.57
 - Backport i386 prolog parser - better backtraces out of semop().
 - Add option --readnever to suppress the reading of symbolic debug
