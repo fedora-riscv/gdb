@@ -1,4 +1,4 @@
-%define cvsdate 20031117
+%define cvsdate 20040223
 # Define this if you want to skip the strip step and preserve debug info.
 # Useful for testing. 
 #define __spec_install_post /usr/lib/rpm/brp-compress || :
@@ -9,7 +9,7 @@ Version: 6.0post
 Release: 0.%{cvsdate}.7
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20031117.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040223.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 
@@ -17,38 +17,30 @@ URL: http://sources.redhat.com/gdb/
 Patch0: gdb-6.0post-ChangeLog.patch
 # ChangeLogs patches for testsuite.
 Patch1: gdb-6.0post-ChangeLog-testsuite.patch
+####### start jumbo mainline patch
+Patch2: gdb-6.0post-sync61-20040308.patch
 ####### start patches from the previous RPM.
-# patch from previous release (Jim Blandy).
-Patch2: gdb-6.0post-symtab.patch
+# patch from previous release.
+Patch3: gdb-6.0post-symtab.patch
 # Changes to the testsuite that are Red Hat specific.
-Patch3: gdb-6.0post-testsuite.patch
-# new unit test for separate debug info.
-Patch4: gdb-6.0post-sepdebug-tst.patch
+Patch4: gdb-6.0post-testsuite.patch
 # Accept multiple outputs from backtrace.
 Patch5: gdb-6.0post-linuxdp-tst.patch
-# Patch to add i386 support to x86-64
-Patch6: gdb-6.0post-x86i386base-aug2003.patch
-# ptrace i386 TLS on x86-64
-Patch7: gdb-6.0post-x86i386tls-aug2003.patch
+# New test to see if libunwind is used. (Red Hat specific)
+Patch6: gdb-6.0post-libunwind-tst.patch
 ####### end patches from the previous RPM.
-# Final libunwind support.
-Patch8: gdb-6.0post-ia64-nov2003.patch
-# Fix to ignore segments with no protection.
-Patch9: gdb-6.0post-gcore-nov2003.patch
-# Fix mi2-basics.exp test
-Patch10: gdb-6.0post-mi-tst-nov2003.patch
-# New test to see if libunwind is used.
-Patch11: gdb-6.0post-libunwind-tst-nov2003.patch
-# Make sure that pthreads binaries have unique names.
-Patch12: gdb-6.0post-pthreads-tst-jan2004.patch
-# Disable pthreads.exp for s390/s390x. FIXME.
-Patch13: gdb-6.0post-pthreads-tst-s390-jan2004.patch
-# 4 Fixes for ppc32/64
-Patch14: gdb-6.0post-ppc64-ptrace-nov2003.patch
-Patch15: gdb-6.0post-ppc64-ntpldesc-nov2003.patch
-Patch16: gdb-6.0post-ppc64-solibadd-nov2003.patch
-Patch17: gdb-6.0post-ppc64-tdepgregset-nov2003.patch
-
+# Some -Wunused warnings fixes
+Patch7: gdb-6.0post-warnings-feb2004.patch
+# Fix some regressions on x86-64
+Patch8: gdb-6.0post-frame-feb2004.patch
+# 32x64 corefile and thread support
+Patch9: gdb-6.0post-ppc64regsets-mar2004.patch
+# 32x54 register values (zero extend)
+Patch10: gdb-6.0post-ppc64uregs-mar2004.patch
+# Better prologue skipping
+Patch11: gdb-6.0post-ppc64prologue-mar2004.patch
+# Patch to fix new thread recognition
+Patch12: gdb-6.0post-thread-fix-mar2004.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind
@@ -61,18 +53,6 @@ Prereq: info
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 and other languages, by executing them in a controlled fashion and
 printing their data.
-
-%ifarch ppc64
-%package -n gdb64
-Summary: A GNU source-level debugger for C, C++ and other languages.
-Group: Development/Debuggers
-Prereq: info
-
-%description -n gdb64
-GDB, the GNU debugger, allows you to debug programs written in C, C++,
-and other languages, by executing them in a controlled fashion and
-printing their data.
-%endif
 
 %prep
 # This allows the tarball name to be different from our version-release name.
@@ -88,16 +68,10 @@ printing their data.
 %patch6 -p1 
 %patch7 -p1 
 %patch8 -p1 
-%patch9 -p1 
-%patch10 -p1 
-%patch11 -p1 
-%patch12 -p1 
-%patch13 -p1 
-%patch14 -p1 
-%patch15 -p1 
-%patch16 -p1 
-%patch17 -p1 
-
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
 cat > gdb/version.in << _FOO
@@ -111,7 +85,13 @@ rm -fr dejagnu tcl expect
 # Also remove the info files that are generated in the FSF snapshot process.
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
-                                                                                
+
+# ... and remove the objective-c testcases -- no objective-c
+rm -fr gdb/testsuite/gdb.objc                                                                                
+# FIXME: remove gdb/gdbserver/config.h from the snapshot. Suspect a bug
+# in the FSF snapshot process.
+rm -f gdb/gdbserver/config.h
+
 %build
 
 # Identify the build directory with the version of gdb as well as
@@ -192,24 +172,6 @@ rm -rf $RPM_BUILD_ROOT
 cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 
-#FIXME: For the moment, rename the gdb binary to gdb64 on the ppc64
-#architecture. Same for run and gcore. Unfortunately for gcore
-#we also need to edit the file to make it use the correct gdb64.
-%ifarch ppc64
-mv $RPM_BUILD_ROOT%{_prefix}/bin/gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdb64
-sed 's/\/usr\/bin\/gdb/\/usr\/bin\/gdb64/' $RPM_BUILD_ROOT%{_prefix}/bin/gcore > $RPM_BUILD_ROOT%{_prefix}/bin/gcore64
-rm $RPM_BUILD_ROOT%{_prefix}/bin/gcore
-mv $RPM_BUILD_ROOT%{_prefix}/bin/run $RPM_BUILD_ROOT%{_prefix}/bin/run64
-%endif
-
-%ifarch ppc
-rm $RPM_BUILD_ROOT%{_prefix}/share/info/annotate.*
-rm $RPM_BUILD_ROOT%{_prefix}/share/info/gdb.*
-rm $RPM_BUILD_ROOT%{_prefix}/share/info/gdbint.*
-rm $RPM_BUILD_ROOT%{_prefix}/share/info/mmalloc.*
-rm $RPM_BUILD_ROOT%{_prefix}/share/info/stabs.*
-%endif
-
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -227,13 +189,7 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%ifarch ppc64
-%post -n gdb64
-%else
 %post
-%endif
-%ifarch ppc
-%else
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
 
@@ -247,15 +203,8 @@ rm -rf $RPM_BUILD_ROOT
 [ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/stabs.info ]		&& /sbin/install-info %{_infodir}/stabs.info %{_infodir}/dir  || :
 [ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
-%endif
 
-%ifarch ppc64
-%preun -n gdb64
-%else
 %preun
-%endif
-%ifarch ppc
-%else
 if [ $1 = 0 ]; then
 	[ -f %{_infodir}/annotate.info ]	&& /sbin/install-info --delete %{_infodir}/annotate.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/annotate.info.gz ]	&& /sbin/install-info --delete %{_infodir}/annotate.info.gz %{_infodir}/dir  || :
@@ -268,30 +217,60 @@ if [ $1 = 0 ]; then
 	[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info --delete %{_infodir}/stabs.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
 fi
-%endif
 
-%ifarch ppc64
-%files -n gdb64
-%else
 %files
-%endif
 %defattr(-,root,root)
 %doc COPYING COPYING.LIB README NEWS
 /usr/bin/*
 %{_libdir}/libmmalloc.a*
 %{_mandir}/*/*
-%ifarch ppc
-%else
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
 %{_infodir}/stabs.info*
 %{_infodir}/mmalloc.info*
-%endif
 
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Mar 09 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.7
+- Bump version number.
+
+* Mon Mar 08 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.6
+- Fix thread support to recognize new threads even when they reuse
+  tids of expired threads.  Also ensure that terminal is held by gdb
+  while determining if a thread-create event has occurred.
+
+* Mon Mar 08 2004 Andrew Cagney <cagney@redhat.com>	0.20040223.5
+- Sync with 6.1 branch; eliminate all amd64 patches;
+  add more robust 32x64 PPC64 patches.
+
+* Tue Mar 02 2004 Elliot Lee <sopwith@redhat.com>
+- rebuilt
+
+* Tue Mar 2 2004 Andrew Cagney <cagney@redhat.com>	0.20040223.4
+- 32x64 fixes that work with threads, replaced old
+  non-thread 32x64 patch, add nat patch.
+
+* Wed Feb 25 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.3
+- Add patch for x86_64 in 32 bit mode.
+
+* Wed Feb 25 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.2
+- Remove ppc64 hacks.
+- Refresh some patches.
+
+* Wed Feb 25 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.1
+- Import new gdb snapshot from mainline FSF.
+- Update patch list.
+
+* Tue Feb 17 2004 Jeff Johnston <jjohnstn@redhat.com>	1.20031117.8
+- Switch ia64-tdep.c to use new abi used by libunwind-0.95 and up.
+- Fix gate area specification for ia64-linux-tdep.c.
+- Fix long double support for ia64.
+
+* Fri Feb 13 2004 Elliot Lee <sopwith@redhat.com>
+- rebuilt
+
 * Thu Jan 08 2004 Elena Zannoni <ezannoni@redhat.com>	0.20031117.7
 - Add fixes for ppc32 support on ppc64 platform, from Andrew Cagney.
 
