@@ -1,24 +1,27 @@
 # Define this if you want to skip the strip step and preserve debug
 # info.  Useful for testing.
-#%define __spec_install_post /usr/lib/rpm/brp-compress || :
+#define __spec_install_post /usr/lib/rpm/brp-compress || :
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages.
 Name: gdb
 
 # Set version to contents of gdb/version.in.
-Version: 6.3
-
-%define gdb_src gdb-%{version}
-%define gdb_build gdb-%{version}-build-%{_target_platform}
+# NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
+# and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
+Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.0.0
+Release: 0.1
 
 License: GPL
 Group: Development/Debuggers
 Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.3.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://gnu.org/software/gdb/
+
+# For our convenience
+%define gdb_src gdb-6.3
+%define gdb_build gdb-%{version}-build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -309,7 +312,7 @@ echo ====================TESTING END=====================
 
 cd ..
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
-cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/NEWS $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}
+cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
 
 %install
 cd ../%{gdb_build}
@@ -318,7 +321,7 @@ rm -rf $RPM_BUILD_ROOT
 %makeinstall
 
 # install the gcore script in /usr/bin
-cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
+cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 
 # Remove the files that are part of a gdb build but that are owned and
@@ -379,6 +382,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+
+* Wed Jan 12 2005 Elena Zannoni <ezannoni@redhat.com>   6.3.0.0-0.1
+                  Andrew Cagney <cagney@redhat.com>	
+                  Jeff Johnston <jjohnstn@redhat.com>	
+- Various fixes to complete the import and merge.
+
 * Wed Dec 01 2004 Andrew Cagney <cagney@redhat.com>	6.3-0.0
 - Import GDB 6.3, get building, add all patches.
 
