@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.27
+Release: 0.28
 
 License: GPL
 Group: Development/Debuggers
