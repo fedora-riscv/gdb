@@ -1,13 +1,16 @@
+%define __libtoolize echo
+
 Summary: A GNU source-level debugger for C, C++ and Fortran.
 Name: gdb
 Version: 5.0
-Release: 7
+Release: 7j
 Copyright: GPL
 Group: Development/Debuggers
 #Source0: ftp://sourceware.cygnus.com/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-20000725.tar.bz2 
-Patch0: gdb-5.0-alpha.patch
-Patch1: gdb-5.0-symchanges.patch
+Source: gdb-5.0.tar.bz2 
+Patch0: gdb-5.0-s390.patch
+Patch1: gdb-5.0-s390-1.patch
+Patch2: gdb-5.0-s390-2.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 Prereq: /sbin/install-info
 ExcludeArch: sparc
@@ -23,10 +26,11 @@ compiler, you may want to install gdb to help you debug your
 programs.
 
 %prep
-%setup -q -n gdb
+%setup -q
 
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 %build
 %configure
@@ -88,6 +92,22 @@ fi
 
 
 %changelog
+* Tue Oct 23 2001 Karsten Hopp <karsten@redhat.de>
+- add 2 more patches from IBM for S/390
+
+* Mon Jun 18 2001 Florian La Roche <Florian.LaRoche@redhat.de>
+- disable libtoolize
+
+* Sat Dec 09 2000 Florian La Roche <Florian.LaRoche@redhat.de>
+- update to 5.0.1 patch from IBM
+
+* Mon Nov 20 2000 Florian La Roche <Florian.LaRoche@redhat.de>
+- added dwarf patch from IBM
+
+* Sun Nov 19 2000 Florian La Roche <Florian.LaRoche@redhat.de>
+- go back to gdb-5.0-release
+- add S390 patch from IBM
+
 * Wed Aug 09 2000 Trond Eivind Glomsrød <teg@redhat.com>
 - added patch from GDB team for C++ symbol handling
 
