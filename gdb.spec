@@ -57,8 +57,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
-# Fix for allowing macros to continue after backtrace errors
-Patch78: gdb-6.1post-backtrace-nov2004.patch
 # Add --readnever hack, and gstack script
 #Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 # No longer a need to set .malloc on ppc64.
@@ -141,6 +139,9 @@ Patch119: gdb-6.3-lwp-cache-20041216.patch
 # Fix to ensure types are visible
 Patch120: gdb-6.3-type-fix-20041213.patch
 
+# Fix for allowing macros to continue after backtrace errors
+Patch121: gdb-6.3-backtrace-20041216.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -194,10 +195,9 @@ and printing their data.
 %patch118 -p1
 %patch119 -p1
 %patch120 -p1
+%patch121 -p1
 
 %patch50 -p1
-
-%patch78 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
