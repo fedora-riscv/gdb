@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.51
+Release: 1.%{cvsdate}.54
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -348,9 +348,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Nov 11 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.54
+- Bump up release number
+
 * Thu Nov 11 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.51
 - Modify configure line to not use absolute paths. This was 
-creating problems with makeinfo/texinfo.
+  creating problems with makeinfo/texinfo.
 - Get rid of makeinfo hack.
 Bugzilla 135633
 
