@@ -38,16 +38,12 @@ Patch0: gdb-6.3-rh-changelogs-20041202.patch
 Patch1: gdb-6.3-rh-dummykfail-20041202.patch
 # Match Red Hat's version info
 Patch2: gdb-6.3-rh-testversion-20041202.patch
+# Check that libunwind works - new test then fix
+Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
+Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 
 # ------------------------------------------
-
-# ChangeLogs patches.
-#N/A: Patch0: gdb-6.1post-ChangeLog.patch
-# ChangeLogs patches for doc.
-#N/A: Patch2: gdb-6.1post-ChangeLog-doc.patch
-
-####### end patches from the previous RPM.
 
 # Fix watchpoint support.
 #Patch5: gdb-6.1post-watchpoint-fix.patch
@@ -61,12 +57,6 @@ Patch8: broken.patch
 # Fix to support applications calling clone directly
 #Patch9: gdb-6.1post-linlwp-aug2004.patch
 Patch9: broken.patch
-
-####### Signal trampoline fixes
-#Patch10: gdb-6.1post-sig-ppc-jun2004.patch
-Patch10: broken.patch
-Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
-Patch12: gdb-6.1post-sig-x86-jun2004.patch
 
 ####### ABI fixes and updates
 #Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
@@ -85,9 +75,6 @@ Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 # Get selftest working with sep-debug-info
 #Patch33: gdb-6.1post-test-self-jul2004.patch
 Patch33: broken.patch
-# Check that libunwind works - new test then fix
-Patch34: gdb-6.1post-test-rh-libunwind.patch
-Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
 #Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
 Patch37: broken.patch
 
@@ -143,6 +130,9 @@ Patch87: gdb-6.1post-remove-bp-nov2004.patch
 
 # Add fixes starting at 100
 Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
+Patch101: gdb-6.3-sigx86-20040621.patch
+Patch102: gdb-6.3-sigsymtramp-20040621.patch
+Patch103: gdb-6.3-sigppc-20040621.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -173,17 +163,18 @@ and printing their data.
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
+%patch4 -p1
 
 %patch100 -p1
+%patch101 -p1
+%patch102 -p1
 
 # Apply patches defined above.
 %patch5 -p1
 %patch6 -p1
 %patch8 -p1
 %patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
 
 %patch19 -p1
 %patch20 -p1
@@ -195,8 +186,6 @@ and printing their data.
 %patch28 -p1
 
 %patch33 -p1
-%patch34 -p1
-%patch35 -p1
 %patch37 -p1
 
 %patch50 -p1
