@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.43
+Release: 1.%{cvsdate}.44
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -98,6 +98,8 @@ Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
 Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
 # Fix for caching thread lwps for linux
 Patch77: gdb-6.1post-lwp-cache-oct2004.patch
+# Fix for allowing macros to continue after backtrace errors
+Patch78: gdb-6.1post-backtrace-nov2004.patch
 
 # Fix panic when stepping an solib call
 Patch80: gdb-6.1post-infcall-step-jul2004.patch
@@ -171,6 +173,7 @@ printing their data.
 %patch75 -p1
 %patch76 -p1
 %patch77 -p1
+%patch78 -p1
 %patch80 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
@@ -348,6 +351,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Nov 05 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.44
+- Allow macros to continue past a backtrace error
+
 * Tue Oct 26 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.43
 - Hack around broken PT_FPSCR defined in headers.
 - Import latest s390 fixes.
