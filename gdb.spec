@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.38
+Release: 1.%{cvsdate}.39
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -66,6 +66,8 @@ Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
 # Generate the bigcore file from the running inferior et.al.
 Patch36: gdb-6.1post-test-bigcoresingle-sep2004.patch
 Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
+# Fix comment bug in sigstep.exp
+Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -144,6 +146,7 @@ printing their data.
 %patch35 -p1
 %patch36 -p1
 %patch37 -p1
+%patch38 -p1
 
 %patch50 -p1
 %patch51 -p1
@@ -334,6 +337,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.39
+- Fix comment bug in sigstep.exp.
+
 * Thu Oct 07 2004 Jeff Johnston	<jjohnstn@redhat.com>	1.200400607.38
 - Do not invalidate cached thread info when resuming threads.
 - Bump up release number.
