@@ -46,26 +46,19 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 # ------------------------------------------
 
 # Fix watchpoint support.
-#Patch5: gdb-6.1post-watchpoint-fix.patch
-Patch5: broken.patch
+#Broken: Patch5: gdb-6.1post-watchpoint-fix.patch
 # Thread fix.
-#Patch6: gdb-6.1post-thread-fix.patch
-Patch6: broken.patch
+#Broken: Patch6: gdb-6.1post-thread-fix.patch
 # Fix to allow using libunwind 0.97 and up.
-#Patch8: gdb-6.1post-libunwind.patch
-Patch8: broken.patch
+#Broken: Patch8: gdb-6.1post-libunwind.patch
 # Fix to support applications calling clone directly
-#Patch9: gdb-6.1post-linlwp-aug2004.patch
-Patch9: broken.patch
+#Broken: Patch9: gdb-6.1post-linlwp-aug2004.patch
 
 ####### ABI fixes and updates
-#Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
-Patch19: broken.patch
-#Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
-Patch20: broken.patch
+#Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
+#Broken: Patch20: gdb-6.1post-abi-ppc64-oct2004.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
-#Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
-Patch23: broken.patch
+#Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
@@ -73,34 +66,25 @@ Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 # Get selftest working with sep-debug-info
-#Patch33: gdb-6.1post-test-self-jul2004.patch
-Patch33: broken.patch
+#Broken: Patch33: gdb-6.1post-test-self-jul2004.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
-#Patch51: gdb-6.1post-pie-jul2004.patch
-Patch51: broken.patch
-#Patch52: gdb-6.1post-test-pie-nov2004.patch
-Patch52: broken.patch
+#Broken: Patch51: gdb-6.1post-pie-jul2004.patch
+#Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
 
 # Add java inferior call support
-#Patch71: gdb-6.1post-java-infcall-aug2004.patch
-Patch71: broken.patch
+#Broken: Patch71: gdb-6.1post-java-infcall-aug2004.patch
 # Add support for manually loaded/unloaded shlibs.
-#Patch72: gdb-6.1post-unload-aug2004.patch
-Patch72: broken.patch
+#Broken: Patch72: gdb-6.1post-unload-aug2004.patch
 # Fix stepping in threads
-#Patch73: gdb-6.1post-thread-step-sep2004.patch
-Patch73: broken.patch
+#Broken: Patch73: gdb-6.1post-thread-step-sep2004.patch
 # Add threaded watchpoint support
-#Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
-Patch74: broken.patch
+#Broken: Patch74: gdb-6.1post-threaded-watchpoints-sep2004.patch
 # Fix for thread_db_get_lwp
-#Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
-Patch75: broken.patch
+#Broken: Patch75: gdb-6.1post-thread-get-lwp-oct2004.patch
 # Fix for S/390 watchpoints under threads.
-#Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
-Patch76: broken.patch
+#Broken: Patch76: gdb-6.1post-s390-watchpoints-oct2004.patch
 # Fix for caching thread lwps for linux
 Patch77: gdb-6.1post-lwp-cache-oct2004.patch
 # Fix for allowing macros to continue after backtrace errors
@@ -110,17 +94,14 @@ Patch79: gdb-6.1post-constructor-nov2004.patch
 
 # Fix panic when stepping an solib call
 # Fix ia64 backtrace
-#Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
-Patch81: broken.patch
+#Broken: Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 # Add --readnever hack, and gstack script
-#Patch82: gdb-6.1post-readnever-nov2004.patch
-Patch82: broken.patch
+#Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 Patch83: gdb-6.1post-gstack-nov2004.patch
 # Add PPC register groups.
 Patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 # No longer a need to set .malloc on ppc64.
-#Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
-Patch85: broken.patch
+#Broken: Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
 # display and x needed to look for a section symbol.
 Patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
 # Continue removing breakpoints even when failure occurs.
@@ -168,41 +149,19 @@ and printing their data.
 %patch101 -p1
 %patch102 -p1
 
-# Apply patches defined above.
-%patch5 -p1
-%patch6 -p1
-%patch8 -p1
-%patch9 -p1
-
-%patch19 -p1
-%patch20 -p1
 %patch21 -p1
-%patch23 -p1
 %patch24 -p1
 %patch25 -p1
 %patch26 -p1
 %patch28 -p1
 
-%patch33 -p1
-
 %patch50 -p1
-%patch51 -p1
-%patch52 -p1
 
-%patch71 -p1
-%patch72 -p1
-%patch73 -p1
-%patch74 -p1
-%patch75 -p1
-%patch76 -p1
 %patch77 -p1
 %patch78 -p1
 %patch79 -p1
-%patch81 -p1
-%patch82 -p1
 %patch83 -p1
 %patch84 -p1
-%patch85 -p1
 %patch86 -p1
 %patch87 -p1
 
