@@ -1,14 +1,10 @@
-%define cvsversion 5.1.90_20020411
-
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.1.90CVS
-Release: 5
+Version: 5.2
+Release: 2
 License: GPL
 Group: Development/Debuggers
-#Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb+dejagnu-%{cvsversion}.tar.bz2
-Patch1: gdb-5.1-threadfpufix.patch
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
@@ -20,9 +16,8 @@ and other languages, by executing them in a controlled fashion and
 printing their data.
 
 %prep
-%setup -q -n gdb+dejagnu-%{cvsversion}
+%setup -q 
 rm -fr gdb/gdbserver
-#patch1 -p1 -b .threadfpupatch
 
 cat > gdb/version.in << _FOO
 Red Hat Linux (%{version}-%{release})
@@ -90,6 +85,18 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue May  7 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-2
+- Rebuild
+
+* Mon Apr 29 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-1
+- 5.2
+
+* Mon Apr 29 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.92-1
+- 5.1.92. Hopefully identical to 5.2 final
+
+* Mon Apr 22 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.91-1
+- 5.1.91. 5.2 expected in a week
+
 * Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-5
 - Update to current
 
