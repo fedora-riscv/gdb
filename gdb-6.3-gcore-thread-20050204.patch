@@ -1,0 +1,31 @@
+2005-02-04  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* linux-nat.c (linux_nat_xfer_memory): Don't use
+	linux_proc_xfer_memory for threads.
+
+--- gdb-6.3/gdb/linux-nat.c.fix	Fri Feb  4 22:52:40 2005
++++ gdb-6.3/gdb/linux-nat.c	Fri Feb  4 22:56:57 2005
+@@ -2382,11 +2382,18 @@ linux_nat_xfer_memory (CORE_ADDR memaddr
+   int xfer;
+ 
+   if (is_lwp (inferior_ptid))
+-    inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
+-
+-  xfer = linux_proc_xfer_memory (memaddr, myaddr, len, write, attrib, target);
+-  if (xfer == 0)
+-    xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
++    {
++      /* For lwps, we cannot use linux_proc_xfer_memory.  */
++      inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
++      xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
++    }
++  else
++    {
++      xfer = linux_proc_xfer_memory (memaddr, myaddr, len, write, 
++		      		     attrib, target);
++      if (xfer == 0)
++        xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
++    }
+ 
+   do_cleanups (old_chain);
+   return xfer;

@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.15
+Release: 0.16
 
 License: GPL
 Group: Development/Debuggers
@@ -174,6 +174,9 @@ Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
 # Tolerate DW_AT_type referencing <0>.
 Patch139: gdb-6.3-dwattype0-20050201.patch
 
+# Fix gcore for threads
+Patch140: gdb-6.3-gcore-thread-20050204.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -246,6 +249,7 @@ and printing their data.
 %patch137 -p1
 %patch138 -p1
 %patch139 -p1
+%patch140 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -414,6 +418,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Feb 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.16
+- Fix gcore to work properly for threaded applications
+- Bugzilla 145309, 145092
+
 * Fri Feb 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.15
 - Tolerate DW_AT_type referencing <0> and instead of generating an
   error, treat as unknown type.
