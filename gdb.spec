@@ -1,13 +1,13 @@
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.1
-Release: 0.71.0ppc
+Version: 5.1.1
+Release: 0.1
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
-Patch0: jakub-gcc31-gdb.patch
-Patch1: gdb-5.1-ppc64.patch
+Patch1: gdb-5.1-threadfpufix.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
+URL: http://sources.redhat.com/gdb/
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
 Prereq: info
 
@@ -18,8 +18,7 @@ printing their data.
 
 %prep
 %setup -q 
-%patch0 -p1 -b .dwarfpatch
-%patch1 -p1
+%patch1 -p1 -b .threadfpupatch
 
 cat > gdb/version.in << _FOO
 Red Hat Linux (%{version}-%{release})
@@ -87,10 +86,17 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Tue Apr 02 2002 Guy Streeter <streeter@redhat.com> 5.1-0.71.0ppc
-- slight change in kernel headers for the 64bit ppc kernel
+* Thu Jan 24 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.1-1
+- 5.1.1
+- add URL
 
-* Mon Nov 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-0.71
+* Wed Jan 09 2002 Tim Powers <timp@redhat.com>
+- automated rebuild
+
+* Mon Dec 10 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-2
+- Fix some thread+fpu problems
+
+* Mon Nov 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-1
 - 5.1
 
 * Mon Nov 19 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.94-0.71
