@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.20
+Release: 0.22
 
 License: GPL
 Group: Development/Debuggers
@@ -177,6 +177,9 @@ Patch139: gdb-6.3-dwattype0-20050201.patch
 # Fix gcore for threads
 Patch140: gdb-6.3-gcore-thread-20050204.patch
 
+# Fix stepping over thread exit
+Patch141: gdb-6.3-step-thread-exit-20050211.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -250,6 +253,7 @@ and printing their data.
 %patch138 -p1
 %patch139 -p1
 %patch140 -p1
+%patch141 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -289,7 +293,7 @@ cd %{gdb_build}
 # at least one warning, and stop the compilation.  The whole configury
 # line needs to be cleaned up.
 
-export CFLAGS="$RPM_OPT_FLAGS"
+export CFLAGS="$RPM_OPT_FLAGS -U_FORTIFY_SOURCE"
 
 enable_build_warnings=""
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
@@ -418,6 +422,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.22
+- Bump up release number.
+
+* Fri Feb 11 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.21
+- Fix gdb to handle stepping over the end of an exiting thread.
+- Bugzilla 146848
+
 * Thu Feb 10 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-0.20
 - Bump up release number.
 
