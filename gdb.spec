@@ -26,14 +26,18 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64
 %endif
 
+# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch;
+# should include the ChangeLog.RedHat change-log entry; and should be
+# created using diff -u ./gdb (not gdb-6.3/gdb).
+
 # Red Hat local patches
 
 # Create empty ChangeLog.RedHat files in all relevant directories.
 Patch0: gdb-6.3-rh-changelogs-20041202.patch
-
-# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch;
-# should include the ChangeLog.RedHat change-log entry; and should be
-# created using diff -u ./gdb (not gdb-6.3/gdb).
+# Work around out-of-date dejagnu that does not have KFAIL
+Patch1: gdb-6.3-rh-dummykfail-20041202.patch
+# Match Red Hat's version info
+Patch2: gdb-6.3-rh-testversion-20041202.patch
 
 
 # ------------------------------------------
@@ -42,8 +46,6 @@ Patch0: gdb-6.3-rh-changelogs-20041202.patch
 #N/A: Patch0: gdb-6.1post-ChangeLog.patch
 # ChangeLogs patches for doc.
 #N/A: Patch2: gdb-6.1post-ChangeLog-doc.patch
-####### start patches from the previous RPM.
-# Silence gcc warnings.
 
 ####### end patches from the previous RPM.
 
@@ -84,10 +86,6 @@ Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 Patch29: broken.patch
 
 ###### Testsuite merge, fixes, and local RH hack
-# Work around out-of-date dejagnu that does not have kfail
-Patch31: gdb-6.1post-test-rh-kfail.patch
-# Match Red Hat version info
-Patch32: gdb-6.1post-test-rh-version.patch
 # Get selftest working with sep-debug-info
 #Patch33: gdb-6.1post-test-self-jul2004.patch
 Patch33: broken.patch
@@ -191,10 +189,10 @@ and printing their data.
 # Apply patches defined above.
 
 %patch0 -p1
+%patch1 -p1
+%patch2 -p1
 
 # Apply patches defined above.
-#%patch0 -p1 
-#%patch2 -p1 
 %patch5 -p1
 %patch6 -p1
 %patch8 -p1
@@ -214,8 +212,6 @@ and printing their data.
 %patch28 -p1
 %patch29 -p1
 
-%patch31 -p1
-%patch32 -p1
 %patch33 -p1
 %patch34 -p1
 %patch35 -p1
