@@ -26,11 +26,15 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64
 %endif
 
-# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch
-# and include the ChangeLog.RedHat change-log entry.
+# Red Hat local patches
 
-# FIXME:
-# Create an empty ChangeLog.RedHat
+# Create empty ChangeLog.RedHat files in all relevant directories.
+Patch0: gdb-6.3-rh-changelogs-20041202.patch
+
+# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch;
+# should include the ChangeLog.RedHat change-log entry; and should be
+# created using diff -u ./gdb (not gdb-6.3/gdb).
+
 
 # ------------------------------------------
 
@@ -185,6 +189,8 @@ and printing their data.
 %setup -q -n %{gdb_src}
 
 # Apply patches defined above.
+
+%patch0 -p1
 
 # Apply patches defined above.
 #%patch0 -p1 
