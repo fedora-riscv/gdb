@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.9
+Release: 0.10
 
 License: GPL
 Group: Development/Debuggers
@@ -163,6 +163,9 @@ Patch131: gdb-6.3-sigrepeats-20050121.patch
 # Fix to support multiple destructors just like multiple constructors
 Patch132: gdb-6.3-dtorfix-20050121.patch
 
+# Fix for ia64 to prevent SIGSEGV in debugger
+Patch133: gdb-6.3-ia64fix-20050121.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -235,6 +238,7 @@ and printing their data.
 %patch130 -p1
 %patch131 -p1
 %patch132 -p1
+%patch133 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -403,6 +407,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jan 21 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.10
+- Fix to prevent resetting unwind kernel table size to invalid value
+  when debugging a core file
+- Bugzilla 145309
+
 * Fri Jan 21 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.9
 - When single stepping handle both back-to-back and nested signals.
 - Disable .symbol patch, results in BFD errors.
