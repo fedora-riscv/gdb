@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.13
+Release: 0.14
 
 License: GPL
 Group: Development/Debuggers
@@ -131,12 +131,8 @@ Patch120: gdb-6.3-type-fix-20041213.patch
 Patch121: gdb-6.3-backtrace-20041216.patch
 
 # VSYSCALL and PIE
-Patch122: gdb-6.3-vsyscall-20041216.patch
-
-# Pie test
-Patch123: gdb-6.3-test-pie-20050107.patch
-
-# Pie support
+Patch122: gdb-6.3-test-pie-20050107.patch
+Patch123: gdb-6.3-vsyscall-20041216.patch
 Patch124: gdb-6.3-pie-20050110.patch
 
 # Get selftest working with sep-debug-info
@@ -159,18 +155,21 @@ Patch130: gdb-6.3-ctorline-20050120.patch
 
 # Handle nested, and back-to-back signals when stepping.
 Patch131: gdb-6.3-sigrepeats-20050121.patch
+Patch132: gdb-6.3-test-sigrepeats-20050121.patch
 
 # Fix to support multiple destructors just like multiple constructors
-Patch132: gdb-6.3-dtorfix-20050121.patch
+Patch133: gdb-6.3-test-dtorfix-20050121.patch
+Patch134: gdb-6.3-dtorfix-20050121.patch
 
 # Fix for ia64 to prevent SIGSEGV in debugger
-Patch133: gdb-6.3-ia64fix-20050121.patch
+Patch135: gdb-6.3-ia64fix-20050121.patch
 
 # Fix to support executable moving
-Patch134: gdb-6.3-movedir-20050125.patch
+Patch136: gdb-6.3-test-movedir-20050125.patch
+Patch137: gdb-6.3-movedir-20050125.patch
 
 # Fix to support unwinding syscalls in ia64 corefiles
-Patch135: gdb-6.3-ia64-corefile-fix-20050127.patch
+Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -222,21 +221,15 @@ and printing their data.
 %patch115 -p1
 %patch116 -p1
 %patch117 -p1
-
 %patch118 -p1
 %patch119 -p1
-
 %patch120 -p1
 %patch121 -p1
-
 %patch122 -p1
 %patch123 -p1
 %patch124 -p1
-
 %patch125 -p1
-
 %patch126 -p1
-
 %patch127 -p1
 %patch128 -p1
 %patch129 -p1
@@ -246,6 +239,9 @@ and printing their data.
 %patch133 -p1
 %patch134 -p1
 %patch135 -p1
+%patch136 -p1
+%patch137 -p1
+%patch138 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -414,6 +410,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Feb  3 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.14
+- Separate out test patches.
+
 * Thu Jan 27 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.13
 - Fix to allow ia64 gdb to backtrace from syscalls in a corefile.
 - Bugzilla 145092.
