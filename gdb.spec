@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.37
+Release: 1
 
 License: GPL
 Group: Development/Debuggers
@@ -442,6 +442,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Mar 16 2005 Elliot Lee <sopwith@redhat.com>
+- rebuilt
+
 * Fri Mar 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.37
 - Bump up release number.
 
