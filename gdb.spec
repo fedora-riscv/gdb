@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.34
+Release: 0.37
 
 License: GPL
 Group: Development/Debuggers
@@ -192,6 +192,9 @@ Patch144: gdb-6.3-addsymfilemem-20050209.patch
 # Allow sibling threads to set threaded watchpoints for x86 and x86-64
 Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 
+# Follow vfork fix from mainline sources
+Patch146: gdb-6.3-follow-vfork-20050303.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -270,6 +273,7 @@ and printing their data.
 %patch143 -p1
 %patch144 -p1
 %patch145 -p1
+%patch146 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -438,6 +442,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Mar 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.37
+- Bump up release number.
+
+* Thu Mar 03 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.35
+- Add follow-fork fix from mainline sources.
+
 * Thu Mar 03 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.34
 - Bump up release number.
 
