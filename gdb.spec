@@ -93,9 +93,6 @@ Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
 Patch36: broken.patch
 #Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
 Patch37: broken.patch
-# Fix comment bug in sigstep.exp
-#Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
-Patch38: broken.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -104,13 +101,6 @@ Patch51: broken.patch
 #Patch52: gdb-6.1post-test-pie-nov2004.patch
 Patch52: broken.patch
 
-##### Bigcore tweak
-#Patch60: gdb-6.1post-o-largefile-jul2004.patch
-Patch60: broken.patch
-
-# Fix crasher in symtab
-#Patch70: gdb-6.1post-symtab-bob-jul2004.patch
-Patch70: broken.patch
 # Add java inferior call support
 #Patch71: gdb-6.1post-java-infcall-aug2004.patch
 Patch71: broken.patch
@@ -137,8 +127,6 @@ Patch78: gdb-6.1post-backtrace-nov2004.patch
 Patch79: gdb-6.1post-constructor-nov2004.patch
 
 # Fix panic when stepping an solib call
-#Patch80: gdb-6.1post-infcall-step-jul2004.patch
-Patch80: broken.patch
 # Fix ia64 backtrace
 #Patch81: gdb-6.1post-ia64-backtrace-nov2004.patch
 Patch81: broken.patch
@@ -208,21 +196,17 @@ and printing their data.
 %patch25 -p1
 %patch26 -p1
 %patch28 -p1
-%patch29 -p1
 
 %patch33 -p1
 %patch34 -p1
 %patch35 -p1
 %patch36 -p1
 %patch37 -p1
-%patch38 -p1
 
 %patch50 -p1
 %patch51 -p1
 %patch52 -p1
 
-%patch60 -p1
-%patch70 -p1
 %patch71 -p1
 %patch72 -p1
 %patch73 -p1
@@ -232,7 +216,6 @@ and printing their data.
 %patch77 -p1
 %patch78 -p1
 %patch79 -p1
-%patch80 -p1
 %patch81 -p1
 %patch82 -p1
 %patch83 -p1
