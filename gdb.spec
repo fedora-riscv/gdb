@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.62
+Release: 1.%{cvsdate}.63
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -118,6 +118,8 @@ patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
 # display and x needed to look for a section symbol.
 patch86: gdb-6.1post-abi-ppc64displaysymbol-nov2004.patch
+# Continue removing breakpoints even when failure occurs.
+patch87: gdb-6.1post-remove-bp-nov2004.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -199,6 +201,7 @@ printing their data.
 %patch84 -p1
 %patch85 -p1
 %patch86 -p1
+%patch87 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -367,6 +370,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 30 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.63
+- When removing breakpoints, continue removing breakpoints even if an
+  error occurs on the list.
+
 * Sun Nov 28 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.62
 - Bump version for RHEL4 build.
 
