@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.2
+Release: 0.3
 
 License: GPL
 Group: Development/Debuggers
@@ -148,6 +148,9 @@ Patch126: gdb-6.3-ppcmalloc-20041124.patch
 # Enable PPC CFI support.
 Patch127: gdb-6.3-ppccfi-20041104.patch
 
+# Fix for non-threaded watchpoints.
+Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -214,6 +217,7 @@ and printing their data.
 %patch126 -p1
 
 %patch127 -p1
+%patch128 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -382,6 +386,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jan 17 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.3
+- Fix for non-threaded watchpoints.
+
 * Mon Jan 17 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.2
 - Enable PPC CFI, remove merged ppc patches.
 
