@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.16
+Release: 0.17
 
 License: GPL
 Group: Development/Debuggers
@@ -418,6 +418,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Feb 07 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.17
+- Modify previous gcore patch to only apply to ia64.
+
 * Fri Feb 04 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.16
 - Fix gcore to work properly for threaded applications
 - Bugzilla 145309, 145092
