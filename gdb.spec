@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.3
+Release: 0.4
 
 License: GPL
 Group: Development/Debuggers
@@ -386,6 +386,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jan 18 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.4
+- Modify non-threaded watchpoint patch to use new observer.
+
 * Mon Jan 17 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.3
 - Fix for non-threaded watchpoints.
 
