@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.28
+Release: 1.%{cvsdate}.29
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -85,6 +85,8 @@ Patch70: gdb-6.1post-symtab-bob-jul2004.patch
 Patch71: gdb-6.1post-java-infcall-aug2004.patch
 # Add support for manually loaded/unloaded shlibs.
 Patch72: gdb-6.1post-unload-aug2004.patch
+# Fix stepping in threads
+Patch73: gdb-6.1post-thread-step-sep2004.patch
 
 # Fix panic when stepping an solib call
 Patch80: gdb-6.1post-infcall-step-jul2004.patch
@@ -153,6 +155,7 @@ printing their data.
 %patch70 -p1
 %patch71 -p1
 %patch72 -p1
+%patch73 -p1
 %patch80 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
@@ -332,6 +335,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Sep 02 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.29
+- Fix low-level lin-lwp code to wait specifically for any stepping
+  LWP (bugzilla 130896)
+
 * Tue Aug 31 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.28
 - Add test case for bugzilla 128618 fix.
 
