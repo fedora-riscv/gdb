@@ -32,12 +32,14 @@ Obsoletes: gdb64
 
 # Red Hat local patches
 
-# Create empty ChangeLog.RedHat files in all relevant directories.
 Patch0: gdb-6.3-rh-changelogs-20041202.patch
+
 # Work around out-of-date dejagnu that does not have KFAIL
 Patch1: gdb-6.3-rh-dummykfail-20041202.patch
+
 # Match Red Hat's version info
 Patch2: gdb-6.3-rh-testversion-20041202.patch
+
 # Check that libunwind works - new test then fix
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
@@ -48,30 +50,23 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 ####### ABI fixes and updates
 #Broken: Patch19: gdb-6.1post-abi-ppccfi-nov2004.patch
 #Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
-
 ###### Testsuite merge, fixes, and local RH hack
 # Get selftest working with sep-debug-info
 #Broken: Patch33: gdb-6.1post-test-self-jul2004.patch
-
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch51: gdb-6.1post-pie-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
-
 # Fix for caching thread lwps for linux
 Patch77: gdb-6.1post-lwp-cache-oct2004.patch
 # Fix for allowing macros to continue after backtrace errors
 Patch78: gdb-6.1post-backtrace-nov2004.patch
 # Fix to expose multiple constructors to end-user
 Patch79: gdb-6.1post-constructor-nov2004.patch
-
 # Add --readnever hack, and gstack script
 #Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
-Patch83: gdb-6.1post-gstack-nov2004.patch
 # No longer a need to set .malloc on ppc64.
 #Broken: Patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
-# Continue removing breakpoints even when failure occurs.
-Patch87: gdb-6.1post-remove-bp-nov2004.patch
 
 # Add fixes starting at 100
 
@@ -137,6 +132,13 @@ Patch115: gdb-6.3-type-fix-20041213.patch
 # Fix to display base constructors from list and breakpoint commands
 Patch116: gdb-6.3-linespec-20041213.patch
 
+# Continue removing breakpoints even when failure occurs.
+Patch117: gdb-6.3-removebp-20041130.patch
+
+# Add a wrapper script to GDB that implements pstack using the
+# --readnever option.
+Patch118: gdb-6.3-gstack-20041123.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -186,14 +188,14 @@ and printing their data.
 %patch114 -p1
 %patch115 -p1
 %patch116 -p1
+%patch117 -p1
+%patch118 -p1
 
 %patch50 -p1
 
 %patch77 -p1
 %patch78 -p1
 %patch79 -p1
-%patch83 -p1
-%patch87 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
