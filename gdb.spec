@@ -88,9 +88,6 @@ Patch33: broken.patch
 # Check that libunwind works - new test then fix
 Patch34: gdb-6.1post-test-rh-libunwind.patch
 Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
-# Generate the bigcore file from the running inferior et.al.
-#Patch36: gdb-6.1post-test-bigcoresingle-sep2004.patch
-Patch36: broken.patch
 #Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
 Patch37: broken.patch
 
@@ -200,7 +197,6 @@ and printing their data.
 %patch33 -p1
 %patch34 -p1
 %patch35 -p1
-%patch36 -p1
 %patch37 -p1
 
 %patch50 -p1
