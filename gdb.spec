@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.30
+Release: 1.%{cvsdate}.31
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -168,9 +168,6 @@ rm -fr gdb/testsuite/gdb.ada
 # in the FSF snapshot process.
 rm -f gdb/gdbserver/config.h
 
-# FIXME: remove bigcore.exp
-rm -f gdb/testsuite/gdb.base/bigcore.exp
-
 %build
 
 # Identify the build directory with the version of gdb as well as
@@ -231,7 +228,7 @@ ld -v
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
-make -k check || :
+make -k check RUNTESTFLAGS='--ignore bigcore.exp' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -323,6 +320,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Sep 27 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.31
+- Instead of deleting bigcore.exp, use runtest --ignore.
+
 * Thu Sep 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.30
 - Merge in mainline testsuite up to 2004-09-23, pick up sig*.exp tests.
   Merge in mainline infrun.c, pick up all infrun.c fixes.
