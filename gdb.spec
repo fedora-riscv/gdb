@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1
+Release: 1.3
 
 License: GPL
 Group: Development/Debuggers
@@ -195,6 +195,9 @@ Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 # Follow vfork fix from mainline sources
 Patch146: gdb-6.3-follow-vfork-20050303.patch
 
+# Fix unexpected compiler warning messages.
+Patch147: gdb-6.3-warnings-20050317.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -274,6 +277,7 @@ and printing their data.
 %patch144 -p1
 %patch145 -p1
 %patch146 -p1
+%patch147 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -313,7 +317,7 @@ cd %{gdb_build}
 # at least one warning, and stop the compilation.  The whole configury
 # line needs to be cleaned up.
 
-export CFLAGS="$RPM_OPT_FLAGS -Wno-unused -Wno-pointer-sign -Wp,-U_FORTIFY_SOURCE"
+export CFLAGS="$RPM_OPT_FLAGS"
 
 enable_build_warnings=""
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
@@ -329,7 +333,7 @@ enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
         --with-separate-debug-dir=/usr/lib/debug \
     %{_target_platform}
 
-make
+make -k
 make info
 
 # Get some information about which tools we interact with. We cannot
@@ -442,6 +446,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Mar 22 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-1.3
+- Bump up release number.
+
+* Thu Mar 17 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-1.1
+- Remove warnings that cause errors when compiled with gcc4 and -Werror.
+
 * Wed Mar 16 2005 Elliot Lee <sopwith@redhat.com>
 - rebuilt
 
