@@ -1,19 +1,19 @@
-%define __libtoolize echo
+%define snapdate 20010316
 
 Summary: A GNU source-level debugger for C, C++ and Fortran.
 Name: gdb
-Version: 5.0
-Release: 7j
+Version: 5.0rh
+Release: 5
 Copyright: GPL
+Patch0: gdb-alpha.patch
 Group: Development/Debuggers
-#Source0: ftp://sourceware.cygnus.com/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-5.0.tar.bz2 
-Patch0: gdb-5.0-s390.patch
-Patch1: gdb-5.0-s390-1.patch
-Patch2: gdb-5.0-s390-2.patch
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/gdb+dejagnu-%{snapdate}.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
-Prereq: /sbin/install-info
-ExcludeArch: sparc
+BuildRequires: perl 
+%ifnarch ia64
+BuildPrereq: compat-glibc
+%endif
+Prereq: info
 
 %description
 Gdb is a full featured, command driven debugger. Gdb allows you to
@@ -26,14 +26,21 @@ compiler, you may want to install gdb to help you debug your
 programs.
 
 %prep
-%setup -q
+%setup -q -n gdb+dejagnu-%{snapdate}
+%patch0 -p1 -b .alpha
 
-%patch0 -p1
-%patch1 -p1
-%patch2 -p1
+
+perl -pi -e "s/^VERSION.*$/VERSION=5\.0rh-%{release} Red Hat Linux 7\.1/" gdb/Makefile.in
 
 %build
-%configure
+%ifarch ia64
+export CFLAGS="$RPM_OPT_FLAGS"
+%else
+export CFLAGS="-I/usr/i386-glibc21-linux/include $RPM_OPT_FLAGS"
+%endif
+rm -fr dejagnu tcl expect 
+./configure --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man --infodir=/usr/share/info \
+    %{_arch}-redhat-linux
 
 make
 make info
@@ -92,21 +99,51 @@ fi
 
 
 %changelog
-* Tue Oct 23 2001 Karsten Hopp <karsten@redhat.de>
-- add 2 more patches from IBM for S/390
+* Sat Mar 17 2001 Bill Nottingham <notting@redhat.com>
+- on ia64, there are no old headers :)
 
-* Mon Jun 18 2001 Florian La Roche <Florian.LaRoche@redhat.de>
-- disable libtoolize
+* Fri Mar 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- build with old headers, new compiler
 
-* Sat Dec 09 2000 Florian La Roche <Florian.LaRoche@redhat.de>
-- update to 5.0.1 patch from IBM
+* Wed Mar 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot
 
-* Mon Nov 20 2000 Florian La Roche <Florian.LaRoche@redhat.de>
-- added dwarf patch from IBM
+* Mon Feb 26 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot which should fix some more IA64 problems (#29151)
+- remove IA64 patch, it's now integrated
 
-* Sun Nov 19 2000 Florian La Roche <Florian.LaRoche@redhat.de>
-- go back to gdb-5.0-release
-- add S390 patch from IBM
+* Wed Feb 21 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- add IA64 and Alpha patches from Kevin Buettner <kevinb@redhat.com>
+- use perl instead of patch for fixing the version string
+
+* Tue Feb 20 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- don't use kgcc anymore
+- mark it as our own version
+- new snapshot
+
+* Mon Jan 22 2001 Bernhard Rosenkraenzer <bero@redhat.com>
+- Link with ncurses 5.x even though we're using kgcc.
+  No need to drag in requirements on ncurses4 (Bug #24445)
+
+* Fri Jan 19 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot
+
+* Thu Dec 20 2000 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot
+
+* Mon Dec 04 2000 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot
+- new alpha patch - it now compiles everywhere. Finally.
+
+* Fri Dec 01 2000 Trond Eivind Glomsrød <teg@redhat.com>
+- new snapshot
+
+* Mon Nov 20 2000 Trond Eivind Glomsrød <teg@redhat.com>
+- new CVS snapshot
+- disable the patches
+- don't use %%configure, as it confuses the autoconf script
+- enable SPARC, disable Alpha
+
 
 * Wed Aug 09 2000 Trond Eivind Glomsrød <teg@redhat.com>
 - added patch from GDB team for C++ symbol handling
