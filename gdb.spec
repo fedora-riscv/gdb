@@ -6,12 +6,18 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.0 branchpoint.
 Version: 6.0post
-Release: 0.%{cvsdate}.7
+Release: 0.%{cvsdate}.19
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040223.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
+
+# Make sure we get rid of the old package gdb64, now that we have unified
+# support for 32-64 bits in one single 64-bit gdb.
+%ifarch ppc ppc64
+Obsoletes: gdb64
+%endif
 
 # ChangeLogs patches.
 Patch0: gdb-6.0post-ChangeLog.patch
@@ -41,6 +47,20 @@ Patch10: gdb-6.0post-ppc64uregs-mar2004.patch
 Patch11: gdb-6.0post-ppc64prologue-mar2004.patch
 # Patch to fix new thread recognition
 Patch12: gdb-6.0post-thread-fix-mar2004.patch
+# Patch to add pie support to gdb.
+Patch13: gdb-6.0post-pie-mar2004.patch
+# Specific pie tests
+Patch14:gdb-6.0post-pie-tst-mar2004.patch
+# patch to delete some leftover printfs....
+Patch15: gdb-6.0post-pie2-mar2004.patch
+# Fix some gcc3.4 warnings.
+Patch16: gdb-6.0post-gcc34warn-mar2004.patch
+# Some testsuite fixes (RH specific)
+Patch17: gdb-6.0post-test-mar2004.patch
+# Fix for ia64 info frame
+Patch18: gdb-6.0post-ia64-info-frame-apr2004.patch
+# Fix for threads
+Patch19: gdb-6.0post-thread-fix-apr2004.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind
@@ -72,6 +92,14 @@ printing their data.
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
+%patch13 -p1
+%patch14 -p1
+%patch15 -p1
+%patch16 -p1
+%patch17 -p1
+%patch18 -p1
+%patch19 -p1
+
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
 cat > gdb/version.in << _FOO
@@ -233,6 +261,45 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon May 03 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.19
+- Add -u parameter to build ChangeLog patch.
+
+* Mon May 03 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.18
+- Update thread fix made for .6 release to FSF version.
+
+* Thu Apr 22 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.17
+- Disable PIE again.
+
+* Thu Apr 22 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.16
+- Bump version number.
+
+* Wed Apr 21 2004 Jeff Johnston <jjohnstn@redhat.com>	0.20040223.15
+- fix ia64 info frame command
+- also fix ia64 tdep file for which elf header file to include
+
+* Tue Mar 30 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.14
+- re-enable pie.
+
+* Tue Mar 30 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.13
+- Fix testsuite glitches.
+
+* Thu Mar 24 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.12
+- Fix typo.
+
+* Thu Mar 24 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.11
+- Make gdb compile w/o warnings with gcc-3.4.
+- Reenable PIE support code.
+
+* Wed Mar 23 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.10
+- Bump version number
+
+* Wed Mar 23 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.9
+- temporarily disable PIE support.
+- Add section to obsolete gdb64 package.
+
+* Sun Mar 21 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.8
+- Add support for debugging of PIE executables.
+
 * Tue Mar 09 2004 Elena Zannoni <ezannoni@redhat.com>	0.20040223.7
 - Bump version number.
 
