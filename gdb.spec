@@ -6,81 +6,102 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 5.3 branchpoint.
 Version: 5.3post
-Release: 0.%{cvsdate}.18
+Release: 0.%{cvsdate}.29
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20021129.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
 
-# gdb-5.3post-misc.patch
+# ChangeLogs patches.
+Patch0: gdb-5.3post-ChangeLog.patch
+# ChangeLogs patches for testsuite.
+Patch1: gdb-5.3post-ChangeLog-testsuite.patch
 # misc patch from previous release, w/o the changes to lin-lwp.c, to avoid
 # conflicts with the nptl changes (on i386). (Jim Blandy and Kevin Buettner).
-Patch0: gdb-5.3post-misc-p1.patch
+Patch2: gdb-5.3post-misc-p1.patch
 # s390 ABI patch, not yet into upstream sources.
-Patch1: gdb-5.3post-s390-may2002.patch
+Patch3: gdb-5.3post-s390-may2002.patch
 # Patch to disable -Werror on a few files, and fix some Makefile dependencies.
 # (Elena Zannoni).
-Patch2: gdb-5.3post-warnings-dec2002.patch
+Patch4: gdb-5.3post-warnings-dec2002.patch
 # Separate debug info patch. (Jim Blandy and Alex Larsson).
-Patch3: gdb-5.3post-dbg-dec2002.patch
+Patch5: gdb-5.3post-dbg-dec2002.patch
 # Patch to accept empty args with --args (Andreas Schwab).
-Patch4: gdb-5.3post-args-jan2003.patch
+Patch6: gdb-5.3post-args-jan2003.patch
 # patch to lin-lwp.c to bring it in sync with sources.redhat.com version.
-Patch5: gdb-5.3post-sync.patch
-# patch from Jeff Johnston (jjohnstn@redhat.com) to lin-lwp.c for
-# nptl support. Applied for i386 only. (Still WIP).
-#Patch6: gdb-5.3post-jj-lwp.patch
-#Patch6: gdb-5.3post-jj-lwp2.patch
+Patch7: gdb-5.3post-sync.patch
+# patch from Jeff Johnston (jjohnstn@redhat.com) with
 # all the fixes for NPTL, hopefully architecture neutral.
-Patch6: gdb-5.3post-all-thread-jan2003.patch
-# old misc patch from Kevin Buettner and Jim Blandy for lin-lwp.c and i386
-# only (applies on top of Jeff Johnston patch).
-# this is now included in the big thread patch.
-#Patch7: gdb-5.3post-misc-p2.patch
-# patch from Jeff Johnston (jjohnstn@redhat.com) for nptl support
-# (applied for i386 only).
-#Patch8: gdb-5.3post-jjohnstn-thread.patch
+Patch8: gdb-5.3post-all-thread-jan2003.patch
 # patch to fix the until command and add advance command (ezannoni@redhat.com).
 Patch9: gdb-5.3post-until-jan2003.patch
-# cumulative ChangeLogs patches.
-Patch10: gdb-5.3post-ChangeLog-all.patch
 # patch to ignore NOBITS .eh_frame section in debug info (ezannoni@redhat.com).
-Patch11: gdb-5.3post-dwarf2-jan2003.patch
+Patch10: gdb-5.3post-dwarf2-jan2003.patch
 # patch to cleanup gfi engine on rerun (mludvig@suse.com).
-Patch12: gdb-5.3post-cfi-jan2003.patch
+Patch11: gdb-5.3post-cfi-jan2003.patch
 # patch to fix ui out errors (ezannoni@redhat.com, kevinb@redhat.com).
-Patch13: gdb-5.3post-uiout-feb2003.patch
+Patch12: gdb-5.3post-uiout-feb2003.patch
 # patch to use the correct include file in s390-nat.c (ezannoni@redhat.com).
-Patch14: gdb-5.3post-s390-feb2003.patch
+Patch13: gdb-5.3post-s390-feb2003.patch
 # patch to expedite execution of testsuite when gdb gets internal
 # error (jimb@redhat.com).
-Patch15: gdb-5.3post-interr-feb2003.patch
+Patch14: gdb-5.3post-interr-feb2003.patch
 # New TLS specific tests (ezannoni@redhat.com).
-Patch16: gdb-5.3post-tlstst-feb2003.patch
+Patch15: gdb-5.3post-tlstst-feb2003.patch
 # various cleanups for the gdb.threads tests
 # (drow@mvista.com, ezannoni@redhat.com).
-Patch17: gdb-5.3post-thrtst-feb2003.patch
+Patch16: gdb-5.3post-thrtst-feb2003.patch
 # Patch to deal with .debug_ranges (rth@redhat.com, ezannoni@redhat.com,
 # drow@mvista.com)
-Patch18: gdb-5.3post-dw2ranges-feb2003.patch
+Patch17: gdb-5.3post-dw2ranges-feb2003.patch
 # From jjohnstn@redhat.com
-Patch19: gdb-5.3post-bug81732-feb2003.patch
+Patch18: gdb-5.3post-bug81732-feb2003.patch
 # Fix for mi-ptreads tests (mec@shout.net). 
-Patch20: gdb-5.3post-mipthreads-feb2003.patch
+Patch19: gdb-5.3post-mipthreads-feb2003.patch
 # Fix for dealing with files with stabs debug info, but no line info. 
 # (jjohnstn@redhat.com, ezannoni@redhat.com).
-Patch21: gdb-5.3post-stabfix-feb2003.patch
+Patch20: gdb-5.3post-stabfix-feb2003.patch
 # Fix for gdb core dump on disassembly. (ezannoni@redhat.com).
-Patch22: gdb-5.3post-s390dis-feb2003.patch
+Patch21: gdb-5.3post-s390dis-feb2003.patch
 # Fix for new kernel behavior with attach and SIGSTOP (ezannoni@redhat.com).
-Patch23: gdb-5.3post-attach-feb2003.patch
+Patch22: gdb-5.3post-attach-feb2003.patch
 # From jjohnstn@redhat.com
-Patch24: gdb-5.3post-jj-lwp3.patch
+Patch23: gdb-5.3post-jj-lwp3.patch
 # Some misc testsuite cleanups. (ezannoni@redhat.com)
-Patch25: gdb-5.3post-tests-feb2003.patch
+Patch24: gdb-5.3post-tests-feb2003.patch
 # Update copyright year in version.
-Patch26: gdb-5.3post-copyright-feb2003.patch
+Patch25: gdb-5.3post-copyright-feb2003.patch
+# Fix to make run-time check for tkill syscall.
+Patch26: gdb-5.3post-jj-lwp4.patch
+# A few misc fixes for x86-64
+Patch27: gdb-5.3post-x86-64-mar2003.patch
+# Fixes for testsuite problems
+Patch28: gdb-5.3post-tests-mar2003.patch
+# More fixes for testsuite problems
+Patch29: gdb-5.3post-tests2-mar2003.patch
+# Inferior func call fixes for x86-64
+Patch30: gdb-5.3post-x86-64-2-mar2003.patch
+# Fix for handling create/death events
+Patch31: gdb-5.3post-threaddb-mar2003.patch
+# Fixes for some testsuite failures
+Patch32: gdb-5.3post-misc-mar2003.patch
+# Fixes for s390 prologue analysis.
+Patch33: gdb-5.3post-s390prologue-mar2003.patch
+# Fixes for disassembling code in threaded apps and core files.
+Patch34: gdb-5.3post-disas-mar2003.patch
+# Fixes for disassemble memory corruption.
+Patch35: gdb-5.3post-disas2-mar2003.patch
+# S/390: help GDB find structs returned by inferior calls.
+Patch36: gdb-5.3post-s390-frame-align-mar2003.patch
+# S/390: Detect end of frame chain
+Patch37: gdb-5.3post-s390-stack-end-mar2003.patch
+# Make test suite recover from various failures
+Patch38: gdb-5.3post-tests3-mar2003.patch
+# Print Java strings correctly.
+Patch39: gdb-5.3post-java-mar2003.patch
+# Script to invoke gdb and execute a gcore command.
+Patch40: gdb-5.3post-gcore-script.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
 Prereq: info
@@ -102,16 +123,8 @@ printing their data.
 %patch4 -p1 
 %patch5 -p1 
 %patch6 -p1 
-%ifarch %{ix86}
-# apply the NPTL patches only on i386.
-#patch6 -p1 
-#patch7 -p1 
-#patch8 -p1 
-%endif
-%ifarch alpha ppc ia64 x86_64 s390 s390x
-# apply the rest of the misc patch only.
-#patch7 -p1 
-%endif
+%patch7 -p1 
+%patch8 -p1 
 %patch9 -p1 
 %patch10 -p1 
 %patch11 -p1 
@@ -130,6 +143,20 @@ printing their data.
 %patch24 -p1 
 %patch25 -p1 
 %patch26 -p1 
+%patch27 -p1 
+%patch28 -p1 
+%patch29 -p1 
+%patch30 -p1 
+%patch31 -p1 
+%patch32 -p1 
+%patch33 -p1 
+%patch34 -p1 
+%patch35 -p1 
+%patch36 -p1 
+%patch37 -p1 
+%patch38 -p1 
+%patch39 -p1 
+%patch40 -p1 
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -161,7 +188,7 @@ export CFLAGS="$RPM_OPT_FLAGS"
 # Only i386 builds with -Werror because other platforms get host header
 # files conflicts.
 enable_build_warnings=""
-%ifarch %{ix86} alpha ia64 ppc s390 s390x
+%ifarch %{ix86} alpha ia64 ppc s390 s390x x86-64
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
@@ -198,6 +225,10 @@ cd ../build-%{_target_platform}
 rm -rf $RPM_BUILD_ROOT
 
 %makeinstall
+
+# install the gcore script in /usr/bin
+cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
+chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -255,6 +286,52 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Mar 31 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.29
+- Include the gcore script, as gdb_gcore.sh and install it in
+  /usr/bin as gcore.
+- One more disassembly fix for core files. Added to
+  gdb-5.3post-disasm-mar2003.patch. Bugzilla 87677.
+- Enable build warnings for x86-64.
+
+* Mon Mar 31 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.28
+- Fix Java strings printing.
+- Fix memory corruption in disassembly code. Bugzilla 85644.
+- Testsuite fixes (jimb@redhat.com). Bugzilla 85457.
+- Fixes for s390 stack handling (jimb@redhat.com). Bugzilla 85039.
+- Fixes for s390 struct return (jimb@redhat.com).
+
+* Wed Mar 26 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.27
+- Fixes for disassembly of code in threaded applications. Bugzilla 87495.
+- Fixes for s390 prologue analysis. (jimb@redhat.com).
+  Bugzilla bugs 85251, 85214.
+
+* Thu Mar 20 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.26
+- Fix inferior function calls with void return on x86-64. Bugzilla bug 83197.
+- Fix for upstream PR/699.
+- Fix some problems with gdb-5.3post-thrtst-feb2003.patch.
+
+* Wed Mar 19 2003 Jeff Johnston <jjohnstn@redhat.com>  0.20021129.25
+- Fix for thread-db.c: check_event() - Bugzilla bug 86231.
+
+* Fri Mar 14 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.24
+- Fix some problems with inferior function calls on x86-64.
+
+* Fri Mar 07 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.23
+- testsuite patches. Bugzilla 85215 85028 85335.
+
+* Thu Mar 06 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.22
+- Fix testsuite problems related to having '+' in the directory name.
+  Bugzilla 85031.
+
+* Mon Mar 03 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.21
+- Fix a few inferior function call problems.
+
+* Mon Mar 03 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.20
+- Split the changelog patches in two. Cleanup messy patch section.
+
+* Thu Feb 27 2003 Jeff Johnston <jjohnstn@redhat.com>  0.20021129.19
+- Perform run-time check for tkill syscall in lin-lwp.c.
+
 * Mon Feb 24 2003 Elena Zannoni <ezannoni@redhat.com>  0.20021129.18
 - Update copyright year printed in version.
 
