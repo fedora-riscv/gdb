@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.59
+Release: 1.%{cvsdate}.60
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -117,6 +117,9 @@ patch83: gdb-6.1post-gstack-nov2004.patch
 # Add PPC register groups.
 patch84: gdb-6.1post-abi-ppcreggroups-nov2004.patch
 
+# No longer a need to set .malloc on ppc64.
+patch85: gdb-6.1post-abi-ppcmalloc-nov2004.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -195,6 +198,7 @@ printing their data.
 %patch82 -p1
 %patch83 -p1
 %patch84 -p1
+%patch85 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -363,6 +367,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Nov 24 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.60
+- For PPC-64, do not set malloc name to ".malloc"; no longer needed.
+- For all, only define kfail when not already defined.
+
 * Wed Nov 24 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.59
 - Bump version.
 
