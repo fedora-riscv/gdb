@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.31
+Release: 0.34
 
 License: GPL
 Group: Development/Debuggers
@@ -189,6 +189,9 @@ Patch143: gdb-6.3-unload-test-20050216.patch
 # Backport addition symfile-mem.o to all GNU/Linux systems.
 Patch144: gdb-6.3-addsymfilemem-20050209.patch
 
+# Allow sibling threads to set threaded watchpoints for x86 and x86-64
+Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -266,6 +269,7 @@ and printing their data.
 %patch142 -p1
 %patch143 -p1
 %patch144 -p1
+%patch145 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -305,7 +309,7 @@ cd %{gdb_build}
 # at least one warning, and stop the compilation.  The whole configury
 # line needs to be cleaned up.
 
-export CFLAGS="$RPM_OPT_FLAGS -Wp,-U_FORTIFY_SOURCE"
+export CFLAGS="$RPM_OPT_FLAGS -Wno-unused -Wno-pointer-sign -Wp,-U_FORTIFY_SOURCE"
 
 enable_build_warnings=""
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
@@ -434,6 +438,14 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 03 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.34
+- Bump up release number.
+
+* Mon Feb 28 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.32
+- Modify debug register handling for x86, x86-64 to be thread-specific.
+- Modify threaded watchpoint code for x86, x86-64 to properly insert
+  and remove watchpoints on all threads.
+
 * Tue Feb 22 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.31
 - Bump version number.
 
