@@ -60,7 +60,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 Patch21: gdb-6.1post-abi-ppc64syscall-jun2004.patch
 #Broken: Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
-Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
 Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
 Patch28: gdb-6.1post-abi-ppc64section-oct2004.patch
 
@@ -112,6 +111,7 @@ Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
 Patch101: gdb-6.3-sigx86-20040621.patch
 Patch102: gdb-6.3-sigsymtramp-20040621.patch
 Patch103: gdb-6.3-sigppc-20040621.patch
+Patch104: gdb-6.3-ppcdotsolib-20041022.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -148,6 +148,8 @@ and printing their data.
 %patch100 -p1
 %patch101 -p1
 %patch102 -p1
+%patch103 -p1
+%patch104 -p1
 
 %patch21 -p1
 %patch24 -p1
