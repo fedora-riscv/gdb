@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.19.1
+Release: 1.%{cvsdate}.19.2
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -35,6 +35,8 @@ Patch4: gdb-6.1post-gccwarn.patch
 Patch5: gdb-6.1post-watchpoint-fix.patch
 # Thread fix.
 Patch6: gdb-6.1post-thread-fix.patch
+# Fix to libunwind test.
+Patch7: gdb-6.1post-libunwind-tst-fix.patch
 
 ####### Signal trampoline fixes
 Patch10: gdb-6.1post-sig-ppc-jun2004.patch
@@ -102,6 +104,7 @@ printing their data.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
+%patch7 -p1
 
 %patch10 -p1
 %patch11 -p1
@@ -309,7 +312,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Fri Jul 30 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.18.1
+* Tue Aug 03 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.20
+- Fix the ia64 libunwind test to match current output.
+
+* Fri Jul 30 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.19
 - Fix the tests where gdb debugs itself, as to not copy
   the executable to xgdb.
 
