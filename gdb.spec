@@ -1,11 +1,10 @@
-%define snapdate 20010316
+%define snapdate 20010516
 
 Summary: A GNU source-level debugger for C, C++ and Fortran.
 Name: gdb
 Version: 5.0rh
-Release: 5
+Release: 9
 Copyright: GPL
-Patch0: gdb-alpha.patch
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/gdb+dejagnu-%{snapdate}.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
@@ -27,17 +26,17 @@ programs.
 
 %prep
 %setup -q -n gdb+dejagnu-%{snapdate}
-%patch0 -p1 -b .alpha
 
+#perl -pi -e "s/^VERSION.*$/VERSION=5\.0rh-%{release} Red Hat Linux 7\.1/" gdb/Makefile.in
+cat > gdb/version.in << _FOO
+Red Hat Linux 7.x (%{version}-%{release})
+_FOO
 
-perl -pi -e "s/^VERSION.*$/VERSION=5\.0rh-%{release} Red Hat Linux 7\.1/" gdb/Makefile.in
 
 %build
-%ifarch ia64
+
 export CFLAGS="$RPM_OPT_FLAGS"
-%else
-export CFLAGS="-I/usr/i386-glibc21-linux/include $RPM_OPT_FLAGS"
-%endif
+
 rm -fr dejagnu tcl expect 
 ./configure --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man --infodir=/usr/share/info \
     %{_arch}-redhat-linux
@@ -73,14 +72,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 /sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir
-/sbin/install-info %{_infodir}/gdbint.info.gz %{_infodir}/dir
 /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir
 /sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir
 
 %preun
 if [ $1 = 0 ]; then
     /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir
-    /sbin/install-info --delete %{_infodir}/gdbint.info.gz %{_infodir}/dir
     /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir
     /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir
 fi
@@ -91,7 +88,6 @@ fi
 /usr/bin/*
 %{_mandir}/*/*
 %{_infodir}/gdb.info*
-%{_infodir}/gdbint.info*
 %{_infodir}/stabs.info*
 %{_infodir}/mmalloc.info*
 
@@ -99,6 +95,23 @@ fi
 
 
 %changelog
+* Wed May 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot - this had thread fixes for curing #39070
+- New way of specifying version
+
+* Tue May  1 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New tarball
+- Kevin's patch is now part of gdb
+
+* Mon Apr  9 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- Add patch from kevinb@redhat.com to fix floating point + thread 
+  problem (#24310)
+- remove old workarounds
+- new snapshot
+
+* Thu Apr  5 2001 Trond Eivind Glomsrød <teg@redhat.com>
+- New snapshot
+
 * Sat Mar 17 2001 Bill Nottingham <notting@redhat.com>
 - on ia64, there are no old headers :)
 
