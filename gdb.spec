@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.29
+Release: 1.%{cvsdate}.30
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -21,13 +21,9 @@ Obsoletes: gdb64
 
 # ChangeLogs patches.
 Patch0: gdb-6.1post-ChangeLog.patch
-# ChangeLogs patches for testsuite.
-Patch1: gdb-6.1post-ChangeLog-testsuite.patch
 # ChangeLogs patches for doc.
 Patch2: gdb-6.1post-ChangeLog-doc.patch
 ####### start patches from the previous RPM.
-# New test to see if libunwind is used. (Red Hat specific)
-Patch3: gdb-6.1post-libunwind-tst.patch
 # Silence gcc warnings.
 Patch4: gdb-6.1post-gccwarn.patch
 
@@ -37,8 +33,6 @@ Patch4: gdb-6.1post-gccwarn.patch
 Patch5: gdb-6.1post-watchpoint-fix.patch
 # Thread fix.
 Patch6: gdb-6.1post-thread-fix.patch
-# Fix to libunwind test.
-Patch7: gdb-6.1post-libunwind-tst-fix.patch
 # Fix to allow using libunwind 0.97 and up.
 Patch8: gdb-6.1post-libunwind.patch
 # Fix to support applications calling clone directly
@@ -49,6 +43,7 @@ Patch10: gdb-6.1post-sig-ppc-jun2004.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
 Patch12: gdb-6.1post-sig-x86-jun2004.patch
 Patch13: gdb-6.1post-sig-step-aug2004.patch
+Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
 Patch20: gdb-6.1post-abi-ppc64-jun2004.patch
@@ -57,19 +52,19 @@ Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
 Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
-Patch30: gdb-6.1post-test-rh.patch
-Patch31: gdb-6.1post-testsuite-20040621.patch
-Patch32: gdb-6.1post-test-sizeof-jun2004.patch
-Patch33: gdb-6.1post-test-signull-jun2004.patch
-Patch34: gdb-6.1post-test-step-jun2004.patch
-Patch35: gdb-6.1post-test-enadisbr-jun2004.patch
-Patch36: gdb-6.1post-test-observer-jun2004.patch
-Patch37: gdb-6.1post-test-bigcore-jun2004.patch
-Patch38: gdb-6.1post-test-sigbpt-jun2004.patch
-Patch39: gdb-6.1post-test-annota-jun2004.patch
-Patch40: gdb-6.1post-test-attach-jun2004.patch
-Patch41: gdb-6.1post-test-self-jul2004.patch
-Patch42: gdb-6.1post-test-unload-aug2004.patch
+Patch30: gdb-6.1post-test-merge-20040923.patch
+# Work around out-of-date dejagnu that does not have kfail
+Patch31: gdb-6.1post-test-rh-kfail.patch
+# Match Red Hat version info
+Patch32: gdb-6.1post-test-rh-version.patch
+# Get selftest working with sep-debug-info
+Patch33: gdb-6.1post-test-self-jul2004.patch
+# Check that libunwind works - new test then fix
+Patch34: gdb-6.1post-test-rh-libunwind.patch
+Patch35: gdb-6.1post-test-rh-libunwindfix1.patch
+# Generate the bigcore file from the running inferior et.al.
+Patch36: gdb-6.1post-test-bigcoresingle-sep2004.patch
+Patch37: gdb-6.1post-test-bigcore64-sep2004.patch
 
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
@@ -114,19 +109,17 @@ printing their data.
 
 # Apply patches defined above.
 %patch0 -p1 
-%patch1 -p1 
 %patch2 -p1 
-%patch3 -p1 
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
-%patch7 -p1
 %patch8 -p1
 %patch9 -p1
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
 %patch13 -p1
+%patch14 -p1
 
 %patch20 -p1
 %patch21 -p1
@@ -141,11 +134,6 @@ printing their data.
 %patch35 -p1
 %patch36 -p1
 %patch37 -p1
-%patch38 -p1
-%patch39 -p1
-%patch40 -p1
-%patch41 -p1
-%patch42 -p1
 
 %patch50 -p1
 %patch51 -p1
@@ -335,6 +323,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Sep 23 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.30
+- Merge in mainline testsuite up to 2004-09-23, pick up sig*.exp tests.
+  Merge in mainline infrun.c, pick up all infrun.c fixes.
+  Generate bigcore's corefile from the running inferior.
+  Limit bigcore's corefile to max file-size.
+
 * Thu Sep 02 2004 Jeff Johnston  <jjohnstn@redhat.com>	1.200400607.29
 - Fix low-level lin-lwp code to wait specifically for any stepping
   LWP (bugzilla 130896)
