@@ -1,4 +1,5 @@
 %define cvsdate 20040607
+ExcludeArch: s390 s390x x86_64 ppc ppc64
 # Define this if you want to skip the strip step and preserve debug info.
 # Useful for testing. 
 #define __spec_install_post /usr/lib/rpm/brp-compress || :
@@ -6,7 +7,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 0.%{cvsdate}.2.2
+Release: 0.%{cvsdate}.2.3
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -30,9 +31,9 @@ Patch2: gdb-6.1post-testsuite.patch
 Patch3: gdb-6.1post-libunwind-tst.patch
 # Silence gcc warnings.
 Patch4: gdb-6.1post-gccwarn.patch
+Patch5: gdb-6.0post-pie-mar2004.patch
+Patch6: gdb-6.0post-pie2-mar2004.patch
 ####### end patches from the previous RPM.
-# Sync up testsuite, contains i386 KFAIL fixes
-Patch5: gdb-6.1post-testsuite-20040611.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 
@@ -56,8 +57,7 @@ printing their data.
 %patch1 -p1 
 %patch2 -p1 
 %patch3 -p1 
-%patch4 -p1 
-%patch5 -p1 
+%patch4 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -140,13 +140,10 @@ ld -v
 # For now do testing only on these platforms. 
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
-cd gdb/testsuite
-make -k check || :
-for t in sum log; do
-  ln gdb.$t gdb-%{_target_platform}.$t || :
-done
-tar cf - gdb-%{_target_platform}.{sum,log} | bzip2 -1 | uuencode gdb-%{_target_platform}.tar.bz2 || :
-cd ../..
+#cd gdb/testsuite
+#make -k check || :
+#test -r gdb.log && cat gdb.log | bzip2 -1 | uuencode gdb-%{_target_platform}.log.bz2 || :
+#cd ../..
 echo ====================TESTING END=====================
 %endif
 
@@ -169,14 +166,19 @@ chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 # These are part of binutils
 
 rm -rf $RPM_BUILD_ROOT/usr/share/locale/
-rm -f $RPM_BUILD_ROOT%{_infodir}/bfd* $RPM_BUILD_ROOT%{_infodir}/standard*
+rm -f $RPM_BUILD_ROOT%{_infodir}/bfd* 
+rm -f $RPM_BUILD_ROOT%{_infodir}/standard*
+rm -f $RPM_BUILD_ROOT%{_infodir}/mmalloc*
 rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
-rm -rf $RPM_BUILD_ROOT/usr/include/  $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
+rm -rf $RPM_BUILD_ROOT/usr/include/  $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
 # Delete this too because the dir file will be updated at rpm install time.
 # We don't want a gdb specific one overwriting the system wide one.
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
+
+path=`echo $RPM_BUILD_ROOT | sed s/install/BUILD/`
+sed -i "s|$path||"  $RPM_BUILD_ROOT%{_infodir}/*.info
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -191,8 +193,8 @@ rm -rf $RPM_BUILD_ROOT
 [ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/gdbint.info ]         && /sbin/install-info %{_infodir}/gdbint.info %{_infodir}/dir || :
 [ -f %{_infodir}/gdbint.info.gz ]      && /sbin/install-info %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
-[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info %{_infodir}/mmalloc.info %{_infodir}/dir || :
-[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
+#[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info %{_infodir}/mmalloc.info %{_infodir}/dir || :
+#[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/stabs.info ]		&& /sbin/install-info %{_infodir}/stabs.info %{_infodir}/dir  || :
 [ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
 
@@ -204,8 +206,8 @@ if [ $1 = 0 ]; then
 	[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdbint.info ]          && /sbin/install-info --delete %{_infodir}/gdbint.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdbint.info.gz ]       && /sbin/install-info --delete %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
-	[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info --delete %{_infodir}/mmalloc.info %{_infodir}/dir  || :
-	[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
+#	[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info --delete %{_infodir}/mmalloc.info %{_infodir}/dir  || :
+#	[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info --delete %{_infodir}/stabs.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
 fi
@@ -214,22 +216,17 @@ fi
 %defattr(-,root,root)
 %doc COPYING COPYING.LIB README NEWS
 /usr/bin/*
-%{_libdir}/libmmalloc.a*
+#%{_libdir}/libmmalloc.a*
 %{_mandir}/*/*
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
 %{_infodir}/stabs.info*
-%{_infodir}/mmalloc.info*
+#%{_infodir}/mmalloc.info*
 
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Fri Jun 11 2004 Andrew Cagney <cagney@redhat.com>	0.200400607.2.1
-- Import latest testsuite changes.  Fixes bogus KFAILs in
-  structs.exp.
-- Uuencode both the .sum and .log test results
-
 * Thu Jun 10 2004 Elena Zannoni <ezannoni@redhat.com>	0.200400607.2
 - Fix Requires and BuildRequires for libunwind dependencies.
 - Add patch to silence gcc3.4 warnings.
