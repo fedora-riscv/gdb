@@ -351,6 +351,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Nov 22 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.56
+- Bump up release number.
+
 * Mon Nov 22 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.55
 - Multiple ia64 backtrace fixes.  Bugzilla 125157
 
