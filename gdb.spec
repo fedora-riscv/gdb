@@ -1,11 +1,12 @@
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 Version: 5.1
-Release: 0.71
+Release: 0.71.0ppc
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/gdb-%{version}.tar.bz2
 Patch0: jakub-gcc31-gdb.patch
+Patch1: gdb-5.1-ppc64.patch
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
 Prereq: info
@@ -18,6 +19,7 @@ printing their data.
 %prep
 %setup -q 
 %patch0 -p1 -b .dwarfpatch
+%patch1 -p1
 
 cat > gdb/version.in << _FOO
 Red Hat Linux (%{version}-%{release})
@@ -85,6 +87,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Apr 02 2002 Guy Streeter <streeter@redhat.com> 5.1-0.71.0ppc
+- slight change in kernel headers for the 64bit ppc kernel
+
 * Mon Nov 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-0.71
 - 5.1
 
