@@ -1,15 +1,20 @@
+%define cvsdate 20021129
 Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
-Version: 5.2.1
-Release: 4
+# Daily snapshot of gdb taken from FSF mainline cvs, after the 5.3 branchpoint.
+Version: 5.3post
+Release: 0.%{cvsdate}.2
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sources.redhat.com/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
+Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20021129.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://sources.redhat.com/gdb/
-Patch0: gdb-5.2.1-misc.patch
-Patch1: gdb-5.2.1-s390-may2002.patch
-BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo
+Patch0: gdb-5.3post-misc.patch
+Patch1: gdb-5.3post-s390-may2002.patch
+Patch2: gdb-5.3post-alpha-nov2002.patch
+Patch3: gdb-5.3post-ia64-dec2002.patch
+Patch4: gdb-5.3post-ppc-dec2002.patch
+BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
 Prereq: info
 
 %description
@@ -18,51 +23,106 @@ and other languages, by executing them in a controlled fashion and
 printing their data.
 
 %prep
-%setup -q 
+# This allows the tarball name to be different from our version-release name.
+%setup -q -n gdb+dejagnu-%{cvsdate}
+
+# Apply patches defined above.
 %patch0 -p1 
 %patch1 -p1 
+%patch2 -p1 
+%patch3 -p1 
+%patch4 -p1 
 
-rm -fr gdb/gdbserver
-
+# Change the version that gets printed at GDB startup, so it is RedHat
+# specific.
 cat > gdb/version.in << _FOO
-Red Hat Linux (%{version}-%{release})
+Red Hat Linux (%{version}-%{release}rh)
 _FOO
+
+# We don't need these. We'll test with the installed versions of
+# expect/dejagnu.
+rm -fr dejagnu tcl expect
 
 
 %build
 
+cd ..
+rm -fr build-%{_target_platform}
+mkdir build-%{_target_platform}
+cd build-%{_target_platform}
+
+# FIXME: The configure option
+# --enable-gdb-build-warnings=,-Werror below can conflict with
+# user settings. For instance, passing a combination of -Wall and -O0
+# from the file rpmrc will always cause at least one warning, and stop
+# the compilation.
+# The whole configury line needs to be cleaned up.
+
 export CFLAGS="$RPM_OPT_FLAGS"
 
-rm -fr dejagnu tcl expect 
-./configure --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man --infodir=/usr/share/info \
-    %{_arch}-redhat-linux
+# Only i386 builds with -Werror because other platforms get host header
+# files conflicts.
+enable_build_warnings=""
+%ifarch %{ix86}
+enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
+%endif
+
+$RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/configure \
+	--prefix=%{_prefix} \
+	--sysconfdir=%{_sysconfdir} \
+	--mandir=%{_mandir} \
+	--infodir=%{_infodir}\
+	$enable_build_warnings \
+    %{_target_platform}
 
 make
 make info
-cp gdb/NEWS .
+
+# For now do testing only on these platforms. The testsuite on x86_64 is not
+# in good shape.
+%ifarch %{ix86} alpha ppc ia64
+echo ====================TESTING=========================
+cd gdb/testsuite
+make -k check || :
+cd ../..
+echo ====================TESTING END=====================
+%endif
+
+cd ..
+# Copy the <sourcetree>/gdb/NEWS file to the directory above it.
+cp $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/gdb/NEWS $RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}
 
 %install
+cd ../build-%{_target_platform}
 rm -rf $RPM_BUILD_ROOT
 
-%makeinstall infodir=$RPM_BUILD_ROOT/${_infodir} prefix=$RPM_BUILD_ROOT/usr
+%makeinstall
 
-# The above is broken, do this for now:
-mkdir -p $RPM_BUILD_ROOT/%{_infodir}
-cp `find -name "*.info*"` $RPM_BUILD_ROOT/%{_infodir}
+# Remove the files that are part of a gdb build but that are owned and
+# provided by other packages.
+# These are part of binutils
 
-rm -f $RPM_BUILD_ROOT%{_infodir}/dir $RPM_BUILD_ROOT%{_infodir}/dir.info* 
-
-#These are part of binutils
-
+rm -rf $RPM_BUILD_ROOT/usr/share/locale/
 rm -f $RPM_BUILD_ROOT%{_infodir}/bfd* $RPM_BUILD_ROOT%{_infodir}/standard*
-rm -rf $RPM_BUILD_ROOT/usr/include/  $RPM_BUILD_ROOT/usr/lib/lib{bfd*,opcodes*}
+rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
+rm -rf $RPM_BUILD_ROOT/usr/include/  $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
+
+# Delete this too because the dir file will be updated at rpm install time.
+# We don't want a gdb specific one overwriting the system wide one.
+
+rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
+# This step is part of the installation of the RPM. Not to be confused
+# with the 'make install ' of the build (rpmbuild) process.
+
 [ -f %{_infodir}/gdb.info ]		&& /sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir || :
 [ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
+[ -f %{_infodir}/gdbint.info ]         && /sbin/install-info %{_infodir}/gdbint.info %{_infodir}/dir || :
+[ -f %{_infodir}/gdbint.info.gz ]      && /sbin/install-info %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info %{_infodir}/mmalloc.info %{_infodir}/dir || :
 [ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
 [ -f %{_infodir}/stabs.info ]		&& /sbin/install-info %{_infodir}/stabs.info %{_infodir}/dir  || :
@@ -72,6 +132,8 @@ rm -rf $RPM_BUILD_ROOT
 if [ $1 = 0 ]; then
 	[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info --delete %{_infodir}/gdb.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
+	[ -f %{_infodir}/gdbint.info ]          && /sbin/install-info --delete %{_infodir}/gdbint.info %{_infodir}/dir  || :
+	[ -f %{_infodir}/gdbint.info.gz ]       && /sbin/install-info --delete %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/mmalloc.info ]		&& /sbin/install-info --delete %{_infodir}/mmalloc.info %{_infodir}/dir  || :
 	[ -f %{_infodir}/mmalloc.info.gz ]	&& /sbin/install-info --delete %{_infodir}/mmalloc.info.gz %{_infodir}/dir  || :
 	[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info --delete %{_infodir}/stabs.info %{_infodir}/dir  || :
@@ -82,14 +144,72 @@ fi
 %defattr(-,root,root)
 %doc COPYING COPYING.LIB README NEWS
 /usr/bin/*
+%{_libdir}/libmmalloc.a*
 %{_mandir}/*/*
 %{_infodir}/gdb.info*
+%{_infodir}/gdbint.info*
 %{_infodir}/stabs.info*
 %{_infodir}/mmalloc.info*
 
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Dec  2 2002 Elena Zannoni <ezannoni@redhat.com>
+- Don't pass to gdb an empty build warnings flag, or that will disable warnings
+  completely. We want to build using gdb's standard warnings instead.
+
+* Mon Dec  2 2002 Elena Zannoni <ezannoni@redhat.com>
+- Don't do testing for x86_64.
+
+* Sun Dec  1 2002 Elena Zannoni <ezannoni@redhat.com>
+- x86_64 doesn't build with Werror yet.
+- Add patch for alpha.
+- Alpha doesn't build with -Werror either.
+- Add patch for ia64.
+- Add patch for ppc.
+- Drop ia64 from -Werror list.
+- Drop ppc from -Werror list.
+
+* Sun Dec  1 2002 Elena Zannoni <ezannoni@redhat.com>
+- Add dejagnu to the build requirements.
+- Enable make check.
+- Add enable-gdb-build-warnings to the configure flags.
+
+* Fri Nov 29 2002 Elena Zannoni <ezannoni@redhat.com>
+- Import new upstream sources.
+- Change version and release strings.
+- Upgrade patches.
+- Build gdb/gdbserver as well.
+- Define and use 'cvsdate'.
+- Do %%setup specifying the source directory name. 
+- Don't cd up one dir before removing tcl and friends.
+- Change the configure command to allow for the new source tree name.
+- Ditto for the copy of NEWS.
+- Add some comments.
+
+* Mon Nov 25 2002 Elena Zannoni <ezannoni@redhat.com> 5.2.1-5
+General revamp.
+- Add patch for gdb/doc/Makefile.in. Part of fix for bug 77615.
+- Add patch for mmalloc/Makefile.in. Part of fix for bug 77615.
+- Change string printed in version.in to <version>-<release>rh.
+- Move the deletion of dejagnu, expect, tcl to the prep section,
+  from the build section.
+- Add build directory housekeeping to build section.
+- Use macros for configure parameters.
+- Do the build in a separate directory.
+- Prepare for testing, but not enable it yet.
+- Correctly copy the NEWS file to the top level directory, for the doc
+  section to find it.
+- Cd to build directory before doing install.
+- Use makeinstall macro, w/o options.
+- Remove workaround for broken gdb info files. Part of fix for bug 77615.
+- Remove share/locale directory, it is in binutils.
+- Remove info/dir file.
+- Clarify meaning of post-install section.
+- Add gdbint info files to post-install, pre-uninstall and files sections.
+  Part of fix for bugs 77615, 76423.
+- Add libmmalloc.a to package.
+
 * Fri Aug 23 2002 Florian La Roche <Florian.LaRoche@redhat.de>
 - added mainframe patch from developerworks
 
