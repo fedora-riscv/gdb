@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 0.4
+Release: 0.5
 
 License: GPL
 Group: Development/Debuggers
@@ -386,6 +386,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 20 2005 Andrew Cagney <cagney@redhat.com>	6.3.0.0-0.5
+- Use bfd_get_synthetic_symtab to read in any synthetic symbols
+  such as 64-bit PPC's ".symbol"s.
+
 * Tue Jan 18 2005 Jeff Johnston <jjohnstn@redhat.com>	6.3.0.0-0.4
 - Modify non-threaded watchpoint patch to use new observer.
 
