@@ -59,8 +59,6 @@ Patch50: gdb-6.1post-vsyscall-jul2004.patch
 #Broken: Patch52: gdb-6.1post-test-pie-nov2004.patch
 # Fix for allowing macros to continue after backtrace errors
 Patch78: gdb-6.1post-backtrace-nov2004.patch
-# Fix to expose multiple constructors to end-user
-Patch79: gdb-6.1post-constructor-nov2004.patch
 # Add --readnever hack, and gstack script
 #Broken: Patch82: gdb-6.1post-readnever-nov2004.patch
 # No longer a need to set .malloc on ppc64.
@@ -124,8 +122,8 @@ Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
 # Multiple patches to ia64 backtrace
 Patch114: gdb-6.3-ia64-backtrace-20041213.patch
 
-# Fix to ensure types are visible
-Patch115: gdb-6.3-type-fix-20041213.patch
+# Fix to expose multiple constructors to end-user
+Patch115: gdb-6.3-constructor-20041216.patch
 
 # Fix to display base constructors from list and breakpoint commands
 Patch116: gdb-6.3-linespec-20041213.patch
@@ -139,6 +137,9 @@ Patch118: gdb-6.3-gstack-20041123.patch
 
 # Fix for caching thread lwps for linux
 Patch119: gdb-6.3-lwp-cache-20041216.patch
+
+# Fix to ensure types are visible
+Patch120: gdb-6.3-type-fix-20041213.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -192,11 +193,11 @@ and printing their data.
 %patch117 -p1
 %patch118 -p1
 %patch119 -p1
+%patch120 -p1
 
 %patch50 -p1
 
 %patch78 -p1
-%patch79 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
