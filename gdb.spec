@@ -226,7 +226,7 @@ enable_build_warnings=""
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
-$RPM_BUILD_DIR/gdb+dejagnu-%{cvsdate}/configure \
+../gdb+dejagnu-%{cvsdate}/configure \
 	--prefix=%{_prefix} \
 	--sysconfdir=%{_sysconfdir} \
 	--mandir=%{_mandir} \
@@ -307,14 +307,6 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
-# This opprobrious hack is to get rid of the full path of the source texinfo
-# file, that makeinfo adds to the info file. The fullpath contains
-# architecture information, and it would make the resulting info files differ
-# on different arches, therefore creating unnecessary conflicts when 
-# installing multiple RPMS.
-path=`echo $RPM_BUILD_ROOT | sed s/install/BUILD/`
-sed -i "s|$path||"  $RPM_BUILD_ROOT%{_infodir}/*.info*
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -356,6 +348,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Nov 11 2004 Elena Zannoni <ezannoni@redhat.com>	1.200400607.51
+- Modify configure line to not use absolute paths. This was 
+creating problems with makeinfo/texinfo.
+- Get rid of makeinfo hack.
+Bugzilla 135633
+
 * Tue Nov 09 2004 Jeff Johnston <jjohnstn@redhat.com>	1.200400607.50
 - Bump up release number
 
