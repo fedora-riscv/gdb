@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.42
+Release: 1.%{cvsdate}.43
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -52,6 +52,8 @@ Patch22: gdb-6.1post-abi-wildframe-jun2004.patch
 Patch23: gdb-6.1post-abi-ppc64main-aug2004.patch
 Patch24: gdb-6.1post-frame-zeropc-sep2004.patch
 Patch25: gdb-6.1post-abi-ppcdotsolib-oct2004.patch
+Patch26: gdb-6.1post-abi-ppc64fpscr-oct2004.patch
+Patch27: gdb-6.1post-abi-s390rewrite-oct2004.patch
 
 ###### Testsuite merge, fixes, and local RH hack
 Patch30: gdb-6.1post-test-merge-20040923.patch
@@ -139,6 +141,8 @@ printing their data.
 %patch23 -p1
 %patch24 -p1
 %patch25 -p1
+%patch26 -p1
+%patch27 -p1
 
 %patch30 -p1
 %patch31 -p1
@@ -340,6 +344,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Oct 26 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.43
+- Hack around broken PT_FPSCR defined in headers.
+- Import latest s390 fixes.
+
 * Fri Oct 22 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.42
 - For 64-bit PPC, convert _dl_debug_state descriptor into a code address.
 - Fix --ignore option.
