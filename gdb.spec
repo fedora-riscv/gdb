@@ -6,7 +6,7 @@ Summary: A GNU source-level debugger for C, C++ and other languages.
 Name: gdb
 # Daily snapshot of gdb taken from FSF mainline cvs, after the 6.1 branchpoint.
 Version: 6.1post
-Release: 1.%{cvsdate}.39
+Release: 1.%{cvsdate}.40
 License: GPL
 Group: Development/Debuggers
 Source: ftp://sources.redhat.com/pub/gdb/snapshots/current/gdb+dejagnu-20040607.tar.bz2
@@ -72,7 +72,7 @@ Patch38: gdb-6.1post-test-sigstepcomment-oct2004.patch
 ##### VSYSCALL and PIE
 Patch50: gdb-6.1post-vsyscall-jul2004.patch
 Patch51: gdb-6.1post-pie-jul2004.patch
-Patch52: gdb-6.1post-pie-tst-jul2004.patch
+Patch52: gdb-6.1post-test-pie-oct2004.patch
 
 ##### Bigcore tweak
 Patch60: gdb-6.1post-o-largefile-jul2004.patch
@@ -245,7 +245,11 @@ ld -v
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
-make -k check RUNTESTFLAGS='--ignore bigcore.exp' || :
+make -k check RUNTESTFLAGS='\
+--ignore bigcore.exp \
+--ignore attach-pie \
+--ignore asm-source.exp \
+' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -337,6 +341,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.40
+- Disable attach-pie.exp test, hangs on amd64 without auxv.
+- Move pie tests to pie.
+
 * Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com>	1.200400607.39
 - Fix comment bug in sigstep.exp.
 
