@@ -62,7 +62,6 @@ Patch9: broken.patch
 Patch10: broken.patch
 Patch11: gdb-6.1post-sig-symtramp-jun2004.patch
 Patch12: gdb-6.1post-sig-x86-jun2004.patch
-#Merged: Patch13: gdb-6.1post-sig-step-aug2004.patch
 #Merged: Patch14: gdb-6.1post-sig-infrun-sep2004.patch
 
 ####### ABI fixes and updates
@@ -202,10 +201,9 @@ and printing their data.
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
-%patch13 -p1
-%patch14 -p1
+#%patch14 -p1
 
-%patch18 -p1
+#%patch18 -p1
 %patch19 -p1
 %patch20 -p1
 %patch21 -p1
@@ -214,11 +212,11 @@ and printing their data.
 %patch24 -p1
 %patch25 -p1
 %patch26 -p1
-%patch27 -p1
+#%patch27 -p1
 %patch28 -p1
-%patch29 -p1
+#%patch29 -p1
 
-%patch30 -p1
+#%patch30 -p1
 %patch31 -p1
 %patch32 -p1
 %patch33 -p1
