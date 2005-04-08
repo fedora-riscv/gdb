@@ -52,10 +52,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 # Add fixes starting at 100
 
-# Just issue a warning when DW_OP_piece.  Stops GDB falling on the
-# floor.
-Patch100: gdb-6.3-dwoppiecewarning-20041202.patch
-
 # Recognize i386 signal trampolines before CFI.  Ensures that signal
 # frames are identified as signal frames.
 Patch101: gdb-6.3-sigx86-20040621.patch
@@ -208,6 +204,9 @@ Patch149: gdb-6.3-ia64-vsyscall-20050330.patch
 Patch150: gdb-6.3-test-sepcrc-20050402.patch
 Patch151: gdb-6.3-sepcrc-20050402.patch
 
+# Handle read side of DW_OP_piece.
+Patch152: gdb-6.3-dwoppieceread-20050407.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -240,7 +239,6 @@ and printing their data.
 %patch3 -p1
 %patch4 -p1
 
-%patch100 -p1
 %patch101 -p1
 %patch102 -p1
 %patch103 -p1
@@ -292,6 +290,7 @@ and printing their data.
 %patch149 -p1
 %patch150 -p1
 %patch151 -p1
+%patch152 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -460,6 +459,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Apr 8 2005 Andrew Cagney <cagney@redhat.com>   	6.3.0.0-1.11
+- Replace patch warning about DW_OP_piece with a patch that implements
+  the DW_OP_piece read path.
+
 * Sat Apr 2 2005 Andrew Cagney <cagney@redhat.com>   	6.3.0.0-1.10
 - Print a warning when the separate debug info's CRC doen't match;
   test.
