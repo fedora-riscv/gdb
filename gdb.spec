@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.11
+Release: 1.12
 
 License: GPL
 Group: Development/Debuggers
@@ -115,7 +115,7 @@ Patch117: gdb-6.3-removebp-20041130.patch
 
 # Add a wrapper script to GDB that implements pstack using the
 # --readnever option.
-Patch118: gdb-6.3-gstack-20041123.patch
+Patch118: gdb-6.3-gstack-20050411.patch
 
 # Fix for caching thread lwps for linux
 Patch119: gdb-6.3-lwp-cache-20041216.patch
@@ -459,6 +459,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Apr 11 2005 Andrew Cagney <cagney@redhat.com>   	6.3.0.0-1.12
+- Update gstack patch, handle systems that lack /proc/<pid>/tasks.
+
 * Fri Apr 8 2005 Andrew Cagney <cagney@redhat.com>   	6.3.0.0-1.11
 - Replace patch warning about DW_OP_piece with a patch that implements
   the DW_OP_piece read path.
