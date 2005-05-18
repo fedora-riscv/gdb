@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.21
+Release: 1.24
 
 License: GPL
 Group: Development/Debuggers
@@ -216,6 +216,9 @@ Patch154: gdb-6.3-ia64-sigtramp-20050427.patch
 # Partial die in cache fix
 Patch155: gdb-6.3-partial-die-20050503.patch
 
+# SA_RESTART patch
+Patch156: gdb-6.3-sarestart-20050518.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -303,6 +306,7 @@ and printing their data.
 %patch153 -p1
 %patch154 -p1
 %patch155 -p1
+%patch156 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -471,6 +475,16 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed May 18 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.24
+- Bump up release number.
+
+* Wed May 18 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.23
+- Bump up release number.
+
+* Wed May 18 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.22
+- Specify SA_RESTART for linux-nat.c handlers and use my_waitpid
+  which handles EINTR.
+
 * Tue May 03 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.21
 - Bump up release number.
 
