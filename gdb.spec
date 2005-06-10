@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.24
+Release: 1.30
 
 License: GPL
 Group: Development/Debuggers
@@ -219,6 +219,9 @@ Patch155: gdb-6.3-partial-die-20050503.patch
 # SA_RESTART patch
 Patch156: gdb-6.3-sarestart-20050518.patch
 
+# Security errata for bfd overflow and untrusted .gdbinit
+Patch157: gdb-6.3-security-errata-20050610.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -307,6 +310,7 @@ and printing their data.
 %patch154 -p1
 %patch155 -p1
 %patch156 -p1
+%patch157 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -475,6 +479,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jun 10 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.30
+- Bump up release number.
+
+* Fri Jun 10 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.28
+- Security errata for bfd and .gdbinit file usage
+- Bugzilla 158680 
+
 * Wed May 18 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.24
 - Bump up release number.
 
