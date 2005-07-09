@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.34
+Release: 1.37
 
 License: GPL
 Group: Development/Debuggers
@@ -222,6 +222,9 @@ Patch156: gdb-6.3-sarestart-20050518.patch
 # Security errata for bfd overflow and untrusted .gdbinit
 Patch157: gdb-6.3-security-errata-20050610.patch
 
+# IA64 sigtramp prev register patch
+Patch158: gdb-6.3-ia64-sigtramp-frame-20050708.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -311,6 +314,7 @@ and printing their data.
 %patch155 -p1
 %patch156 -p1
 %patch157 -p1
+%patch158 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -479,6 +483,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jul 08 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.37
+- Bump up release number.
+
+* Fri Jul 08 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.35
+- Build pseudo-registers properly for sigtramp frame.
+- Bugzilla 160339
+
 * Fri Jul 08 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.34
 - Bump up release number.
 
