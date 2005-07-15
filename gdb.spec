@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.41
+Release: 1.45
 
 License: GPL
 Group: Development/Debuggers
@@ -228,6 +228,9 @@ Patch158: gdb-6.3-ia64-sigtramp-frame-20050708.patch
 # IA64 sigaltstack patch
 Patch159: gdb-6.3-ia64-sigaltstack-20050711.patch
 
+# IA64 gcore speed-up patch
+Patch160: gdb-6.3-ia64-gcore-speedup-20050714.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -319,6 +322,7 @@ and printing their data.
 %patch157 -p1
 %patch158 -p1
 %patch159 -p1
+%patch160 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -487,6 +491,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jul 14 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.45
+- Bump up release number.
+
+* Thu Jul 14 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.42
+- Add work-around to make ia64 gcore work faster.
+- Bugzilla 147436
+
 * Thu Jul 14 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.41
 - Bump up release number.
 
