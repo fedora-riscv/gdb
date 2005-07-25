@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.49
+Release: 1.53
 
 License: GPL
 Group: Development/Debuggers
@@ -234,6 +234,9 @@ Patch160: gdb-6.3-ia64-gcore-speedup-20050714.patch
 # Notify observers that the inferior has been created
 Patch161: gdb-6.3-inferior-notification-20050721.patch
 
+# Fix ia64 info frame bug
+Patch162: gdb-6.3-ia64-info-frame-fix-20050725.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -327,6 +330,7 @@ and printing their data.
 %patch159 -p1
 %patch160 -p1
 %patch161 -p1
+%patch162 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -495,6 +499,14 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jul 25 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.53
+- Bump up release number.
+                                                                                
+* Mon Jul 25 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.50
+- Fix bug with info frame and cursor address on ia64.
+- Add testcase to verify pseudo-registers calculated for ia64 sigtramp.
+- Bugzilla 160339
+                                                                                
 * Fri Jul 22 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.49
 - Bump up release number.
                                                                                 
