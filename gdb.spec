@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.53
+Release: 1.57
 
 License: GPL
 Group: Development/Debuggers
@@ -237,6 +237,9 @@ Patch161: gdb-6.3-inferior-notification-20050721.patch
 # Fix ia64 info frame bug
 Patch162: gdb-6.3-ia64-info-frame-fix-20050725.patch
 
+# Verify printing of inherited members test
+Patch163: gdb-6.3-inheritancetest-20050726.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -330,7 +333,7 @@ and printing their data.
 %patch159 -p1
 %patch160 -p1
 %patch161 -p1
-%patch162 -p1
+%patch163 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -499,6 +502,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jul 26 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.57
+- Bump up release number.
+                                                                                
+* Tue Jul 26 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.54
+- Add testcase to verify printing of inherited members
+- Bugzilla 146835
+                                                                                
 * Mon Jul 25 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.53
 - Bump up release number.
                                                                                 
