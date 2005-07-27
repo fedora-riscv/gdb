@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.57
+Release: 1.61
 
 License: GPL
 Group: Development/Debuggers
@@ -333,6 +333,7 @@ and printing their data.
 %patch159 -p1
 %patch160 -p1
 %patch161 -p1
+%patch162 -p1
 %patch163 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
@@ -502,6 +503,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jul 27 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.61
+- Bump up release number.
+                                                                                
 * Tue Jul 26 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.57
 - Bump up release number.
                                                                                 
