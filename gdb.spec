@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.61
+Release: 1.65
 
 License: GPL
 Group: Development/Debuggers
@@ -240,6 +240,9 @@ Patch162: gdb-6.3-ia64-info-frame-fix-20050725.patch
 # Verify printing of inherited members test
 Patch163: gdb-6.3-inheritancetest-20050726.patch
 
+# Add readnever option
+Patch164: gdb-6.3-readnever-20050907.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -335,6 +338,7 @@ and printing their data.
 %patch161 -p1
 %patch162 -p1
 %patch163 -p1
+%patch164 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -503,6 +507,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Sep 07 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.65
+- Bump up release number.
+
+* Wed Sep 07 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.62
+- Readd readnever option
+
 * Wed Jul 27 2005 Jeff Johnston <jjohnstn@redhat.com>   6.3.0.0-1.61
 - Bump up release number.
                                                                                 

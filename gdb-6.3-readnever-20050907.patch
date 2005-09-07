@@ -1,0 +1,86 @@
+2004-11-18  Andrew Cagney  <cagney@gnu.org>
+
+        * dwarf2read.c: Include "top.c".
+        (dwarf2_has_info): Check for readnever_symbol_files.
+        * symfile.c (readnever_symbol_files): Define.
+        * top.h (readnever_symbol_files): Declare.
+        * main.c (captured_main): Add --readnever option.
+        (print_gdb_help): Ditto.
+
+2004-11-18  Andrew Cagney  <cagney@gnu.org>
+
+        * gdb.texinfo (File Options): Document --readnever.
+
+--- gdb-6.3/gdb/doc/gdb.texinfo.fix	2005-09-07 13:32:23.000000000 -0400
++++ gdb-6.3/gdb/doc/gdb.texinfo	2005-09-07 13:33:21.000000000 -0400
+@@ -952,6 +952,12 @@ Read each symbol file's entire symbol ta
+ the default, which is to read it incrementally as it is needed.
+ This makes startup slower, but makes future operations faster.
+ 
++@item --readnever
++@cindex @code{--readnever}
++Do not read each symbol file's symbolic debug information.  This makes
++startup faster but at the expense of not being able to perform
++symbolic debugging.
++
+ @end table
+ 
+ You typically combine the @code{-mapped} and @code{-readnow} options in
+--- gdb-6.3/gdb/main.c.fix	2005-09-07 13:31:43.000000000 -0400
++++ gdb-6.3/gdb/main.c	2005-09-07 13:33:21.000000000 -0400
+@@ -250,6 +250,7 @@ captured_main (void *data)
+       {"xdb", no_argument, &xdb_commands, 1},
+       {"dbx", no_argument, &dbx_commands, 1},
+       {"readnow", no_argument, &readnow_symbol_files, 1},
++      {"readnever", no_argument, &readnever_symbol_files, 1},
+       {"r", no_argument, &readnow_symbol_files, 1},
+       {"quiet", no_argument, &quiet, 1},
+       {"q", no_argument, &quiet, 1},
+@@ -861,6 +862,7 @@ Options:\n\n\
+   fputs_unfiltered (_(" file.\n\
+   --quiet            Do not print version number on startup.\n\
+   --readnow          Fully read symbol files on first access.\n\
++  --readnever        Do not read symbol files.\n\
+ "), stream);
+   fputs_unfiltered (_("\
+   --se=FILE          Use FILE as symbol file and executable file.\n\
+--- gdb-6.3/gdb/symfile.c.fix	2005-09-07 13:31:48.000000000 -0400
++++ gdb-6.3/gdb/symfile.c	2005-09-07 13:33:21.000000000 -0400
+@@ -75,6 +75,7 @@ static void clear_symtab_users_cleanup (
+ 
+ /* Global variables owned by this file */
+ int readnow_symbol_files;	/* Read full symbols immediately */
++int readnever_symbol_files;	/* Never read full symbols.  */
+ 
+ /* External variables and functions referenced. */
+ 
+--- gdb-6.3/gdb/dwarf2read.c.fix	2005-09-07 13:31:58.000000000 -0400
++++ gdb-6.3/gdb/dwarf2read.c	2005-09-07 13:34:03.000000000 -0400
+@@ -45,6 +45,7 @@
+ #include "dwarf2loc.h"
+ #include "cp-support.h"
+ #include "hashtab.h"
++#include "top.h"
+ #include "command.h"
+ #include "gdbcmd.h"
+ 
+@@ -1100,7 +1101,8 @@ dwarf2_has_info (struct objfile *objfile
+   dwarf_loc_section = 0;
+   
+   bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
+-  return (dwarf_info_section != NULL && dwarf_abbrev_section != NULL);
++  return (!readnever_symbol_files
++	  && dwarf_info_section != NULL && dwarf_abbrev_section != NULL);
+ }
+ 
+ /* This function is mapped across the sections and remembers the
+--- gdb-6.3/gdb/top.h.fix	2005-09-07 13:32:08.000000000 -0400
++++ gdb-6.3/gdb/top.h	2005-09-07 13:33:21.000000000 -0400
+@@ -57,6 +57,7 @@ extern void set_prompt (char *);
+ 
+ /* From random places.  */
+ extern int readnow_symbol_files;
++extern int readnever_symbol_files;
+ 
+ /* Perform _initialize initialization */
+ extern void gdb_init (char *);
