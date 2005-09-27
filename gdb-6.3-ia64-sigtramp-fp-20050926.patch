@@ -1,0 +1,145 @@
+2005-09-27  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* libunwind-frame.c (libunwind_frame_cache): Save the current
+	stack pointer in the cache.
+	(libunwind_sigtramp_frame_this_id): New function.
+	(libunwind_sigtramp_frame_unwind): New unwinder.
+	(libunwind_sigtramp_frame_sniffer): Return 
+	libunwind_sigtramp_frame_unwind address.
+	* libunwind-frame.h (libunwind_sigtramp_frame_this_id): New
+	prototype.
+	* ia64-tdep.c (ia64_libunwind_sigtramp_frame_this_id): Calculate
+	the base address using the current stack pointer plus a fixed
+	offset.
+	
+--- gdb-6.3/gdb/libunwind-frame.c.fix	2005-09-26 14:45:45.000000000 -0400
++++ gdb-6.3/gdb/libunwind-frame.c	2005-09-26 14:46:27.000000000 -0400
+@@ -62,6 +62,7 @@ static unw_word_t (*unw_find_dyn_list_p)
+ struct libunwind_frame_cache
+ {
+   CORE_ADDR base;
++  CORE_ADDR sp;
+   CORE_ADDR func_addr;
+   unw_cursor_t cursor;
+ };
+@@ -131,7 +132,7 @@ libunwind_frame_cache (struct frame_info
+   unw_accessors_t *acc;
+   unw_addr_space_t as;
+   unw_cursor_t *cursor_addr;
+-  unw_word_t fp;
++  unw_word_t fp, sp;
+   unw_regnum_t uw_sp_regnum;
+   struct libunwind_frame_cache *cache;
+   struct libunwind_descr *descr;
+@@ -176,15 +177,28 @@ libunwind_frame_cache (struct frame_info
+   else /* make copy */
+     cache->cursor = *cursor_addr;
+ 
++  /* For the base address, we have a small problem.  The majority
++     of the time, we can get the stack pointer of the previous
++     frame to use as a frame pointer.  In the case where we have
++     a signal trampoline, the stack may change due to a sigaltstack
++     being set up.  In that case, the normal mechanism will give us
++     an address in the regular stack which is not at the end of the
++     sigaltstack as we want.  To handle this, we record the stack
++     address so the caller may calculate a more correct base address
++     to use.  */
++  uw_sp_regnum = descr->gdb2uw (SP_REGNUM);
++  ret = unw_get_reg_p (&cache->cursor, uw_sp_regnum, &sp);
++  if (ret < 0)
++    error ("Can't get libunwind sp register.");
++
+   if (unw_step_p (&cache->cursor) < 0)
+     return NULL;
+ 
+-  /* To get base address, get sp from previous frame.  */
+-  uw_sp_regnum = descr->gdb2uw (SP_REGNUM);
+   ret = unw_get_reg_p (&cache->cursor, uw_sp_regnum, &fp);
+   if (ret < 0)
+     error ("Can't get libunwind sp register.");
+ 
++  cache->sp = (CORE_ADDR)sp;
+   cache->base = (CORE_ADDR)fp;
+ 
+   *this_cache = cache;
+@@ -371,6 +385,31 @@ libunwind_search_unwind_table (void *as,
+ 				    di, pi, need_unwind_info, args);
+ }
+ 
++void
++libunwind_sigtramp_frame_this_id (struct frame_info *next_frame, 
++				  void **this_cache,
++		      		  struct frame_id *this_id)
++{
++  struct libunwind_frame_cache *cache =
++    libunwind_frame_cache (next_frame, this_cache);
++
++  /* Unlike a regular frame, we can't use the normal frame pointer
++     mechanism because a sigaltstack may have been used.  Instead,
++     we return the current stack pointer for the caller to use
++     to calculate the base address.  */
++  if (cache != NULL)
++    (*this_id) = frame_id_build (cache->sp, cache->func_addr);
++  else
++    (*this_id) = null_frame_id;
++}
++
++static const struct frame_unwind libunwind_sigtramp_frame_unwind =
++{
++  SIGTRAMP_FRAME,
++  libunwind_sigtramp_frame_this_id,
++  libunwind_frame_prev_register
++};
++
+ /* Verify if we are in a sigtramp frame and we can use libunwind to unwind.  */
+ const struct frame_unwind *
+ libunwind_sigtramp_frame_sniffer (struct frame_info *next_frame)
+@@ -403,7 +442,7 @@ libunwind_sigtramp_frame_sniffer (struct
+   /* Check to see if we are in a signal frame.  */
+   ret = unw_is_signal_frame_p (&cursor);
+   if (ret > 0)
+-    return &libunwind_frame_unwind;
++    return &libunwind_sigtramp_frame_unwind;
+ 
+   return NULL;
+ }
+--- gdb-6.3/gdb/libunwind-frame.h.fix	2005-09-26 14:45:57.000000000 -0400
++++ gdb-6.3/gdb/libunwind-frame.h	2005-09-26 14:46:30.000000000 -0400
+@@ -49,6 +49,9 @@ void libunwind_frame_set_descr (struct g
+ 
+ void libunwind_frame_this_id (struct frame_info *next_frame, void **this_cache,
+ 			      struct frame_id *this_id);
++void libunwind_sigtramp_frame_this_id (struct frame_info *next_frame, 
++				       void **this_cache,
++			      	       struct frame_id *this_id);
+ void libunwind_frame_prev_register (struct frame_info *next_frame, void **this_cache,
+ 				    int regnum, int *optimizedp,
+ 				    enum lval_type *lvalp, CORE_ADDR *addrp,
+--- gdb-6.3/gdb/ia64-tdep.c.fix	2005-09-26 14:46:04.000000000 -0400
++++ gdb-6.3/gdb/ia64-tdep.c	2005-09-26 14:46:22.000000000 -0400
+@@ -3035,7 +3035,7 @@ ia64_libunwind_sigtramp_frame_this_id (s
+   struct frame_id id;
+   CORE_ADDR prev_ip;
+ 
+-  libunwind_frame_this_id (next_frame, this_cache, &id);
++  libunwind_sigtramp_frame_this_id (next_frame, this_cache, &id);
+   if (frame_id_eq (id, null_frame_id))
+     {
+       (*this_id) = null_frame_id;
+@@ -3047,8 +3047,14 @@ ia64_libunwind_sigtramp_frame_this_id (s
+   frame_unwind_register (next_frame, IA64_BSP_REGNUM, buf);
+   bsp = extract_unsigned_integer (buf, 8);
+ 
+-  /* For a sigtramp frame, we don't make the check for previous ip being 0.  */
+-  (*this_id) = frame_id_build_special (id.stack_addr, id.code_addr, bsp);
++  /* For a sigtramp frame, we don't make the check for previous ip being 0.  
++     We also must calculate the frame pointer because libunwind will give
++     us back the current stack pointer instead of the frame pointer since
++     it cannot figure this out when in a sigaltstack.  We make a basic
++     assumption of 16 (default size) + 8 bytes for sigcontext address.
++     FIXME: if libunwind were to export the frame pointer address, we
++            could eliminate the assumption and get the actual value.  */
++  (*this_id) = frame_id_build_special (id.stack_addr + 24, id.code_addr, bsp);
+ 
+   if (gdbarch_debug >= 1)
+     fprintf_unfiltered (gdb_stdlog,

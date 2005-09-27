@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.69
+Release: 1.73
 
 License: GPL
 Group: Development/Debuggers
@@ -246,6 +246,9 @@ Patch164: gdb-6.3-readnever-20050907.patch
 # Remove extraneous xfree
 Patch165: gdb-6.3-xfree-20050922.patch
 
+# Fix frame pointer for ia64 sigtramp frame
+Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -343,6 +346,7 @@ and printing their data.
 %patch163 -p1
 %patch164 -p1
 %patch165 -p1
+%patch166 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -511,6 +515,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Sep 26 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.73
+- Bump up release number.
+
+* Mon Sep 26 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.70
+- Fix frame pointer calculation for ia64 sigtramp frame.
+
 * Thu Sep 22 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.69
 - Bump up release number.
 
