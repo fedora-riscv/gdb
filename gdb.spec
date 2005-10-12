@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.77
+Release: 1.81
 
 License: GPL
 Group: Development/Debuggers
@@ -252,6 +252,9 @@ Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 # Fix DSO read logic for attached process
 Patch167: gdb-6.3-attach-dso-20050929.patch
 
+# Support gdb attaching to a stopped process
+Patch168: gdb-6.3-attach-stop-20051011.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -351,6 +354,7 @@ and printing their data.
 %patch165 -p1
 %patch166 -p1
 %patch167 -p1
+%patch168 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -519,6 +523,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Oct 11 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.81
+- Bump up release number.
+
+* Tue Oct 11 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.78
+- Support gdb attaching to a stopped process.
+
 * Thu Sep 29 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.77
 - Bump up release number.
 
