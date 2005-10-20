@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.81
+Release: 1.85
 
 License: GPL
 Group: Development/Debuggers
@@ -523,6 +523,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Oct 18 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.85
+- Bump up release number.
+
+* Tue Oct 18 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.82
+- Modify attach patch to add missing fclose.
+- Bugzilla 166712
+
 * Tue Oct 11 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.81
 - Bump up release number.
 
