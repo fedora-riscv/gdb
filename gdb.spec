@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.85
+Release: 1.89
 
 License: GPL
 Group: Development/Debuggers
@@ -255,6 +255,9 @@ Patch167: gdb-6.3-attach-dso-20050929.patch
 # Support gdb attaching to a stopped process
 Patch168: gdb-6.3-attach-stop-20051011.patch
 
+# Fix ia64 gdb problem with user-specified SIGILL handling
+Patch169: gdb-6.3-ia64-sigill-20051115.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -355,6 +358,7 @@ and printing their data.
 %patch166 -p1
 %patch167 -p1
 %patch168 -p1
+%patch169 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -523,6 +527,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Nov 15 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.89
+- Bump up release number.
+
+* Tue Nov 15 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.86
+- Fix ia64 user-specified SIGILL handling error.
+- Bugzilla 165038.
+
 * Tue Oct 18 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.85
 - Bump up release number.
 
