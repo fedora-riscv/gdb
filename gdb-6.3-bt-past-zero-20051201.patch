@@ -1,0 +1,76 @@
+2005-12-01  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* frame.c (backtrace_past_zero_pc): New static variable.
+	(get_prev_frame): Don't return NULL for zero pc value if
+	backtrace past-zero-frame option is turned on.
+	(_initialize_frame): Initialize new command to allow backtracing
+	past a zero pc value (set backtrace past-zero-pc).
+
+testsuite/gdb.base:
+2005-12-01  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* setshow.exp: Add testing of "set backtrace past-zero-pc" option.
+
+--- gdb-6.3/gdb/testsuite/gdb.base/setshow.exp.fix	2005-12-01 14:43:02.000000000 -0500
++++ gdb-6.3/gdb/testsuite/gdb.base/setshow.exp	2005-12-01 14:43:20.000000000 -0500
+@@ -1,4 +1,4 @@
+-# Copyright 1992, 1994, 1996, 1997, 1998, 2001, 2003
++# Copyright 1992, 1994, 1996, 1997, 1998, 2001, 2003, 2005
+ # Free Software Foundation, Inc.
+ 
+ # This program is free software; you can redistribute it and/or modify
+@@ -106,6 +106,16 @@ if { ![target_info exists use_gdb_stub] 
+     delete_breakpoints
+     gdb_test "run" "Starting program:.*foo bar blup baz bubble.*" "passing args"
+ }
++#test show backtrace past-zero-pc
++gdb_test "show backtrace past-zero-pc" "Whether backtraces should continue past a zero pc value is off." "default show backtrace past-zero-pc (off)"
++#test set backtrace past-zero-pc on
++gdb_test "set backtrace past-zero-pc on" "" "set backtrace past-zero-pc on"
++#test show backtrace past-zero-pc
++gdb_test "show backtrace past-zero-pc" "Whether backtraces should continue past a zero pc value is on." "show backtrace past-zero-pc (on)"
++#test set backtrace past-zero-pc off
++gdb_test "set backtrace past-zero-pc off" "" "set backtrace past-zero-pc off"
++#test show backtrace past-zero-pc
++gdb_test "show backtrace past-zero-pc" "Whether backtraces should continue past a zero pc value is off." "show backtrace past-zero-pc (off)"
+ #test set check range on
+ gdb_test "set check range on" "" "set check range on" 
+ #test show check range on
+--- gdb-6.3/gdb/frame.c.fix	2005-12-01 14:42:47.000000000 -0500
++++ gdb-6.3/gdb/frame.c	2005-12-01 14:44:08.000000000 -0500
+@@ -115,6 +115,7 @@ static int frame_debug;
+ /* Flag to indicate whether backtraces should stop at main et.al.  */
+ 
+ static int backtrace_past_main;
++static int backtrace_past_zero_pc;
+ static unsigned int backtrace_limit = UINT_MAX;
+ 
+ static void
+@@ -1236,9 +1237,7 @@ get_prev_frame (struct frame_info *this_
+     }
+ 
+   if (this_frame->level > 0
+-#if 0
+-      && backtrace_past_zero_pc
+-#endif
++      && !backtrace_past_zero_pc
+       && get_frame_type (this_frame) == NORMAL_FRAME
+       && get_frame_type (get_next_frame (this_frame)) == NORMAL_FRAME
+       && get_frame_pc (this_frame) == 0)
+@@ -1537,6 +1536,16 @@ Whether backtraces should continue past 
+ 			   NULL, NULL, &set_backtrace_cmdlist,
+ 			   &show_backtrace_cmdlist);
+ 
++  add_setshow_boolean_cmd ("past-zero-pc", class_obscure,
++			   &backtrace_past_zero_pc, "\
++Set whether backtraces should continue past a zero pc value.", "\
++Show whether backtraces should continue past a zero pc value..", "\
++Normally GDB stops backtracing when it finds a zero pc.\n\
++Set this variable if you need to see the rest of the stack trace.", "\
++Whether backtraces should continue past a zero pc value is %s.",
++			   NULL, NULL, &set_backtrace_cmdlist,
++			   &show_backtrace_cmdlist);
++
+   add_setshow_uinteger_cmd ("limit", class_obscure,
+ 			    &backtrace_limit, "\
+ Set an upper bound on the number of backtrace levels.", "\

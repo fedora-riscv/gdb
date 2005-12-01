@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.89
+Release: 1.93
 
 License: GPL
 Group: Development/Debuggers
@@ -258,6 +258,9 @@ Patch168: gdb-6.3-attach-stop-20051011.patch
 # Fix ia64 gdb problem with user-specified SIGILL handling
 Patch169: gdb-6.3-ia64-sigill-20051115.patch
 
+# Allow option to continue backtracing past a zero pc value
+Patch170: gdb-6.3-bt-past-zero-20051201.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -359,6 +362,7 @@ and printing their data.
 %patch167 -p1
 %patch168 -p1
 %patch169 -p1
+%patch170 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -527,6 +531,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Dec 01 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.93
+- Bump up release number.
+
+* Thu Dec 01 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.90
+- Add option to allow backtracing past zero pc value.
+- Bugzilla 170275
+
 * Tue Nov 15 2005 Jeff Johnston	<jjohnstn@redhat.com>	6.3.0.0-1.89
 - Bump up release number.
 
