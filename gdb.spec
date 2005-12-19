@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.93.1
+Release: 1.94
 
 License: GPL
 Group: Development/Debuggers
@@ -261,6 +261,10 @@ Patch169: gdb-6.3-ia64-sigill-20051115.patch
 # Allow option to continue backtracing past a zero pc value
 Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
+# Silence type-punning warnings that cause compilation errors because
+# of -Werror.
+Patch171: gdb-6.3-type-punning-20051219.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -363,6 +367,7 @@ and printing their data.
 %patch168 -p1
 %patch169 -p1
 %patch170 -p1
+%patch171 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -531,6 +536,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Dec 19 2005 Alexandre Oliva <aoliva@redhat.com>	6.3.0.0-1.94
+- Fix type-punning warnings issued by GCC 4.1.
+
 * Fri Dec 16 2005 Jesse Keating <jkeating@redhat.com>
 - rebuilt for new gcj
 
