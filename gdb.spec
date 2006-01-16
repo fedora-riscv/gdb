@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.94
+Release: 1.98
 
 License: GPL
 Group: Development/Debuggers
@@ -536,6 +536,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jan 16 2006 Alexandre Oliva <aoliva@redhat.com>	6.3.0.0-1.98
+- Bump up release number.
+
 * Mon Dec 19 2005 Alexandre Oliva <aoliva@redhat.com>	6.3.0.0-1.94
 - Fix type-punning warnings issued by GCC 4.1.
 
