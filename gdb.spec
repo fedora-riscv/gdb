@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.98
+Release: 1.98.1
 
 License: GPL
 Group: Development/Debuggers
@@ -536,6 +536,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Feb 07 2006 Jesse Keating <jkeating@redhat.com> - 6.3.0.0-1.98.1
+- rebuilt for new gcc4.1 snapshot and glibc changes
+
 * Mon Jan 16 2006 Alexandre Oliva <aoliva@redhat.com>	6.3.0.0-1.98
 - Bump up release number.
 
