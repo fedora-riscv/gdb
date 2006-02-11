@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.98.1
+Release: 1.98.2
 
 License: GPL
 Group: Development/Debuggers
@@ -536,6 +536,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Feb 10 2006 Jesse Keating <jkeating@redhat.com> - 6.3.0.0-1.98.2
+- bump again for double-long bug on ppc(64)
+
 * Tue Feb 07 2006 Jesse Keating <jkeating@redhat.com> - 6.3.0.0-1.98.1
 - rebuilt for new gcc4.1 snapshot and glibc changes
 
