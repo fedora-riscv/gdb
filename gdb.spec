@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.98.2
+Release: 1.102
 
 License: GPL
 Group: Development/Debuggers
@@ -263,7 +263,7 @@ Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
 # Silence type-punning warnings that cause compilation errors because
 # of -Werror.
-Patch171: gdb-6.3-type-punning-20051219.patch
+Patch171: gdb-6.3-type-punning-20060214.patch
 
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
@@ -536,6 +536,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.102
+- Bump up release number.
+
+* Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.99
+- Use type-punning warning fixes as accepted upstream.
+
 * Fri Feb 10 2006 Jesse Keating <jkeating@redhat.com> - 6.3.0.0-1.98.2
 - bump again for double-long bug on ppc(64)
 
