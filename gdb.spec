@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.102
+Release: 1.103
 
 License: GPL
 Group: Development/Debuggers
@@ -536,6 +536,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.106
+- Bump up release number.
+
+* Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.103
+- Adjust type-punning patch to include fix not needed upstream.
+
 * Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.102
 - Bump up release number.
 
