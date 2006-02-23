@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.106
+Release: 1.110
 
 License: GPL
 Group: Development/Debuggers
@@ -265,6 +265,10 @@ Patch170: gdb-6.3-bt-past-zero-20051201.patch
 # of -Werror.
 Patch171: gdb-6.3-type-punning-20060214.patch
 
+# Enable gdb to debug using executables and core files with different
+# prelink base addresses.
+Patch172: gdb-6.3-prelink-core-20060223.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -368,6 +372,7 @@ and printing their data.
 %patch169 -p1
 %patch170 -p1
 %patch171 -p1
+%patch172 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -536,6 +541,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Feb 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.110
+- Bump up release number.
+
+* Thu Feb 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.107
+- Enable gdb to debug core files and executables with mismatched
+prelink base addresses.  Fixes BZ 175075.
+
 * Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.106
 - Bump up release number.
 
