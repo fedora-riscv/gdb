@@ -541,10 +541,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Thu Feb 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.110
+* Thu Feb 23 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.110
 - Bump up release number.
 
-* Thu Feb 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.107
+* Thu Feb 23 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.107
 - Enable gdb to debug core files and executables with mismatched
 prelink base addresses.  Fixes BZ 175075.
 
