@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.110
+Release: 1.114
 
 License: GPL
 Group: Development/Debuggers
@@ -269,6 +269,12 @@ Patch171: gdb-6.3-type-punning-20060214.patch
 # prelink base addresses.
 Patch172: gdb-6.3-prelink-core-20060223.patch
 
+# Enable gdb to recognize stack frames annotated with the "S" augmentation.
+Patch173: gdb-6.3-augmS-20060303.patch
+
+# Enable gdb to recognize CFA value expressions introduced in Dwarf3.
+Patch174: gdb-6.3-cfaval-20060303.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -373,6 +379,8 @@ and printing their data.
 %patch170 -p1
 %patch171 -p1
 %patch172 -p1
+%patch173 -p1
+%patch174 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -541,6 +549,14 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Mar  3 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.114
+- Bump up release number.
+
+* Fri Mar  3 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.111
+- Add support for "S" augmentation for signal stack frames.
+- Add support for CFA value expressions and encodings.
+- Various improvements to the prelink test.
+
 * Thu Feb 23 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.110
 - Bump up release number.
 
