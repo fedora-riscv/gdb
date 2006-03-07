@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.114
+Release: 1.118
 
 License: GPL
 Group: Development/Debuggers
@@ -549,6 +549,16 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Mar  7 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.118
+- Bump up release number.
+
+* Tue Mar  7 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.115
+- Change dwarf2 frame identifiers to use the actual PC instead of the
+function's entry point.
+- Fix FSF and GDB contact addresses in new testcases.
+- Change prelink test to issue untested instead of warning message if
+system libraries are not prelinked.
+
 * Fri Mar  3 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.114
 - Bump up release number.
 
