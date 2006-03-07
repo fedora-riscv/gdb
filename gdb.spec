@@ -556,6 +556,7 @@ fi
 - Change dwarf2 frame identifiers to use the actual PC instead of the
 function's entry point.
 - Fix FSF and GDB contact addresses in new testcases.
+- Do not try to compile x86_64-only CFA testcase on 32-bit x86.
 - Change prelink test to issue untested instead of warning message if
 system libraries are not prelinked.
 
