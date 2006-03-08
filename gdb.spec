@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.118
+Release: 1.122
 
 License: GPL
 Group: Development/Debuggers
@@ -549,6 +549,14 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.122
+- Bump up release number.
+
+* Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.119
+- Fix regression in PIE debugging (BZ 133944) (re?)introduced by
+the prelink fix (BZ 175075).  Improve testcase for the prelink fix.
+- Revert dwarf2 frame identifier change.
+
 * Tue Mar  7 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.118
 - Bump up release number.
 
