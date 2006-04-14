@@ -1,0 +1,523 @@
+2005-12-14  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* symfile-mem.c (read_memory): New static read callback function.
+	(symfile_add_from_memory): Pass read_memory to bfd instead of
+	target_read_memory.
+	* target.c (target_xfer_memory): Add support for LONGEST len and
+	change all callers.
+	(deprecated_debug_xfer_memory, target_read_memory): Ditto.
+	(target_write_memory, do_xfer_memory): Ditto.
+	(target_xfer_memory_partial, target_read_memory_partial): Ditto.
+	(target_write_memory_partial): Ditto.
+	* infptrace.c (child_xfer_memory): Ditto.
+	* linux-nat.c (linux_nat_xfer_memory): Ditto.
+	(linux_nat_proc_xfer_memory): Ditto.
+	* dcache.c (dcache_xfer_memory): Ditto.
+	* exec.c (xfer_memory): Ditto.
+	* remote.c (remote_xfer_memory): Ditto.
+	* remote-sim.c (gdbsim_xfer_interior_memory): Ditto.
+	* target.h: Change prototypes for functions changed above.
+	* linux-nat.h: Ditto.
+	* remote.h: Ditto.
+	* dcache.h: Ditto.
+
+--- gdb-6.3/gdb/symfile-mem.c.fix	2005-12-14 17:57:05.000000000 -0500
++++ gdb-6.3/gdb/symfile-mem.c	2005-12-14 18:10:19.000000000 -0500
+@@ -57,6 +57,14 @@
+ #include "elf/common.h"
+ 
+ 
++/* Local callback routine to pass to bfd to read from target memory,
++   using a len constrained to INT_MAX.  */
++static int
++read_target_memory (CORE_ADDR addr, char *buf, int len)
++{
++  return target_read_memory (addr, buf, (LONGEST)len);
++}
++
+ /* Read inferior memory at ADDR to find the header of a loaded object file
+    and read its in-core symbols out of inferior memory.  TEMPL is a bfd
+    representing the target's format.  */
+@@ -74,7 +82,7 @@ symbol_file_add_from_memory (struct bfd 
+     error ("add-symbol-file-from-memory not supported for this target");
+ 
+   nbfd = bfd_elf_bfd_from_remote_memory (templ, addr, &loadbase,
+-					 target_read_memory);
++					 read_target_memory);
+   if (nbfd == NULL)
+     error ("Failed to read a valid object file image from memory.");
+ 
+--- gdb-6.3/gdb/target.c.fix	2005-12-06 16:16:29.000000000 -0500
++++ gdb-6.3/gdb/target.c	2005-12-14 18:16:06.000000000 -0500
+@@ -82,7 +82,7 @@ static LONGEST default_xfer_partial (str
+    partial transfers, try either target_read_memory_partial or
+    target_write_memory_partial).  */
+ 
+-static int target_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len,
++static int target_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len,
+ 			       int write);
+ 
+ static void init_dummy_target (void);
+@@ -109,9 +109,9 @@ static void debug_to_store_registers (in
+ 
+ static void debug_to_prepare_to_store (void);
+ 
+-static int deprecated_debug_xfer_memory (CORE_ADDR, char *, int, int,
+-					 struct mem_attrib *,
+-					 struct target_ops *);
++static LONGEST deprecated_debug_xfer_memory (CORE_ADDR, char *, LONGEST, int,
++					    struct mem_attrib *,
++					    struct target_ops *);
+ 
+ static void debug_to_files_info (struct target_ops *);
+ 
+@@ -514,7 +514,7 @@ update_current_target (void)
+ 	    (void (*) (void)) 
+ 	    noprocess);
+   de_fault (deprecated_xfer_memory, 
+-	    (int (*) (CORE_ADDR, char *, int, int, struct mem_attrib *, struct target_ops *)) 
++	    (LONGEST (*) (CORE_ADDR, char *, LONGEST, int, struct mem_attrib *, struct target_ops *)) 
+ 	    nomemory);
+   de_fault (to_files_info, 
+ 	    (void (*) (struct target_ops *)) 
+@@ -945,7 +945,7 @@ target_xfer_partial (struct target_ops *
+    implementing another singluar mechanism (for instance, a generic
+    object:annex onto inferior:object:annex say).  */
+ 
+-static LONGEST
++static int
+ xfer_using_stratum (enum target_object object, const char *annex,
+ 		    ULONGEST offset, LONGEST len, void *readbuf,
+ 		    const void *writebuf)
+@@ -1010,7 +1010,7 @@ xfer_using_stratum (enum target_object o
+    deal with partial reads should call target_read_memory_partial. */
+ 
+ int
+-target_read_memory (CORE_ADDR memaddr, char *myaddr, int len)
++target_read_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len)
+ {
+   if (target_xfer_partial_p ())
+     return xfer_using_stratum (TARGET_OBJECT_MEMORY, NULL,
+@@ -1020,7 +1020,7 @@ target_read_memory (CORE_ADDR memaddr, c
+ }
+ 
+ int
+-target_write_memory (CORE_ADDR memaddr, char *myaddr, int len)
++target_write_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len)
+ {
+   if (target_xfer_partial_p ())
+     return xfer_using_stratum (TARGET_OBJECT_MEMORY, NULL,
+@@ -1051,11 +1051,11 @@ static int trust_readonly = 0;
+ 
+    Result is -1 on error, or the number of bytes transfered.  */
+ 
+-int
+-do_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
++LONGEST
++do_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write,
+ 		struct mem_attrib *attrib)
+ {
+-  int res;
++  LONGEST res;
+   int done = 0;
+   struct target_ops *t;
+ 
+@@ -1113,10 +1113,10 @@ do_xfer_memory (CORE_ADDR memaddr, char 
+    Result is 0 or errno value.  */
+ 
+ static int
+-target_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write)
++target_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write)
+ {
+-  int res;
+-  int reg_len;
++  LONGEST res;
++  LONGEST reg_len;
+   struct mem_region *region;
+ 
+   /* Zero length requests are ok and require no work.  */
+@@ -1186,12 +1186,12 @@ target_xfer_memory (CORE_ADDR memaddr, c
+ 
+    Result is -1 on error, or the number of bytes transfered.  */
+ 
+-static int
+-target_xfer_memory_partial (CORE_ADDR memaddr, char *myaddr, int len,
++static LONGEST
++target_xfer_memory_partial (CORE_ADDR memaddr, char *myaddr, LONGEST len,
+ 			    int write_p, int *err)
+ {
+-  int res;
+-  int reg_len;
++  LONGEST res;
++  LONGEST reg_len;
+   struct mem_region *region;
+ 
+   /* Zero length requests are ok and require no work.  */
+@@ -1250,8 +1250,8 @@ target_xfer_memory_partial (CORE_ADDR me
+   return res;
+ }
+ 
+-int
+-target_read_memory_partial (CORE_ADDR memaddr, char *buf, int len, int *err)
++LONGEST
++target_read_memory_partial (CORE_ADDR memaddr, char *buf, LONGEST len, int *err)
+ {
+   if (target_xfer_partial_p ())
+     return target_xfer_partial (target_stack, TARGET_OBJECT_MEMORY, NULL,
+@@ -1260,8 +1260,9 @@ target_read_memory_partial (CORE_ADDR me
+     return target_xfer_memory_partial (memaddr, buf, len, 0, err);
+ }
+ 
+-int
+-target_write_memory_partial (CORE_ADDR memaddr, char *buf, int len, int *err)
++LONGEST
++target_write_memory_partial (CORE_ADDR memaddr, char *buf, LONGEST len, 
++			     int *err)
+ {
+   if (target_xfer_partial_p ())
+     return target_xfer_partial (target_stack, TARGET_OBJECT_MEMORY, NULL,
+@@ -1985,8 +1986,8 @@ debug_to_prepare_to_store (void)
+   fprintf_unfiltered (gdb_stdlog, "target_prepare_to_store ()\n");
+ }
+ 
+-static int
+-deprecated_debug_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len,
++static LONGEST
++deprecated_debug_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len,
+ 			      int write, struct mem_attrib *attrib,
+ 			      struct target_ops *target)
+ {
+@@ -1996,9 +1997,9 @@ deprecated_debug_xfer_memory (CORE_ADDR 
+ 						attrib, target);
+ 
+   fprintf_unfiltered (gdb_stdlog,
+-		      "target_xfer_memory (0x%x, xxx, %d, %s, xxx) = %d",
++		      "target_xfer_memory (0x%x, xxx, %ld, %s, xxx) = %d",
+ 		      (unsigned int) memaddr,	/* possable truncate long long */
+-		      len, write ? "write" : "read", retval);
++		      (long)len, write ? "write" : "read", retval);
+ 
+   if (retval > 0)
+     {
+--- gdb-6.3/gdb/target.h.fix	2005-12-06 16:16:33.000000000 -0500
++++ gdb-6.3/gdb/target.h	2005-12-14 17:56:47.000000000 -0500
+@@ -330,8 +330,8 @@ struct target_ops
+        NOTE: cagney/2004-10-01: This has been entirely superseeded by
+        to_xfer_partial and inferior inheritance.  */
+ 
+-    int (*deprecated_xfer_memory) (CORE_ADDR memaddr, char *myaddr,
+-				   int len, int write,
++    LONGEST (*deprecated_xfer_memory) (CORE_ADDR memaddr, char *myaddr,
++				   LONGEST len, int write,
+ 				   struct mem_attrib *attrib,
+ 				   struct target_ops *target);
+ 
+@@ -533,20 +533,20 @@ extern void target_disconnect (char *, i
+ 
+ extern DCACHE *target_dcache;
+ 
+-extern int do_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
+-			   struct mem_attrib *attrib);
++extern LONGEST do_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len,
++			       int write, struct mem_attrib *attrib);
+ 
+ extern int target_read_string (CORE_ADDR, char **, int, int *);
+ 
+-extern int target_read_memory (CORE_ADDR memaddr, char *myaddr, int len);
++extern int target_read_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len);
+ 
+-extern int target_write_memory (CORE_ADDR memaddr, char *myaddr, int len);
++extern int target_write_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len);
+ 
+-extern int xfer_memory (CORE_ADDR, char *, int, int,
+-			struct mem_attrib *, struct target_ops *);
++extern LONGEST xfer_memory (CORE_ADDR, char *, LONGEST, int,
++			    struct mem_attrib *, struct target_ops *);
+ 
+-extern int child_xfer_memory (CORE_ADDR, char *, int, int,
+-			      struct mem_attrib *, struct target_ops *);
++extern LONGEST child_xfer_memory (CORE_ADDR, char *, LONGEST, int,
++			          struct mem_attrib *, struct target_ops *);
+ 
+ /* Make a single attempt at transfering LEN bytes.  On a successful
+    transfer, the number of bytes actually transfered is returned and
+@@ -554,11 +554,11 @@ extern int child_xfer_memory (CORE_ADDR,
+    of bytes actually transfered is not defined) and ERR is set to a
+    non-zero error indication.  */
+ 
+-extern int target_read_memory_partial (CORE_ADDR addr, char *buf, int len,
+-				       int *err);
++extern LONGEST target_read_memory_partial (CORE_ADDR addr, char *buf, LONGEST len,
++					   int *err);
+ 
+-extern int target_write_memory_partial (CORE_ADDR addr, char *buf, int len,
+-					int *err);
++extern LONGEST target_write_memory_partial (CORE_ADDR addr, char *buf, LONGEST len,
++					    int *err);
+ 
+ extern char *child_pid_to_exec_file (int);
+ 
+--- gdb-6.3/gdb/infptrace.c.fix	2005-12-06 16:16:38.000000000 -0500
++++ gdb-6.3/gdb/infptrace.c	2005-12-14 14:22:10.000000000 -0500
+@@ -443,17 +443,17 @@ store_inferior_registers (int regnum)
+    deprecated_child_ops doesn't allow memory operations to cross below
+    us in the target stack anyway.  */
+ 
+-int
+-child_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
++LONGEST
++child_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write,
+ 		   struct mem_attrib *attrib, struct target_ops *target)
+ {
+-  int i;
++  LONGEST i;
+   /* Round starting address down to longword boundary.  */
+   CORE_ADDR addr = memaddr & -(CORE_ADDR) sizeof (PTRACE_TYPE_RET);
+   /* Round ending address up; get number of longwords that makes.  */
+-  int count = ((((memaddr + len) - addr) + sizeof (PTRACE_TYPE_RET) - 1)
++  LONGEST count = ((((memaddr + len) - addr) + sizeof (PTRACE_TYPE_RET) - 1)
+ 	       / sizeof (PTRACE_TYPE_RET));
+-  int alloc = count * sizeof (PTRACE_TYPE_RET);
++  LONGEST alloc = count * sizeof (PTRACE_TYPE_RET);
+   PTRACE_TYPE_RET *buffer;
+   struct cleanup *old_chain = NULL;
+ 
+--- gdb-6.3/gdb/dcache.c.fix	2005-12-06 16:16:44.000000000 -0500
++++ gdb-6.3/gdb/dcache.c	2005-12-14 15:18:22.000000000 -0500
+@@ -524,9 +524,9 @@ dcache_free (DCACHE *dcache)
+ 
+    This routine is indended to be called by remote_xfer_ functions. */
+ 
+-int
+-dcache_xfer_memory (DCACHE *dcache, CORE_ADDR memaddr, char *myaddr, int len,
+-		    int should_write)
++LONGEST
++dcache_xfer_memory (DCACHE *dcache, CORE_ADDR memaddr, char *myaddr,
++		    LONGEST len, int should_write)
+ {
+   int i;
+   int (*xfunc) (DCACHE *dcache, CORE_ADDR addr, char *ptr);
+--- gdb-6.3/gdb/dcache.h.fix	2005-12-06 16:16:50.000000000 -0500
++++ gdb-6.3/gdb/dcache.h	2005-12-14 15:18:47.000000000 -0500
+@@ -37,7 +37,7 @@ void dcache_free (DCACHE *);
+ 
+ /* Simple to call from <remote>_xfer_memory */
+ 
+-int dcache_xfer_memory (DCACHE *cache, CORE_ADDR mem, char *my, int len,
+-			int should_write);
++LONGEST dcache_xfer_memory (DCACHE *cache, CORE_ADDR mem, char *my, LONGEST len,
++			    int should_write);
+ 
+ #endif /* DCACHE_H */
+--- gdb-6.3/gdb/exec.c.fix	2005-12-06 16:16:56.000000000 -0500
++++ gdb-6.3/gdb/exec.c	2005-12-14 15:06:30.000000000 -0500
+@@ -444,8 +444,8 @@ map_vmap (bfd *abfd, bfd *arch)
+    The same routine is used to handle both core and exec files;
+    we just tail-call it with more arguments to select between them.  */
+ 
+-int
+-xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
++LONGEST
++xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write,
+ 	     struct mem_attrib *attrib,
+ 	     struct target_ops *target)
+ {
+--- gdb-6.3/gdb/linux-nat.c.fix	2005-12-06 16:17:02.000000000 -0500
++++ gdb-6.3/gdb/linux-nat.c	2005-12-14 14:26:41.000000000 -0500
+@@ -2444,12 +2444,12 @@ linux_nat_mourn_inferior (void)
+ #ifdef NATIVE_XFER_UNWIND_TABLE
+ extern int ia64_linux_check_stack_region(struct lwp_info *lwp, void *range);
+ #endif
+-static int
+-linux_nat_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
++static LONGEST
++linux_nat_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write,
+ 		     struct mem_attrib *attrib, struct target_ops *target)
+ {
+   struct cleanup *old_chain = save_inferior_ptid ();
+-  int xfer;
++  LONGEST xfer;
+ 
+ #ifdef NATIVE_XFER_UNWIND_TABLE
+   struct mem_region range;
+@@ -2467,7 +2467,7 @@ linux_nat_xfer_memory (CORE_ADDR memaddr
+     xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
+   else if (iterate_over_lwps (ia64_linux_check_stack_region, &range) != NULL) 
+     { /* This region contains ia64 rse registers, we have to re-read.  */
+-      int xxfer;
++      LONGEST xxfer;
+       /* Re-read register stack area.  */
+       xxfer = child_xfer_memory (range.lo, myaddr + (range.lo - memaddr),
+                                  range.hi - range.lo, write, attrib, target);
+@@ -3091,8 +3091,8 @@ linux_nat_info_proc_cmd (char *args, int
+     }
+ }
+ 
+-int
+-linux_proc_xfer_memory (CORE_ADDR addr, char *myaddr, int len, int write,
++LONGEST
++linux_proc_xfer_memory (CORE_ADDR addr, char *myaddr, LONGEST len, int write,
+ 			struct mem_attrib *attrib, struct target_ops *target)
+ {
+   int fd, ret;
+--- gdb-6.3/gdb/linux-nat.h.fix	2005-12-06 16:17:07.000000000 -0500
++++ gdb-6.3/gdb/linux-nat.h	2005-12-14 14:27:44.000000000 -0500
+@@ -80,9 +80,10 @@ struct linux_watchpoint
+ struct mem_attrib;
+ struct target_ops;
+ 
+-extern int linux_proc_xfer_memory (CORE_ADDR addr, char *myaddr, int len,
+-				   int write, struct mem_attrib *attrib,
+-				   struct target_ops *target);
++extern LONGEST linux_proc_xfer_memory (CORE_ADDR addr, char *myaddr,
++				       LONGEST len,
++				       int write, struct mem_attrib *attrib,
++				       struct target_ops *target);
+ 
+ /* Find process PID's pending signal set from /proc/pid/status.  */
+ void linux_proc_pending_signals (int pid, sigset_t *pending, sigset_t *blocked, sigset_t *ignored);
+--- gdb-6.3/gdb/remote.c.fix	2005-12-06 16:17:17.000000000 -0500
++++ gdb-6.3/gdb/remote.c	2005-12-14 15:14:39.000000000 -0500
+@@ -27,6 +27,7 @@
+ #include "gdb_string.h"
+ #include <ctype.h>
+ #include <fcntl.h>
++#include <limits.h>
+ #include "inferior.h"
+ #include "bfd.h"
+ #include "symfile.h"
+@@ -69,10 +70,10 @@ static void build_remote_gdbarch_data (v
+ 
+ static void remote_files_info (struct target_ops *ignore);
+ 
+-static int remote_xfer_memory (CORE_ADDR memaddr, char *myaddr,
+-			       int len, int should_write,
+-			       struct mem_attrib *attrib,
+-			       struct target_ops *target);
++static LONGEST remote_xfer_memory (CORE_ADDR memaddr, char *myaddr,
++			           LONGEST len, int should_write,
++			           struct mem_attrib *attrib,
++			           struct target_ops *target);
+ 
+ static void remote_prepare_to_store (void);
+ 
+@@ -3791,18 +3792,25 @@ remote_read_bytes (CORE_ADDR memaddr, ch
+    SHOULD_WRITE is nonzero.  Returns length of data written or read; 0
+    for error.  TARGET is unused.  */
+ 
+-static int
+-remote_xfer_memory (CORE_ADDR mem_addr, char *buffer, int mem_len,
++static LONGEST
++remote_xfer_memory (CORE_ADDR mem_addr, char *buffer, LONGEST mem_len,
+ 		    int should_write, struct mem_attrib *attrib,
+ 		    struct target_ops *target)
+ {
+   CORE_ADDR targ_addr;
+   int targ_len;
+   int res;
++  int len;
++
++  /* This routine is not set up to handle > INT_MAX bytes.  */
++  if (mem_len >= (LONGEST)INT_MAX)
++    return 0;
++
++  len = (int)mem_len;
+ 
+   /* Should this be the selected frame?  */
+   gdbarch_remote_translate_xfer_address (current_gdbarch, current_regcache,
+-					 mem_addr, mem_len,
++					 mem_addr, len,
+ 					 &targ_addr, &targ_len);
+   if (targ_len <= 0)
+     return 0;
+@@ -3812,7 +3820,7 @@ remote_xfer_memory (CORE_ADDR mem_addr, 
+   else
+     res = remote_read_bytes (targ_addr, buffer, targ_len);
+ 
+-  return res;
++  return (LONGEST)res;
+ }
+ 
+ static void
+--- gdb-6.3/gdb/thread-db.c.fix	2005-12-06 16:17:22.000000000 -0500
++++ gdb-6.3/gdb/thread-db.c	2005-12-14 14:42:28.000000000 -0500
+@@ -955,12 +955,12 @@ thread_db_wait (ptid_t ptid, struct targ
+   return ptid;
+ }
+ 
+-static int
+-thread_db_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
++static LONGEST
++thread_db_xfer_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len, int write,
+ 		       struct mem_attrib *attrib, struct target_ops *target)
+ {
+   struct cleanup *old_chain = save_inferior_ptid ();
+-  int xfer;
++  LONGEST xfer;
+ 
+   if (is_thread (inferior_ptid))
+     {
+--- gdb-6.3/gdb/remote-sim.c.fix	2005-12-07 16:02:02.000000000 -0500
++++ gdb-6.3/gdb/remote-sim.c	2005-12-14 15:15:53.000000000 -0500
+@@ -93,10 +93,10 @@ static ptid_t gdbsim_wait (ptid_t ptid, 
+ 
+ static void gdbsim_prepare_to_store (void);
+ 
+-static int gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, char *myaddr, 
+-					int len, int write,
+-					struct mem_attrib *attrib,
+-					struct target_ops *target);
++static LONGEST gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, char *myaddr, 
++					    LONGEST len, int write,
++					    struct mem_attrib *attrib,
++					    struct target_ops *target);
+ 
+ static void gdbsim_files_info (struct target_ops *target);
+ 
+@@ -741,11 +741,14 @@ gdbsim_prepare_to_store (void)
+ 
+    Returns the number of bytes transferred. */
+ 
+-static int
+-gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, char *myaddr, int len,
++static LONGEST
++gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, char *myaddr, LONGEST len,
+ 			     int write, struct mem_attrib *attrib,
+ 			     struct target_ops *target)
+ {
++  /* Convert to len type that sim_read and sim_write can handle.  */
++  int xfer_len = (int)len;
++
+   if (!program_loaded)
+     error ("No program loaded.");
+ 
+@@ -755,22 +758,22 @@ gdbsim_xfer_inferior_memory (CORE_ADDR m
+       printf_filtered ("gdbsim_xfer_inferior_memory: myaddr 0x");
+       gdb_print_host_address (myaddr, gdb_stdout);
+       printf_filtered (", memaddr 0x%s, len %d, write %d\n",
+-		       paddr_nz (memaddr), len, write);
++		       paddr_nz (memaddr), xfer_len, write);
+       if (sr_get_debug () && write)
+-	dump_mem (myaddr, len);
++	dump_mem (myaddr, xfer_len);
+     }
+ 
+   if (write)
+     {
+-      len = sim_write (gdbsim_desc, memaddr, myaddr, len);
++      xfer_len = sim_write (gdbsim_desc, memaddr, myaddr, xfer_len);
+     }
+   else
+     {
+-      len = sim_read (gdbsim_desc, memaddr, myaddr, len);
+-      if (sr_get_debug () && len > 0)
+-	dump_mem (myaddr, len);
++      xfer_len = sim_read (gdbsim_desc, memaddr, myaddr, xfer_len);
++      if (sr_get_debug () && xfer_len > 0)
++	dump_mem (myaddr, xfer_len);
+     }
+-  return len;
++  return (LONGEST)xfer_len;
+ }
+ 
+ static void
