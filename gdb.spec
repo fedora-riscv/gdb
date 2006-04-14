@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.127
+Release: 1.128.FC6
 
 License: GPL
 Group: Development/Debuggers
@@ -21,7 +21,7 @@ URL: http://gnu.org/software/gdb/
 
 # For our convenience
 %define gdb_src gdb-6.3
-%define gdb_build gdb-%{version}-build-%{_target_platform}
+%define gdb_build %{gdb_src}/build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -281,6 +281,13 @@ Patch175: gdb-6.3-support-fopen64-20060413.patch
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
 
+# Do not let exceptions in GDB break SIGCHLD blocking.
+Patch177: gdb-6.3-sigchld-exception-20060331.patch
+
+# Hard-code executable names in gstack, such that it can run with a
+# corrupted or missing PATH.
+Patch178: gdb-6.3-gstack-without-path-20060414.patch
+
 %ifarch ia64
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
 %else
@@ -389,6 +396,8 @@ and printing their data.
 %patch174 -p1
 %patch175 -p1
 %patch176 -p1
+%patch177 -p1
+%patch178 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -435,7 +444,7 @@ enable_build_warnings=""
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
-../%{gdb_src}/configure \
+../configure \
 	--prefix=%{_prefix} \
 	--sysconfdir=%{_sysconfdir} \
 	--mandir=%{_mandir} \
@@ -557,12 +566,24 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Apr 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.128
+- Avoid race conditions caused by exceptions messing with signal masks.
+(BZ 175270, BZ 175083, maybe BZ 172938).
+- Hardcode /bin and /usr/bin paths into gstack (BZ 179829).
+- Build in a subdir of the source tree instead of in a sibling directory.
+- Switch to versioning scheme that uses the same base revision number
+for all OSes, and uses a suffix to tell the builds apart and ensure
+upgradability.
+
 * Thu Apr 13 2006 Stepan Kasal <skasal@redhat.com>    - 6.3.0.0-1.127
 - Bump up release number.
 
 * Thu Apr 13 2006 Stepan Kasal <skasal@redhat.com>    - 6.3.0.0-1.123
-- Use fopen64 where available.  Fixes BZ 179399.
+- Use fopen64 where available.  Fixes BZ 178796.
 - Use bigger numbers than int.  Fixes BZ 171783.
+
+* Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.122
+- Bump up release number.
 
 * Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.119
 - Fix regression in PIE debugging (BZ 133944) (re?)introduced by
