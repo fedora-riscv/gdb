@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.128.FC6
+Release: 1.129.FC6
 
 License: GPL
 Group: Development/Debuggers
@@ -566,6 +566,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed May 17 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.129
+- Add not-automatically-generated file to fopen64 patch (BZ 191948).
+
 * Fri Apr 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.128
 - Avoid race conditions caused by exceptions messing with signal masks.
 (BZ 175270, BZ 175083, maybe BZ 172938).
