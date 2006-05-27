@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.129.FC6
+Release: 1.130.FC6
 
 License: GPL
 Group: Development/Debuggers
@@ -281,8 +281,8 @@ Patch175: gdb-6.3-support-fopen64-20060413.patch
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
 
-# Do not let exceptions in GDB break SIGCHLD blocking.
-Patch177: gdb-6.3-sigchld-exception-20060331.patch
+# Do not let errors related with debug registers break thread debugging.
+Patch177: gdb-6.3-catch-debug-registers-error-20060527.patch
 
 # Hard-code executable names in gstack, such that it can run with a
 # corrupted or missing PATH.
@@ -566,13 +566,19 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat May 27 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.130
+- Rewrite patch for BZ 175270, BZ 175083 so as to catch the exception
+earlier.
+- Remove too-fragile testcases from patches for CFA value and "S"
+augmentation.
+
 * Wed May 17 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.129
 - Add not-automatically-generated file to fopen64 patch (BZ 191948).
 
 * Fri Apr 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.128
 - Avoid race conditions caused by exceptions messing with signal masks.
 (BZ 175270, BZ 175083, maybe BZ 172938).
-- Hardcode /bin and /usr/bin paths into gstack (BZ 179829).
+- Hardcode /bin and /usr/bin paths into gstack (BZ 179829, BZ 190548).
 - Build in a subdir of the source tree instead of in a sibling directory.
 - Switch to versioning scheme that uses the same base revision number
 for all OSes, and uses a suffix to tell the builds apart and ensure
@@ -582,15 +588,16 @@ upgradability.
 - Bump up release number.
 
 * Thu Apr 13 2006 Stepan Kasal <skasal@redhat.com>    - 6.3.0.0-1.123
-- Use fopen64 where available.  Fixes BZ 178796.
-- Use bigger numbers than int.  Fixes BZ 171783.
+- Use fopen64 where available.  Fixes BZ 178796, BZ 190547.
+- Use bigger numbers than int.  Fixes BZ 171783, BZ 179096.
 
 * Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.122
 - Bump up release number.
 
 * Wed Mar  8 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.119
-- Fix regression in PIE debugging (BZ 133944) (re?)introduced by
-the prelink fix (BZ 175075).  Improve testcase for the prelink fix.
+- Fix regression in PIE debugging (BZ 133944) (re?)introduced by the
+prelink fix (BZ 175075, BZ 190545).  Improve testcase for the prelink
+fix.
 - Revert dwarf2 frame identifier change.
 
 * Tue Mar  7 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.118
@@ -617,7 +624,7 @@ system libraries are not prelinked.
 
 * Thu Feb 23 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.107
 - Enable gdb to debug core files and executables with mismatched
-prelink base addresses.  Fixes BZ 175075.
+prelink base addresses.  Fixes BZ 175075, BZ 190545.
 
 * Tue Feb 14 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.106
 - Bump up release number.
