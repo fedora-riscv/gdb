@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.130.FC6
+Release: 1.131.FC6
 
 License: GPL
 Group: Development/Debuggers
@@ -288,13 +288,10 @@ Patch177: gdb-6.3-catch-debug-registers-error-20060527.patch
 # corrupted or missing PATH.
 Patch178: gdb-6.3-gstack-without-path-20060414.patch
 
-%ifarch ia64
-BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu libunwind >= 0.96-3
-%else
-BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu
-%endif
+BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 
 %ifarch ia64
+BuildRequires: libunwind >= 0.96-3
 Requires: libunwind >= 0.96-3
 %endif
  
@@ -566,6 +563,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed May 31 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.131
+- Require gettext at build time.  (BZ193366)
+
 * Sat May 27 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.130
 - Rewrite patch for BZ 175270, BZ 175083 so as to catch the exception
 earlier.
