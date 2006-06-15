@@ -293,6 +293,7 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
+BuildRequires: flex
 
 %ifarch ia64
 BuildRequires: libunwind >= 0.96-3
@@ -569,6 +570,7 @@ fi
 
 %changelog
 * Thu Jun 15 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.132
+- Require flex at build time.
 - Additional patch for BZ 175083, to cope with waitpid setting status
 even when returning zero.
 
