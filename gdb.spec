@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.3.0.0
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.131.FC6
+Release: 1.132.FC6
 
 License: GPL
 Group: Development/Debuggers
@@ -281,12 +281,16 @@ Patch175: gdb-6.3-support-fopen64-20060413.patch
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
 
-# Do not let errors related with debug registers break thread debugging.
-Patch177: gdb-6.3-catch-debug-registers-error-20060527.patch
-
 # Hard-code executable names in gstack, such that it can run with a
 # corrupted or missing PATH.
-Patch178: gdb-6.3-gstack-without-path-20060414.patch
+Patch177: gdb-6.3-gstack-without-path-20060414.patch
+
+# Do not let errors related with debug registers break thread debugging.
+Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
+
+# Copy with waitpid modifying status even when returning zero, as on
+# ia32el.
+Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 
@@ -395,6 +399,7 @@ and printing their data.
 %patch176 -p1
 %patch177 -p1
 %patch178 -p1
+%patch179 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -563,6 +568,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jun 15 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.132
+- Additional patch for BZ 175083, to cope with waitpid setting status
+even when returning zero.
+
 * Wed May 31 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.131
 - Require gettext at build time.  (BZ193366)
 
