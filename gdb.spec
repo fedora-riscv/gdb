@@ -311,14 +311,6 @@ _FOO
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
 
-# ... and remove the objective-c testcases -- no objective-c
-rm -fr gdb/testsuite/gdb.objc                                                                                
-# ... and remove the ada testcases -- no ada support at all.
-rm -fr gdb/testsuite/gdb.ada                                                                                
-# FIXME: remove gdb/gdbserver/config.h from the snapshot. Suspect a bug
-# in the FSF snapshot process.
-rm -f gdb/gdbserver/config.h
-
 %build
 
 # Initially we're in the %{gdb_src} directory.
