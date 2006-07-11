@@ -123,7 +123,7 @@ Patch134: gdb-6.3-dtorfix-20050121.patch
 Patch136: gdb-6.3-test-movedir-20050125.patch
 
 # Fix to support unwinding syscalls in ia64 corefiles
-Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
+# Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
 
 # Tolerate DW_AT_type referencing <0>.
 Patch139: gdb-6.3-dwattype0-20050201.patch
@@ -268,7 +268,6 @@ and printing their data.
 %patch133 -p1
 %patch134 -p1
 %patch136 -p1
-%patch138 -p1
 %patch139 -p1
 %patch140 -p1
 %patch141 -p1
