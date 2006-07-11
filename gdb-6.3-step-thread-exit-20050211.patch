@@ -20,8 +20,10 @@
 	* testsuite/gdb.threads/step-thread-exit.c: New testcase.
 	* testsuite/gdb.threads/step-thread-exit.exp: Ditto.
 	
---- gdb-6.3/gdb/testsuite/gdb.threads/step-thread-exit.c.fix	2005-02-11 16:51:43.000000000 -0500
-+++ gdb-6.3/gdb/testsuite/gdb.threads/step-thread-exit.c	2005-02-11 18:27:55.000000000 -0500
+Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c	2006-07-07 02:26:54.000000000 -0300
 @@ -0,0 +1,43 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -66,8 +68,10 @@
 +}
 +
 +
---- gdb-6.3/gdb/testsuite/gdb.threads/step-thread-exit.exp.fix	2005-02-11 16:51:47.000000000 -0500
-+++ gdb-6.3/gdb/testsuite/gdb.threads/step-thread-exit.exp	2005-02-11 18:28:23.000000000 -0500
+Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp	2006-07-07 02:26:54.000000000 -0300
 @@ -0,0 +1,100 @@
 +# This testcase is part of GDB, the GNU debugger.
 +
@@ -169,9 +173,11 @@
 +  }
 +}
 +
---- gdb-6.3/gdb/infrun.c.fix	2005-02-11 16:50:08.000000000 -0500
-+++ gdb-6.3/gdb/infrun.c	2005-02-11 16:52:45.000000000 -0500
-@@ -1072,6 +1072,7 @@ init_execution_control_state (struct exe
+Index: gdb-6.5/gdb/infrun.c
+===================================================================
+--- gdb-6.5.orig/gdb/infrun.c	2006-07-07 01:17:35.000000000 -0300
++++ gdb-6.5/gdb/infrun.c	2006-07-07 02:26:54.000000000 -0300
+@@ -1088,6 +1088,7 @@ init_execution_control_state (struct exe
    ecs->current_symtab = ecs->sal.symtab;
    ecs->infwait_state = infwait_normal_state;
    ecs->waiton_ptid = pid_to_ptid (-1);
@@ -179,7 +185,7 @@
    ecs->wp = &(ecs->ws);
  }
  
-@@ -1296,6 +1297,16 @@ handle_inferior_event (struct execution_
+@@ -1307,6 +1308,16 @@ handle_inferior_event (struct execution_
        ui_out_text (uiout, "]\n");
      }
  
@@ -196,7 +202,7 @@
    switch (ecs->ws.kind)
      {
      case TARGET_WAITKIND_LOADED:
-@@ -2665,11 +2676,12 @@ process_event_stop_test:
+@@ -2651,11 +2662,12 @@ process_event_stop_test:
  static int
  currently_stepping (struct execution_control_state *ecs)
  {
@@ -214,9 +220,11 @@
  }
  
  /* Subroutine call with source code we should not step over.  Do step
---- gdb-6.3/gdb/linux-nat.c.fix	2005-02-11 16:50:14.000000000 -0500
-+++ gdb-6.3/gdb/linux-nat.c	2005-02-11 17:02:54.000000000 -0500
-@@ -1032,17 +1032,20 @@ linux_nat_detach (char *args, int from_t
+Index: gdb-6.5/gdb/linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 02:24:51.000000000 -0300
++++ gdb-6.5/gdb/linux-nat.c	2006-07-07 02:29:12.000000000 -0300
+@@ -1121,18 +1121,21 @@ linux_nat_detach (char *args, int from_t
  static int
  resume_callback (struct lwp_info *lp, void *data)
  {
@@ -226,8 +234,9 @@
      {
        struct thread_info *tp;
  
--      child_resume (pid_to_ptid (GET_LWP (lp->ptid)), 0, TARGET_SIGNAL_0);
-+      child_resume (pid_to_ptid (GET_LWP (lp->ptid)), step, TARGET_SIGNAL_0);
+       linux_ops->to_resume (pid_to_ptid (GET_LWP (lp->ptid)),
+-			    0, TARGET_SIGNAL_0);
++			    step, TARGET_SIGNAL_0);
        if (debug_linux_nat)
  	fprintf_unfiltered (gdb_stdlog,
 -			    "RC:  PTRACE_CONT %s, 0, 0 (resume sibling)\n",
@@ -240,11 +249,11 @@
      }
  
    return 0;
-@@ -1110,13 +1113,17 @@ linux_nat_resume (ptid_t ptid, int step,
+@@ -1243,13 +1246,17 @@ linux_nat_resume (ptid_t ptid, int step,
    if (resume_all)
      iterate_over_lwps (resume_callback, NULL);
  
--  child_resume (ptid, step, signo);
+-  linux_ops->to_resume (ptid, step, signo);
 -  if (debug_linux_nat)
 -    fprintf_unfiltered (gdb_stdlog,
 -			"LLR: %s %s, %s (resume event thread)\n",
@@ -253,10 +262,10 @@
 -			signo ? strsignal (signo) : "0");
 +  if (lp)
 +    {
-+      child_resume (ptid, step, signo);
++      linux_ops->to_resume (ptid, step, signo);
 +
 +      if (debug_linux_nat)
-+        fprintf_unfiltered (gdb_stdlog,
++	fprintf_unfiltered (gdb_stdlog,
 +			    "LLR: %s %s, %s (resume event thread)\n",
 +			    step ? "PTRACE_SINGLESTEP" : "PTRACE_CONT",
 +			    target_pid_to_str (ptid),
@@ -265,7 +274,7 @@
  }
  
  /* Issue kill to specified lwp.  */
-@@ -1826,7 +1833,7 @@ stop_and_resume_callback (struct lwp_inf
+@@ -1840,7 +1847,7 @@ stop_and_resume_callback (struct lwp_inf
        for (ptr = lwp_list; ptr; ptr = ptr->next)
  	if (lp == ptr)
  	  {
@@ -274,7 +283,7 @@
  	    resume_set_callback (lp, NULL);
  	  }
      }
-@@ -1837,8 +1844,10 @@ static ptid_t
+@@ -1851,8 +1858,10 @@ static ptid_t
  linux_nat_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
  {
    struct lwp_info *lp = NULL;
@@ -285,7 +294,7 @@
    pid_t pid = PIDGET (ptid);
    sigset_t flush_mask;
  
-@@ -1864,14 +1873,12 @@ retry:
+@@ -1890,14 +1899,12 @@ retry:
       gets the expected trap so we don't want to wait on any LWP.
       This has ramifications when adjustment of the PC is required which can be
       different after a breakpoint vs a step (e.g. x86).  */
@@ -303,7 +312,7 @@
    }
  
    /* If any pid, check if there is a LWP with a wait status pending.  */
-@@ -2134,8 +2141,9 @@ retry:
+@@ -2130,8 +2137,9 @@ retry:
  	    }
  
  	  /* Make sure we don't report a SIGSTOP that we sent
@@ -315,7 +324,7 @@
  	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP)
  	    {
  	      if (debug_linux_nat)
-@@ -2169,6 +2177,20 @@ retry:
+@@ -2165,6 +2173,20 @@ retry:
  
        if (pid == -1)
  	{
@@ -379,7 +388,7 @@
    /* Now stop all other LWP's ...  */
    iterate_over_lwps (stop_callback, NULL);
  
-@@ -2278,6 +2336,10 @@ retry:
+@@ -2275,6 +2333,10 @@ retry:
    else
      store_waitstatus (ourstatus, status);
  
@@ -387,12 +396,14 @@
 +  if (step_lp && step_lp != lp)
 +    ourstatus->step_thread_exit = 1;
 +
-   return (threaded ? lp->ptid : pid_to_ptid (GET_LWP (lp->ptid)));
+   return lp->ptid;
  }
  
---- gdb-6.3/gdb/target.h.fix	2005-02-11 16:50:19.000000000 -0500
-+++ gdb-6.3/gdb/target.h	2005-02-11 16:52:52.000000000 -0500
-@@ -134,6 +134,7 @@ enum target_waitkind
+Index: gdb-6.5/gdb/target.h
+===================================================================
+--- gdb-6.5.orig/gdb/target.h	2006-05-05 17:08:45.000000000 -0300
++++ gdb-6.5/gdb/target.h	2006-07-07 02:26:54.000000000 -0300
+@@ -136,6 +136,7 @@ enum target_waitkind
  struct target_waitstatus
    {
      enum target_waitkind kind;

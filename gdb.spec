@@ -8,19 +8,19 @@ Name: gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.3.0.0
+Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1.132.FC6
+Release: 1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.3.tar.bz2
+Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.5.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%define gdb_src gdb-6.3
+%define gdb_src gdb-6.5
 %define gdb_build %{gdb_src}/build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -56,14 +56,6 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 # frames are identified as signal frames.
 Patch101: gdb-6.3-sigx86-20040621.patch
 
-# Don't reject signal trampoline frames that have a [data] symbol
-# associated with them as occures when backtracing through an
-# alt-stack in the data address space.
-Patch102: gdb-6.3-sigsymtramp-20040621.patch
-
-# Add unwinders for PPC and PPC64 signal trampolines.
-Patch103: gdb-6.3-ppcsignals-20040621.patch
-
 # Use convert_from_func_ptr_addr on the solib breakpoint address;
 # simplifies and makes more consistent the logic.
 Patch104: gdb-6.3-ppcdotsolib-20041022.patch
@@ -74,22 +66,9 @@ Patch105: gdb-6.3-ppc64syscall-20040622.patch
 # Stop a backtrace when a zero PC is encountered.
 Patch106: gdb-6.3-framepczero-20040927.patch
 
-# Hack around broken header files that incorrectly define the FPSCR
-# macro.
-Patch107: gdb-6.3-ppc64fpscrhack-20041026.patch
-
 # Pass the pc's section into the symbol search code; stops the lookup
 # finding a symbol from the wrong section.
 Patch108: gdb-6.3-ppc64section-20041026.patch
-
-# Add PPC register groups so that info registers et.al.; along with
-# register save and restore; work better.  On PPC-64 it was restoring
-# the PS register setting the break-on-branch bit!
-Patch109: gdb-6.3-ppcreggroups-20041124.patch
-
-# Fix up 64-bit PPC inferior function calls so that function
-# parameters are passed correctly.
-Patch110: gdb-6.3-ppc64abi-20040621.patch
 
 # Include the pc's section when doing a symbol lookup so that the
 # correct symbol is found.
@@ -100,9 +79,6 @@ Patch112: gdb-6.3-thread-step-20041207.patch
 
 # Threaded watchpoint support
 Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
-
-# Multiple patches to ia64 backtrace
-Patch114: gdb-6.3-ia64-backtrace-20041213.patch
 
 # Fix to expose multiple constructors to end-user
 Patch115: gdb-6.3-constructor-20041216.patch
@@ -123,19 +99,12 @@ Patch119: gdb-6.3-lwp-cache-20041216.patch
 # Fix to ensure types are visible
 Patch120: gdb-6.3-type-fix-20041213.patch
 
-# Fix for allowing macros to continue after backtrace errors
-Patch121: gdb-6.3-backtrace-20041216.patch
-
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
-Patch123: gdb-6.3-vsyscall-20041216.patch
 Patch124: gdb-6.3-pie-20050110.patch
 
 # Get selftest working with sep-debug-info
 Patch125: gdb-6.3-test-self-20050110.patch
-
-# No longer a need to set .malloc on ppc64.
-Patch126: gdb-6.3-ppcmalloc-20041124.patch
 
 # Enable PPC CFI support.
 Patch127: gdb-6.3-ppccfi-20041104.patch
@@ -143,26 +112,15 @@ Patch127: gdb-6.3-ppccfi-20041104.patch
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 
-# Add synthetic symbols (esp PPC-64 .symbols) to min symtab
-Patch129: gdb-6.3-ppcdotsym-20050126.patch
-
 # Add PPC .symbols to min-symtable.
 Patch130: gdb-6.3-ctorline-20050120.patch
-
-# Handle nested, and back-to-back signals when stepping.
-Patch131: gdb-6.3-sigrepeats-20050121.patch
-Patch132: gdb-6.3-test-sigrepeats-20050121.patch
 
 # Fix to support multiple destructors just like multiple constructors
 Patch133: gdb-6.3-test-dtorfix-20050121.patch
 Patch134: gdb-6.3-dtorfix-20050121.patch
 
-# Fix for ia64 to prevent SIGSEGV in debugger
-Patch135: gdb-6.3-ia64fix-20050121.patch
-
 # Fix to support executable moving
 Patch136: gdb-6.3-test-movedir-20050125.patch
-Patch137: gdb-6.3-movedir-20050125.patch
 
 # Fix to support unwinding syscalls in ia64 corefiles
 Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
@@ -179,17 +137,8 @@ Patch141: gdb-6.3-step-thread-exit-20050211.patch
 # Prevent gdb from being pushed into background
 Patch142: gdb-6.3-terminal-fix-20050214.patch
 
-# Fix for unload.exp testcase
-Patch143: gdb-6.3-unload-test-20050216.patch
-
-# Backport addition symfile-mem.o to all GNU/Linux systems.
-Patch144: gdb-6.3-addsymfilemem-20050209.patch
-
 # Allow sibling threads to set threaded watchpoints for x86 and x86-64
 Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
-
-# Follow vfork fix from mainline sources
-Patch146: gdb-6.3-follow-vfork-20050303.patch
 
 # Fix unexpected compiler warning messages.
 Patch147: gdb-6.3-warnings-20050317.patch
@@ -204,22 +153,10 @@ Patch149: gdb-6.3-ia64-vsyscall-20050330.patch
 Patch150: gdb-6.3-test-sepcrc-20050402.patch
 Patch151: gdb-6.3-sepcrc-20050402.patch
 
-# Handle read side of DW_OP_piece.
-Patch152: gdb-6.3-dwoppieceread-20050407.patch
-
 # Do not issue warning message about first page of storage for ia64 gcore
 Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
 
-# Ia64 patch for added libunwind support
-Patch154: gdb-6.3-ia64-sigtramp-20050427.patch
-
-# Partial die in cache fix
-Patch155: gdb-6.3-partial-die-20050503.patch
-
-# SA_RESTART patch
-Patch156: gdb-6.3-sarestart-20050518.patch
-
-# Security errata for bfd overflow and untrusted .gdbinit
+# Security errata for untrusted .gdbinit
 Patch157: gdb-6.3-security-errata-20050610.patch
 
 # IA64 sigtramp prev register patch
@@ -249,9 +186,6 @@ Patch165: gdb-6.3-xfree-20050922.patch
 # Fix frame pointer for ia64 sigtramp frame
 Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 
-# Fix DSO read logic for attached process
-Patch167: gdb-6.3-attach-dso-20050929.patch
-
 # Support gdb attaching to a stopped process
 Patch168: gdb-6.3-attach-stop-20051011.patch
 
@@ -261,22 +195,11 @@ Patch169: gdb-6.3-ia64-sigill-20051115.patch
 # Allow option to continue backtracing past a zero pc value
 Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
-# Silence type-punning warnings that cause compilation errors because
-# of -Werror.
-Patch171: gdb-6.3-type-punning-20060214.patch
-
-# Enable gdb to debug using executables and core files with different
-# prelink base addresses.
-Patch172: gdb-6.3-prelink-core-20060223.patch
-
 # Enable gdb to recognize stack frames annotated with the "S" augmentation.
 Patch173: gdb-6.3-augmS-20060303.patch
 
 # Enable gdb to recognize CFA value expressions introduced in Dwarf3.
 Patch174: gdb-6.3-cfaval-20060303.patch
-
-# Use fopen64 where available.
-Patch175: gdb-6.3-support-fopen64-20060413.patch
 
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
@@ -323,61 +246,40 @@ and printing their data.
 %patch4 -p1
 
 %patch101 -p1
-%patch102 -p1
-%patch103 -p1
 %patch104 -p1
 %patch105 -p1
 %patch106 -p1
-%patch107 -p1
 %patch108 -p1
-%patch109 -p1
-%patch110 -p1
 %patch111 -p1
 %patch112 -p1
 %patch113 -p1
-%patch114 -p1
 %patch115 -p1
 %patch116 -p1
 %patch117 -p1
 %patch118 -p1
 %patch119 -p1
 %patch120 -p1
-%patch121 -p1
 %patch122 -p1
-%patch123 -p1
 %patch124 -p1
 %patch125 -p1
-%patch126 -p1
 %patch127 -p1
 %patch128 -p1
-%patch129 -p1
 %patch130 -p1
-%patch131 -p1
-%patch132 -p1
 %patch133 -p1
 %patch134 -p1
-%patch135 -p1
 %patch136 -p1
-%patch137 -p1
 %patch138 -p1
 %patch139 -p1
 %patch140 -p1
 %patch141 -p1
 %patch142 -p1
-%patch143 -p1
-%patch144 -p1
 %patch145 -p1
-%patch146 -p1
 %patch147 -p1
 %patch148 -p1
 %patch149 -p1
 %patch150 -p1
 %patch151 -p1
-%patch152 -p1
 %patch153 -p1
-%patch154 -p1
-%patch155 -p1
-%patch156 -p1
 %patch157 -p1
 %patch158 -p1
 %patch159 -p1
@@ -388,15 +290,11 @@ and printing their data.
 %patch164 -p1
 %patch165 -p1
 %patch166 -p1
-%patch167 -p1
 %patch168 -p1
 %patch169 -p1
 %patch170 -p1
-%patch171 -p1
-%patch172 -p1
 %patch173 -p1
 %patch174 -p1
-%patch175 -p1
 %patch176 -p1
 %patch177 -p1
 %patch178 -p1
@@ -569,6 +467,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jul 11 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-1
+- Upgrade to GDB 6.5.  Drop redundant patches, forward-port remaining
+ones.
+
 * Thu Jun 15 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.132
 - Require flex and bison at build time.
 - Additional patch for BZ 175083, to cope with waitpid setting status

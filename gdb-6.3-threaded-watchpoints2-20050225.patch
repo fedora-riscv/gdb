@@ -35,16 +35,10 @@
 	* testsuite/gdb.threads/watchthreads2.c: New test case.
 	* testsuite/gdb.threads/watchthreads2.exp: Ditto.
 
---- gdb-6.3/gdb/config/i386/nm-linux64.h.fix	2004-08-15 12:10:23.000000000 -0400
-+++ gdb-6.3/gdb/config/i386/nm-linux64.h	2005-02-28 17:36:09.000000000 -0500
-@@ -1,6 +1,6 @@
- /* Native support for GNU/Linux x86-64.
- 
--   Copyright 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   Copyright 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
- 
-    Contributed by Jiri Smid, SuSE Labs.
- 
+Index: gdb-6.5/gdb/config/i386/nm-linux64.h
+===================================================================
+--- gdb-6.5.orig/gdb/config/i386/nm-linux64.h	2006-07-11 02:44:36.000000000 -0300
++++ gdb-6.5/gdb/config/i386/nm-linux64.h	2006-07-11 02:45:16.000000000 -0300
 @@ -35,22 +35,59 @@
  
  /* Provide access to the i386 hardware debugging registers.  */
@@ -87,11 +81,11 @@
 +
 +/* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
 + *  *    unused.  Return 0 on success, EBUSY on failure.  */
-+extern int amd64_linux_insert_hw_breakpoint (CORE_ADDR addr, void *shadow);
++extern int amd64_linux_insert_hw_breakpoint (struct bp_target_info *bp_tgt);
 +
 +/* Remove a hardware-assisted breakpoint at address ADDR.  SHADOW is
 + *  *    unused. Return 0 on success, -1 on failure.  */
-+extern int  amd64_linux_remove_hw_breakpoint (CORE_ADDR addr, void *shadow);
++extern int  amd64_linux_remove_hw_breakpoint (struct bp_target_info *bp_tgt);
 +
 +/* Override basic amd64 macros for watchpoint and hardware breakpoint 
 + *    insertion/removal to support threads.  */
@@ -104,27 +98,20 @@
 +  amd64_linux_remove_watchpoint (addr, len, type)
 +
 +#undef target_insert_hw_breakpoint
-+#define target_insert_hw_breakpoint(addr, shadow) \
-+  amd64_linux_insert_hw_breakpoint (addr, shadow)
++#define target_insert_hw_breakpoint(bp_tgt) \
++  amd64_linux_insert_hw_breakpoint (bp_tgt)
 +
 +#undef target_remove_hw_breakpoint
-+#define target_remove_hw_breakpoint(addr, shadow) \
-+  amd64_linux_remove_hw_breakpoint (addr, shadow)
++#define target_remove_hw_breakpoint(bp_tgt) \
++  amd64_linux_remove_hw_breakpoint (bp_tgt)
  
  /* Override copies of {fetch,store}_inferior_registers in `infptrace.c'.  */
  #define FETCH_INFERIOR_REGISTERS
---- gdb-6.3/gdb/config/i386/nm-linux.h.fix	2004-09-20 12:39:35.000000000 -0400
-+++ gdb-6.3/gdb/config/i386/nm-linux.h	2005-02-28 17:36:00.000000000 -0500
-@@ -1,7 +1,7 @@
- /* Native support for GNU/Linux x86.
- 
-    Copyright 1986, 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997,
--   1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
-+   1998, 1999, 2000, 2001, 2002, 2005 Free Software Foundation, Inc.
- 
-    This file is part of GDB.
- 
-@@ -45,23 +45,61 @@ extern CORE_ADDR register_u_addr (CORE_A
+Index: gdb-6.5/gdb/config/i386/nm-linux.h
+===================================================================
+--- gdb-6.5.orig/gdb/config/i386/nm-linux.h	2006-07-11 02:44:36.000000000 -0300
++++ gdb-6.5/gdb/config/i386/nm-linux.h	2006-07-11 02:45:16.000000000 -0300
+@@ -46,23 +46,61 @@ extern CORE_ADDR register_u_addr (CORE_A
  
  /* Provide access to the i386 hardware debugging registers.  */
  
@@ -167,11 +154,11 @@
 +
 +/* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
 + *    unused.  Return 0 on success, EBUSY on failure.  */
-+extern int i386_linux_insert_hw_breakpoint (CORE_ADDR addr, void *shadow);
++extern int i386_linux_insert_hw_breakpoint (struct bp_target_info *bp_tgt);
 +
 +/* Remove a hardware-assisted breakpoint at address ADDR.  SHADOW is
 + *    unused. Return 0 on success, -1 on failure.  */
-+extern int  i386_linux_remove_hw_breakpoint (CORE_ADDR addr, void *shadow);
++extern int  i386_linux_remove_hw_breakpoint (struct bp_target_info *bp_tgt);
 +
 +/* Override basic i386 macros for watchpoint and hardware breakpoint 
 +   insertion/removal to support threads.  */
@@ -184,26 +171,20 @@
 +  i386_linux_remove_watchpoint (addr, len, type)
 +
 +#undef target_insert_hw_breakpoint
-+#define target_insert_hw_breakpoint(addr, shadow) \
-+  i386_linux_insert_hw_breakpoint (addr, shadow)
++#define target_insert_hw_breakpoint(bp_tgt) \
++  i386_linux_insert_hw_breakpoint (bp_tgt)
 +
 +#undef target_remove_hw_breakpoint
-+#define target_remove_hw_breakpoint(addr, shadow) \
-+  i386_linux_remove_hw_breakpoint (addr, shadow)
++#define target_remove_hw_breakpoint(bp_tgt) \
++  i386_linux_remove_hw_breakpoint (bp_tgt)
 +
  /* Override copies of {fetch,store}_inferior_registers in `infptrace.c'.  */
  #define FETCH_INFERIOR_REGISTERS
  
---- gdb-6.3/gdb/i386-nat.c.fix	2005-02-25 16:53:44.000000000 -0500
-+++ gdb-6.3/gdb/i386-nat.c	2005-02-28 17:33:11.000000000 -0500
-@@ -1,6 +1,6 @@
- /* Native-dependent code for the i386.
- 
--   Copyright 2001, 2004 Free Software Foundation, Inc.
-+   Copyright 2001, 2004, 2005 Free Software Foundation, Inc.
- 
-    This file is part of GDB.
- 
+Index: gdb-6.5/gdb/i386-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/i386-nat.c	2006-07-11 02:44:36.000000000 -0300
++++ gdb-6.5/gdb/i386-nat.c	2006-07-11 02:45:16.000000000 -0300
 @@ -21,6 +21,7 @@
  
  #include "defs.h"
@@ -212,8 +193,10 @@
  #include "command.h"
  #include "gdbcmd.h"
  
---- gdb-6.3/gdb/testsuite/gdb.threads/watchthreads2.c.fix	2005-02-28 17:33:54.000000000 -0500
-+++ gdb-6.3/gdb/testsuite/gdb.threads/watchthreads2.c	2005-02-28 17:35:37.000000000 -0500
+Index: gdb-6.5/gdb/testsuite/gdb.threads/watchthreads2.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.5/gdb/testsuite/gdb.threads/watchthreads2.c	2006-07-11 02:45:16.000000000 -0300
 @@ -0,0 +1,66 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -281,8 +264,10 @@
 +    pthread_exit(NULL);
 +}
 +
---- gdb-6.3/gdb/testsuite/gdb.threads/watchthreads2.exp.fix	2005-02-28 17:33:57.000000000 -0500
-+++ gdb-6.3/gdb/testsuite/gdb.threads/watchthreads2.exp	2005-02-28 17:35:33.000000000 -0500
+Index: gdb-6.5/gdb/testsuite/gdb.threads/watchthreads2.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.5/gdb/testsuite/gdb.threads/watchthreads2.exp	2006-07-11 02:45:16.000000000 -0300
 @@ -0,0 +1,133 @@
 +# This testcase is part of GDB, the GNU debugger.
 +
@@ -417,26 +402,19 @@
 +} else {
 +  fail $message 
 +}
---- gdb-6.3/gdb/i386-linux-nat.c.fix	2005-02-24 19:36:12.000000000 -0500
-+++ gdb-6.3/gdb/i386-linux-nat.c	2005-02-28 17:33:01.000000000 -0500
-@@ -1,6 +1,7 @@
- /* Native-dependent code for GNU/Linux i386.
- 
--   Copyright 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005 
-+   Free Software Foundation, Inc.
- 
-    This file is part of GDB.
- 
-@@ -23,6 +24,7 @@
+Index: gdb-6.5/gdb/i386-linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/i386-linux-nat.c	2006-07-11 02:44:36.000000000 -0300
++++ gdb-6.5/gdb/i386-linux-nat.c	2006-07-11 02:45:16.000000000 -0300
+@@ -24,6 +24,7 @@
  #include "inferior.h"
  #include "gdbcore.h"
  #include "regcache.h"
 +#include "observer.h"
+ #include "target.h"
  #include "linux-nat.h"
  
- #include "gdb_assert.h"
-@@ -612,14 +614,14 @@ store_inferior_registers (int regno)
+@@ -614,14 +615,14 @@ i386_linux_store_inferior_registers (int
  /* Support for debug registers.  */
  
  static unsigned long
@@ -454,7 +432,7 @@
  
    /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
       ptrace call fails breaks debugging remote targets.  The correct
-@@ -640,13 +642,13 @@ i386_linux_dr_get (int regnum)
+@@ -642,13 +643,13 @@ i386_linux_dr_get (int regnum)
  }
  
  static void
@@ -471,7 +449,7 @@
  
    errno = 0;
    ptrace (PTRACE_POKEUSER, tid,
-@@ -656,34 +658,158 @@ i386_linux_dr_set (int regnum, unsigned 
+@@ -658,34 +659,158 @@ i386_linux_dr_set (int regnum, unsigned 
  }
  
  void
@@ -599,10 +577,10 @@
 +/* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
 +   unused.  Return 0 on success, EBUSY on failure.  */
 +int
-+i386_linux_insert_hw_breakpoint (CORE_ADDR addr, void *shadow)
++i386_linux_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
 +{
 +  int rc;
-+  rc = i386_insert_hw_breakpoint (addr, shadow);
++  rc = i386_insert_hw_breakpoint (bt_tgt);
 +  if (!rc)
 +    i386_linux_sync_debug_registers_across_threads ();
 +  return rc;
@@ -611,10 +589,10 @@
 +/* Remove a hardware-assisted breakpoint at address ADDR.  SHADOW is
 +   unused.  Return 0 on success, -1 on failure.  */
 +int
-+i386_linux_remove_hw_breakpoint (CORE_ADDR addr, void *shadow)
++i386_linux_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
 +{
 +  int rc;
-+  rc = i386_remove_hw_breakpoint (addr, shadow);
++  rc = i386_remove_hw_breakpoint (bp_tgt);
 +  if (!rc)
 +    i386_linux_sync_debug_registers_across_threads ();
 +  return rc;
@@ -638,9 +616,9 @@
  /* Called by libthread_db.  Returns a pointer to the thread local
     storage (or its descriptor).  */
  
-@@ -817,3 +943,10 @@ child_post_startup_inferior (ptid_t ptid
-   i386_cleanup_dregs ();
-   linux_child_post_startup_inferior (ptid);
+@@ -844,3 +969,10 @@ _initialize_i386_linux_nat (void)
+   /* Register the target.  */
+   linux_nat_add_target (t);
  }
 +
 +void
@@ -649,17 +627,11 @@
 +  observer_attach_linux_new_thread (i386_linux_new_thread);
 +}
 +    
---- gdb-6.3/gdb/amd64-linux-nat.c.fix	2005-02-24 19:37:56.000000000 -0500
-+++ gdb-6.3/gdb/amd64-linux-nat.c	2005-02-28 17:32:44.000000000 -0500
-@@ -1,6 +1,6 @@
- /* Native-dependent code for GNU/Linux x86-64.
- 
--   Copyright 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   Copyright 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
-    Contributed by Jiri Smid, SuSE Labs.
- 
-    This file is part of GDB.
-@@ -24,6 +24,7 @@
+Index: gdb-6.5/gdb/amd64-linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/amd64-linux-nat.c	2006-07-11 02:44:36.000000000 -0300
++++ gdb-6.5/gdb/amd64-linux-nat.c	2006-07-11 02:45:16.000000000 -0300
+@@ -25,6 +25,7 @@
  #include "inferior.h"
  #include "gdbcore.h"
  #include "regcache.h"
@@ -667,7 +639,7 @@
  #include "linux-nat.h"
  
  #include "gdb_assert.h"
-@@ -228,14 +229,14 @@ store_inferior_registers (int regnum)
+@@ -229,14 +230,14 @@ amd64_linux_store_inferior_registers (in
  
  
  static unsigned long
@@ -685,7 +657,7 @@
  
    /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
       ptrace call fails breaks debugging remote targets.  The correct
-@@ -256,13 +257,13 @@ amd64_linux_dr_get (int regnum)
+@@ -257,13 +258,13 @@ amd64_linux_dr_get (int regnum)
  }
  
  static void
@@ -702,7 +674,7 @@
  
    errno = 0;
    ptrace (PT_WRITE_U, tid, offsetof (struct user, u_debugreg[regnum]), value);
-@@ -271,34 +272,158 @@ amd64_linux_dr_set (int regnum, unsigned
+@@ -272,34 +273,158 @@ amd64_linux_dr_set (int regnum, unsigned
  }
  
  void
@@ -830,10 +802,10 @@
 +/* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
 +   unused.  Return 0 on success, EBUSY on failure.  */
 +int
-+amd64_linux_insert_hw_breakpoint (CORE_ADDR addr, void *shadow)
++amd64_linux_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
 +{
 +  int rc;
-+  rc = i386_insert_hw_breakpoint (addr, shadow);
++  rc = i386_insert_hw_breakpoint (bp_tgt);
 +  if (!rc)
 +    amd64_linux_sync_debug_registers_across_threads ();
 +  return rc;
@@ -842,10 +814,10 @@
 +/* Remove a hardware-assisted breakpoint at address ADDR.  SHADOW is
 +   unused.  Return 0 on success, -1 on failure.  */
 +int
-+amd64_linux_remove_hw_breakpoint (CORE_ADDR addr, void *shadow)
++amd64_linux_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
 +{
 +  int rc;
-+  rc = i386_remove_hw_breakpoint (addr, shadow);
++  rc = i386_remove_hw_breakpoint (bp_tgt);
 +  if (!rc)
 +    amd64_linux_sync_debug_registers_across_threads ();
 +  return rc;
@@ -869,10 +841,10 @@
  /* This function is called by libthread_db as part of its handling of
     a request for a thread's local storage address.  */
  
-@@ -380,4 +505,6 @@ _initialize_amd64_linux_nat (void)
- 	      == amd64_native_gregset32_num_regs);
-   gdb_assert (ARRAY_SIZE (amd64_linux_gregset64_reg_offset)
- 	      == amd64_native_gregset64_num_regs);
+@@ -399,4 +524,6 @@ _initialize_amd64_linux_nat (void)
+ 
+   /* Register the target.  */
+   linux_nat_add_target (t);
 +
 +  observer_attach_linux_new_thread (amd64_linux_new_thread);
  }

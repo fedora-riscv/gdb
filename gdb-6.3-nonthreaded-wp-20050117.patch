@@ -1,7 +1,9 @@
---- gdb-6.3/gdb/doc/observer.texi.fix	Tue Jan 18 16:51:56 2005
-+++ gdb-6.3/gdb/doc/observer.texi	Tue Jan 18 17:38:57 2005
-@@ -91,6 +91,10 @@ at the entry-point instruction.  For @sa
- inferior, and before any information on the inferior has been printed.
+Index: gdb-6.5/gdb/doc/observer.texi
+===================================================================
+--- gdb-6.5.orig/gdb/doc/observer.texi	2006-07-07 04:08:37.000000000 -0300
++++ gdb-6.5/gdb/doc/observer.texi	2006-07-07 04:19:00.000000000 -0300
+@@ -119,6 +119,10 @@ when @value{GDBN} calls this observer, t
+ haven't been loaded yet.
  @end deftypefun
  
 +@deftypefun void mourn_inferior (struct target_ops *@var{target})
@@ -9,18 +11,12 @@
 +@end deftypefun
 +
  @deftypefun void solib_unloaded (struct so_list *@var{solib})
- The specified shared library has been discovered to be unloaded.
+ The shared library specified by @var{solib} has been unloaded.
  @end deftypefun
---- gdb-6.3/gdb/linux-nat.c.fix	Tue Jan 18 16:52:24 2005
-+++ gdb-6.3/gdb/linux-nat.c	Tue Jan 18 17:14:01 2005
-@@ -1,6 +1,6 @@
- /* GNU/Linux native-dependent code common to multiple platforms.
- 
--   Copyright 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   Copyright 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
- 
-    This file is part of GDB.
- 
+Index: gdb-6.5/gdb/linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 04:00:05.000000000 -0300
++++ gdb-6.5/gdb/linux-nat.c	2006-07-07 04:20:40.000000000 -0300
 @@ -802,11 +802,23 @@ iterate_over_lwps (int (*callback) (stru
  {
    struct lwp_info *lp, *lpnext;
@@ -48,8 +44,8 @@
      }
  
    return NULL;
-@@ -3103,6 +3115,18 @@ linux_proc_pending_signals (int pid, sig
-   fclose (procfile);
+@@ -3262,6 +3274,18 @@ linux_nat_add_target (struct target_ops 
+   thread_db_init (t);
  }
  
 +/* Observer function for a mourn inferior event.  This is needed
@@ -67,29 +63,20 @@
  void
  _initialize_linux_nat (void)
  {
-@@ -3120,7 +3144,9 @@ Specify any of the following keywords fo
-   stat     -- list a bunch of random process info.\n\
+@@ -3276,6 +3300,8 @@ Specify any of the following keywords fo
    status   -- list a different bunch of random process info.\n\
-   all      -- list all available /proc info.");
--
-+  
+   all      -- list all available /proc info."));
+ 
 +  observer_attach_mourn_inferior (linux_nat_mourn_inferior_observer);
-+  
-   init_linux_nat_ops ();
-   add_target (&linux_nat_ops);
-   thread_db_init (&linux_nat_ops);
---- gdb-6.3/gdb/target.c.fix	Tue Jan 18 17:02:37 2005
-+++ gdb-6.3/gdb/target.c	Tue Jan 18 17:39:43 2005
-@@ -1,7 +1,7 @@
- /* Select target systems and architectures at runtime for GDB.
++
+   /* Save the original signal mask.  */
+   sigprocmask (SIG_SETMASK, NULL, &normal_mask);
  
-    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
--   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
- 
-    Contributed by Cygnus Support.
- 
-@@ -38,6 +38,7 @@
+Index: gdb-6.5/gdb/target.c
+===================================================================
+--- gdb-6.5.orig/gdb/target.c	2006-07-07 03:52:38.000000000 -0300
++++ gdb-6.5/gdb/target.c	2006-07-07 04:19:00.000000000 -0300
+@@ -39,6 +39,7 @@
  #include "regcache.h"
  #include "gdb_assert.h"
  #include "gdbcore.h"
@@ -97,7 +84,7 @@
  
  static void target_info (char *, int);
  
-@@ -266,6 +267,13 @@ target_load (char *arg, int from_tty)
+@@ -267,6 +268,13 @@ target_load (char *arg, int from_tty)
    (*current_target.to_load) (arg, from_tty);
  }
  
@@ -111,18 +98,11 @@
  static int
  nomemory (CORE_ADDR memaddr, char *myaddr, int len, int write,
  	  struct target_ops *t)
---- gdb-6.3/gdb/target.h.fix	Tue Jan 18 17:02:42 2005
-+++ gdb-6.3/gdb/target.h	Tue Jan 18 17:15:30 2005
-@@ -1,7 +1,7 @@
- /* Interface between GDB and target environments, including files and processes
- 
-    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
--   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
-+   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
- 
-    Contributed by Cygnus Support.  Written by John Gilmore.
- 
-@@ -779,8 +779,7 @@ extern void target_load (char *arg, int 
+Index: gdb-6.5/gdb/target.h
+===================================================================
+--- gdb-6.5.orig/gdb/target.h	2006-07-07 03:52:40.000000000 -0300
++++ gdb-6.5/gdb/target.h	2006-07-07 04:19:00.000000000 -0300
+@@ -783,8 +783,7 @@ int target_follow_fork (int follow_child
  
  /* The inferior process has died.  Do what is right.  */
  

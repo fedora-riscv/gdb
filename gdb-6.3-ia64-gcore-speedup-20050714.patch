@@ -7,58 +7,68 @@
 	(ia64_rse_skip_regs): Ditto.
 	(ia64_linux_check_stack_region): New function.
 	
---- gdb-6.3/gdb/linux-nat.c.fix	2005-07-14 17:53:13.000000000 -0400
-+++ gdb-6.3/gdb/linux-nat.c	2005-07-14 19:31:00.000000000 -0400
-@@ -2438,7 +2438,9 @@ linux_nat_mourn_inferior (void)
- 
-   deprecated_child_ops.to_mourn_inferior ();
+Index: gdb-6.5/gdb/linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 02:29:12.000000000 -0300
++++ gdb-6.5/gdb/linux-nat.c	2006-07-07 03:03:55.000000000 -0300
+@@ -2473,7 +2473,9 @@ linux_nat_xfer_partial (struct target_op
+   do_cleanups (old_chain);
+   return xfer;
  }
 -
 +#ifdef NATIVE_XFER_UNWIND_TABLE
 +extern int ia64_linux_check_stack_region(struct lwp_info *lwp, void *range);
 +#endif
  static int
- linux_nat_xfer_memory (CORE_ADDR memaddr, char *myaddr, int len, int write,
- 		     struct mem_attrib *attrib, struct target_ops *target)
-@@ -2446,14 +2448,29 @@ linux_nat_xfer_memory (CORE_ADDR memaddr
-   struct cleanup *old_chain = save_inferior_ptid ();
-   int xfer;
+ linux_nat_thread_alive (ptid_t ptid)
+ {
+@@ -3214,15 +3216,34 @@ linux_xfer_partial (struct target_ops *o
+     return procfs_xfer_auxv (ops, object, annex, readbuf, writebuf,
+ 			     offset, len);
  
--#ifdef NATIVE_XFER_UNWIND_TABLE
+-#ifndef NATIVE_XFER_UNWIND_TABLE
 -  /* FIXME: For ia64, we cannot currently use linux_proc_xfer_memory
 -            for accessing thread storage.  Revert when Bugzilla 147436
+-	    is fixed.  */
+   xfer = linux_proc_xfer_partial (ops, object, annex, readbuf, writebuf,
+ 				  offset, len);
+   if (xfer != 0)
+-    return xfer;
++    {
 +#ifdef NATIVE_XFER_UNWIND_TABLE
-+  struct mem_region range;
-+  range.lo = memaddr;
-+  range.hi = memaddr + len;
++      struct mem_region range;
++      range.lo = memaddr;
++      range.hi = memaddr + len;
 +
-+  /* FIXME: For ia64, we cannot currently trust linux_proc_xfer_memory
-+            for accessing rse register storage.  Revert when Bugzilla 147436
- 	    is fixed.  */
-   if (is_lwp (inferior_ptid))
-     inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
- 
--  xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
-+  xfer = linux_proc_xfer_memory (memaddr, myaddr, len, write, attrib, target);
-+  if (xfer == 0)
-+    xfer = child_xfer_memory (memaddr, myaddr, len, write, attrib, target);
-+  else if (iterate_over_lwps (ia64_linux_check_stack_region, &range) != NULL) 
-+    { /* This region contains ia64 rse registers, we have to re-read.  */
-+      int xxfer;
-+      /* Re-read register stack area.  */
-+      xxfer = child_xfer_memory (range.lo, myaddr + (range.lo - memaddr),
-+                                 range.hi - range.lo, write, attrib, target);
-+      if (xxfer == 0)
-+        xfer = 0;
++      /* FIXME: For ia64, we cannot currently use
++	 linux_proc_xfer_partial for accessing rse register storage.
++	 Revert when Bugzilla 147436 is fixed.  */
++      if (iterate_over_lwps (ia64_linux_check_stack_region, &range) != NULL)
++	{ /* This region contains ia64 rse registers, we have to re-read.  */
++	  int xxfer;
++
++	  /* Re-read register stack area.  */
++	  xxfer = super_xfer_partial (ops, object, annex,
++				      readbuf + (range.lo - memaddr),
++				      writebuf + (range.lo - memaddr),
++				      offset + (range.lo - memaddr),
++				      range.hi - range.lo);
++	  if (xxfer == 0)
++	    xfer = 0;
++	}
+ #endif
++      return xfer;
 +    }
- #else
-   if (is_lwp (inferior_ptid))
-     inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
---- gdb-6.3/gdb/ia64-linux-nat.c.fix	2005-07-14 17:54:43.000000000 -0400
-+++ gdb-6.3/gdb/ia64-linux-nat.c	2005-07-14 17:55:19.000000000 -0400
-@@ -784,6 +784,64 @@ ia64_linux_save_sigtrap_info (void *queu
-           lp->saved_trap_data);
- }
+ 
+   return super_xfer_partial (ops, object, annex, readbuf, writebuf,
+ 			     offset, len);
+Index: gdb-6.5/gdb/ia64-linux-nat.c
+===================================================================
+--- gdb-6.5.orig/gdb/ia64-linux-nat.c	2006-03-24 20:08:16.000000000 -0300
++++ gdb-6.5/gdb/ia64-linux-nat.c	2006-07-07 02:52:25.000000000 -0300
+@@ -687,6 +687,64 @@ ia64_linux_xfer_partial (struct target_o
+ 
+ void _initialize_ia64_linux_nat (void);
  
 +/*
 + * Note: taken from ia64_tdep.c

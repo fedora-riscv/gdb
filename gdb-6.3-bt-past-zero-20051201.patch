@@ -11,8 +11,10 @@ testsuite/gdb.base:
 
 	* setshow.exp: Add testing of "set backtrace past-zero-pc" option.
 
---- gdb-6.3/gdb/testsuite/gdb.base/setshow.exp.fix	2005-12-01 14:43:02.000000000 -0500
-+++ gdb-6.3/gdb/testsuite/gdb.base/setshow.exp	2005-12-01 14:43:20.000000000 -0500
+Index: gdb-6.5/gdb/testsuite/gdb.base/setshow.exp
+===================================================================
+--- gdb-6.5.orig/gdb/testsuite/gdb.base/setshow.exp	2006-07-11 02:46:50.000000000 -0300
++++ gdb-6.5/gdb/testsuite/gdb.base/setshow.exp	2006-07-11 02:47:24.000000000 -0300
 @@ -1,4 +1,4 @@
 -# Copyright 1992, 1994, 1996, 1997, 1998, 2001, 2003
 +# Copyright 1992, 1994, 1996, 1997, 1998, 2001, 2003, 2005
@@ -36,17 +38,28 @@ testsuite/gdb.base:
  #test set check range on
  gdb_test "set check range on" "" "set check range on" 
  #test show check range on
---- gdb-6.3/gdb/frame.c.fix	2005-12-01 14:42:47.000000000 -0500
-+++ gdb-6.3/gdb/frame.c	2005-12-01 14:44:08.000000000 -0500
-@@ -115,6 +115,7 @@ static int frame_debug;
- /* Flag to indicate whether backtraces should stop at main et.al.  */
+Index: gdb-6.5/gdb/frame.c
+===================================================================
+--- gdb-6.5.orig/gdb/frame.c	2006-07-11 02:46:50.000000000 -0300
++++ gdb-6.5/gdb/frame.c	2006-07-11 02:51:20.000000000 -0300
+@@ -131,6 +131,16 @@ Whether backtraces should continue past 
+ 		    value);
+ }
  
- static int backtrace_past_main;
 +static int backtrace_past_zero_pc;
- static unsigned int backtrace_limit = UINT_MAX;
- 
++static void
++show_backtrace_past_zero_pc (struct ui_file *file, int from_tty,
++			     struct cmd_list_element *c, const char *value)
++{
++  fprintf_filtered (file, _("\
++Whether backtraces should continue past a zero pc value is %s.\n"),
++		    value);
++}
++
+ static int backtrace_past_entry;
  static void
-@@ -1236,9 +1237,7 @@ get_prev_frame (struct frame_info *this_
+ show_backtrace_past_entry (struct ui_file *file, int from_tty,
+@@ -1313,9 +1323,7 @@ get_prev_frame (struct frame_info *this_
      }
  
    if (this_frame->level > 0
@@ -57,20 +70,21 @@ testsuite/gdb.base:
        && get_frame_type (this_frame) == NORMAL_FRAME
        && get_frame_type (get_next_frame (this_frame)) == NORMAL_FRAME
        && get_frame_pc (this_frame) == 0)
-@@ -1537,6 +1536,16 @@ Whether backtraces should continue past 
- 			   NULL, NULL, &set_backtrace_cmdlist,
+@@ -1629,6 +1637,17 @@ the rest of the stack trace."),
+ 			   &set_backtrace_cmdlist,
  			   &show_backtrace_cmdlist);
  
 +  add_setshow_boolean_cmd ("past-zero-pc", class_obscure,
-+			   &backtrace_past_zero_pc, "\
-+Set whether backtraces should continue past a zero pc value.", "\
-+Show whether backtraces should continue past a zero pc value..", "\
++ 			   &backtrace_past_zero_pc, _("\
++Set whether backtraces should continue past a zero pc value."), _("\
++Show whether backtraces should continue past a zero pc value."), _("\
 +Normally GDB stops backtracing when it finds a zero pc.\n\
-+Set this variable if you need to see the rest of the stack trace.", "\
-+Whether backtraces should continue past a zero pc value is %s.",
-+			   NULL, NULL, &set_backtrace_cmdlist,
-+			   &show_backtrace_cmdlist);
++Set this variable if you need to see the rest of the stack trace."), 
++ 			   NULL,
++			   show_backtrace_past_zero_pc,
++			   &set_backtrace_cmdlist,
++ 			   &show_backtrace_cmdlist);
 +
-   add_setshow_uinteger_cmd ("limit", class_obscure,
- 			    &backtrace_limit, "\
- Set an upper bound on the number of backtrace levels.", "\
+   add_setshow_integer_cmd ("limit", class_obscure,
+ 			   &backtrace_limit, _("\
+ Set an upper bound on the number of backtrace levels."), _("\
