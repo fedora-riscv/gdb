@@ -217,7 +217,7 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
-BuildRequires: flex bison uuencode prelink
+BuildRequires: flex bison sharutils prelink
 
 %ifarch %{multilib_64_archs} sparc ppc
 # Ensure glibc{,-devel} is installed for both multilib arches
@@ -464,7 +464,7 @@ fi
 
 %changelog
 * Wed Jul 12 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-2
-- BuildReq uuencode, prelink and, on multilib systems, 32-bit glibc-devel.
+- BuildReq sharutils, prelink and, on multilib systems, 32-bit glibc-devel.
 - Drop obsolete attach-stop patch.
 - Fix testcases in threaded-watchpoints2 and step-thread-exit patches.
 - Re-enable attach-pie.exp, asm-source.exp and sigstep.exp tests.
