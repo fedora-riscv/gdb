@@ -23,8 +23,8 @@
 Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c	2006-07-07 02:26:54.000000000 -0300
-@@ -0,0 +1,43 @@
++++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c	2006-07-12 03:18:47.000000000 -0300
+@@ -0,0 +1,50 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
 +   Copyright 2005 Free Software Foundation, Inc.
@@ -55,6 +55,8 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c
 +  printf("In thread_function, *x is %d\n", *x);
 +} /* thread_function_end */
 +
++volatile int repeat = 0;
++
 +main()
 +{
 +  int ret;
@@ -62,8 +64,13 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c
 +  int i = 3;
 +
 +  ret = pthread_create (&th, NULL, thread_function, &i);
++  do
++    {
++      repeat = 0;
++      sleep (3);  /* sleep */
++    }
++  while (repeat);
 +  pthread_join (th, NULL);
-+  sleep (3);  /* sleep */
 +  return 0;
 +}
 +
@@ -71,8 +78,8 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.c
 Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp	2006-07-07 02:26:54.000000000 -0300
-@@ -0,0 +1,100 @@
++++ gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp	2006-07-12 03:22:30.000000000 -0300
+@@ -0,0 +1,113 @@
 +# This testcase is part of GDB, the GNU debugger.
 +
 +# Copyright 2005 Free Software Foundation, Inc.
@@ -138,8 +145,8 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
 +     send_gdb "next\n"
 +     exp_continue
 +  }
-+  -re "Thread.*exited.*Stepped over thread exit.*Program received signal SIGSTOP.*$gdb_prompt $" {
-+     pass $test
++  -re "Stepped over thread exit.*Program received signal SIGSTOP.*$gdb_prompt $" {
++     pass "$test"
 +  }
 +  -re "start_thread.*$gdb_prompt $" {
 +     send_gdb "next\n"
@@ -152,7 +159,17 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
 +runto_main
 +gdb_breakpoint "$sleep_line"
 +gdb_breakpoint "$end_line"
-+gdb_test "continue" "Break.*thread_function.*" "continue to thread_function 2"
++set test "continue to thread_function 2"
++gdb_test_multiple "continue" "$test" {
++    -re "Break.*thread_function.*$gdb_prompt $" {
++	pass $test
++    }
++    -re "Break.*$sleep_line.*$gdb_prompt $" {
++	gdb_test "set repeat=1" "" ""
++	send_gdb "continue\n"
++	exp_continue
++    }
++}
 +
 +# Keep nexting until we cause the thread to exit.  In this case, we
 +# expect the breakpoint in the main thread to have already triggered
@@ -164,8 +181,11 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
 +     send_gdb "next\n"
 +     exp_continue
 +  }
-+  -re "Thread.*exited.*Stepped over thread exit.*Break.*$sleep_line.*" {
-+     pass $test
++  -re "Stepped over thread exit.*Break.*$sleep_line.*$gdb_prompt $" {
++     pass "$test (breakpoint hit)"
++  }
++  -re "Stepped over thread exit.*$gdb_prompt $" {
++     pass "$test (breakpoint not hit)"
 +  }
 +  -re "start_thread.*$gdb_prompt $" {
 +     send_gdb "next\n"
@@ -175,8 +195,8 @@ Index: gdb-6.5/gdb/testsuite/gdb.threads/step-thread-exit.exp
 +
 Index: gdb-6.5/gdb/infrun.c
 ===================================================================
---- gdb-6.5.orig/gdb/infrun.c	2006-07-07 01:17:35.000000000 -0300
-+++ gdb-6.5/gdb/infrun.c	2006-07-07 02:26:54.000000000 -0300
+--- gdb-6.5.orig/gdb/infrun.c	2006-07-12 01:54:29.000000000 -0300
++++ gdb-6.5/gdb/infrun.c	2006-07-12 03:22:41.000000000 -0300
 @@ -1088,6 +1088,7 @@ init_execution_control_state (struct exe
    ecs->current_symtab = ecs->sal.symtab;
    ecs->infwait_state = infwait_normal_state;
@@ -202,7 +222,7 @@ Index: gdb-6.5/gdb/infrun.c
    switch (ecs->ws.kind)
      {
      case TARGET_WAITKIND_LOADED:
-@@ -2651,11 +2662,12 @@ process_event_stop_test:
+@@ -2697,11 +2708,12 @@ process_event_stop_test:
  static int
  currently_stepping (struct execution_control_state *ecs)
  {
@@ -222,9 +242,9 @@ Index: gdb-6.5/gdb/infrun.c
  /* Subroutine call with source code we should not step over.  Do step
 Index: gdb-6.5/gdb/linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 02:24:51.000000000 -0300
-+++ gdb-6.5/gdb/linux-nat.c	2006-07-07 02:29:12.000000000 -0300
-@@ -1121,18 +1121,21 @@ linux_nat_detach (char *args, int from_t
+--- gdb-6.5.orig/gdb/linux-nat.c	2006-07-12 01:54:29.000000000 -0300
++++ gdb-6.5/gdb/linux-nat.c	2006-07-12 03:22:42.000000000 -0300
+@@ -1137,18 +1137,21 @@ linux_nat_detach (char *args, int from_t
  static int
  resume_callback (struct lwp_info *lp, void *data)
  {
@@ -249,7 +269,7 @@ Index: gdb-6.5/gdb/linux-nat.c
      }
  
    return 0;
-@@ -1243,13 +1246,17 @@ linux_nat_resume (ptid_t ptid, int step,
+@@ -1259,13 +1262,17 @@ linux_nat_resume (ptid_t ptid, int step,
    if (resume_all)
      iterate_over_lwps (resume_callback, NULL);
  
@@ -274,7 +294,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  }
  
  /* Issue kill to specified lwp.  */
-@@ -1840,7 +1847,7 @@ stop_and_resume_callback (struct lwp_inf
+@@ -1863,7 +1870,7 @@ stop_and_resume_callback (struct lwp_inf
        for (ptr = lwp_list; ptr; ptr = ptr->next)
  	if (lp == ptr)
  	  {
@@ -283,7 +303,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  	    resume_set_callback (lp, NULL);
  	  }
      }
-@@ -1851,8 +1858,10 @@ static ptid_t
+@@ -1874,8 +1881,10 @@ static ptid_t
  linux_nat_wait (ptid_t ptid, struct target_waitstatus *ourstatus)
  {
    struct lwp_info *lp = NULL;
@@ -294,7 +314,7 @@ Index: gdb-6.5/gdb/linux-nat.c
    pid_t pid = PIDGET (ptid);
    sigset_t flush_mask;
  
-@@ -1890,14 +1899,12 @@ retry:
+@@ -1913,14 +1922,12 @@ retry:
       gets the expected trap so we don't want to wait on any LWP.
       This has ramifications when adjustment of the PC is required which can be
       different after a breakpoint vs a step (e.g. x86).  */
@@ -312,7 +332,7 @@ Index: gdb-6.5/gdb/linux-nat.c
    }
  
    /* If any pid, check if there is a LWP with a wait status pending.  */
-@@ -2130,8 +2137,9 @@ retry:
+@@ -2161,8 +2168,9 @@ retry:
  	    }
  
  	  /* Make sure we don't report a SIGSTOP that we sent
@@ -324,7 +344,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP)
  	    {
  	      if (debug_linux_nat)
-@@ -2165,6 +2173,20 @@ retry:
+@@ -2196,6 +2204,20 @@ retry:
  
        if (pid == -1)
  	{
@@ -345,7 +365,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  	  /* Alternate between checking cloned and uncloned processes.  */
  	  options ^= __WCLONE;
  
-@@ -2237,6 +2259,42 @@ retry:
+@@ -2268,6 +2290,42 @@ retry:
      fprintf_unfiltered (gdb_stdlog, "LLW: Candidate event %s in %s.\n",
  			status_to_str (status), target_pid_to_str (lp->ptid));
  
@@ -388,7 +408,7 @@ Index: gdb-6.5/gdb/linux-nat.c
    /* Now stop all other LWP's ...  */
    iterate_over_lwps (stop_callback, NULL);
  
-@@ -2275,6 +2333,10 @@ retry:
+@@ -2306,6 +2364,10 @@ retry:
    else
      store_waitstatus (ourstatus, status);
  
@@ -401,8 +421,8 @@ Index: gdb-6.5/gdb/linux-nat.c
  
 Index: gdb-6.5/gdb/target.h
 ===================================================================
---- gdb-6.5.orig/gdb/target.h	2006-05-05 17:08:45.000000000 -0300
-+++ gdb-6.5/gdb/target.h	2006-07-07 02:26:54.000000000 -0300
+--- gdb-6.5.orig/gdb/target.h	2006-07-12 01:54:29.000000000 -0300
++++ gdb-6.5/gdb/target.h	2006-07-12 03:22:40.000000000 -0300
 @@ -136,6 +136,7 @@ enum target_waitkind
  struct target_waitstatus
    {

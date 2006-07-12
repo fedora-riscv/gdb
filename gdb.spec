@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -187,6 +187,7 @@ Patch165: gdb-6.3-xfree-20050922.patch
 Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 
 # Support gdb attaching to a stopped process
+# Appears to be obsolete, not applied. -aoliva
 Patch168: gdb-6.3-attach-stop-20051011.patch
 
 # Fix ia64 gdb problem with user-specified SIGILL handling
@@ -216,7 +217,12 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
-BuildRequires: flex bison
+BuildRequires: flex bison uuencode prelink
+
+%ifarch %{multilib_64_archs} sparc ppc
+# Ensure glibc{,-devel} is installed for both multilib arches
+BuildRequires: /lib/libc.so.6 /usr/lib/libc.so /lib64/libc.so.6 /usr/lib64/libc.so
+%endif
 
 %ifarch ia64
 BuildRequires: libunwind >= 0.96-3
@@ -289,7 +295,6 @@ and printing their data.
 %patch164 -p1
 %patch165 -p1
 %patch166 -p1
-%patch168 -p1
 %patch169 -p1
 %patch170 -p1
 %patch173 -p1
@@ -374,7 +379,7 @@ ld -v
 echo ====================TESTING=========================
 cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
-make -k check RUNTESTFLAGS='--ignore bigcore.exp\ attach-pie.exp\ asm-source.exp\ sigstep.exp' || :
+make -k check RUNTESTFLAGS='--ignore bigcore.exp' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -458,9 +463,15 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jul 12 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-2
+- BuildReq uuencode, prelink and, on multilib systems, 32-bit glibc-devel.
+- Drop obsolete attach-stop patch.
+- Fix testcases in threaded-watchpoints2 and step-thread-exit patches.
+- Re-enable attach-pie.exp, asm-source.exp and sigstep.exp tests.
+
 * Tue Jul 11 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-1
 - Upgrade to GDB 6.5.  Drop redundant patches, forward-port remaining
-ones.
+ones.  Re-enable ada and objc testsuites.
 
 * Thu Jun 15 2006 Alexandre Oliva <aoliva@redhat.com> - 6.3.0.0-1.132
 - Require flex and bison at build time.
