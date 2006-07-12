@@ -217,7 +217,7 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
-BuildRequires: flex bison sharutils prelink
+BuildRequires: flex bison sharutils
 
 %ifarch %{multilib_64_archs} sparc ppc
 # Ensure glibc{,-devel} is installed for both multilib arches
@@ -227,6 +227,8 @@ BuildRequires: /lib/libc.so.6 /usr/lib/libc.so /lib64/libc.so.6 /usr/lib64/libc.
 %ifarch ia64
 BuildRequires: libunwind >= 0.96-3
 Requires: libunwind >= 0.96-3
+%else
+BuildRequires: prelink
 %endif
  
 Prereq: info
