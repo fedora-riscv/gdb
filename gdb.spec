@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -212,13 +212,17 @@ Patch177: gdb-6.3-gstack-without-path-20060414.patch
 # Do not let errors related with debug registers break thread debugging.
 Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 
-# Copy with waitpid modifying status even when returning zero, as on
+# Cope with waitpid modifying status even when returning zero, as on
 # ia32el.
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
+
+# Backport GNU .hash support.
+Patch180: gdb-6.5-bfd-hash-style-20060714.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
+%define multilib_64_archs sparc64 ppc64 s390x x86_64
 %ifarch %{multilib_64_archs} sparc ppc
 # Ensure glibc{,-devel} is installed for both multilib arches
 BuildRequires: /lib/libc.so.6 /usr/lib/libc.so /lib64/libc.so.6 /usr/lib64/libc.so
@@ -305,6 +309,7 @@ and printing their data.
 %patch177 -p1
 %patch178 -p1
 %patch179 -p1
+%patch180 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -465,6 +470,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jul 13 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-3
+- Add missing definition of multilib_64_archs for glibc-devel buildreqs.
+- Backport support for .gnu.hash sections.
+
 * Wed Jul 12 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-2
 - BuildReq sharutils, prelink and, on multilib systems, 32-bit glibc-devel.
 - Drop obsolete attach-stop patch.
