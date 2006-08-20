@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 3%{?dist}
+Release: 3_jkratoch0%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -219,6 +219,27 @@ Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 # Backport GNU .hash support.
 Patch180: gdb-6.5-bfd-hash-style-20060714.patch
 
+# Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
+Patch181: gdb-6.5-bz200048-find_line_pc-segv.patch
+
+# Do not step into the PPC solib trampolines (BZ 200533).
+Patch182: gdb-6.5-bz200533-ppc-solib_trampoline.patch
+
+# Fix exec() from threaded program, partial CVS backport (BZ 182116).
+Patch183: gdb-6.3-bz182116-exec-from-pthread.patch
+
+# Fix occasional failure to load shared libraries (BZ 146810).
+Patch184: gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch
+
+# Bugfix object names completion (fixes Patch116, BZ 193763).
+Patch185: gdb-6.3-bz193763-object-name-completion.patch
+
+# Avoid crash of 'info threads' if stale threads exist (BZ 195429).
+Patch186: gdb-6.5-bz195429-stale-threads-crash.patch
+
+# Handle corrupted or missing location list information (BZ 196439).
+Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -310,6 +331,13 @@ and printing their data.
 %patch178 -p1
 %patch179 -p1
 %patch180 -p1
+%patch181 -p1
+%patch182 -p1
+%patch183 -p0
+%patch184 -p0
+%patch185 -p1
+%patch186 -p0
+%patch187 -p0
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -470,6 +498,15 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Aug 20 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-3_jkratoch0
+- Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
+- Do not step into the PPC solib trampolines (BZ 200533).
+- Fix exec() from threaded program, partial CVS backport (BZ 182116).
+- Fix occasional failure to load shared libraries (BZ 146810).
+- Bugfix object names completion (fixes Patch116, BZ 193763).
+- Avoid crash of 'info threads' if stale threads exist (BZ 195429).
+- Handle corrupted or missing location list information (BZ 196439).
+
 * Thu Jul 13 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-3
 - Add missing definition of multilib_64_archs for glibc-devel buildreqs.
 - Backport support for .gnu.hash sections.
