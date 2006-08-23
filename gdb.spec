@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -219,6 +219,9 @@ Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 # Backport GNU .hash support.
 Patch180: gdb-6.5-bfd-hash-style-20060714.patch
 
+# Add support for memory nops on x86.
+Patch181: gdb-6.5-opcodes-i386-nopmem.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -310,6 +313,7 @@ and printing their data.
 %patch178 -p1
 %patch179 -p1
 %patch180 -p1
+%patch181 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -470,6 +474,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* ??? Alexandre Oliva <aoliva@redhat.com> - 6.5-4
+- Backport support for i386 nop memory instructions.
+
 * Thu Jul 13 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-3
 - Add missing definition of multilib_64_archs for glibc-devel buildreqs.
 - Backport support for .gnu.hash sections.
