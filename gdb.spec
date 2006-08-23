@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 3_jkratoch0%{?dist}
+Release: 3_jkratoch1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -240,6 +240,9 @@ Patch186: gdb-6.5-bz195429-stale-threads-crash.patch
 # Handle corrupted or missing location list information (BZ 196439).
 Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat.patch
 
+# Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
+Patch188: gdb-6.5-bz203661-emit-relocs.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -338,6 +341,7 @@ and printing their data.
 %patch185 -p1
 %patch186 -p0
 %patch187 -p0
+%patch188 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -498,6 +502,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Aug 23 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-3_jkratoch1
+- Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
+
 * Sun Aug 20 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-3_jkratoch0
 - Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
 - Do not step into the PPC solib trampolines (BZ 200533).
