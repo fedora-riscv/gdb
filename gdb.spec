@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 3_jkratoch1%{?dist}
+Release: 5_jkratoch0%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -243,6 +243,9 @@ Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat.patch
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
+# Add support for memory nops on x86.
+Patch189: gdb-6.5-opcodes-i386-nopmem.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -336,12 +339,13 @@ and printing their data.
 %patch180 -p1
 %patch181 -p1
 %patch182 -p1
-%patch183 -p0
-%patch184 -p0
+%patch183 -p1
+%patch184 -p1
 %patch185 -p1
-%patch186 -p0
-%patch187 -p0
+%patch186 -p1
+%patch187 -p1
 %patch188 -p1
+%patch189 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -502,11 +506,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Wed Aug 23 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-3_jkratoch1
-- Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
-
-* Sun Aug 20 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-3_jkratoch0
-- Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
+* Thu Aug 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-5
+- Backport support for i386 nop memory instructions.
+- Fix debuginfo addresses resolving for --emit-relocs Linux kernels
+(BZ 203661, from Jan Kratochvil, like the remaining changes).
+- Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ
+200048).
 - Do not step into the PPC solib trampolines (BZ 200533).
 - Fix exec() from threaded program, partial CVS backport (BZ 182116).
 - Fix occasional failure to load shared libraries (BZ 146810).
