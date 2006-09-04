@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -247,6 +247,7 @@ Patch188: gdb-6.5-bz203661-emit-relocs.patch
 Patch189: gdb-6.5-opcodes-i386-nopmem.patch
 
 # Security patch: avoid stack overflows in dwarf expression computation.
+# CVE-2006-4146
 Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
@@ -510,6 +511,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Sep  4 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-7
+- Fix bug in patch for CVE-2006-4146. (BZ 203873, BZ 203880)
+
 * Thu Aug 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-6
 - Avoid overflows and underflows in dwarf expression computation stack.
 (BZ 203873)
