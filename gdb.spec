@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 4%{?dist}
+Release: 6%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -219,11 +219,35 @@ Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 # Backport GNU .hash support.
 Patch180: gdb-6.5-bfd-hash-style-20060714.patch
 
+# Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
+Patch181: gdb-6.5-bz200048-find_line_pc-segv.patch
+
+# Do not step into the PPC solib trampolines (BZ 200533).
+Patch182: gdb-6.5-bz200533-ppc-solib_trampoline.patch
+
+# Fix exec() from threaded program, partial CVS backport (BZ 182116).
+Patch183: gdb-6.3-bz182116-exec-from-pthread.patch
+
+# Fix occasional failure to load shared libraries (BZ 146810).
+Patch184: gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch
+
+# Bugfix object names completion (fixes Patch116, BZ 193763).
+Patch185: gdb-6.3-bz193763-object-name-completion.patch
+
+# Avoid crash of 'info threads' if stale threads exist (BZ 195429).
+Patch186: gdb-6.5-bz195429-stale-threads-crash.patch
+
+# Handle corrupted or missing location list information (BZ 196439).
+Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat.patch
+
+# Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
+Patch188: gdb-6.5-bz203661-emit-relocs.patch
+
 # Add support for memory nops on x86.
-Patch181: gdb-6.5-opcodes-i386-nopmem.patch
+Patch189: gdb-6.5-opcodes-i386-nopmem.patch
 
 # Security patch: avoid stack overflows in dwarf expression computation.
-Patch182: gdb-6.5-dwarf-stack-overflow.patch
+Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -318,6 +342,14 @@ and printing their data.
 %patch180 -p1
 %patch181 -p1
 %patch182 -p1
+%patch183 -p1
+%patch184 -p1
+%patch185 -p1
+%patch186 -p1
+%patch187 -p1
+%patch188 -p1
+%patch189 -p1
+%patch190 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -478,9 +510,22 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
-* Wed Aug 23 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-4
-- Backport support for i386 nop memory instructions.
+* Thu Aug 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-6
 - Avoid overflows and underflows in dwarf expression computation stack.
+(BZ 203873)
+
+* Thu Aug 24 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-5
+- Backport support for i386 nop memory instructions.
+- Fix debuginfo addresses resolving for --emit-relocs Linux kernels
+(BZ 203661, from Jan Kratochvil, like the remaining changes).
+- Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ
+200048).
+- Do not step into the PPC solib trampolines (BZ 200533).
+- Fix exec() from threaded program, partial CVS backport (BZ 182116).
+- Fix occasional failure to load shared libraries (BZ 146810).
+- Bugfix object names completion (fixes Patch116, BZ 193763).
+- Avoid crash of 'info threads' if stale threads exist (BZ 195429).
+- Handle corrupted or missing location list information (BZ 196439).
 
 * Thu Jul 13 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-3
 - Add missing definition of multilib_64_archs for glibc-devel buildreqs.
