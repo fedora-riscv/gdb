@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -250,6 +250,9 @@ Patch189: gdb-6.5-opcodes-i386-nopmem.patch
 # CVE-2006-4146
 Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
+# Fix gdb printf command argument using "%p" (BZ 205551).
+Patch191: gdb-6.5-bz205551-printf-p.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -351,6 +354,7 @@ and printing their data.
 %patch188 -p1
 %patch189 -p1
 %patch190 -p1
+%patch191 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -511,6 +515,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Sep 11 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-8
+- Fix gdb printf command argument using "%p" (BZ 205551).
+
 * Mon Sep  4 2006 Alexandre Oliva <aoliva@redhat.com> - 6.5-7
 - Fix bug in patch for CVE-2006-4146. (BZ 203873, BZ 203880)
 
