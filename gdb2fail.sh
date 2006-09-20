@@ -2,25 +2,45 @@
 
 if test "$#" -eq 0
 then
-    echo Usage: $0 /mnt/redhat/dist/DIST/gdb/VERSION/tests/ARCH/build.log.gz ... 1>&2
+    echo >&2 "Usage: $0 [ /mnt/brew/packages/gdb/VERSION/DIST/data/logs/ARCH/build.log ]"
+    echo >&2 "       [ /mnt/brew/scratch/USERNAME/task_TASKID/logs/ARCH/build.log ]"
+    echo >&2 "       [ /mnt/brew/work/tasks/TASKID/build.log ] ..."
     exit 1
 fi
 
-find "$@" -path '*/gdb/*/tests/*/build.log.gz' -print | while read f
+if [ -d tests ];then
+	if [ ! -f tests/.v2 ];then
+		echo >&2 "Directory will be deleted!: tests"
+		exit 1
+	fi
+	rm -rf tests
+fi
+mkdir tests
+touch tests/.v2	# Marker for this temporary directory type
+
+find "$@" -path '*/build.log' -print | while read f
 do
-    echo $f 1>&2
-    ver=`echo "${f}" | sed -e 's,^.*gdb/\([-0-9\.]*\)/tests/\([^/]*\)/.*$,\1,'`
-    isa=`echo "${f}" | sed -e 's,^.*gdb/\([-0-9\.]*\)/tests/\([^/]*\)/.*$,\2,'`
+    echo "$f" >&2
+    ver=`echo "$f" | sed -n -e 's,^.*gdb/\([-0-9\.]*\)/\([^/]*\)/data/logs/\([^/]*\)/.*$,-\1,p'`
+    rel=`echo "$f" | sed -n -e 's,^.*gdb/\([-0-9\.]*\)/\([^/]*\)/data/logs/\([^/]*\)/.*$,-\2,p'`
+    isa=`echo "$f" | sed -n -e 's,^.*gdb/\([-0-9\.]*\)/\([^/]*\)/data/logs/\([^/]*\)/.*$,.\3,p'`
+    if test -z "$ver" ; then
+    ver=`echo "$f" | sed -n -e 's,^.*/scratch/.*/task_\([0-9]*\)/logs/\([^/]*\)/.*$,-\1,p'`
+    fi
+    if test -z "$isa" ; then
+    isa=`echo "$f" | sed -n -e 's,^.*/scratch/.*/task_\([0-9]*\)/logs/\([^/]*\)/.*$,-\2,p'`
+    fi
     # begin 644 gdb-i386-redhat-linux-gnu.tar.bz2
+    line="gdb${ver}${rel}${isa}"
+###    echo "$line"
     for t in sum log ; do
-	mkdir -p tests/${ver}
-	gunzip < $f | uudecode -o /dev/stdout | bunzip2 \
-	    | tar xpvOf - gdb-${isa}-redhat-linux-gnu.$t \
-	    > tests/gdb-${ver}-${isa}.$t
+	uudecode < "$f" -o /dev/stdout | bunzip2 \
+	    | tar -xpvO -f - "gdb-*-redhat-linux-gnu.$t" \
+	    > "tests/$line.$t"
     done
-    echo "${ver}"
-done | sort -u | while read ver ; do
-    ( cd tests && /home/cygnus/cagney/bin/do-analize-tests gdb-${ver}-*.sum )
-    echo "$PWD/tests/*.html"
-    ls -1 tests/*.html 1>&2
 done
+
+( cd tests && /home/cygnus/cagney/bin/do-analize-tests *.sum )
+
+echo "$PWD/tests/*.html"
+ls -1 tests/*.html 1>&2
