@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -186,10 +186,6 @@ Patch165: gdb-6.3-xfree-20050922.patch
 # Fix frame pointer for ia64 sigtramp frame
 Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 
-# Support gdb attaching to a stopped process
-# Appears to be obsolete, not applied. -aoliva
-Patch168: gdb-6.3-attach-stop-20051011.patch
-
 # Fix ia64 gdb problem with user-specified SIGILL handling
 Patch169: gdb-6.3-ia64-sigill-20051115.patch
 
@@ -252,6 +248,24 @@ Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
 # Fix gdb printf command argument using "%p" (BZ 205551).
 Patch191: gdb-6.5-bz205551-printf-p.patch
+
+# Fix crash on C++ symbol failing to be demangled (BZ 206813).
+Patch192: gdb-6.5-bz206813-cplusplus-symbol-null.patch
+
+# Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
+Patch193: gdb-6.5-attach-stop.patch
+
+# Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
+# FIXME: Still to be updated.
+Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
+
+# Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
+Patch195: gdb-6.5-tls-of-separate-debuginfo.patch
+
+# Fix TLS symbols resolving for shared libraries with a relative pathname.
+# The testsuite needs `gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch'.
+# The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
+Patch196: gdb-6.5-sharedlibrary-path.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -355,6 +369,11 @@ and printing their data.
 %patch189 -p1
 %patch190 -p1
 %patch191 -p1
+%patch192 -p1
+%patch193 -p1
+%patch194 -p1
+%patch195 -p1
+%patch196 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -515,6 +534,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Sep 21 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-9
+- Fix crash on C++ symbol failing to be demangled (BZ 206813).
+- Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
+- Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
+- Fix TLS symbols resolving for shared libraries with a relative pathname.
+- Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
+
 * Mon Sep 11 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-8
 - Fix gdb printf command argument using "%p" (BZ 205551).
 

@@ -1,0 +1,289 @@
+sleep 1h& pid=$!; kill -STOP $pid; gdb sleep $pid
+	->
+Attaching to program: /bin/sleep, process 20768
+../../gdb/linux-nat.c:1057: internal-error: linux_nat_attach: Assertion `pid == GET_PID (inferior_ptid) && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP' failed.
+
+Specific to Red Hat kernels, kernel.org kernels lockup on gdb "attach".
+
+
+2006-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb-6.5/gdb/linux-nat.c (linux_nat_attach): Handle already stopped
+	processes.
+
+2006-09-17  Jeff Johnston  <jjohnstn@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/attachstop.exp, gdb.base/attachstop.c: New files,
+	test attaching to already stopped processes.
+
+
+Index: gdb-6.5/gdb/linux-nat.c
+===================================================================
+RCS file: /cvs/src/src/gdb/linux-nat.c,v
+retrieving revision 1.50
+diff -u -p -r1.50 linux-nat.c
+--- gdb-6.5-orig/gdb/linux-nat.c	16 Sep 2006 09:48:12 -0000	1.50
++++ gdb-6.5/gdb/linux-nat.c	17 Sep 2006 21:50:32 -0000
+@@ -1022,13 +1022,16 @@ linux_nat_attach (char *args, int from_t
+       lp->cloned = 1;
+     }
+ 
+-  gdb_assert (pid == GET_PID (inferior_ptid)
+-	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP);
++  /* Do not check `WSTOPSIG (status) == SIGSTOP' as the status may be
++     arbitrary - depending on the signal that stopped the processes.
++     If the process was running we get SIGSTOP, if it was already stopped
++     by SIGSTOP we get 0.  The value gets used for `PTRACE_CONT'.  */
++  gdb_assert (pid == GET_PID (inferior_ptid) && WIFSTOPPED (status));
+ 
+   lp->stopped = 1;
+ 
+-  /* Fake the SIGSTOP that core GDB expects.  */
+-  lp->status = W_STOPCODE (SIGSTOP);
++  /* Provide the stop status that core GDB expects.  */
++  lp->status = status;
+   lp->resumed = 1;
+   if (debug_linux_nat)
+     {
+Index: gdb-6.5/gdb/testsuite/gdb.base/attachstop.c
+===================================================================
+RCS file: gdb-6.5/gdb/testsuite/gdb.base/attachstop.c
+diff -N gdb-6.5/gdb/testsuite/gdb.base/attachstop.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ gdb-6.5/gdb/testsuite/gdb.base/attachstop.c	17 Sep 2006 21:50:32 -0000
+@@ -0,0 +1,29 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2005 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
++
++/* This program is intended to be started outside of gdb, then
++   manually stopped via a signal.  */
++
++#include <unistd.h>
++
++int main ()
++{
++  sleep (10000);  /* Ridiculous time, but we will eventually kill it.  */
++  sleep (10000);  /* Second sleep.  */
++  return 0;
++}
+Index: gdb-6.5/gdb/testsuite/gdb.base/attachstop.exp
+===================================================================
+RCS file: gdb-6.5/gdb/testsuite/gdb.base/attachstop.exp
+diff -N gdb-6.5/gdb/testsuite/gdb.base/attachstop.exp
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ gdb-6.5/gdb/testsuite/gdb.base/attachstop.exp	17 Sep 2006 21:50:32 -0000
+@@ -0,0 +1,198 @@
++# Copyright 2005-2006
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++# This test was created by modifying attach.exp.
++# This file was created by Jeff Johnston <jjohnstn@redhat.com>.
++# This file was updated by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++# This test only works on Linux
++if { ![istarget "*-*-linux-gnu*"] } {
++    return 0
++}
++
++set testfile "attachstop"
++set srcfile  ${testfile}.c
++set binfile  ${objdir}/${subdir}/${testfile}
++set escapedbinfile  [string_to_regexp ${objdir}/${subdir}/${testfile}]
++
++#execute_anywhere "rm -f ${binfile}"
++remote_exec build "rm -f ${binfile}"
++# For debugging this test
++#
++#log_user 1
++
++# build the test case
++#
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    gdb_suppress_entire_file "Testcase compile failed, so all tests in this file will automatically fail."
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1
++}
++
++# Start the program running and then wait for a bit, to be sure
++# that it can be attached to.
++
++set testpid [eval exec $binfile &]
++exec sleep 2
++   
++# Stop the program 
++remote_exec build "kill -s STOP ${testpid}"
++
++# Start with clean gdb
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# Verify that we can attach to the process by first giving its
++# executable name via the file command, and using attach with the
++# process ID.
++
++set test "set file, before attach1 to stopped process"
++gdb_test_multiple "file $binfile" "$test" {
++   -re "Load new symbol table from.*y or n. $" {
++        gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*done." \
++		"$test (re-read)"
++    }
++    -re "Reading symbols from $escapedbinfile\.\.\.*done.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++set test "attach1 to stopped, after setting file"
++gdb_test_multiple "attach $testpid" "$test" {
++    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++gdb_test "bt" ".*sleep.*main.*" "attach1 to stopped bt"
++
++# Exit and detach the process.
++   
++gdb_exit
++
++set fileid [open /proc/${testpid}/status r];
++gets $fileid line1;
++gets $fileid line2;
++close $fileid;
++
++set test "attach1, exit leaves process stopped"
++if {[string match "*(stopped)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# At this point, the process should still be stopped
++
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# Verify that we can attach to the process just by giving the
++# process ID.
++   
++set test "attach2 to stopped, after setting file"
++gdb_test_multiple "attach $testpid" "$test" {
++    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++gdb_test "bt" ".*sleep.*main.*" "attach2 to stopped bt"
++gdb_breakpoint [gdb_get_line_number "Second sleep"]
++set test "attach2 continue"
++send_gdb "continue\n"
++gdb_expect {
++  -re "Continuing"
++    { pass "continue ($test)" }
++  timeout
++    { fail "continue ($test) (timeout)" }
++}
++
++# For this to work we must be sure to consume the "Continuing."
++# message first, or GDB's signal handler may not be in place.
++after 1000 {send_gdb "\003"}
++set test "attach2 stop unbreakable interrupt"
++gdb_expect 4 {
++  -re "Program received signal SIGINT.*$gdb_prompt $"
++    {
++      fail "$test (broke into)"
++    }
++  -re "Breakpoint \[0-9\].*$srcfile.*$gdb_prompt $"
++    {
++      fail "$test (broke into)"
++    }
++  timeout
++    {
++      pass $test
++    }
++}
++
++# Continue the program 
++remote_exec build "kill -s CONT ${testpid}"
++
++# Already sent before: after 1000 {send_gdb "\003"}
++set test "attach2 stop by interrupt"
++gdb_expect {
++  -re "Program received signal SIGINT.*$gdb_prompt $"
++    {
++      pass $test
++    }
++  -re "Breakpoint \[0-9\].*$srcfile.*$gdb_prompt $"
++    {
++      pass $test
++    }
++  timeout
++    {
++      fail "$test (timeout)"
++    }
++}
++
++gdb_exit
++
++# At this point, the process should be sleeping
++
++set fileid2 [open /proc/${testpid}/status r];
++gets $fileid2 line1;
++gets $fileid2 line2;
++close $fileid2;
++
++set test "attach2, exit leaves process sleeping"
++if {[string match "*(sleeping)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# Make sure we don't leave a process around to confuse
++# the next test run (and prevent the compile by keeping
++# the text file busy), in case the "set should_exit" didn't
++# work.
++   
++remote_exec build "kill -9 ${testpid}"
++
++return 0
