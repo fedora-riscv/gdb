@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -267,6 +267,9 @@ Patch195: gdb-6.5-tls-of-separate-debuginfo.patch
 # The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 Patch196: gdb-6.5-sharedlibrary-path.patch
 
+# Support IPv6 for gdbserver (BZ 198365).
+Patch197: gdb-6.5-IPv6.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -374,6 +377,7 @@ and printing their data.
 %patch194 -p1
 %patch195 -p1
 %patch196 -p1
+%patch197 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -450,7 +454,8 @@ ld -v
 echo ====================TESTING=========================
 cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
-make -k check RUNTESTFLAGS='--ignore bigcore.exp' || :
+# "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
+make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp"' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -534,6 +539,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Sep 27 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-10
+- Support IPv6 for gdbserver (BZ 198365).
+- Temporarily disable testcase "chng-syms.exp" for a possible kernel Bug 207002.
+
 * Wed Sep 21 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-9
 - Fix crash on C++ symbol failing to be demangled (BZ 206813).
 - Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
