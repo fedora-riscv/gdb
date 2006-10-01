@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -268,7 +268,20 @@ Patch195: gdb-6.5-tls-of-separate-debuginfo.patch
 Patch196: gdb-6.5-sharedlibrary-path.patch
 
 # Support IPv6 for gdbserver (BZ 198365).
-Patch197: gdb-6.5-IPv6.patch
+Patch197: gdb-6.5-bz198365-IPv6.patch
+
+# No longer disassemble invalid i386 opcodes of movQ/movA (BZ 172034).
+Patch198: gdb-6.5-bz172034-disasm-i386-C6-C7.patch
+
+# Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
+# FIXME: It could be autodetected.
+Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch 
+
+# Fix dereferencing registers for 32bit inferiors on 64bit hosts (BZ 181390).
+Patch200: gdb-6.5-bz181390-memory-address-width.patch
+
+# Fix `gcore' command for 32bit inferiors on 64bit hosts.
+Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -378,6 +391,10 @@ and printing their data.
 %patch195 -p1
 %patch196 -p1
 %patch197 -p1
+%patch198 -p1
+%patch199 -p1
+%patch200 -p1
+%patch201 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -539,6 +556,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Oct  1 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-11
+- No longer disassemble invalid i386 opcodes of movQ/movA (BZ 172034).
+- Simplify the IPv6 patch for gdbserver (BZ 198365).
+- Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
+- Fix dereferencing registers for 32bit inferiors on 64bit hosts (BZ 181390).
+- Fix `gcore' command for 32bit inferiors on 64bit hosts.
+
 * Wed Sep 27 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-10
 - Support IPv6 for gdbserver (BZ 198365).
 - Temporarily disable testcase "chng-syms.exp" for a possible kernel Bug 207002.
