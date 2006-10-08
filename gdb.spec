@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -390,7 +390,7 @@ and printing their data.
 %patch194 -p1
 %patch195 -p1
 %patch196 -p1
-%patch197 -p1
+#%patch197 -p1
 %patch198 -p1
 %patch199 -p1
 %patch200 -p1
@@ -556,6 +556,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Oct  8 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-12
+- Disabled IPv6 until its user visible syntax gets stable upstream.
+
 * Sun Oct  1 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-11
 - No longer disassemble invalid i386 opcodes of movQ/movA (BZ 172034).
 - Simplify the IPv6 patch for gdbserver (BZ 198365).
