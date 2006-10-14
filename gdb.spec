@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -283,6 +283,9 @@ Patch200: gdb-6.5-bz181390-memory-address-width.patch
 # Fix `gcore' command for 32bit inferiors on 64bit hosts.
 Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
+# Fix deadlock accessing last address space byte; for corrupted backtraces.
+Patch203: gdb-6.5-last-address-space-byte.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -395,6 +398,7 @@ and printing their data.
 %patch199 -p1
 %patch200 -p1
 %patch201 -p1
+%patch203 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -556,6 +560,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Oct 14 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-13
+- Fix deadlock accessing last address space byte; for corrupted backtraces.
+
 * Sun Oct  8 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-12
 - Disabled IPv6 until its user visible syntax gets stable upstream.
 
