@@ -1,0 +1,143 @@
+2006-10-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb/symtab.c (matching_bfd_sections): Fix VMA matching for objects
+	loaded at a different address than stored on the disk.
+
+2006-10-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/relativedebug.c, gdb.base/relativedebug.exp: New file, 
+	resolving of PC in libc pause(3) (with possibly different on-disk VMA).
+
+
+Index: ./gdb/symtab.c
+===================================================================
+--- ./gdb/symtab.c	17 Oct 2006 20:17:44 -0000	1.148
++++ ./gdb/symtab.c	29 Oct 2006 22:29:21 -0000
+@@ -739,8 +739,11 @@ matching_bfd_sections (asection *first, 
+   if (bfd_get_section_size (first) != bfd_get_section_size (second))
+     return 0;
+ 
++  /* In-memory addresses may start at a different offset, relativize them.  */
+   if (bfd_get_section_vma (first->owner, first)
+-      != bfd_get_section_vma (second->owner, second))
++      - bfd_get_start_address (first->owner)
++      != bfd_get_section_vma (second->owner, second)
++	 - bfd_get_start_address (second->owner))
+     return 0;
+ 
+   if (bfd_get_section_name (first->owner, first) == NULL
+Index: ./gdb/testsuite/gdb.base/relativedebug.c
+===================================================================
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/relativedebug.c	29 Oct 2006 22:29:21 -0000
+@@ -0,0 +1,37 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2006 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
++   02111-1307, USA.  */
++
++#include <unistd.h>
++#include <stdlib.h>
++#include <signal.h>
++
++
++static void handler (int signo)
++{
++	abort ();
++}
++
++int main (void)
++{
++	signal (SIGALRM, handler);
++	alarm (1);
++	pause ();
++	pause ();
++	return 0;
++}
+Index: ./gdb/testsuite/gdb.base/relativedebug.exp
+===================================================================
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/relativedebug.exp	29 Oct 2006 22:29:21 -0000
+@@ -0,0 +1,68 @@
++# Copyright 2006 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set testfile relativedebug
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# pause () -> SIGALRM -> handler () -> abort ()
++
++gdb_test "run" \
++         ".*Program received signal SIGABRT, Aborted..*" \
++         "run"
++
++# incorrect (#6):
++# (gdb) bt
++# #0  0x00325402 in __kernel_vsyscall ()
++# #1  0x00718f20 in *__GI_raise (sig=6) at ../nptl/sysdeps/unix/sysv/linux/raise.c:64
++# #2  0x0071a801 in *__GI_abort () at abort.c:88
++# #3  0x0804841f in handler (signo=14) at ./gdb.base/relativedebug.c:27
++# #4  <signal handler called>
++# #5  0x00325402 in __kernel_vsyscall ()
++# #6  0x0077ebc6 in ?? () from /lib/i686/nosegneg/libc.so.6
++# #7  0x08048455 in main () at ./gdb.base/relativedebug.c:34
++# (gdb)
++
++# correct (#6):
++# (gdb) bt
++# #0  0x00b33402 in __kernel_vsyscall ()
++# #1  0x00718f20 in *__GI_raise (sig=6) at ../nptl/sysdeps/unix/sysv/linux/raise.c:64
++# #2  0x0071a801 in *__GI_abort () at abort.c:88
++# #3  0x0804841f in handler (signo=14) at ./gdb.base/relativedebug.c:27
++# #4  <signal handler called>
++# #5  0x00b33402 in __kernel_vsyscall ()
++# #6  0x0077ebc6 in __pause_nocancel () from /lib/i686/nosegneg/libc.so.6
++# #7  0x08048455 in main () at ./gdb.base/relativedebug.c:34
++# (gdb)
++
++gdb_test "bt" \
++         ".*\[^a-zA-Z\]pause\[^a-zA-Z\].*" \
++         "pause(3) seen there"

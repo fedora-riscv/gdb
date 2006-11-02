@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -286,6 +286,17 @@ Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 # Fix deadlock accessing last address space byte; for corrupted backtraces.
 Patch203: gdb-6.5-last-address-space-byte.patch
 
+# Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
+# "gdb-6.5-matching_bfd_sections.patch" is a prerequisited CVS backport.
+Patch205: gdb-6.5-matching_bfd_sections.patch
+Patch206: gdb-6.5-relativedebug.patch
+
+# Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
+Patch207: gdb-6.5-symbols-overlap.patch
+
+# Improved testsuite results by the testsuite provided by the courtesy of BEA.
+Patch208: gdb-6.5-BEA-testsuite.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -399,6 +410,10 @@ and printing their data.
 %patch200 -p1
 %patch201 -p1
 %patch203 -p1
+%patch205 -p1
+%patch206 -p1
+%patch207 -p1
+%patch208 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -476,7 +491,7 @@ echo ====================TESTING=========================
 cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
-make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp"' || :
+make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp"' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -560,6 +575,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Nov  2 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-14
+- Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
+- Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
+- Also disable testcase "checkpoint.exp" for a possible kernel Bug 207002.
+- Improved testsuite results by the testsuite provided by the courtesy of BEA.
+
 * Sat Oct 14 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-13
 - Fix deadlock accessing last address space byte; for corrupted backtraces.
 
