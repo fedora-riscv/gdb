@@ -491,7 +491,8 @@ echo ====================TESTING=========================
 cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
-make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp"' || :
+# "threadcrash.exp" is incompatible on ia64 with old kernels.
+make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -579,7 +580,7 @@ fi
 - Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
 - Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
 - Also disable testcase "checkpoint.exp" for a possible kernel Bug 207002.
-- Improved testsuite results by the testsuite provided by the courtesy of BEA.
+- Provided (disabled during build) threading testsuite from BEA.
 
 * Sat Oct 14 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-13
 - Fix deadlock accessing last address space byte; for corrupted backtraces.
