@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -297,6 +297,9 @@ Patch207: gdb-6.5-symbols-overlap.patch
 # Improved testsuite results by the testsuite provided by the courtesy of BEA.
 Patch208: gdb-6.5-BEA-testsuite.patch
 
+# Fix readline segfault on excessively long hand-typed lines.
+Patch209: gdb-6.5-readline-long-line-crash.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -414,6 +417,7 @@ and printing their data.
 %patch206 -p1
 %patch207 -p1
 %patch208 -p1
+%patch209 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -576,6 +580,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Nov  9 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-15
+- Fix readline segfault on excessively long hand-typed lines.
+
 * Sat Nov  2 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-14
 - Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
 - Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
