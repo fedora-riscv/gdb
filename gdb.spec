@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -582,6 +582,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-17
+- Bugfix testcase typo of gdb-6.5-16.
+
 * Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-16
 - Provide testcase for accessing the last address space byte.
 
