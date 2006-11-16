@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -285,6 +285,7 @@ Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
 # Fix deadlock accessing last address space byte; for corrupted backtraces.
 Patch203: gdb-6.5-last-address-space-byte.patch
+Patch211: gdb-6.5-last-address-space-byte-test.patch
 
 # Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
 # "gdb-6.5-matching_bfd_sections.patch" is a prerequisited CVS backport.
@@ -418,6 +419,7 @@ and printing their data.
 %patch207 -p1
 %patch208 -p1
 %patch209 -p1
+%patch211 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -580,6 +582,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-16
+- Provide testcase for accessing the last address space byte.
+
 * Wed Nov  9 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-15
 - Fix readline segfault on excessively long hand-typed lines.
 
