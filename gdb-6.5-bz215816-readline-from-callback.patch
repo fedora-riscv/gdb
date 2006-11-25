@@ -1,0 +1,42 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=215816
+
+
+Index: ./readline/readline.c
+===================================================================
+RCS file: /cvs/src/src/readline/readline.c,v
+retrieving revision 1.10
+diff -u -p -r1.10 readline.c
+--- ./readline/readline.c	5 May 2006 18:26:12 -0000	1.10
++++ ./readline/readline.c	22 Nov 2006 19:40:17 -0000
+@@ -295,6 +295,7 @@ readline (prompt)
+      const char *prompt;
+ {
+   char *value;
++  int in_callback;
+ 
+   /* If we are at EOF return a NULL string. */
+   if (rl_pending_input == EOF)
+@@ -303,6 +304,13 @@ readline (prompt)
+       return ((char *)NULL);
+     }
+ 
++  /* When we call readline, we have to make sure that readline isn't in
++     the callback state. Otherwise, it will get really confused.
++     PR gdb tui/2173.  */
++  in_callback = RL_ISSTATE (RL_STATE_CALLBACK);
++  if (in_callback)
++    RL_UNSETSTATE (RL_STATE_CALLBACK);
++
+   rl_set_prompt (prompt);
+ 
+   rl_initialize ();
+@@ -321,6 +329,9 @@ readline (prompt)
+   rl_clear_signals ();
+ #endif
+ 
++  if (in_callback)
++    RL_SETSTATE (RL_STATE_CALLBACK);
++
+   return (value);
+ }
+ 

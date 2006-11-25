@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -301,6 +301,9 @@ Patch208: gdb-6.5-BEA-testsuite.patch
 # Fix readline segfault on excessively long hand-typed lines.
 Patch209: gdb-6.5-readline-long-line-crash.patch
 
+# Fix readline history for input mode commands like `command' (BZ 215816).
+Patch212: gdb-6.5-bz215816-readline-from-callback.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -420,6 +423,7 @@ and printing their data.
 %patch208 -p1
 %patch209 -p1
 %patch211 -p1
+%patch212 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -582,6 +586,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Nov 25 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-18
+- Fix readline history for input mode commands like `command' (BZ 215816).
+
 * Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-17
 - Bugfix testcase typo of gdb-6.5-16.
 
