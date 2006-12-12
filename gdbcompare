@@ -1,0 +1,64 @@
+#! /usr/bin/perl
+# $Id$
+
+
+use strict;
+use warnings;
+use Data::Dumper;
+
+my $suffix=shift @ARGV if ($ARGV[0]||"")=~/^(?:sum|log)$/;
+$suffix||="sum";
+
+local *DIR;
+opendir DIR,"tests" or die "opendir: $!";
+my %arch;
+for my $name (sort readdir(DIR)) {
+	next if $name!~/^gdb-.*[-.]([^-.]+)[.]$suffix$/o;
+	push @{$arch{$1}},$name;
+}
+closedir DIR or die "closedir: $!";
+
+for (values(%arch)) {
+	die "Not 2 elements:\n".Dumper($_) if 2!=@$_;
+}
+
+system("rm -f tests/gdbcompare-*.diff") and die;
+
+for my $arch (sort keys(%arch)) {
+	my @sorted=sort { ($a=~/([-.])[^-.]+[.]\w+$/)[0] cmp ($b=~/([-.])[^-.]+[.]\w+$/)[0];; } @{$arch{$arch}};
+	do { system $_ and die $_; } for "diff -u tests/'".$sorted[1]."' tests/'".$sorted[0]."' >tests/gdbcompare-'$arch'.diff;true";
+}
+
+system("vim tests/gdbcompare-*.diff");
+
+__END__;
+
+-rw-rw-r--  1 jkratoch jkratoch 2820599 Dec 11 16:23 gdb-450894-i386.log
+-rw-rw-r--  1 jkratoch jkratoch  661657 Dec 11 16:23 gdb-450894-i386.sum
+-rw-rw-r--  1 jkratoch jkratoch 3238088 Dec 11 16:23 gdb-450894-ia64.log
+-rw-rw-r--  1 jkratoch jkratoch  662796 Dec 11 16:23 gdb-450894-ia64.sum
+-rw-rw-r--  1 jkratoch jkratoch 2959339 Dec 11 16:23 gdb-450894-ppc.log
+-rw-rw-r--  1 jkratoch jkratoch  678114 Dec 11 16:23 gdb-450894-ppc.sum
+-rw-rw-r--  1 jkratoch jkratoch 2932760 Dec 11 16:23 gdb-450894-ppc64.log
+-rw-rw-r--  1 jkratoch jkratoch  674048 Dec 11 16:23 gdb-450894-ppc64.sum
+-rw-rw-r--  1 jkratoch jkratoch 2855270 Dec 11 16:23 gdb-450894-s390.log
+-rw-rw-r--  1 jkratoch jkratoch  666079 Dec 11 16:23 gdb-450894-s390.sum
+-rw-rw-r--  1 jkratoch jkratoch 2883027 Dec 11 16:23 gdb-450894-s390x.log
+-rw-rw-r--  1 jkratoch jkratoch  668279 Dec 11 16:23 gdb-450894-s390x.sum
+-rw-rw-r--  1 jkratoch jkratoch 2911138 Dec 11 16:23 gdb-450894-x86_64.log
+-rw-rw-r--  1 jkratoch jkratoch  666999 Dec 11 16:23 gdb-450894-x86_64.sum
+-rw-rw-r--  1 jkratoch jkratoch 2882257 Dec 11 16:23 gdb-6.5-13.fc6.i386.log
+-rw-rw-r--  1 jkratoch jkratoch  667929 Dec 11 16:23 gdb-6.5-13.fc6.i386.sum
+-rw-rw-r--  1 jkratoch jkratoch 3311427 Dec 11 16:23 gdb-6.5-13.fc6.ia64.log
+-rw-rw-r--  1 jkratoch jkratoch  669221 Dec 11 16:23 gdb-6.5-13.fc6.ia64.sum
+-rw-rw-r--  1 jkratoch jkratoch 3025126 Dec 11 16:23 gdb-6.5-13.fc6.ppc.log
+-rw-rw-r--  1 jkratoch jkratoch  684577 Dec 11 16:23 gdb-6.5-13.fc6.ppc.sum
+-rw-rw-r--  1 jkratoch jkratoch 3267611 Dec 11 16:23 gdb-6.5-13.fc6.ppc64.log
+-rw-rw-r--  1 jkratoch jkratoch  682348 Dec 11 16:23 gdb-6.5-13.fc6.ppc64.sum
+-rw-rw-r--  1 jkratoch jkratoch 2912963 Dec 11 16:23 gdb-6.5-13.fc6.s390.log
+-rw-rw-r--  1 jkratoch jkratoch  672505 Dec 11 16:23 gdb-6.5-13.fc6.s390.sum
+-rw-rw-r--  1 jkratoch jkratoch 2942297 Dec 11 16:23 gdb-6.5-13.fc6.s390x.log
+-rw-rw-r--  1 jkratoch jkratoch  674676 Dec 11 16:23 gdb-6.5-13.fc6.s390x.sum
+-rw-rw-r--  1 jkratoch jkratoch 2974880 Dec 11 16:23 gdb-6.5-13.fc6.x86_64.log
+-rw-rw-r--  1 jkratoch jkratoch  673396 Dec 11 16:23 gdb-6.5-13.fc6.x86_64.sum
+
