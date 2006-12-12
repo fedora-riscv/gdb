@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -46,6 +46,9 @@ Patch2: gdb-6.3-rh-testversion-20041202.patch
 # Check that libunwind works - new test then fix
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
+
+# Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
+Source2: gdb-orphanripper.c
 
 
 # ------------------------------------------
@@ -253,6 +256,7 @@ Patch191: gdb-6.5-bz205551-printf-p.patch
 Patch192: gdb-6.5-bz206813-cplusplus-symbol-null.patch
 
 # Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
+# Fix attachment also to a threaded stopped process (BZ 219118).
 Patch193: gdb-6.5-attach-stop.patch
 
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
@@ -499,10 +503,11 @@ ld -v
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
+gcc -o ./orphanripper %{SOURCE2} -Wall
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
 # "threadcrash.exp" is incompatible on ia64 with old kernels.
-make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
+./orphanripper make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -586,6 +591,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Dec 12 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-19
+- Fix attachment also to a threaded stopped process (BZ 219118).
+- Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
+
 * Sat Nov 25 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-18
 - Fix readline history for input mode commands like `command' (BZ 215816).
 
