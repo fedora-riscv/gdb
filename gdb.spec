@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -304,9 +304,13 @@ Patch208: gdb-6.5-BEA-testsuite.patch
 
 # Fix readline segfault on excessively long hand-typed lines.
 Patch209: gdb-6.5-readline-long-line-crash.patch
+Patch213: gdb-6.5-readline-long-line-crash-test.patch
 
 # Fix readline history for input mode commands like `command' (BZ 215816).
 Patch212: gdb-6.5-bz215816-readline-from-callback.patch
+
+# Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
+Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -428,6 +432,8 @@ and printing their data.
 %patch209 -p1
 %patch211 -p1
 %patch212 -p1
+%patch213 -p1
+%patch214 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -591,6 +597,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Dec 19 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-20
+- Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
+- Testcase for readline segfault on excessively long hand-typed lines.
+
 * Tue Dec 12 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-19
 - Fix attachment also to a threaded stopped process (BZ 219118).
 - Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
