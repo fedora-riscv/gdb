@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -221,9 +221,6 @@ Patch180: gdb-6.5-bfd-hash-style-20060714.patch
 # Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
 Patch181: gdb-6.5-bz200048-find_line_pc-segv.patch
 
-# Do not step into the PPC solib trampolines (BZ 200533).
-Patch182: gdb-6.5-bz200533-ppc-solib_trampoline.patch
-
 # Fix exec() from threaded program, partial CVS backport (BZ 182116).
 Patch183: gdb-6.3-bz182116-exec-from-pthread.patch
 
@@ -311,6 +308,13 @@ Patch212: gdb-6.5-bz215816-readline-from-callback.patch
 
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
+
+# Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
+Patch215: gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch
+Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch 
+
+# Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
+Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -404,7 +408,6 @@ and printing their data.
 %patch179 -p1
 %patch180 -p1
 %patch181 -p1
-%patch182 -p1
 %patch183 -p1
 %patch184 -p1
 %patch185 -p1
@@ -434,6 +437,9 @@ and printing their data.
 %patch212 -p1
 %patch213 -p1
 %patch214 -p1
+%patch215 -p1
+%patch216 -p1
+%patch217 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -597,6 +603,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Dec 23 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-21
+- Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
+- Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
+
 * Tue Dec 19 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-20
 - Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 - Testcase for readline segfault on excessively long hand-typed lines.
