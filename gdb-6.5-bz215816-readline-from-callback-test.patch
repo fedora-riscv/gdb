@@ -1,0 +1,97 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=215816
+
+
+Index: ./gdb/testsuite/gdb.base/readline-callback-history.c
+===================================================================
+RCS file: ./gdb/testsuite/gdb.base/readline-callback-history.c
+diff -N ./gdb/testsuite/gdb.base/readline-callback-history.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/readline-callback-history.c	25 Dec 2006 22:54:37 -0000
+@@ -0,0 +1,25 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2006 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++int main()
++{
++  return 0;
++}
+Index: ./gdb/testsuite/gdb.base/readline-callback-history.exp
+===================================================================
+RCS file: ./gdb/testsuite/gdb.base/readline-callback-history.exp
+diff -N ./gdb/testsuite/gdb.base/readline-callback-history.exp
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/readline-callback-history.exp	25 Dec 2006 22:54:37 -0000
+@@ -0,0 +1,55 @@
++# Copyright 2006 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile start
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++# For: \033[A (up arrow)
++set env(TERM) vt100
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# For C programs, "start" should stop in main().
++
++gdb_test "b main" \
++         "Breakpoint 1 at.*" \
++         "Breakpoint put"
++
++gdb_test "run" \
++         "Breakpoint 1, main (.*) at .*" \
++         "Stopped at the breakpoint"
++
++# \033[A (up arrow)
++gdb_test "command 1\n\033\[A\nend" \
++         "Type commands for when breakpoint 1 is hit.*\n>command 1.*" \
++         "History is available even from callback"

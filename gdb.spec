@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -305,6 +305,7 @@ Patch213: gdb-6.5-readline-long-line-crash-test.patch
 
 # Fix readline history for input mode commands like `command' (BZ 215816).
 Patch212: gdb-6.5-bz215816-readline-from-callback.patch
+Patch219: gdb-6.5-bz215816-readline-from-callback-test.patch
 
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
@@ -315,6 +316,10 @@ Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
 Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
+
+# Fix unwinding crash on older gcj(1) code (extended CFI support) (BZ 165025).
+Patch221: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-fix.patch
+Patch222: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -440,6 +445,9 @@ and printing their data.
 %patch215 -p1
 %patch216 -p1
 %patch217 -p1
+%patch219 -p1
+%patch221 -p1
+%patch222 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -603,6 +611,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Dec 30 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-22
+- Fix unwinding crash on older gcj(1) code (extended CFI support) (BZ 165025).
+- Include testcase for the readline history of input mode commands (BZ 215816).
+
 * Sat Dec 23 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-21
 - Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
 - Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
