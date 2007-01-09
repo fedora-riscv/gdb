@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -46,9 +46,6 @@ Patch2: gdb-6.3-rh-testversion-20041202.patch
 # Check that libunwind works - new test then fix
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
-
-# Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
-Source2: gdb-orphanripper.c
 
 
 # ------------------------------------------
@@ -321,6 +318,10 @@ Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
 Patch221: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-fix.patch
 Patch222: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-test.patch
 
+# Find symbols properly at their original (included) file (BZ 109921).
+Patch224: gdb-6.5-bz109921-DW_AT_decl_file-fix.patch
+Patch225: gdb-6.5-bz109921-DW_AT_decl_file-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -448,6 +449,8 @@ and printing their data.
 %patch219 -p1
 %patch221 -p1
 %patch222 -p1
+%patch224 -p1
+%patch225 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -523,11 +526,10 @@ ld -v
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
 echo ====================TESTING=========================
 cd gdb/testsuite
-gcc -o ./orphanripper %{SOURCE2} -Wall
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
 # "threadcrash.exp" is incompatible on ia64 with old kernels.
-./orphanripper make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
+make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
@@ -611,6 +613,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jan  9 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-23
+- Find symbols properly at their original (included) file (BZ 109921).
+- Remove the stuck mock(1) builds disfunctional workaround (-> mock BZ 221351).
+
 * Sat Dec 30 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-22
 - Fix unwinding crash on older gcj(1) code (extended CFI support) (BZ 165025).
 - Include testcase for the readline history of input mode commands (BZ 215816).
