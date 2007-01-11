@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -613,6 +613,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 11 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-24
+- Backport readline history for input mode commands like `command' (BZ 215816).
+
 * Tue Jan  9 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-23
 - Find symbols properly at their original (included) file (BZ 109921).
 - Remove the stuck mock(1) builds disfunctional workaround (-> mock BZ 221351).
