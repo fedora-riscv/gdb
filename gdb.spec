@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -322,6 +322,9 @@ Patch222: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-test.patch
 Patch224: gdb-6.5-bz109921-DW_AT_decl_file-fix.patch
 Patch225: gdb-6.5-bz109921-DW_AT_decl_file-test.patch
 
+# Fix unwinding of non-CFI (w/o debuginfo) PPC code by recent GCC (BZ 140532).
+Patch226: gdb-6.3-bz140532-ppcnoncfi-skip_prologue-PIC.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -451,6 +454,7 @@ and printing their data.
 %patch222 -p1
 %patch224 -p1
 %patch225 -p1
+%patch226 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -613,6 +617,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jan 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-25
+- Fix unwinding of non-CFI (w/o debuginfo) PPC code by recent GCC (BZ 140532).
+
 * Thu Jan 11 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-24
 - Backport readline history for input mode commands like `command' (BZ 215816).
 
