@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -105,9 +105,6 @@ Patch124: gdb-6.3-pie-20050110.patch
 
 # Get selftest working with sep-debug-info
 Patch125: gdb-6.3-test-self-20050110.patch
-
-# Enable PPC CFI support.
-Patch127: gdb-6.3-ppccfi-20041104.patch
 
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
@@ -324,6 +321,14 @@ Patch225: gdb-6.5-bz109921-DW_AT_decl_file-test.patch
 
 # Fix unwinding of non-CFI (w/o debuginfo) PPC code by recent GCC (BZ 140532).
 Patch226: gdb-6.3-bz140532-ppcnoncfi-skip_prologue-PIC.patch
+# Fix unwinding of non-debug (.eh_frame) PPC code, Andreas Schwab (BZ 140532).
+Patch227: gdb-6.5-bz140532-ppc-eh_frame-regnum.patch
+# Fix unwinding of debug (.debug_frame) PPC code, workaround GCC (BZ 140532).
+Patch228: gdb-6.5-bz140532-ppc-debug_frame-return_address.patch
+Patch229: gdb-6.5-bz140532-ppc-debug_frame-return_address-test.patch
+
+# Fix missing testsuite .log output of testcases using get_compiler_info().
+Patch230: gdb-6.5-testsuite-log.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -380,7 +385,6 @@ and printing their data.
 %patch122 -p1
 %patch124 -p1
 %patch125 -p1
-%patch127 -p1
 %patch128 -p1
 %patch130 -p1
 %patch133 -p1
@@ -455,6 +459,10 @@ and printing their data.
 %patch224 -p1
 %patch225 -p1
 %patch226 -p1
+%patch227 -p1
+%patch228 -p1
+%patch229 -p1
+%patch230 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -617,6 +625,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jan 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-26
+- Fix unwinding of non-debug (.eh_frame) PPC code, Andreas Schwab (BZ 140532).
+- Fix unwinding of debug (.debug_frame) PPC code, workaround GCC (BZ 140532).
+- Fix missing testsuite .log output of testcases using get_compiler_info().
+
 * Fri Jan 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-25
 - Fix unwinding of non-CFI (w/o debuginfo) PPC code by recent GCC (BZ 140532).
 

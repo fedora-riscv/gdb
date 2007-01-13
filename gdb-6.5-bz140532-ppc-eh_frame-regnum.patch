@@ -1,0 +1,91 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=140532
+
+
+2006-05-09  Andreas Schwab  <schwab@suse.de>
+
+	* rs6000-tdep.c: Include "dwarf2-frame.h".
+	(rs6000_eh_frame_regnum): Define.
+	(rs6000_gdbarch_init): Enable use of DWARF CFI frame unwinder.
+	Register rs6000_eh_frame_regnum.
+
+	* Makefile.in (rs6000-tdep.o): Update dependencies.
+
+
+http://sourceware.org/ml/gdb-patches/2006-05/msg00341.html
+	Selectively enabling them on platforms that are unlikely to have ever
+	used GCC versions before 3.4 should be fine.
+
+
+--- ./gdb/Makefile.in	5 May 2006 22:39:12 -0000	1.812
++++ ./gdb/Makefile.in	9 May 2006 14:10:40 -0000
+@@ -2515,7 +2515,7 @@ rs6000-tdep.o: rs6000-tdep.c $(defs_h) $
+ 	$(reggroups_h) $(libbfd_h) $(coff_internal_h) $(libcoff_h) \
+ 	$(coff_xcoff_h) $(libxcoff_h) $(elf_bfd_h) $(solib_svr4_h) \
+ 	$(ppc_tdep_h) $(gdb_assert_h) $(dis_asm_h) $(trad_frame_h) \
+-	$(frame_unwind_h) $(frame_base_h) $(rs6000_tdep_h)
++	$(frame_unwind_h) $(frame_base_h) $(rs6000_tdep_h) $(dwarf2_frame_h)
+ rs6000-aix-tdep.o: rs6000-aix-tdep.c $(defs_h) $(osabi_h) $(rs6000_tdep_h)
+ s390-nat.o: s390-nat.c $(defs_h) $(tm_h) $(regcache_h) $(inferior_h) \
+ 	$(s390_tdep_h) $(target_h) $(linux_nat_h)
+--- ./gdb/rs6000-tdep.c	23 Apr 2006 14:15:01 -0000	1.258
++++ ./gdb/rs6000-tdep.c	9 May 2006 14:10:15 -0000
+@@ -40,6 +40,7 @@
+ #include "sim-regno.h"
+ #include "gdb/sim-ppc.h"
+ #include "reggroups.h"
++#include "dwarf2-frame.h"
+ 
+ #include "libbfd.h"		/* for bfd_default_set_arch_mach */
+ #include "coff/internal.h"	/* for libcoff.h */
+@@ -2243,6 +2244,40 @@ rs6000_dwarf2_reg_to_regnum (int num)
+ }
+ 
+ 
++/* Convert a .eh_frame register number to a Dwarf 2 register number.  */
++static int
++rs6000_eh_frame_regnum (struct gdbarch *gdbarch, int num)
++{
++  if (0 <= num && num <= 63)	/* r0-r31,fp0-fp31 */
++    return num;
++  else if (68 <= num && num <= 75) /* cr0-cr8 */
++    return num - 68 + 86;
++  else if (77 <= num && num <= 108) /* vr0-vr31 */
++    return num - 77 + 1124;
++  else
++    switch (num)
++      {
++      case 64: /* mq */
++	return 100;
++      case 65: /* lr */
++	return 108;
++      case 66: /* ctr */
++	return 109;
++      case 76: /* xer */
++	return 101;
++      case 109: /* vrsave */
++	return 356;
++      case 110: /* vscr */
++	return 67;
++      case 111: /* spe_acc */
++	return 99;
++      case 112: /* spefscr */
++	return 612;
++      default:
++	return num;
++      }
++}
++
+ static void
+ rs6000_store_return_value (struct type *type,
+                            struct regcache *regcache,
+@@ -3461,6 +3496,10 @@ rs6000_gdbarch_init (struct gdbarch_info
+   /* Helpers for function argument information.  */
+   set_gdbarch_fetch_pointer_argument (gdbarch, rs6000_fetch_pointer_argument);
+ 
++  /* Hook in the DWARF CFI frame unwinder.  */
++  frame_unwind_append_sniffer (gdbarch, dwarf2_frame_sniffer);
++  dwarf2_frame_set_eh_frame_regnum (gdbarch, rs6000_eh_frame_regnum);
++
+   /* Hook in ABI-specific overrides, if they have been registered.  */
+   gdbarch_init_osabi (info, gdbarch);
+ 
