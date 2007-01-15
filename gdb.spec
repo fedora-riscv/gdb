@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.5
 
 # The release always contains a leading reserved number, start it at 0.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -625,6 +625,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jan 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-27
+- Fix the testsuite results broken in 6.5-26, stop invalid testsuite runs.
+
 * Fri Jan 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-26
 - Fix unwinding of non-debug (.eh_frame) PPC code, Andreas Schwab (BZ 140532).
 - Fix unwinding of debug (.debug_frame) PPC code, workaround GCC (BZ 140532).
