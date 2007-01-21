@@ -1,0 +1,146 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=196439
+
+
+2006-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+        * gdb.dwarf2/dw2-stripped.exp: New file, Handle corrupted
+        or missing location list information.
+        * gdb.dwarf2/dw2-stripped.c: New file, Handle corrupted
+        or missing location list information.
+
+
+Index: gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
+===================================================================
+RCS file: gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
+diff -N gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.c	26 Aug 2006 11:47:26 -0000
+@@ -0,0 +1,42 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2004 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
++   USA.  */
++
++
++/* The function `func1' traced into must have debug info on offset > 0;
++   (DW_UNSND (attr)).  This is the reason of `func0' existence.  */
++
++void
++func0(int a, int b)
++{
++}
++
++/* `func1' being traced into must have some arguments to dump.  */
++
++void
++func1(int a, int b)
++{
++  func0 (a,b);
++}
++
++int
++main(void)
++{
++  func1 (1, 2);
++  return 0;
++}
+Index: gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
+===================================================================
+RCS file: gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
+diff -N gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ gdb-6.5/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp	26 Aug 2006 11:47:27 -0000
+@@ -0,0 +1,79 @@
++# Copyright 2006 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++# Minimal DWARF-2 unit test
++
++# This test can only be run on targets which support DWARF-2.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0  
++}
++
++set testfile "dw2-stripped"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}.x
++
++remote_exec build "rm -f ${binfile}"
++
++# get the value of gcc_compiled
++if [get_compiler_info ${binfile}] {
++    return -1
++}
++
++# This test can only be run on gcc as we use additional_flags=FIXME
++if {$gcc_compiled == 0} {
++    return 0
++}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-ggdb3}] != "" } {
++    return -1
++}
++
++remote_exec build "objcopy -R .debug_loc ${binfile}"
++set strip_output [remote_exec build "objdump -h ${binfile}"]
++
++set test "stripping test file preservation"
++if [ regexp ".debug_info " $strip_output]  {
++    pass "$test (.debug_info preserved)"
++} else {
++    fail "$test (.debug_info got also stripped)"
++}
++
++set test "stripping test file functionality"
++if [ regexp ".debug_loc " $strip_output]  {
++    fail "$test (.debug_loc still present)"
++} else {
++    pass "$test (.debug_loc stripped)"
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# For C programs, "start" should stop in main().
++
++gdb_test "start" \
++         ".*main \\(\\) at .*" \
++         "start"
++gdb_test "step" \
++         "func.* \\(.*\\) at .*" \
++         "step"

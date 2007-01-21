@@ -12,10 +12,10 @@ gdb/testsuite:
 	* gdb.arch/ia64-sigill.c: New test.
 	* gdb.arch/ia64-sigill.exp: Ditto.
 
-Index: gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.exp
+Index: gdb-6.6/gdb/testsuite/gdb.arch/ia64-sigill.exp
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.exp	2006-07-07 03:16:54.000000000 -0300
+--- /dev/null
++++ gdb-6.6/gdb/testsuite/gdb.arch/ia64-sigill.exp
 @@ -0,0 +1,59 @@
 +#   Copyright 2005 Free Software Foundation, Inc.
 +
@@ -76,10 +76,10 @@ Index: gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.exp
 +gdb_test "handle SIGILL nostop noprint" "SIGILL.*No.*No.*Yes.*" "handle sigill"
 +gdb_test "run" "Starting program.*ia64-sigill.*\[New thread.*\].*hello world.*Program exited normally." "run to exit"
 + 
-Index: gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.c
+Index: gdb-6.6/gdb/testsuite/gdb.arch/ia64-sigill.c
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.c	2006-07-07 03:16:54.000000000 -0300
+--- /dev/null
++++ gdb-6.6/gdb/testsuite/gdb.arch/ia64-sigill.c
 @@ -0,0 +1,8 @@
 +#include <stdio.h>
 +
@@ -89,25 +89,11 @@ Index: gdb-6.5/gdb/testsuite/gdb.arch/ia64-sigill.c
 +  return 0;
 +}
 +
-Index: gdb-6.5/gdb/linux-thread-db.c
+Index: gdb-6.6/gdb/linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/linux-thread-db.c	2006-07-07 01:06:36.000000000 -0300
-+++ gdb-6.5/gdb/linux-thread-db.c	2006-07-07 03:16:54.000000000 -0300
-@@ -926,7 +926,8 @@ thread_db_wait (ptid_t ptid, struct targ
-        post-processing and bail out early.  */
-     return ptid;
- 
--  if (ourstatus->kind == TARGET_WAITKIND_EXITED)
-+  if (ourstatus->kind == TARGET_WAITKIND_EXITED
-+      || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
-     return pid_to_ptid (-1);
- 
-   if (ourstatus->kind == TARGET_WAITKIND_STOPPED
-Index: gdb-6.5/gdb/linux-nat.c
-===================================================================
---- gdb-6.5.orig/gdb/linux-nat.c	2006-07-07 03:03:55.000000000 -0300
-+++ gdb-6.5/gdb/linux-nat.c	2006-07-07 03:16:54.000000000 -0300
-@@ -2209,7 +2209,8 @@ retry:
+--- gdb-6.6.orig/gdb/linux-nat.c
++++ gdb-6.6/gdb/linux-nat.c
+@@ -2241,7 +2241,8 @@ retry:
       threads can be a bit time-consuming so if we want decent
       performance with heavily multi-threaded programs, especially when
       they're using a high frequency timer, we'd better avoid it if we
@@ -117,7 +103,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  
    if (WIFSTOPPED (status))
      {
-@@ -2220,7 +2221,9 @@ retry:
+@@ -2252,7 +2253,9 @@ retry:
        if (!lp->step
  	  && signal_stop_state (signo) == 0
  	  && signal_print_state (signo) == 0

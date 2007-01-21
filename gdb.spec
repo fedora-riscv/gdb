@@ -8,19 +8,19 @@ Name: gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.5
+Version: 6.6
 
-# The release always contains a leading reserved number, start it at 0.
-Release: 27%{?dist}
+# The release always contains a leading reserved number, start it at 1.
+Release: 1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.5.tar.bz2
+Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.6.tar.bz2
 Buildroot: %{_tmppath}/%{name}-%{version}-root
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%define gdb_src gdb-6.5
+%define gdb_src gdb-6.6
 %define gdb_build %{gdb_src}/build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -29,7 +29,7 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64
 %endif
 
-# GDB patches have the format gdb-<version>-<desc>-<YYYYMMDD>.patch;
+# GDB patches have the format gdb-<version>-bz<red-hat-bz-#>-<desc>.patch;
 # should include the ChangeLog.RedHat change-log entry; and should be
 # created using diff -u ./gdb (not gdb-6.3/gdb).
 
@@ -189,12 +189,6 @@ Patch169: gdb-6.3-ia64-sigill-20051115.patch
 # Allow option to continue backtracing past a zero pc value
 Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
-# Enable gdb to recognize stack frames annotated with the "S" augmentation.
-Patch173: gdb-6.3-augmS-20060303.patch
-
-# Enable gdb to recognize CFA value expressions introduced in Dwarf3.
-Patch174: gdb-6.3-cfaval-20060303.patch
-
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
 
@@ -209,32 +203,17 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 # ia32el.
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
-# Backport GNU .hash support.
-Patch180: gdb-6.5-bfd-hash-style-20060714.patch
-
 # Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
 Patch181: gdb-6.5-bz200048-find_line_pc-segv.patch
-
-# Fix exec() from threaded program, partial CVS backport (BZ 182116).
-Patch183: gdb-6.3-bz182116-exec-from-pthread.patch
-
-# Fix occasional failure to load shared libraries (BZ 146810).
-Patch184: gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch
 
 # Bugfix object names completion (fixes Patch116, BZ 193763).
 Patch185: gdb-6.3-bz193763-object-name-completion.patch
 
-# Avoid crash of 'info threads' if stale threads exist (BZ 195429).
-Patch186: gdb-6.5-bz195429-stale-threads-crash.patch
-
-# Handle corrupted or missing location list information (BZ 196439).
-Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat.patch
+# Testcase for corrupted or missing location list information (BZ 196439).
+Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
 
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
-
-# Add support for memory nops on x86.
-Patch189: gdb-6.5-opcodes-i386-nopmem.patch
 
 # Security patch: avoid stack overflows in dwarf expression computation.
 # CVE-2006-4146
@@ -242,9 +221,6 @@ Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
 # Fix gdb printf command argument using "%p" (BZ 205551).
 Patch191: gdb-6.5-bz205551-printf-p.patch
-
-# Fix crash on C++ symbol failing to be demangled (BZ 206813).
-Patch192: gdb-6.5-bz206813-cplusplus-symbol-null.patch
 
 # Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
 # Fix attachment also to a threaded stopped process (BZ 219118).
@@ -258,15 +234,11 @@ Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 Patch195: gdb-6.5-tls-of-separate-debuginfo.patch
 
 # Fix TLS symbols resolving for shared libraries with a relative pathname.
-# The testsuite needs `gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch'.
 # The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 Patch196: gdb-6.5-sharedlibrary-path.patch
 
 # Support IPv6 for gdbserver (BZ 198365).
 Patch197: gdb-6.5-bz198365-IPv6.patch
-
-# No longer disassemble invalid i386 opcodes of movQ/movA (BZ 172034).
-Patch198: gdb-6.5-bz172034-disasm-i386-C6-C7.patch
 
 # Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
 # FIXME: It could be autodetected.
@@ -278,13 +250,10 @@ Patch200: gdb-6.5-bz181390-memory-address-width.patch
 # Fix `gcore' command for 32bit inferiors on 64bit hosts.
 Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
-# Fix deadlock accessing last address space byte; for corrupted backtraces.
-Patch203: gdb-6.5-last-address-space-byte.patch
+# Testcase for deadlocking on last address space byte; for corrupted backtraces.
 Patch211: gdb-6.5-last-address-space-byte-test.patch
 
 # Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
-# "gdb-6.5-matching_bfd_sections.patch" is a prerequisited CVS backport.
-Patch205: gdb-6.5-matching_bfd_sections.patch
 Patch206: gdb-6.5-relativedebug.patch
 
 # Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
@@ -329,6 +298,13 @@ Patch229: gdb-6.5-bz140532-ppc-debug_frame-return_address-test.patch
 
 # Fix missing testsuite .log output of testcases using get_compiler_info().
 Patch230: gdb-6.5-testsuite-log.patch
+
+# Testcase for exec() from threaded program (BZ 202689).
+Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
+
+# Backported post gdb-6.6 release ia64 unwinding fixups.
+Patch232: gdb-6.6-ia64-kernel-unwind.patch
+Patch233: gdb-6.6-ia64-pc-unwind.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -413,35 +389,24 @@ and printing their data.
 %patch166 -p1
 %patch169 -p1
 %patch170 -p1
-%patch173 -p1
-%patch174 -p1
 %patch176 -p1
 %patch177 -p1
 %patch178 -p1
 %patch179 -p1
-%patch180 -p1
 %patch181 -p1
-%patch183 -p1
-%patch184 -p1
 %patch185 -p1
-%patch186 -p1
 %patch187 -p1
 %patch188 -p1
-%patch189 -p1
 %patch190 -p1
 %patch191 -p1
-%patch192 -p1
 %patch193 -p1
 %patch194 -p1
 %patch195 -p1
 %patch196 -p1
 #%patch197 -p1
-%patch198 -p1
 %patch199 -p1
 %patch200 -p1
 %patch201 -p1
-%patch203 -p1
-%patch205 -p1
 %patch206 -p1
 %patch207 -p1
 %patch208 -p1
@@ -463,6 +428,9 @@ and printing their data.
 %patch228 -p1
 %patch229 -p1
 %patch230 -p1
+%patch231 -p1
+%patch232 -p1
+%patch233 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -625,6 +593,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Jan 20 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-1
+- Upgrade to GDB 6.6.  Drop redundant patches, forward-port remaining ones.
+- Backported post gdb-6.6 release ia64 unwinding fixups.
+- Testcase for exec() from threaded program (BZ 202689).
+
 * Mon Jan 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-27
 - Fix the testsuite results broken in 6.5-26, stop invalid testsuite runs.
 

@@ -9,24 +9,14 @@
 	file, provide nested (overlapping) functions for the PC resolving.
 
 
---- gdb-6.5/gdb/minsyms.c-orig	2006-10-31 08:21:32.000000000 -0500
-+++ gdb-6.5/gdb/minsyms.c	2006-10-31 08:24:37.000000000 -0500
-@@ -464,6 +464,7 @@
- 	         objfile's minimal symbol table.  See if it is the best one
- 	         overall. */
+Index: ./gdb/minsyms.c
+===================================================================
+--- ./gdb/minsyms.c	17 Oct 2006 20:17:44 -0000	1.47
++++ ./gdb/minsyms.c	30 Oct 2006 12:41:26 -0000
+@@ -511,6 +511,29 @@ lookup_minimal_symbol_by_pc_section (COR
+ 		      continue;
+ 		    }
  
-+	      while (0
- 	      /* Skip any absolute symbols.  This is apparently what adb
- 	         and dbx do, and is needed for the CM-5.  There are two
- 	         known possible problems: (1) on ELF, apparently end, edata,
-@@ -473,8 +474,27 @@
- 	         NeXT are absolute.  If we want special handling for this
- 	         it probably should be triggered by a special
- 	         mst_abs_or_lib or some such.  */
--	      while (hi >= 0
--		     && msymbol[hi].type == mst_abs)
-+		     || (hi >= 0
-+			 && msymbol[hi].type == mst_abs)
 +		  /* We are behind the current symbol's size.
 +		     Try the previous symbol - if it is non-zero sized one it
 +		     may overlap the current one and reach our PC.
@@ -39,16 +29,20 @@
 +		     Limit it only for the overlapping cases as we could harm
 +		     the zero-sized symbols detection logic around.
 +		     */
-+		     || (hi > 0
-+			 && MSYMBOL_SIZE (&msymbol[hi]) != 0
-+			 && pc >= (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
-+				   + MSYMBOL_SIZE (&msymbol[hi]))
-+			 && pc < (SYMBOL_VALUE_ADDRESS (&msymbol[hi - 1])
-+				  + MSYMBOL_SIZE (&msymbol[hi - 1])))
-+		     )
- 		--hi;
- 
- 	      /* If "section" specified, skip any symbol from wrong section */
++		  if (hi > 0
++		      && MSYMBOL_SIZE (&msymbol[hi]) != 0
++		      && pc >= (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
++				+ MSYMBOL_SIZE (&msymbol[hi]))
++		      && pc < (SYMBOL_VALUE_ADDRESS (&msymbol[hi - 1])
++			       + MSYMBOL_SIZE (&msymbol[hi - 1])))
++		    {
++		      hi--;
++		      continue;
++		    }
++
+ 		  /* Otherwise, this symbol must be as good as we're going
+ 		     to get.  */
+ 		  break;
 Index: ./gdb/testsuite/gdb.arch/i386-size-overlap.c
 ===================================================================
 --- /dev/null	1 Jan 1970 00:00:00 -0000
@@ -107,10 +101,10 @@ Index: ./gdb/testsuite/gdb.arch/i386-size-overlap.c
 +    "    mov   %esp, %ebp\n"
 +    "    call  " SYMBOL (trap) "\n"
 +    "    .size " SYMBOL (main) ", .-" SYMBOL (main) "\n");
-Index: ./gdb/testsuite/gdb.arch/i386-size-overlap.exp
+Index: gdb/testsuite/gdb.arch/i386-size-overlap.exp
 ===================================================================
 RCS file: gdb/testsuite/gdb.arch/i386-size-overlap.exp
-diff -N gdb/testsuite/gdb.arch/i386-size-overlap.exp
+diff -N ./gdb/testsuite/gdb.arch/i386-size-overlap.exp
 --- /dev/null	1 Jan 1970 00:00:00 -0000
 +++ ./gdb/testsuite/gdb.arch/i386-size-overlap.exp	30 Oct 2006 12:41:35 -0000
 @@ -0,0 +1,79 @@
