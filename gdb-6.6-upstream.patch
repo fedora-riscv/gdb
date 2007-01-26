@@ -1,0 +1,335 @@
+2006-12-28  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* ia64-tdep.c (get_kernel_table): Correct signedness in check
+	for a negative return value.
+
+
+--- ./gdb/ia64-tdep.c	12 Jul 2006 18:13:45 -0000	1.140
++++ ./gdb/ia64-tdep.c	28 Dec 2006 23:48:51 -0000	1.141
+@@ -2486,13 +2486,14 @@ get_kernel_table (unw_word_t ip, unw_dyn
+   if (!ktab) 
+     {
+       gdb_byte *ktab_buf;
+-      size_t size;
++      LONGEST size;
+ 
+-      ktab_size = getunwind_table (&ktab_buf);
+-      if (ktab_size <= 0)
++      size = getunwind_table (&ktab_buf);
++      if (size <= 0)
+ 	return -UNW_ENOINFO;
+-      else
+-	ktab = (struct ia64_table_entry *) ktab_buf;
++
++      ktab = (struct ia64_table_entry *) ktab_buf;
++      ktab_size = size;
+ 
+       for (etab = ktab; etab->start_offset; ++etab)
+         etab->info_offset += KERNEL_START;
+
+
+2007-01-11  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* frame.c (get_prev_frame_1): Check PC_REGNUM before using it.
+
+
+--- ./gdb/frame.c	9 Jan 2007 20:19:15 -0000	1.218
++++ ./gdb/frame.c	11 Jan 2007 17:18:22 -0000	1.219
+@@ -1221,10 +1221,17 @@ get_prev_frame_1 (struct frame_info *thi
+      have different frame IDs, the new frame will be bogus; two
+      functions can't share a register save slot for the PC.  This can
+      happen when the prologue analyzer finds a stack adjustment, but
+-     no PC save.  This check does assume that the "PC register" is
+-     roughly a traditional PC, even if the gdbarch_unwind_pc method
+-     frobs it.  */
++     no PC save.
++
++     This check does assume that the "PC register" is roughly a
++     traditional PC, even if the gdbarch_unwind_pc method adjusts
++     it (we do not rely on the value, only on the unwound PC being
++     dependent on this value).  A potential improvement would be
++     to have the frame prev_pc method and the gdbarch unwind_pc
++     method set the same lval and location information as
++     frame_register_unwind.  */
+   if (this_frame->level > 0
++      && PC_REGNUM >= 0
+       && get_frame_type (this_frame) == NORMAL_FRAME
+       && get_frame_type (this_frame->next) == NORMAL_FRAME)
+     {
+
+
+2007-01-20  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* arch-utils.c (show_endian): Correct reversed condition.
+
+
+--- ./gdb/arch-utils.c	13 Jan 2007 23:24:43 -0000	1.138
++++ ./gdb/arch-utils.c	20 Jan 2007 18:16:33 -0000
+@@ -322,7 +322,7 @@ static void
+ show_endian (struct ui_file *file, int from_tty, struct cmd_list_element *c,
+ 	     const char *value)
+ {
+-  if (target_byte_order_user != BFD_ENDIAN_UNKNOWN)
++  if (target_byte_order_user == BFD_ENDIAN_UNKNOWN)
+     if (TARGET_BYTE_ORDER == BFD_ENDIAN_BIG)
+       fprintf_unfiltered (file, _("The target endianness is set automatically "
+ 				  "(currently big endian)\n"));
+
+
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=224128
+
+
+2007-01-26  Jan Kratochvil <jan.kratochvil@redhat.com>
+
+	* c-valprint.c (c_val_print): Require strings to be of no-signed CHARs.
+	* NEWS: Describe CHAR array vs. string identifcation rules.
+
+2007-01-26  Jan Kratochvil <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo: Describe CHAR array vs. string identifcation rules.
+
+2007-01-25  Jan Kratochvil <jan.kratochvil@redhat.com>
+
+	* gdb.base/charsign.exp, gdb.base/charsign.c: New files.
+	* gdb.arch/i386-sse.exp: Check $xmm.v16_int8 printing as a number array.
+	* gdb.base/printcmds.exp: Sign-provided CHARs now became arrays.
+	* gdb.base/setvar.exp: Likewise.
+
+
+--- ./gdb/NEWS	21 Jan 2007 17:48:53 -0000	1.211
++++ ./gdb/NEWS	26 Jan 2007 10:31:48 -0000
+@@ -15,6 +15,9 @@ frequency signals (e.g. SIGALRM) via the
+ target's overall architecture.  GDB can read a description from
+ a local file or over the remote serial protocol.
+ 
++* Arrays of explicitly SIGNED or UNSIGNED CHARs are now printed as arrays
++  of numbers.
++
+ * New commands
+ 
+ set mem inaccessible-by-default
+--- ./gdb/c-valprint.c	9 Jan 2007 17:58:50 -0000	1.41
++++ ./gdb/c-valprint.c	26 Jan 2007 10:31:48 -0000
+@@ -96,7 +96,7 @@ c_val_print (struct type *type, const gd
+ 	    }
+ 	  /* For an array of chars, print with string syntax.  */
+ 	  if (eltlen == 1 &&
+-	      ((TYPE_CODE (elttype) == TYPE_CODE_INT)
++	      ((TYPE_CODE (elttype) == TYPE_CODE_INT && TYPE_NOSIGN (elttype))
+ 	       || ((current_language->la_language == language_m2)
+ 		   && (TYPE_CODE (elttype) == TYPE_CODE_CHAR)))
+ 	      && (format == 0 || format == 's'))
+--- ./gdb/doc/gdb.texinfo	26 Jan 2007 08:54:01 -0000	1.380
++++ ./gdb/doc/gdb.texinfo	26 Jan 2007 10:32:00 -0000
+@@ -5632,6 +5632,26 @@ If you ask to print an object whose cont
+ by the debug information, @value{GDBN} will say @samp{<incomplete
+ type>}.  @xref{Symbols, incomplete type}, for more about this.
+ 
++Strings are identified as arrays of @code{char} values without specified
++signedness.  Arrays of either @code{signed char} or @code{unsigned char} get
++printed as arrays of 1 byte sized integers.  @code{-fsigned-char} or
++@code{-funsigned-char} @value{NGCC} options have no effect as @value{GDBN}
++defines literal string type @code{"char"} as @code{char} without a sign.
++For program code
++
++@smallexample
++char var0[] = "A";
++signed char var1[] = "A";
++@end smallexample
++
++You get during debugging
++@smallexample
++(gdb) print var0
++$1 = "A"
++(gdb) print var1
++$2 = @{65 'A', 0 '\0'@}
++@end smallexample
++
+ @node Arrays
+ @section Artificial arrays
+ 
+--- ./gdb/testsuite/gdb.arch/i386-sse.exp	9 Jan 2007 17:59:09 -0000	1.5
++++ ./gdb/testsuite/gdb.arch/i386-sse.exp	26 Jan 2007 10:32:00 -0000
+@@ -83,7 +83,10 @@ gdb_continue_to_breakpoint "continue to 
+ foreach r {0 1 2 3 4 5 6 7} {
+     gdb_test "print \$xmm$r.v4_float" \
+         ".. = \\{$r, $r.25, $r.5, $r.75\\}.*" \
+-        "check contents of %xmm$r"
++        "check float contents of %xmm$r"
++    gdb_test "print \$xmm$r.v16_int8" \
++        ".. = \\{(-?\[0-9\]+ '.*', ){15}-?\[0-9\]+ '.*'\\}.*" \
++        "check int8 contents of %xmm$r"
+ }
+ 
+ foreach r {0 1 2 3 4 5 6 7} {
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/charsign.c	26 Jan 2007 10:32:00 -0000
+@@ -0,0 +1,37 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++int main()
++{
++  return 0;
++}
++
++char n[]="A";
++signed char s[]="A";
++unsigned char u[]="A";
++
++typedef char char_n;
++typedef signed char char_s;
++typedef unsigned char char_u;
++
++char_n n_typed[]="A";
++char_s s_typed[]="A";
++char_u u_typed[]="A";
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/charsign.exp	26 Jan 2007 10:32:00 -0000
+@@ -0,0 +1,70 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile charsign
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++proc do_test { cflags } {
++    global srcdir
++    global binfile
++    global subdir
++    global srcfile
++    global gdb_prompt
++
++    if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable [list debug additional_flags=$cflags]] != "" } {
++	untested "Couldn't compile test program"
++	return -1
++    }
++
++    # Get things started.
++
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    # For C programs, "start" should stop in main().
++
++    gdb_test "p n" \
++	     "= \"A\""
++    gdb_test "p s" \
++	     "= \\{65 'A', 0 '\\\\0'\\}"
++    gdb_test "p u" \
++	     "= \\{65 'A', 0 '\\\\0'\\}"
++    gdb_test "p n_typed" \
++	     "= \"A\""
++    gdb_test "p s_typed" \
++	     "= \\{65 'A', 0 '\\\\0'\\}"
++    gdb_test "p u_typed" \
++	     "= \\{65 'A', 0 '\\\\0'\\}"
++}
++
++# The string identification works despite the compiler flags below due to
++# gdbtypes.c:
++#   if (name && strcmp (name, "char") == 0)
++#     TYPE_FLAGS (type) |= TYPE_FLAG_NOSIGN;
++
++do_test {}
++do_test {-fsigned-char}
++do_test {-funsigned-char}
+--- ./gdb/testsuite/gdb.base/printcmds.exp	9 Jan 2007 17:59:11 -0000	1.14
++++ ./gdb/testsuite/gdb.base/printcmds.exp	26 Jan 2007 10:32:01 -0000
+@@ -590,18 +590,18 @@ proc test_print_char_arrays {} {
+     gdb_test "set print address on" ""
+ 
+     gdb_test "p arrays" \
+-	" = {array1 = \"abc\", array2 = \"d\", array3 = \"e\", array4 = \"fg\", array5 = \"hij\"}"
++	" = \\{array1 = \\{97 'a', 98 'b', 99 'c', 0 '\\\\0'\\}, array2 = \\{100 'd'\\}, array3 = \\{101 'e'\\}, array4 = \\{102 'f', 103 'g'\\}, array5 = \\{104 'h', 105 'i', 106 'j', 0 '\\\\0'\\}\\}"
+ 
+     gdb_test "p parrays"		" = \\(struct some_arrays \\*\\) $hex"
+-    gdb_test "p parrays->array1"	" = \"abc\""
++    gdb_test "p parrays->array1"	" = \\{97 'a', 98 'b', 99 'c', 0 '\\\\0'\\}"
+     gdb_test "p &parrays->array1"	" = \\(unsigned char \\(\\*\\)\\\[4\\\]\\) $hex"
+-    gdb_test "p parrays->array2"	" = \"d\""
++    gdb_test "p parrays->array2"	" = \\{100 'd'\\}"
+     gdb_test "p &parrays->array2"	" = \\(unsigned char \\(\\*\\)\\\[1\\\]\\) $hex"
+-    gdb_test "p parrays->array3"	" = \"e\""
++    gdb_test "p parrays->array3"	" = \\{101 'e'\\}"
+     gdb_test "p &parrays->array3"	" = \\(unsigned char \\(\\*\\)\\\[1\\\]\\) $hex"
+-    gdb_test "p parrays->array4"	" = \"fg\""
++    gdb_test "p parrays->array4"	" = \\{102 'f', 103 'g'\\}"
+     gdb_test "p &parrays->array4"	" = \\(unsigned char \\(\\*\\)\\\[2\\\]\\) $hex"
+-    gdb_test "p parrays->array5"	" = \"hij\""
++    gdb_test "p parrays->array5"	" = \\{104 'h', 105 'i', 106 'j', 0 '\\\\0'\\}"
+     gdb_test "p &parrays->array5"	" = \\(unsigned char \\(\\*\\)\\\[4\\\]\\) $hex"
+ 
+     gdb_test "set print address off" ""
+--- ./gdb/testsuite/gdb.base/setvar.exp	9 Jan 2007 17:59:11 -0000	1.10
++++ ./gdb/testsuite/gdb.base/setvar.exp	26 Jan 2007 10:32:01 -0000
+@@ -233,11 +233,11 @@ test_set "set variable v_char_array\[0\]
+ #
+ # test "set variable" for "signed char array[2]"
+ #
+-test_set "set variable v_signed_char_array\[0\]='h'" "set variable v_signed_char_array\[1\]='i'" "print v_signed_char_array" ".*.\[0-9\]* =.*\"hi\""        "set variable signed char array=\"hi\" (string)" 
++test_set "set variable v_signed_char_array\[0\]='h'" "set variable v_signed_char_array\[1\]='i'" "print v_signed_char_array" ".*.\[0-9\]* =.*\\{104 'h', 105 'i'\\}"        "set variable signed char array=\"hi\" (string)" 
+ #
+ # test "set variable" for "unsigned char array[2]"
+ #
+-test_set "set variable v_unsigned_char_array\[0\]='h'" "set variable v_unsigned_char_array\[1\]='i'" "print v_unsigned_char_array" ".*.\[0-9\]* =.*\"hi\""        "set variable unsigned char array=\"hi\" (string)" 
++test_set "set variable v_unsigned_char_array\[0\]='h'" "set variable v_unsigned_char_array\[1\]='i'" "print v_unsigned_char_array" ".*.\[0-9\]* =.*\\{104 'h', 105 'i'\\}"        "set variable unsigned char array=\"hi\" (string)" 
+ #
+ # test "set variable" for "short array[2]"
+ #
+@@ -289,11 +289,11 @@ test_set "set v_char_pointer=v_char_arra
+ #
+ # test "set variable" for type "signed char *"
+ #
+-test_set "set v_signed_char_pointer=v_signed_char_array" "set variable *(v_signed_char_pointer)='h'" "set variable *(v_signed_char_pointer+1)='i'" "print v_signed_char_array" ".*.\[0-9\]* =.*\"hi\""  "print *(v_signed_char_pointer+1)" ".*.\[0-9\]* = 105 \'i\'"     "set variable signed char pointer=\"hi\" (string)" 
++test_set "set v_signed_char_pointer=v_signed_char_array" "set variable *(v_signed_char_pointer)='h'" "set variable *(v_signed_char_pointer+1)='i'" "print v_signed_char_array" ".*.\[0-9\]* =.*\\{104 'h', 105 'i'\\}"  "print *(v_signed_char_pointer+1)" ".*.\[0-9\]* = 105 \'i\'"     "set variable signed char pointer=\"hi\" (string)" 
+ #
+ # test "set variable" for type "unsigned char *"
+ #
+-test_set "set v_unsigned_char_pointer=v_unsigned_char_array" "set variable *(v_unsigned_char_pointer)='h'" "set variable *(v_unsigned_char_pointer+1)='i'" "print v_unsigned_char_array" ".*.\[0-9\]* =.*\"hi\""  "print *(v_unsigned_char_pointer+1)" ".*.\[0-9\]* = 105 \'i\'"     "set variable unsigned char pointer=\"hi\" (string)" 
++test_set "set v_unsigned_char_pointer=v_unsigned_char_array" "set variable *(v_unsigned_char_pointer)='h'" "set variable *(v_unsigned_char_pointer+1)='i'" "print v_unsigned_char_array" ".*.\[0-9\]* =.*\\{104 'h', 105 'i'\\}"  "print *(v_unsigned_char_pointer+1)" ".*.\[0-9\]* = 105 \'i\'"     "set variable unsigned char pointer=\"hi\" (string)" 
+ #
+ # test "set variable" for type "short *"
+ #

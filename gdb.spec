@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -302,9 +302,8 @@ Patch230: gdb-6.5-testsuite-log.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.6 release ia64 unwinding fixups.
-Patch232: gdb-6.6-ia64-kernel-unwind.patch
-Patch233: gdb-6.6-ia64-pc-unwind.patch
+# Backported post gdb-6.6 release fixups.
+Patch232: gdb-6.6-upstream.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
@@ -430,7 +429,6 @@ and printing their data.
 %patch230 -p1
 %patch231 -p1
 %patch232 -p1
-%patch233 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -593,6 +591,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Jan 26 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-2
+- Backported post gdb-6.6 release PPC `show endian' fixup.
+- Fix displaying of numeric char arrays as strings (BZ 224128).
+- Simplified patches by merging upstream accepted ones into a single file.
+
 * Sat Jan 20 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-1
 - Upgrade to GDB 6.6.  Drop redundant patches, forward-port remaining ones.
 - Backported post gdb-6.6 release ia64 unwinding fixups.
