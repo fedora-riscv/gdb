@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -591,6 +591,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Feb  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-3
+- Fix a race during attaching to dying threads; backport (BZ 209445).
+- Testcase of unwinding has now marked its unsolvable cases (for BZ 140532).
+
 * Fri Jan 26 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-2
 - Backported post gdb-6.6 release PPC `show endian' fixup.
 - Fix displaying of numeric char arrays as strings (BZ 224128).

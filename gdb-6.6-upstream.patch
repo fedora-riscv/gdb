@@ -333,3 +333,168 @@ https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=224128
  #
  # test "set variable" for type "short *"
  #
+
+
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=209445
+
+
+[ backported ]
+2006-12-31  Daniel Jacobowitz  <dan@codesourcery.com>
+
+        * linux-nat.c (lin_lwp_attach_lwp): Return a status.  Do not
+        add the LWP to our list until we are attached.  Warn instead
+        of erroring if the attach fails.
+        * linux-nat.h (lin_lwp_attach_lwp): New prototype.
+        * linux-thread-db.c (attach_thread): Call lin_lwp_attach_lwp
+        directly.  Do not add the thread to our list until we are
+        successfully attached.
+        * config/nm-linux.h (lin_lwp_attach_lwp, ATTACH_LWP): Delete.
+
+
+--- ./gdb/linux-nat.c	20 Nov 2006 21:47:06 -0000	1.51
++++ ./gdb/linux-nat.c	31 Dec 2006 21:04:51 -0000	1.52
+@@ -915,12 +915,13 @@ exit_lwp (struct lwp_info *lp)
+ 
+ /* Attach to the LWP specified by PID.  If VERBOSE is non-zero, print
+    a message telling the user that a new LWP has been added to the
+-   process.  */
++   process.  Return 0 if successful or -1 if the new LWP could not
++   be attached.  */
+ 
+-void
++int
+ lin_lwp_attach_lwp (ptid_t ptid, int verbose)
+ {
+-  struct lwp_info *lp, *found_lp;
++  struct lwp_info *lp;
+ 
+   gdb_assert (is_lwp (ptid));
+ 
+@@ -932,12 +933,7 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+       sigprocmask (SIG_BLOCK, &blocked_mask, NULL);
+     }
+ 
+-  if (verbose)
+-    printf_filtered (_("[New %s]\n"), target_pid_to_str (ptid));
+-
+-  found_lp = lp = find_lwp_pid (ptid);
+-  if (lp == NULL)
+-    lp = add_lwp (ptid);
++  lp = find_lwp_pid (ptid);
+ 
+   /* We assume that we're already attached to any LWP that has an id
+      equal to the overall process id, and to any LWP that is already
+@@ -945,14 +941,25 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+      and we've had PID wraparound since we last tried to stop all threads,
+      this assumption might be wrong; fortunately, this is very unlikely
+      to happen.  */
+-  if (GET_LWP (ptid) != GET_PID (ptid) && found_lp == NULL)
++  if (GET_LWP (ptid) != GET_PID (ptid) && lp == NULL)
+     {
+       pid_t pid;
+       int status;
+ 
+       if (ptrace (PTRACE_ATTACH, GET_LWP (ptid), 0, 0) < 0)
+-	error (_("Can't attach %s: %s"), target_pid_to_str (ptid),
+-	       safe_strerror (errno));
++	{
++	  /* If we fail to attach to the thread, issue a warning,
++	     but continue.  One way this can happen is if thread
++	     creation is interrupted; as of Linux 2.6.19, a kernel
++	     bug may place threads in the thread list and then fail
++	     to create them.  */
++	  warning (_("Can't attach %s: %s"), target_pid_to_str (ptid),
++		   safe_strerror (errno));
++	  return -1;
++	}
++
++      if (lp == NULL)
++	lp = add_lwp (ptid);
+ 
+       if (debug_linux_nat)
+ 	fprintf_unfiltered (gdb_stdlog,
+@@ -990,8 +997,15 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+          threads.  Note that this won't have already been done since
+          the main thread will have, we assume, been stopped by an
+          attach from a different layer.  */
++      if (lp == NULL)
++	lp = add_lwp (ptid);
+       lp->stopped = 1;
+     }
++
++  if (verbose)
++    printf_filtered (_("[New %s]\n"), target_pid_to_str (ptid));
++
++  return 0;
+ }
+ 
+ static void
+--- ./gdb/linux-nat.h	20 Nov 2006 21:47:06 -0000	1.13
++++ ./gdb/linux-nat.h	31 Dec 2006 21:04:51 -0000	1.14
+@@ -80,6 +80,8 @@ extern void linux_enable_event_reporting
+ extern ptid_t linux_handle_extended_wait (int pid, int status,
+ 					  struct target_waitstatus *ourstatus);
+ 
++extern int lin_lwp_attach_lwp (ptid_t ptid, int verbose);
++
+ /* Iterator function for lin-lwp's lwp list.  */
+ struct lwp_info *iterate_over_lwps (int (*callback) (struct lwp_info *, 
+ 						     void *), 
+--- ./gdb/config/nm-linux.h	28 Nov 2006 19:45:07 -0000	1.27
++++ ./gdb/config/nm-linux.h	31 Dec 2006 21:04:51 -0000	1.28
+@@ -1,6 +1,6 @@
+ /* Native support for GNU/Linux.
+ 
+-   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005
++   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+    Free Software Foundation, Inc.
+ 
+    This file is part of GDB.
+@@ -25,9 +25,6 @@ struct target_ops;
+ /* GNU/Linux is SVR4-ish but its /proc file system isn't.  */
+ #undef USE_PROC_FS
+ 
+-extern void lin_lwp_attach_lwp (ptid_t ptid, int verbose);
+-#define ATTACH_LWP(ptid, verbose) lin_lwp_attach_lwp ((ptid), (verbose))
+-
+ extern void lin_thread_get_thread_signals (sigset_t *mask);
+ #define GET_THREAD_SIGNALS(mask) lin_thread_get_thread_signals (mask)
+ 
+--- gdb-6.6/gdb-orig/linux-thread-db.c	2007-01-30 14:10:38.000000000 -0500
++++ gdb-6.6/gdb/linux-thread-db.c	2007-01-30 14:16:22.000000000 -0500
+@@ -678,6 +678,13 @@
+ 
+   check_thread_signals ();
+ 
++  if (ti_p->ti_state == TD_THR_UNKNOWN || ti_p->ti_state == TD_THR_ZOMBIE)
++    return;			/* A zombie thread -- do not attach.  */
++
++  /* Under GNU/Linux, we have to attach to each and every thread.  */
++  if (lin_lwp_attach_lwp (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid)), 0) < 0)
++    return;
++
+   /* Add the thread to GDB's thread list.  */
+   tp = add_thread (ptid);
+   tp->private = xmalloc (sizeof (struct private_thread_info));
+@@ -686,20 +693,10 @@
+   if (verbose)
+     printf_unfiltered (_("[New %s]\n"), target_pid_to_str (ptid));
+ 
+-  if (ti_p->ti_state == TD_THR_UNKNOWN || ti_p->ti_state == TD_THR_ZOMBIE)
+-    return;			/* A zombie thread -- do not attach.  */
+-
+-  new_ptid = BUILD_LWP (ti_p->ti_lid, GET_PID (ptid));
+-
+-  /* Under GNU/Linux, we have to attach to each and every thread.  */
+-#ifdef ATTACH_LWP
+-  ATTACH_LWP (new_ptid, 0);
+-#endif
+-
+   /* Notify any observers of a new linux thread.  This
+      would include any linux platforms that have to insert hardware
+      watchpoints on every thread.  */
+-  observer_notify_linux_new_thread (new_ptid);
++  observer_notify_linux_new_thread (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid)));
+ 
+   /* Enable thread event reporting for this thread.  */
+   err = td_thr_event_enable_p (th_p, 1);
