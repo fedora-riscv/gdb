@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -305,6 +305,9 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 # Backported post gdb-6.6 release fixups.
 Patch232: gdb-6.6-upstream.patch
 
+# Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
+Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -429,6 +432,7 @@ and printing their data.
 %patch230 -p1
 %patch231 -p1
 %patch232 -p1
+%patch234 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -591,6 +595,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Feb 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-4
+- Backport + testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
+
 * Mon Feb  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-3
 - Fix a race during attaching to dying threads; backport (BZ 209445).
 - Testcase of unwinding has now marked its unsolvable cases (for BZ 140532).
