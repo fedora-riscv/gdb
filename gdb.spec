@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -308,6 +308,9 @@ Patch232: gdb-6.6-upstream.patch
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
 
+# Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
+Patch235: gdb-6.3-bz231832-obstack-2gb.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -433,6 +436,7 @@ and printing their data.
 %patch231 -p1
 %patch232 -p1
 %patch234 -p1
+%patch235 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -595,6 +599,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Mar 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-5
+- Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
+
 * Sun Feb 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-4
 - Backport + testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 
