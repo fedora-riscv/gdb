@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -599,6 +599,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Mar 14 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-6
+- Fix occasional dwarf2_read_address: Corrupted DWARF expression (BZ 232353).
+
 * Mon Mar 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-5
 - Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
 
