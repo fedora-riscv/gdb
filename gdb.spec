@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -311,6 +311,9 @@ Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
 # Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
 Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 
+# Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
+Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -437,6 +440,7 @@ and printing their data.
 %patch232 -p1
 %patch234 -p1
 %patch235 -p1
+%patch236 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -599,6 +603,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-7
+- Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
+
 * Wed Mar 14 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-6
 - Fix occasional dwarf2_read_address: Corrupted DWARF expression (BZ 232353).
 
