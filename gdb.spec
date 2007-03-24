@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -314,6 +314,9 @@ Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 # Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
 Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
 
+# Use definition of an empty structure as it is not an opaque type (BZ 233716).
+Patch238: gdb-6.6-bz233716-empty-structure-override.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -441,6 +444,7 @@ and printing their data.
 %patch234 -p1
 %patch235 -p1
 %patch236 -p1
+%patch238 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -603,6 +607,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Mar 24 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-8
+- Use definition of an empty structure as it is not an opaque type (BZ 233716).
+- Fixed the gdb.base/attachstop.exp testcase false 2 FAILs.
+
 * Thu Mar 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-7
 - Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
 
