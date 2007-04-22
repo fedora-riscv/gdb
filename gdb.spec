@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -317,6 +317,15 @@ Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
 # Use definition of an empty structure as it is not an opaque type (BZ 233716).
 Patch238: gdb-6.6-bz233716-empty-structure-override.patch
 
+# Use the runtime variant of `libunwind-ARCH.so.7' rather than the `.so' one.
+Patch244: gdb-6.6-libunwind-major-version.patch
+
+# Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
+Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
+
+# Fix testcase for watchpoints in threads (for BZ 237096).
+Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -327,8 +336,8 @@ BuildRequires: /lib/libc.so.6 /usr/lib/libc.so /lib64/libc.so.6 /usr/lib64/libc.
 %endif
 
 %ifarch ia64
-BuildRequires: libunwind >= 0.96-3
-Requires: libunwind >= 0.96-3
+BuildRequires: libunwind-devel >= 0.99-0.1.frysk20070405cvs
+Requires: libunwind >= 0.99-0.1.frysk20070405cvs
 %else
 BuildRequires: prelink
 %endif
@@ -445,6 +454,9 @@ and printing their data.
 %patch235 -p1
 %patch236 -p1
 %patch238 -p1
+%patch244 -p1
+%patch245 -p1
+%patch246 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -483,13 +495,19 @@ enable_build_warnings=""
 enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
 
-../configure \
-	--prefix=%{_prefix} \
-	--sysconfdir=%{_sysconfdir} \
-	--mandir=%{_mandir} \
-	--infodir=%{_infodir}\
-	$enable_build_warnings \
-        --with-separate-debug-dir=/usr/lib/debug \
+../configure						\
+	--prefix=%{_prefix}				\
+	--libdir=%{_libdir}				\
+	--sysconfdir=%{_sysconfdir}			\
+	--mandir=%{_mandir}				\
+	--infodir=%{_infodir}				\
+	$enable_build_warnings				\
+	--with-separate-debug-dir=/usr/lib/debug	\
+%ifarch ia64
+	--with-libunwind				\
+%else
+	--without-libunwind				\
+%endif
     %{_target_platform}
 
 make -k
@@ -607,6 +625,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Apr 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-9
+- Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
+- Fix testcase for watchpoints in threads (for BZ 237096).
+- BuildRequires now `libunwind-devel' instead of the former `libunwind'.
+- Use the runtime libunwind .so.7, it requires now >= 0.99-0.1.frysk20070405cvs.
+
 * Sat Mar 24 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-8
 - Use definition of an empty structure as it is not an opaque type (BZ 233716).
 - Fixed the gdb.base/attachstop.exp testcase false 2 FAILs.
