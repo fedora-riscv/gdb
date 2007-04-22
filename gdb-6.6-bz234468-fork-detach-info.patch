@@ -1,0 +1,127 @@
+--- ./gdb/linux-nat.c	9 Feb 2007 20:52:16 -0000	1.56
++++ ./gdb/linux-nat.c	22 Apr 2007 17:20:25 -0000
+@@ -378,9 +378,17 @@ child_follow_fork (struct target_ops *op
+       /* Detach new forked process?  */
+       if (detach_fork)
+ 	{
++	  static int advice_printed = 0;
++
++	  target_terminal_ours ();
++	  fprintf_filtered (gdb_stdlog,
++			 _("[Detaching after fork from child process %d.%s]\n"),
++			    child_pid, (advice_printed ? "" :
++					_(" (Try `set detach-on-fork off'.)")));
++	  advice_printed = 1;
++
+ 	  if (debug_linux_nat)
+ 	    {
+-	      target_terminal_ours ();
+ 	      fprintf_filtered (gdb_stdlog,
+ 				"Detaching after fork from child process %d.\n",
+ 				child_pid);
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/fork-detach.c	22 Apr 2007 17:20:25 -0000
+@@ -0,0 +1,57 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <unistd.h>
++#include <assert.h>
++#include <stdlib.h>
++
++static void func (void)
++{
++}
++
++int main (void)
++{
++  pid_t child;
++
++  child = fork ();
++  switch (child)
++    {
++      case -1:
++	abort ();
++      case 0:
++	func ();
++	break;
++      default:
++        {
++/* We do not test the switching to the other fork by GDB `fork 1'.  */
++#if 0
++	  pid_t got;
++
++	  got = waitpid (child, NULL, 0);
++	  assert (got == child);
++#endif
++	  break;
++	}
++    }
++  return 0;
++}
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/fork-detach.exp	22 Apr 2007 17:20:25 -0000
+@@ -0,0 +1,43 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile fork-detach
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++gdb_run_cmd
++# `Starting program: .*' prefix is available since gdb-6.7.
++gdb_test "" \
++         "\\\[Detaching after fork from child process.*Program exited normally\\..*" \
++         "Info message caught"

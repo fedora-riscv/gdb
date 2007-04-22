@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -326,6 +326,9 @@ Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 # Fix testcase for watchpoints in threads (for BZ 237096).
 Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 
+# Notify user of a child forked process being detached (BZ 235197).
+Patch247: gdb-6.6-bz234468-fork-detach-info.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils
 
@@ -457,6 +460,7 @@ and printing their data.
 %patch244 -p1
 %patch245 -p1
 %patch246 -p1
+%patch247 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -625,6 +629,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Apr 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-10
+- Notify user of a child forked process being detached (BZ 235197).
+
 * Sun Apr 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-9
 - Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
 - Fix testcase for watchpoints in threads (for BZ 237096).
