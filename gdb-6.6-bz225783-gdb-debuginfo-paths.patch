@@ -1,0 +1,30 @@
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=225783
+
+
+--- gdb-6.6-orig/gdb/Makefile.in	2007-04-08 20:49:10.000000000 +0200
++++ gdb-6.6/gdb/Makefile.in	2007-04-08 23:22:40.000000000 +0200
+@@ -1672,17 +1672,19 @@ po/$(PACKAGE).pot: force
+ 
+ .SUFFIXES: .y .l
+ .y.c: 
+-	$(SHELL) $(YLWRAP) $< y.tab.c $@.tmp -- $(YACC) $(YFLAGS)
+-	-sed -e '/extern.*malloc/d' \
++	rm -f $@ $@.tmp
++	$(SHELL) $(YLWRAP) $< y.tab.c $@ -- $(YACC) $(YFLAGS) && mv $@ $@.tmp \
++		|| (rm -f $@; false)
++	sed -e '/extern.*malloc/d' \
+ 	     -e '/extern.*realloc/d' \
+ 	     -e '/extern.*free/d' \
+ 	     -e '/include.*malloc.h/d' \
+ 	     -e 's/\([^x]\)malloc/\1xmalloc/g' \
+ 	     -e 's/\([^x]\)realloc/\1xrealloc/g' \
+ 	     -e '/^#line.*y.tab.c/d' \
+-	  < $@.tmp > $@.new
+-	-rm $@.tmp
+-	mv $@.new ./$*.c
++	     -e "s/^\(#line.*\)`basename $<`/\1`echo $<|sed 's/\//\\\\\//g'`/" \
++	  < $@.tmp > $@
++	rm -f $@.tmp
+ .l.c:
+ 	if [ "$(FLEX)" ] && $(FLEX) --version >/dev/null 2>&1; then \
+ 	    $(FLEX) -o$@ $< && \

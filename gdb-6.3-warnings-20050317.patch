@@ -1,17 +1,3 @@
-Index: gdb-6.6/gdb/configure
-===================================================================
---- gdb-6.6.orig/gdb/configure
-+++ gdb-6.6/gdb/configure
-@@ -20991,7 +20991,8 @@ fi
- # gdb/doc/gdbint.texinfo.
- build_warnings="-Wimplicit -Wreturn-type -Wcomment -Wtrigraphs \
- -Wformat -Wparentheses -Wpointer-arith -Wformat-nonliteral \
---Wunused-label -Wunused-function -Wno-pointer-sign"
-+-Wunused-label -Wunused-function -Wno-pointer-sign -Wno-unused \
-+-Wp,-U_FORTIFY_SOURCE"
- 
- # GCC supports -Wuninitialized only with -O or -On, n != 0.
- if test x${CFLAGS+set} = xset; then
 Index: gdb-6.6/gdb/mi/mi-cmd-env.c
 ===================================================================
 --- gdb-6.6.orig/gdb/mi/mi-cmd-env.c
@@ -534,20 +520,6 @@ Index: gdb-6.6/gdb/varobj.c
  
        /* Set ourselves as our root */
        var->root->rootvar = var;
-Index: gdb-6.6/gdb/configure.ac
-===================================================================
---- gdb-6.6.orig/gdb/configure.ac
-+++ gdb-6.6/gdb/configure.ac
-@@ -1112,7 +1112,8 @@ fi
- # gdb/doc/gdbint.texinfo.
- build_warnings="-Wimplicit -Wreturn-type -Wcomment -Wtrigraphs \
- -Wformat -Wparentheses -Wpointer-arith -Wformat-nonliteral \
---Wunused-label -Wunused-function -Wno-pointer-sign"
-+-Wunused-label -Wunused-function -Wno-pointer-sign -Wno-unused \
-+-Wp,-U_FORTIFY_SOURCE"
- 
- # GCC supports -Wuninitialized only with -O or -On, n != 0.
- if test x${CFLAGS+set} = xset; then
 Index: gdb-6.6/gdb/doublest.c
 ===================================================================
 --- gdb-6.6.orig/gdb/doublest.c
@@ -572,3 +544,121 @@ Index: gdb-6.6/gdb/doublest.c
      }
    if (len < sizeof(result) * FLOATFORMAT_CHAR_BIT)
      /* Mask out bits which are not part of the field */
+diff -u -rup gdb-6.6-orig/gdb/cli/cli-cmds.c gdb-6.6/gdb/cli/cli-cmds.c
+--- gdb-6.6-orig/gdb/cli/cli-cmds.c	2007-04-08 20:49:09.000000000 +0200
++++ gdb-6.6/gdb/cli/cli-cmds.c	2007-04-08 20:54:49.000000000 +0200
+@@ -323,7 +323,8 @@ pwd_command (char *args, int from_tty)
+ {
+   if (args)
+     error (_("The \"pwd\" command does not take an argument: %s"), args);
+-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
++  /* Unused result.  */
++  1 && getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+ 
+   if (strcmp (gdb_dirbuf, current_directory) != 0)
+     printf_unfiltered (_("Working directory %s\n (canonically %s).\n"),
+diff -u -rup gdb-6.6-orig/gdb/inflow.c gdb-6.6/gdb/inflow.c
+--- gdb-6.6-orig/gdb/inflow.c	2006-02-10 23:01:43.000000000 +0100
++++ gdb-6.6/gdb/inflow.c	2007-04-08 20:56:48.000000000 +0200
+@@ -549,17 +549,20 @@ new_tty (void)
+   if (tty != 0)
+     {
+       close (0);
+-      dup (tty);
++      /* Unused result.  */
++      1 && dup (tty);
+     }
+   if (tty != 1)
+     {
+       close (1);
+-      dup (tty);
++      /* Unused result.  */
++      1 && dup (tty);
+     }
+   if (tty != 2)
+     {
+       close (2);
+-      dup (tty);
++      /* Unused result.  */
++      1 && dup (tty);
+     }
+   if (tty > 2)
+     close (tty);
+diff -u -rup gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
+--- gdb-6.6-orig/gdb/linux-nat.c	2007-04-08 20:49:11.000000000 +0200
++++ gdb-6.6/gdb/linux-nat.c	2007-04-08 20:54:08.000000000 +0200
+@@ -2972,7 +2972,8 @@ linux_nat_info_proc_cmd (char *args, int
+       sprintf (fname1, "/proc/%lld/cmdline", pid);
+       if ((procfile = fopen (fname1, "r")) > 0)
+ 	{
+-	  fgets (buffer, sizeof (buffer), procfile);
++	  /* Unused result.  */
++	  1 && fgets (buffer, sizeof (buffer), procfile);
+ 	  printf_filtered ("cmdline = '%s'\n", buffer);
+ 	  fclose (procfile);
+ 	}
+diff -u -rup gdb-6.6-orig/gdb/main.c gdb-6.6/gdb/main.c
+--- gdb-6.6-orig/gdb/main.c	2007-04-08 20:49:09.000000000 +0200
++++ gdb-6.6/gdb/main.c	2007-04-08 20:55:30.000000000 +0200
+@@ -195,7 +195,8 @@ captured_main (void *data)
+   line[0] = '\0';		/* Terminate saved (now empty) cmd line */
+   instream = stdin;
+ 
+-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
++  /* Unused result.  */
++  1 && getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+   current_directory = gdb_dirbuf;
+ 
+   gdb_stdout = stdio_fileopen (stdout);
+diff -u -rup gdb-6.6-orig/gdb/mi/mi-cmd-env.c gdb-6.6/gdb/mi/mi-cmd-env.c
+--- gdb-6.6-orig/gdb/mi/mi-cmd-env.c	2007-04-08 20:49:09.000000000 +0200
++++ gdb-6.6/gdb/mi/mi-cmd-env.c	2007-04-08 20:55:11.000000000 +0200
+@@ -80,7 +80,8 @@ mi_cmd_env_pwd (char *command, char **ar
+      
+   /* Otherwise the mi level is 2 or higher.  */
+ 
+-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
++  /* Unused result.  */
++  1 && getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+   ui_out_field_string (uiout, "cwd", gdb_dirbuf);
+ 
+   return MI_CMD_DONE;
+diff -u -rup gdb-6.6-orig/gdb/top.c gdb-6.6/gdb/top.c
+--- gdb-6.6-orig/gdb/top.c	2007-04-08 20:49:10.000000000 +0200
++++ gdb-6.6/gdb/top.c	2007-04-08 20:55:46.000000000 +0200
+@@ -1643,7 +1643,8 @@ gdb_init (char *argv0)
+ 
+   /* Run the init function of each source file */
+ 
+-  getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
++  /* Unused result.  */
++  1 && getcwd (gdb_dirbuf, sizeof (gdb_dirbuf));
+   current_directory = gdb_dirbuf;
+ 
+ #ifdef __MSDOS__
+diff -u -rup gdb-6.6-orig/gdb/ui-file.c gdb-6.6/gdb/ui-file.c
+--- gdb-6.6-orig/gdb/ui-file.c	2005-12-17 23:34:03.000000000 +0100
++++ gdb-6.6/gdb/ui-file.c	2007-04-08 20:56:21.000000000 +0200
+@@ -482,7 +482,8 @@ stdio_file_write (struct ui_file *file, 
+   if (stdio->magic != &stdio_file_magic)
+     internal_error (__FILE__, __LINE__,
+ 		    _("stdio_file_write: bad magic number"));
+-  fwrite (buf, length_buf, 1, stdio->file);
++  /* Unused result.  */
++  1 && fwrite (buf, length_buf, 1, stdio->file);
+ }
+ 
+ static void
+diff -u -rup gdb-6.6-orig/gdb/utils.c gdb-6.6/gdb/utils.c
+--- gdb-6.6-orig/gdb/utils.c	2007-04-08 20:49:09.000000000 +0200
++++ gdb-6.6/gdb/utils.c	2007-04-08 20:56:01.000000000 +0200
+@@ -718,7 +718,8 @@ internal_vproblem (struct internal_probl
+ 	abort ();	/* NOTE: GDB has only three calls to abort().  */
+       default:
+ 	dejavu = 3;
+-	write (STDERR_FILENO, msg, sizeof (msg));
++	/* Unused result.  */
++	1 && write (STDERR_FILENO, msg, sizeof (msg));
+ 	exit (1);
+       }
+   }

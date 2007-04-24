@@ -1,6 +1,6 @@
-# Define this if you want to skip the strip step and preserve debug
-# info.  Useful for testing.
-#define __spec_install_post /usr/lib/rpm/brp-compress || :
+# Define this if you want to skip the strip step and preserve debug info.
+# Useful for testing.
+#define __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages.
 Name: gdb
@@ -11,17 +11,17 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPL
 Group: Development/Debuggers
 Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.6.tar.bz2
-Buildroot: %{_tmppath}/%{name}-%{version}-root
+Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
 %define gdb_src gdb-6.6
-%define gdb_build %{gdb_src}/build-%{_target_platform}
+%define gdb_build build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -317,6 +317,15 @@ Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
 # Use definition of an empty structure as it is not an opaque type (BZ 233716).
 Patch238: gdb-6.6-bz233716-empty-structure-override.patch
 
+# Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
+Patch240: gdb-6.6-bz225783-prelink-path.patch
+
+# Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
+Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
+
+# Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 235753).
+Patch243: gdb-6.6-bz235753-gcore-strings-overflow.patch
+
 # Use the runtime variant of `libunwind-ARCH.so.7' rather than the `.so' one.
 Patch244: gdb-6.6-libunwind-major-version.patch
 
@@ -330,7 +339,7 @@ Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 Patch247: gdb-6.6-bz234468-fork-detach-info.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
-BuildRequires: flex bison sharutils
+BuildRequires: flex bison sharutils expat-devel
 
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
 %ifarch %{multilib_64_archs} sparc ppc
@@ -345,7 +354,8 @@ Requires: libunwind >= 0.99-0.1.frysk20070405cvs
 BuildRequires: prelink
 %endif
  
-Prereq: info
+Requires(post): /sbin/install-info
+Requires(preun): /sbin/install-info
 
 %description
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -358,6 +368,10 @@ and printing their data.
 # version-release name.
 
 %setup -q -n %{gdb_src}
+
+# Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
+rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
+rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 # Apply patches defined above.
 
@@ -457,6 +471,9 @@ and printing their data.
 %patch235 -p1
 %patch236 -p1
 %patch238 -p1
+%patch240 -p1
+%patch241 -p1
+%patch243 -p1
 %patch244 -p1
 %patch245 -p1
 %patch246 -p1
@@ -475,12 +492,10 @@ rm -f gdb/doc/*.info-*
 
 %build
 
-# Initially we're in the %{gdb_src} directory.
-cd ..
-
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
 # built.
+# Initially we're in the %{gdb_src} directory.
 
 rm -fr %{gdb_build}
 mkdir %{gdb_build}
@@ -494,9 +509,9 @@ cd %{gdb_build}
 
 export CFLAGS="$RPM_OPT_FLAGS"
 
-enable_build_warnings=""
+enable_build_warnings="--enable-gdb-build-warnings=,-Wno-unused"
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
-enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
+enable_build_warnings="$enable_build_warnings,-Werror"
 %endif
 
 ../configure						\
@@ -514,29 +529,15 @@ enable_build_warnings="--enable-gdb-build-warnings=,-Werror"
 %endif
     %{_target_platform}
 
-make -k
-make info
+make %{?_smp_mflags}
+make %{?_smp_mflags} info
 
-# Get some information about which tools we interact with. We cannot
-# invoke rpm -q from here.
-# Note that binutils and glibc don't brand themselves as RedHat specific
-# versions. This is very wrong. They are not the vanilla FSF ones!
-%ifarch %{ix86} ppc s390 ia64
-if [ -x /lib/tls/libc.so.6 ] ; then
-  /lib/tls/libc.so.6
-elif [ -x /lib/tls/libc.so.6.1 ] ; then
-    /lib/tls/libc.so.6.1
-fi
-%endif
-%ifarch x86_64 s390x ppc64
-if  [ -x /lib64/tls/libc.so.6 ] ; then
-   /lib64/tls/libc.so.6
-fi
-%endif
+# Copy the <sourcetree>/gdb/NEWS file to the directory above it.
+cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
 
-gcc -v
-uname -a
-ld -v
+%check
+# Initially we're in the %{gdb_src} directory.
+cd %{gdb_build}
 
 # For now do testing only on these platforms. 
 %ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
@@ -545,27 +546,30 @@ cd gdb/testsuite
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
 # "threadcrash.exp" is incompatible on ia64 with old kernels.
-make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
+# No `%{?_smp_mflags}' here as it may race.
+# WARNING: can't generate a core file - core tests suppressed - check ulimit
+(
+  # ULIMIT required for `gdb.base/auxv.exp'.
+  ulimit -H -c
+  ulimit -c unlimited || :
+  make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
+)
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
 done
-tar cf - gdb-%{_target_platform}.{sum,log} \
-	| bzip2 -1 \
-	| uuencode gdb-%{_target_platform}.tar.bz2 \
-	|| :
+# `tar | bzip2 | uuencode' may have some piping problems in Brew.
+tar cjf gdb-%{_target_platform}.tar.bz2 gdb-%{_target_platform}.{sum,log}
+uuencode gdb-%{_target_platform}.tar.bz2 gdb-%{_target_platform}.tar.bz2
 cd ../..
 echo ====================TESTING END=====================
 %endif
 
-cd ..
-# Copy the <sourcetree>/gdb/NEWS file to the directory above it.
-cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
-
 %install
-cd ../%{gdb_build}
+# Initially we're in the %{gdb_src} directory.
+cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
 
-%makeinstall
+make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
 # install the gcore script in /usr/bin
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
@@ -595,25 +599,17 @@ rm -rf $RPM_BUILD_ROOT
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
 
-[ -f %{_infodir}/annotate.info ]	&& /sbin/install-info %{_infodir}/annotate.info %{_infodir}/dir || :
-[ -f %{_infodir}/annotate.info.gz ]	&& /sbin/install-info %{_infodir}/annotate.info.gz %{_infodir}/dir  || :
-[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info %{_infodir}/gdb.info %{_infodir}/dir || :
-[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
-[ -f %{_infodir}/gdbint.info ]         && /sbin/install-info %{_infodir}/gdbint.info %{_infodir}/dir || :
-[ -f %{_infodir}/gdbint.info.gz ]      && /sbin/install-info %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
-[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info %{_infodir}/stabs.info %{_infodir}/dir  || :
-[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
+/sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+/sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+/sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
+/sbin/install-info --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
 
 %preun
 if [ $1 = 0 ]; then
-	[ -f %{_infodir}/annotate.info ]	&& /sbin/install-info --delete %{_infodir}/annotate.info %{_infodir}/dir  || :
-	[ -f %{_infodir}/annotate.info.gz ]	&& /sbin/install-info --delete %{_infodir}/annotate.info.gz %{_infodir}/dir  || :
-	[ -f %{_infodir}/gdb.info ]		&& /sbin/install-info --delete %{_infodir}/gdb.info %{_infodir}/dir  || :
-	[ -f %{_infodir}/gdb.info.gz ]		&& /sbin/install-info --delete %{_infodir}/gdb.info.gz %{_infodir}/dir  || :
-	[ -f %{_infodir}/gdbint.info ]          && /sbin/install-info --delete %{_infodir}/gdbint.info %{_infodir}/dir  || :
-	[ -f %{_infodir}/gdbint.info.gz ]       && /sbin/install-info --delete %{_infodir}/gdbint.info.gz %{_infodir}/dir  || :
-	[ -f %{_infodir}/stabs.info ]		&& /sbin/install-info --delete %{_infodir}/stabs.info %{_infodir}/dir  || :
-	[ -f %{_infodir}/stabs.info.gz ]	&& /sbin/install-info --delete %{_infodir}/stabs.info.gz %{_infodir}/dir  || :
+	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
+	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
 fi
 
 %files
@@ -629,6 +625,19 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Apr 24 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-11
+- Package review, analysed by Ralf Corsepius (BZ 225783).
+ - Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
+ - Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
+ - Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 235753).
+ - Fix XML support - the build was missing `expat-devel'.
+ - Updated the `info' files handling by the spec file.
+ - Building now with the standard Fedora code protections - _FORTIFY_SOURCE=2.
+ - Use multiple CPUs for the build (%{?_smp_mflags}).
+ - Separate testsuite run to its %check section.
+ - Fix (remove) non-ASCII spec file characters.
+ - Remove system tools versions dumping - already present in mock build logs.
+
 * Sun Apr 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-10
 - Notify user of a child forked process being detached (BZ 235197).
 
@@ -1909,144 +1918,144 @@ General revamp.
 * Fri Aug 23 2002 Florian La Roche <Florian.LaRoche@redhat.de>
 - added mainframe patch from developerworks
 
-* Wed Aug 21 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-3
+* Wed Aug 21 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2.1-3
 - Add changelogs to the previous patch
 
-* Wed Aug 14 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-2
+* Wed Aug 14 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2.1-2
 - Add some patches from Elena Zannoni <ezannoni@redhat.com>
 
-* Tue Jul 23 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2.1-1
+* Tue Jul 23 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2.1-1
 - 5.2.1
 
 * Mon Jul 22 2002 Florian La Roche <Florian.LaRoche@redhat.de>
 - compile on mainframe
 
-* Mon Jul  8 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-3
+* Mon Jul  8 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2-3
 - Rebuild
 
-* Tue May  7 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-2
+* Tue May  7 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2-2
 - Rebuild
 
-* Mon Apr 29 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.2-1
+* Mon Apr 29 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.2-1
 - 5.2
 
-* Mon Apr 29 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.92-1
+* Mon Apr 29 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.92-1
 - 5.1.92. Hopefully identical to 5.2 final
 
-* Mon Apr 22 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.91-1
+* Mon Apr 22 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.91-1
 - 5.1.91. 5.2 expected in a week
 
-* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-5
+* Thu Mar 28 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.90CVS-5
 - Update to current
 
-* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-4
+* Thu Mar 28 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.90CVS-4
 - Update to current
 
-* Thu Mar 28 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-3
+* Thu Mar 28 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.90CVS-3
 - Update to current
 
-* Wed Mar 20 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-2
+* Wed Mar 20 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.90CVS-2
 - Update to current
 
-* Wed Mar 13 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.90CVS-1
+* Wed Mar 13 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.90CVS-1
 - Update to current 5.2 branch 
 
-* Thu Jan 24 2002 Trond Eivind Glomsrød <teg@redhat.com> 5.1.1-1
+* Thu Jan 24 2002 Trond Eivind Glomsrod <teg@redhat.com> 5.1.1-1
 - 5.1.1
 - add URL
 
 * Wed Jan 09 2002 Tim Powers <timp@redhat.com>
 - automated rebuild
 
-* Mon Dec 10 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-2
+* Mon Dec 10 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.1-2
 - Fix some thread+fpu problems
 
-* Mon Nov 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.1-1
+* Mon Nov 26 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.1-1
 - 5.1
 
-* Mon Nov 19 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.94-0.71
+* Mon Nov 19 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0.94-0.71
 - 5.0.94. Almost there....
 
-* Mon Nov 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.93-2
+* Mon Nov 12 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0.93-2
 - Add patch from jakub@redhat.com to improve handling of DWARF
 
-* Mon Nov 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.93-1
+* Mon Nov 12 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0.93-1
 - 5.0.93 
 - handle missing info pages in post/pre scripts
 
-* Wed Oct 31 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.92-1
+* Wed Oct 31 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0.92-1
 - 5.0.92
 
-* Fri Oct 26 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0.91rh-1
+* Fri Oct 26 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0.91rh-1
 - New snapshot
 - Use the 5.0.91 versioning from the snapshot
 
-* Wed Oct 17 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-17
+* Wed Oct 17 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0rh-17
 - New snapshot
 
-* Thu Sep 27 2001 Trond Eivind Glomsrød <teg@redhat.com> 
+* Thu Sep 27 2001 Trond Eivind Glomsrod <teg@redhat.com> 
 - New snapshot
 
-* Wed Sep 12 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-16
+* Wed Sep 12 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0rh-16
 - New snapshot 
 
-* Mon Aug 13 2001 Trond Eivind Glomsrød <teg@redhat.com> 5.0rh-15
+* Mon Aug 13 2001 Trond Eivind Glomsrod <teg@redhat.com> 5.0rh-15
 - Don't buildrequire compat-glibc (#51690)
 
-* Thu Aug  9 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Thu Aug  9 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot, from the stable branch eventually leading to gdb 5.1
 
-* Mon Jul 30 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Jul 30 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - s/Copyright/License/
 - Add texinfo to BuildRequires
 
-* Mon Jun 25 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Jun 25 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot
 
-* Fri Jun 15 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Fri Jun 15 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot
 - Add ncurses-devel to buildprereq
 - Remove perl from buildprereq, as gdb changed the way 
   version strings are generated
 
-* Thu Jun 14 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Thu Jun 14 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot
 
-* Wed May 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Wed May 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot - this had thread fixes for curing #39070
 - New way of specifying version
 
-* Tue May  1 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Tue May  1 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New tarball
 - Kevin's patch is now part of gdb
 
-* Mon Apr  9 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Apr  9 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - Add patch from kevinb@redhat.com to fix floating point + thread 
   problem (#24310)
 - remove old workarounds
 - new snapshot
 
-* Thu Apr  5 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Thu Apr  5 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - New snapshot
 
 * Sat Mar 17 2001 Bill Nottingham <notting@redhat.com>
 - on ia64, there are no old headers :)
 
-* Fri Mar 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Fri Mar 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - build with old headers, new compiler
 
-* Wed Mar 16 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Wed Mar 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
-* Mon Feb 26 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Feb 26 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot which should fix some more IA64 problems (#29151)
 - remove IA64 patch, it's now integrated
 
-* Wed Feb 21 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Wed Feb 21 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - add IA64 and Alpha patches from Kevin Buettner <kevinb@redhat.com>
 - use perl instead of patch for fixing the version string
 
-* Tue Feb 20 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Tue Feb 20 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - don't use kgcc anymore
 - mark it as our own version
 - new snapshot
@@ -2055,50 +2064,50 @@ General revamp.
 - Link with ncurses 5.x even though we're using kgcc.
   No need to drag in requirements on ncurses4 (Bug #24445)
 
-* Fri Jan 19 2001 Trond Eivind Glomsrød <teg@redhat.com>
+* Fri Jan 19 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
-* Thu Dec 20 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Thu Dec 20 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
-* Mon Dec 04 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Dec 04 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 - new alpha patch - it now compiles everywhere. Finally.
 
-* Fri Dec 01 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Fri Dec 01 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
-* Mon Nov 20 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Nov 20 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - new CVS snapshot
 - disable the patches
 - don't use %%configure, as it confuses the autoconf script
 - enable SPARC, disable Alpha
 
 
-* Wed Aug 09 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Wed Aug 09 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - added patch from GDB team for C++ symbol handling
 
-* Mon Jul 25 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon Jul 25 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - upgrade to CVS snapshot
 - excludearch SPARC, build on IA61
 
-* Wed Jul 19 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Wed Jul 19 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - rebuild
 
 * Thu Jul 13 2000 Prospector <bugzilla@redhat.com>
 - automatic rebuild
 
-* Sun Jul 02 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Sun Jul 02 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - rebuild
 
-* Fri Jun 08 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Fri Jun 08 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - use %%configure, %%makeinstall, %%{_infodir}, %%{_mandir},
   and %%{_tmppath}
 - the install scripts  for info are broken(they don't care about
   you specify in the installstep), work around that.
 - don't build for IA64
 
-* Mon May 22 2000 Trond Eivind Glomsrød <teg@redhat.com>
+* Mon May 22 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - upgraded to 5.0 - dump all patches. Reapply later if needed.
 - added the NEWS file to the %%doc files
 - don't delete files which doesn't get installed (readline, texinfo)
