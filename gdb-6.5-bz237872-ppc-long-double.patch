@@ -1,0 +1,124 @@
+2007-04-20  Luis Machado  <luisgpm@br.ibm.com>
+
+	* rs6000-tdep.c (rs6000_gdbarch_init): Set the long double format for
+	powerpc64.
+	* configure.host : Set the host long double format for powerpc64 to be
+	a 128-bit type defined in libiberty/floatformat.c.
+	* ppc-linux-tdep.c (ppc_linux_init_abi): Remove code that sets long double 
+	size to 8 bytes. This breaks expression evaluation by overriding the 
+	default.
+	* floatformat.c : Introduce default floatformat structs to describe the
+	128-bit long double found on the powerpc64. Description does not fully
+	describe this format which is actually a pair of 64-bit doubles. However
+	we are relying on floatformat_to_doublest() recognizing that this is
+	also the default host floatformat.
+	* floatformat.h : Default floatformat structs for powerpc64 128-bit
+	long doubles.
+
+Index: ./gdb/configure.host
+===================================================================
+--- ./gdb/configure.host.orig	2007-04-21 23:51:06.000000000 -0300
++++ ./gdb/configure.host	2007-04-21 23:51:09.000000000 -0300
+@@ -179,6 +179,11 @@
+ 	gdb_host_double_format="&floatformat_ieee_double_big"
+ 	gdb_host_long_double_format="&floatformat_m68881_ext"
+ 	;;
++powerpc64-*-*)
++	gdb_host_float_format=0
++	gdb_host_double_format=0
++	gdb_host_long_double_format="&floatformat_ppc64_long_double_big"
++	;;
+ *)
+ 	gdb_host_float_format=0
+ 	gdb_host_double_format=0
+Index: ./gdb/rs6000-tdep.c
+===================================================================
+--- ./gdb/rs6000-tdep.c.orig	2007-04-21 23:51:06.000000000 -0300
++++ ./gdb/rs6000-tdep.c	2007-04-21 23:51:09.000000000 -0300
+@@ -3442,7 +3442,19 @@
+   set_gdbarch_float_bit (gdbarch, 4 * TARGET_CHAR_BIT);
+   set_gdbarch_double_bit (gdbarch, 8 * TARGET_CHAR_BIT);
+   if (sysv_abi)
+-    set_gdbarch_long_double_bit (gdbarch, 16 * TARGET_CHAR_BIT);
++    {
++      int byte_order = gdbarch_byte_order (gdbarch);
++
++      if (byte_order == BFD_ENDIAN_BIG)
++        set_gdbarch_long_double_format (gdbarch, &floatformat_ppc64_long_double_big);
++      else if (byte_order == BFD_ENDIAN_LITTLE) 
++        set_gdbarch_long_double_format (gdbarch, &floatformat_ppc64_long_double_little);
++      else
++        internal_error (__FILE__, __LINE__,
++                      _("rs6000_gdbarch_init: "
++                        "bad byte order"));
++      set_gdbarch_long_double_bit (gdbarch, 16 * TARGET_CHAR_BIT);
++    }
+   else
+     set_gdbarch_long_double_bit (gdbarch, 8 * TARGET_CHAR_BIT);
+   set_gdbarch_char_signed (gdbarch, 0);
+Index: ./include/floatformat.h
+===================================================================
+--- ./include/floatformat.h.orig	2007-04-21 23:51:06.000000000 -0300
++++ ./include/floatformat.h	2007-04-21 23:51:09.000000000 -0300
+@@ -118,6 +118,9 @@
+ extern const struct floatformat floatformat_ia64_spill_little;
+ extern const struct floatformat floatformat_ia64_quad_big;
+ extern const struct floatformat floatformat_ia64_quad_little;
++/* ppc64 long double implemented as 2 doubles */
++extern const struct floatformat floatformat_ppc64_long_double_big;
++extern const struct floatformat floatformat_ppc64_long_double_little;
+ 
+ /* Convert from FMT to a double.
+    FROM is the address of the extended float.
+Index: ./libiberty/floatformat.c
+===================================================================
+--- ./libiberty/floatformat.c.orig	2007-04-21 23:51:06.000000000 -0300
++++ ./libiberty/floatformat.c	2007-04-21 23:51:09.000000000 -0300
+@@ -106,6 +106,25 @@
+   floatformat_always_valid
+ };
+ 
++/* floatformats for ppc64 long double, big and little endian.           */
++/* The layout is a pair of doubles. Don't use this description to pass  */
++/* information to get_field(). The bit size is the important thing.     */
++const struct floatformat floatformat_ppc64_long_double_big =
++{
++  floatformat_big, 128, 0, 1, 11, 1023, 2047, 12, 52, 
++  floatformat_intbit_no,
++  "floatformat_ppc64_long_double_big",
++  floatformat_always_valid
++};
++
++const struct floatformat floatformat_ppc64_long_double_little =
++{
++  floatformat_little, 128, 0, 1, 11, 1023, 2047, 12, 52, 
++  floatformat_intbit_no,
++  "floatformat_ppc64_long_double_little",
++  floatformat_always_valid
++};
++
+ /* floatformat for IEEE double, little endian byte order, with big endian word
+    ordering, as on the ARM.  */
+ 
+Index: ./gdb/ppc-linux-tdep.c
+===================================================================
+--- ./gdb/ppc-linux-tdep.c.orig	2007-04-21 19:48:50.000000000 -0300
++++ ./gdb/ppc-linux-tdep.c	2007-04-22 00:29:50.000000000 -0300
+@@ -1059,7 +1059,8 @@
+ {
+   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
+ 
+-  /* NOTE: jimb/2004-03-26: The System V ABI PowerPC Processor
++#if 0
++	/* NOTE: jimb/2004-03-26: The System V ABI PowerPC Processor
+      Supplement says that long doubles are sixteen bytes long.
+      However, as one of the known warts of its ABI, PPC GNU/Linux uses
+      eight-byte long doubles.  GCC only recently got 128-bit long
+@@ -1068,6 +1069,7 @@
+      double' on PPC GNU/Linux are non-conformant.  */
+   /* NOTE: cagney/2005-01-25: True for both 32- and 64-bit.  */
+   set_gdbarch_long_double_bit (gdbarch, 8 * TARGET_CHAR_BIT);
++#endif
+ 
+   if (tdep->wordsize == 4)
+     {
