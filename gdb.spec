@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -338,7 +338,10 @@ Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 # Notify user of a child forked process being detached (BZ 235197).
 Patch247: gdb-6.6-bz234468-fork-detach-info.patch
 
-# New testcase for 32bit inferiors on 64bit hosts.
+# Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232014).
+Patch248: gdb-6.6-bz232014-gcore-ppc-on-ppc64.patch
+
+# New testcase for gcore of 32bit inferiors on 64bit hosts.
 Patch249: gdb-6.6-gcore32-test.patch
 
 # Enable PowerPC to print 128-bit long double variables (BZ 237872).
@@ -484,6 +487,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch245 -p1
 %patch246 -p1
 %patch247 -p1
+%patch248 -p1
 %patch249 -p1
 %patch251 -p1
 
@@ -633,9 +637,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Apr 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-13
+- Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232015).
+
 * Wed Apr 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-12
 - Enable PowerPC to print 128-bit long double variables (BZ 237872).
-- New testcase for 32bit inferiors on 64bit hosts.
+- New testcase for gcore of 32bit inferiors on 64bit hosts.
 
 * Tue Apr 24 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-11
 - Package review, analysed by Ralf Corsepius (BZ 225783).
