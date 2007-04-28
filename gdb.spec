@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -323,8 +323,8 @@ Patch240: gdb-6.6-bz225783-prelink-path.patch
 # Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
 Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
 
-# Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 235753).
-Patch243: gdb-6.6-bz235753-gcore-strings-overflow.patch
+# Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 238285).
+Patch243: gdb-6.6-bz238285-gcore-strings-overflow.patch
 
 # Use the runtime variant of `libunwind-ARCH.so.7' rather than the `.so' one.
 Patch244: gdb-6.6-libunwind-major-version.patch
@@ -637,6 +637,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Apr 28 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-14
+- Fixup for the PPC Power6/DFP instructions disassembly (BZ 230000).
+- New testcase for the GCORE buffer overflow (for BZ 238285, formerly 235753).
+
 * Wed Apr 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-13
 - Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232015).
 
@@ -648,7 +652,7 @@ fi
 - Package review, analysed by Ralf Corsepius (BZ 225783).
  - Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
  - Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
- - Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 235753).
+ - Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 238285).
  - Fix XML support - the build was missing `expat-devel'.
  - Updated the `info' files handling by the spec file.
  - Building now with the standard Fedora code protections - _FORTIFY_SOURCE=2.
