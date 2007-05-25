@@ -27,6 +27,9 @@ do
     if test -z "$ver" ; then
     ver=`echo "$f" | sed -n -e 's,^.*/scratch/.*/task_\([0-9]*\)/logs/\([^/]*\)/.*$,-\1,p'`
     fi
+    if test -z "$ver" ; then
+    ver=`echo "$f" | sed -n -e 's,^.*/build-\([0-9]*\)/.*$,-\1,p'`
+    fi
     if test -z "$isa" ; then
     isa=`echo "$f" | sed -n -e 's,^.*/scratch/.*/task_\([0-9]*\)/logs/\([^/]*\)/.*$,-\2,p'`
     fi
