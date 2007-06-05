@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -637,6 +637,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jun  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-15
+- Fix crash on missing filenames debug info (BZ 242155).
+
 * Sat Apr 28 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-14
 - Fixup for the PPC Power6/DFP instructions disassembly (BZ 230000).
 - New testcase for the GCORE buffer overflow (for BZ 238285, formerly 235753).
