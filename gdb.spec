@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -347,6 +347,9 @@ Patch249: gdb-6.6-gcore32-test.patch
 # Enable PowerPC to print 128-bit long double variables (BZ 237872).
 Patch251: gdb-6.5-bz237872-ppc-long-double.patch
 
+# Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
+Patch254: gdb-6.6-testsuite-timeouts.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 
@@ -490,6 +493,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch248 -p1
 %patch249 -p1
 %patch251 -p1
+%patch254 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -560,11 +564,13 @@ cd gdb/testsuite
 # "threadcrash.exp" is incompatible on ia64 with old kernels.
 # No `%{?_smp_mflags}' here as it may race.
 # WARNING: can't generate a core file - core tests suppressed - check ulimit
+# "attachstop.exp" - Functionality is currently broken but timeout is long.
+# "readline-overflow.exp" - Testcase is broken, functionality is OK.
 (
   # ULIMIT required for `gdb.base/auxv.exp'.
   ulimit -H -c
   ulimit -c unlimited || :
-  make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp"' || :
+  make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp attachstop.exp readline-overflow.exp"' || :
 )
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
@@ -637,6 +643,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jun  7 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-15
+- Testcase update to cover PPC Power6/DFP instructions disassembly (BZ 230000).
+- Disable some known timeouting/failing testcases to reduce the build time.
+- Fix crash on missing filenames debug info (BZ 242155).
+
 * Sat Apr 28 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-14
 - Fixup for the PPC Power6/DFP instructions disassembly (BZ 230000).
 - New testcase for the GCORE buffer overflow (for BZ 238285, formerly 235753).
