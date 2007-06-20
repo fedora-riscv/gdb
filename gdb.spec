@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -222,10 +222,6 @@ Patch190: gdb-6.5-dwarf-stack-overflow.patch
 # Fix gdb printf command argument using "%p" (BZ 205551).
 Patch191: gdb-6.5-bz205551-printf-p.patch
 
-# Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
-# Fix attachment also to a threaded stopped process (BZ 219118).
-Patch193: gdb-6.5-attach-stop.patch
-
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
 # FIXME: Still to be updated.
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
@@ -350,6 +346,10 @@ Patch251: gdb-6.5-bz237872-ppc-long-double.patch
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
 Patch254: gdb-6.6-testsuite-timeouts.patch
 
+# Fix attaching a stopped nonthreaded/threaded process (BZ 219118, 233852).
+# Fix attaching during a pending signal being delivered.
+Patch256: gdb-6.6-bz233852-attach-signalled.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 
@@ -448,7 +448,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch188 -p1
 %patch190 -p1
 %patch191 -p1
-%patch193 -p1
 %patch194 -p1
 %patch195 -p1
 %patch196 -p1
@@ -494,6 +493,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch249 -p1
 %patch251 -p1
 %patch254 -p1
+%patch256 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -643,6 +643,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jun 20 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-16
+- Fix attaching a stopped process on expected + upstream kernels (BZ 233852).
+ - Fix attaching during a pending signal being delivered.
+
 * Thu Jun  7 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-15
 - Testcase update to cover PPC Power6/DFP instructions disassembly (BZ 230000).
 - Disable some known timeouting/failing testcases to reduce the build time.
