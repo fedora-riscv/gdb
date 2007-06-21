@@ -1,0 +1,160 @@
+Index: ./gdb/inferior.h
+===================================================================
+RCS file: /cvs/src/src/gdb/inferior.h,v
+retrieving revision 1.83
+diff -u -p -r1.83 inferior.h
+--- ./gdb/inferior.h	15 Jun 2007 22:44:55 -0000	1.83
++++ ./gdb/inferior.h	19 Jun 2007 07:14:04 -0000
+@@ -194,7 +194,15 @@ extern void reopen_exec_file (void);
+ /* The `resume' routine should only be called in special circumstances.
+    Normally, use `proceed', which handles a lot of bookkeeping.  */
+ 
+-extern void resume (int, enum target_signal);
++enum resume_step
++  {
++    /* currently_stepping () should return non-zero for non-continue.  */
++    RESUME_STEP_CONTINUE = 0,
++    RESUME_STEP_USER,		/* Stepping is intentional by the user.  */
++    RESUME_STEP_NEEDED		/* Stepping only for software watchpoints.  */
++  };
++
++extern void resume (enum resume_step, enum target_signal);
+ 
+ /* From misc files */
+ 
+Index: ./gdb/infrun.c
+===================================================================
+RCS file: /cvs/src/src/gdb/infrun.c,v
+retrieving revision 1.241
+diff -u -p -r1.241 infrun.c
+--- ./gdb/infrun.c	18 Jun 2007 18:23:08 -0000	1.241
++++ ./gdb/infrun.c	19 Jun 2007 07:14:32 -0000
+@@ -76,7 +76,8 @@ static void set_schedlock_func (char *ar
+ 
+ struct execution_control_state;
+ 
+-static int currently_stepping (struct execution_control_state *ecs);
++static enum resume_step currently_stepping (struct execution_control_state
++									  *ecs);
+ 
+ static void xdb_handle_command (char *args, int from_tty);
+ 
+@@ -466,7 +467,7 @@ static const char *scheduler_enums[] = {
+   schedlock_step,
+   NULL
+ };
+-static const char *scheduler_mode = schedlock_off;
++static const char *scheduler_mode = schedlock_step;
+ static void
+ show_scheduler_mode (struct ui_file *file, int from_tty,
+ 		     struct cmd_list_element *c, const char *value)
+@@ -496,15 +497,18 @@ set_schedlock_func (char *args, int from
+    STEP nonzero if we should step (zero to continue instead).
+    SIG is the signal to give the inferior (zero for none).  */
+ void
+-resume (int step, enum target_signal sig)
++resume (enum resume_step step, enum target_signal sig)
+ {
+   int should_resume = 1;
+   struct cleanup *old_cleanups = make_cleanup (resume_cleanups, 0);
+   QUIT;
+ 
+   if (debug_infrun)
+-    fprintf_unfiltered (gdb_stdlog, "infrun: resume (step=%d, signal=%d)\n",
+-			step, sig);
++    fprintf_unfiltered (gdb_stdlog, "infrun: resume (step=%s, signal=%d)\n",
++			(step == RESUME_STEP_CONTINUE ? "RESUME_STEP_CONTINUE"
++			: (step == RESUME_STEP_USER ? "RESUME_STEP_USER"
++			                            : "RESUME_STEP_NEEDED")),
++			sig);
+ 
+   /* FIXME: calling breakpoint_here_p (read_pc ()) three times! */
+ 
+@@ -595,7 +599,8 @@ a command like `return' or `jump' to con
+ 
+       if ((scheduler_mode == schedlock_on)
+ 	  || (scheduler_mode == schedlock_step
+-	      && (step || singlestep_breakpoints_inserted_p)))
++	      && (step == RESUME_STEP_USER
++		  || singlestep_breakpoints_inserted_p)))
+ 	{
+ 	  /* User-settable 'scheduler' mode requires solo thread resume. */
+ 	  resume_ptid = inferior_ptid;
+@@ -705,7 +710,8 @@ static CORE_ADDR prev_pc;
+ void
+ proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
+ {
+-  int oneproc = 0;
++  enum resume_step resume_step = (step ? RESUME_STEP_USER
++				       : RESUME_STEP_CONTINUE);
+ 
+   if (step > 0)
+     step_start_function = find_pc_function (read_pc ());
+@@ -719,13 +725,13 @@ proceed (CORE_ADDR addr, enum target_sig
+ 	   step one instruction before inserting breakpoints so that
+ 	   we do not stop right away (and report a second hit at this
+ 	   breakpoint).  */
+-	oneproc = 1;
++	resume_step = RESUME_STEP_USER;
+       else if (gdbarch_single_step_through_delay_p (current_gdbarch)
+               && gdbarch_single_step_through_delay (current_gdbarch,
+                                                     get_current_frame ()))
+ 	/* We stepped onto an instruction that needs to be stepped
+ 	   again before re-inserting the breakpoint, do so.  */
+-	oneproc = 1;
++	resume_step = RESUME_STEP_USER;
+     }
+   else
+     {
+@@ -749,9 +755,9 @@ proceed (CORE_ADDR addr, enum target_sig
+      that reported the most recent event.  If a step-over is required
+      it returns TRUE and sets the current thread to the old thread. */
+   if (prepare_to_proceed () && breakpoint_here_p (read_pc ()))
+-    oneproc = 1;
++    resume_step = RESUME_STEP_USER;
+ 
+-  if (oneproc)
++  if (resume_step == RESUME_STEP_USER)
+     /* We will get a trace trap after one instruction.
+        Continue it automatically and insert breakpoints then.  */
+     trap_expected = 1;
+@@ -800,8 +806,11 @@ proceed (CORE_ADDR addr, enum target_sig
+      updated correctly when the inferior is stopped.  */
+   prev_pc = read_pc ();
+ 
++  if (resume_step == RESUME_STEP_CONTINUE && bpstat_should_step ())
++    resume_step = RESUME_STEP_NEEDED;
++
+   /* Resume inferior.  */
+-  resume (oneproc || step || bpstat_should_step (), stop_signal);
++  resume (resume_step, stop_signal);
+ 
+   /* Wait for it to stop (if not standalone)
+      and in any case decode why it stopped, and act accordingly.  */
+@@ -2695,14 +2704,20 @@ process_event_stop_test:
+ 
+ /* Are we in the middle of stepping?  */
+ 
+-static int
++static enum resume_step
+ currently_stepping (struct execution_control_state *ecs)
+ {
+-  return ((!ecs->handling_longjmp
+-	   && ((step_range_end && step_resume_breakpoint == NULL)
+-	       || trap_expected))
+-	  || ecs->stepping_through_solib_after_catch
+-	  || bpstat_should_step ());
++  if (!ecs->handling_longjmp
++      && ((step_range_end && step_resume_breakpoint == NULL) || trap_expected))
++    return RESUME_STEP_USER;
++
++  if (ecs->stepping_through_solib_after_catch)
++    return RESUME_STEP_USER;
++
++  if (bpstat_should_step ())
++    return RESUME_STEP_NEEDED;
++
++  return RESUME_STEP_CONTINUE;
+ }
+ 
+ /* Subroutine call with source code we should not step over.  Do step

@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -74,8 +74,9 @@ Patch108: gdb-6.3-ppc64section-20041026.patch
 # correct symbol is found.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
-# Fix stepping in threads
-Patch112: gdb-6.3-thread-step-20041207.patch
+# Use upstream `set scheduler-locking step' as default.
+# Fix upstream `set scheduler-locking step' vs. upstream PPC atomic seqs.
+Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 
 # Threaded watchpoint support
 Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
@@ -128,8 +129,9 @@ Patch139: gdb-6.3-dwattype0-20050201.patch
 # Fix gcore for threads
 Patch140: gdb-6.3-gcore-thread-20050204.patch
 
-# Fix stepping over thread exit
-Patch141: gdb-6.3-step-thread-exit-20050211.patch
+# Stop while intentionally stepping and the thread exit is met.
+Patch141: gdb-6.6-step-thread-exit.patch
+Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Prevent gdb from being pushed into background
 Patch142: gdb-6.3-terminal-fix-20050214.patch
@@ -350,6 +352,10 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 # Fix attaching during a pending signal being delivered.
 Patch256: gdb-6.6-bz233852-attach-signalled.patch
 
+# Support for stepping over PPC atomic instruction sequences (BZ 237572).
+Patch257: gdb-6.6-bz237572-ppc-atomic-sequence-upstream.patch
+Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 
@@ -418,6 +424,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch139 -p1
 %patch140 -p1
 %patch141 -p1
+%patch259 -p1
 %patch142 -p1
 %patch145 -p1
 %patch147 -p1
@@ -494,6 +501,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch251 -p1
 %patch254 -p1
 %patch256 -p1
+%patch257 -p1
+%patch258 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -643,6 +652,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jun 21 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-17
+- Support for stepping over PPC atomic instruction sequences (BZ 237572).
+- `set scheduler-locking step' is no longer enforced but it is now default.
+
 * Wed Jun 20 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-16
 - Fix attaching a stopped process on expected + upstream kernels (BZ 233852).
  - Fix attaching during a pending signal being delivered.
