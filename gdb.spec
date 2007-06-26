@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -74,9 +74,10 @@ Patch108: gdb-6.3-ppc64section-20041026.patch
 # correct symbol is found.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
-# Use upstream `set scheduler-locking step' as default.
 # Fix upstream `set scheduler-locking step' vs. upstream PPC atomic seqs.
 Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
+# Make upstream `set scheduler-locking step' as default.
+Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
 
 # Threaded watchpoint support
 Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
@@ -503,6 +504,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch256 -p1
 %patch257 -p1
 %patch258 -p1
+%patch260 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -652,6 +654,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Jun 26 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-18
+- Fix PPC software watchpoints active while stepping atomic instr. (BZ 237572).
+
 * Thu Jun 21 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-17
 - Support for stepping over PPC atomic instruction sequences (BZ 237572).
 - `set scheduler-locking step' is no longer enforced but it is now default.

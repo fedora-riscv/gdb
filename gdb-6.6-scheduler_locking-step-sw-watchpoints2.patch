@@ -1,10 +1,19 @@
-Index: ./gdb/inferior.h
-===================================================================
-RCS file: /cvs/src/src/gdb/inferior.h,v
-retrieving revision 1.83
-diff -u -p -r1.83 inferior.h
+2007-06-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* inferior.h (enum resume_step): New definition.
+	(resume): Change STEP parameter type to ENUM RESUME_STEP.
+	* infrun.c (resume): Likewise.  Extend debug printing of the STEP
+	parameter.  Lock the scheduler only for intentional stepping.
+	(proceed): Replace the variable ONESTEP with tristate RESUME_STEP.
+	Set the third RESUME_STEP state according to BPSTAT_SHOULD_STEP.
+	(currently_stepping): Change the return type to ENUM RESUME_STEP.
+	Return RESUME_STEP_NEEDED if it is just due to BPSTAT_SHOULD_STEP.
+	* linux-nat.c (select_singlestep_lwp_callback): Do not focus on
+	the software watchpoint events.
+	* linux-nat.h (struct lwp_info): Redeclare STEP as ENUM RESUME_STEP.
+
 --- ./gdb/inferior.h	15 Jun 2007 22:44:55 -0000	1.83
-+++ ./gdb/inferior.h	19 Jun 2007 07:14:04 -0000
++++ ./gdb/inferior.h	25 Jun 2007 20:33:02 -0000
 @@ -194,7 +194,15 @@ extern void reopen_exec_file (void);
  /* The `resume' routine should only be called in special circumstances.
     Normally, use `proceed', which handles a lot of bookkeeping.  */
@@ -22,13 +31,8 @@ diff -u -p -r1.83 inferior.h
  
  /* From misc files */
  
-Index: ./gdb/infrun.c
-===================================================================
-RCS file: /cvs/src/src/gdb/infrun.c,v
-retrieving revision 1.241
-diff -u -p -r1.241 infrun.c
---- ./gdb/infrun.c	18 Jun 2007 18:23:08 -0000	1.241
-+++ ./gdb/infrun.c	19 Jun 2007 07:14:32 -0000
+--- ./gdb/infrun.c	22 Jun 2007 12:47:48 -0000	1.243
++++ ./gdb/infrun.c	25 Jun 2007 20:33:02 -0000
 @@ -76,7 +76,8 @@ static void set_schedlock_func (char *ar
  
  struct execution_control_state;
@@ -39,15 +43,6 @@ diff -u -p -r1.241 infrun.c
  
  static void xdb_handle_command (char *args, int from_tty);
  
-@@ -466,7 +467,7 @@ static const char *scheduler_enums[] = {
-   schedlock_step,
-   NULL
- };
--static const char *scheduler_mode = schedlock_off;
-+static const char *scheduler_mode = schedlock_step;
- static void
- show_scheduler_mode (struct ui_file *file, int from_tty,
- 		     struct cmd_list_element *c, const char *value)
 @@ -496,15 +497,18 @@ set_schedlock_func (char *args, int from
     STEP nonzero if we should step (zero to continue instead).
     SIG is the signal to give the inferior (zero for none).  */
@@ -70,9 +65,12 @@ diff -u -p -r1.241 infrun.c
  
    /* FIXME: calling breakpoint_here_p (read_pc ()) three times! */
  
-@@ -595,7 +599,8 @@ a command like `return' or `jump' to con
+@@ -593,9 +597,10 @@ a command like `return' or `jump' to con
+ 	  resume_ptid = inferior_ptid;
+ 	}
  
-       if ((scheduler_mode == schedlock_on)
+-      if ((scheduler_mode == schedlock_on)
++      if (scheduler_mode == schedlock_on
  	  || (scheduler_mode == schedlock_step
 -	      && (step || singlestep_breakpoints_inserted_p)))
 +	      && (step == RESUME_STEP_USER
@@ -80,7 +78,7 @@ diff -u -p -r1.241 infrun.c
  	{
  	  /* User-settable 'scheduler' mode requires solo thread resume. */
  	  resume_ptid = inferior_ptid;
-@@ -705,7 +710,8 @@ static CORE_ADDR prev_pc;
+@@ -711,7 +716,8 @@ static CORE_ADDR prev_pc;
  void
  proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
  {
@@ -90,7 +88,7 @@ diff -u -p -r1.241 infrun.c
  
    if (step > 0)
      step_start_function = find_pc_function (read_pc ());
-@@ -719,13 +725,13 @@ proceed (CORE_ADDR addr, enum target_sig
+@@ -725,13 +731,13 @@ proceed (CORE_ADDR addr, enum target_sig
  	   step one instruction before inserting breakpoints so that
  	   we do not stop right away (and report a second hit at this
  	   breakpoint).  */
@@ -106,7 +104,7 @@ diff -u -p -r1.241 infrun.c
      }
    else
      {
-@@ -749,9 +755,9 @@ proceed (CORE_ADDR addr, enum target_sig
+@@ -755,9 +761,9 @@ proceed (CORE_ADDR addr, enum target_sig
       that reported the most recent event.  If a step-over is required
       it returns TRUE and sets the current thread to the old thread. */
    if (prepare_to_proceed () && breakpoint_here_p (read_pc ()))
@@ -118,7 +116,7 @@ diff -u -p -r1.241 infrun.c
      /* We will get a trace trap after one instruction.
         Continue it automatically and insert breakpoints then.  */
      trap_expected = 1;
-@@ -800,8 +806,11 @@ proceed (CORE_ADDR addr, enum target_sig
+@@ -806,8 +812,11 @@ proceed (CORE_ADDR addr, enum target_sig
       updated correctly when the inferior is stopped.  */
    prev_pc = read_pc ();
  
@@ -131,7 +129,7 @@ diff -u -p -r1.241 infrun.c
  
    /* Wait for it to stop (if not standalone)
       and in any case decode why it stopped, and act accordingly.  */
-@@ -2695,14 +2704,20 @@ process_event_stop_test:
+@@ -2681,14 +2690,20 @@ process_event_stop_test:
  
  /* Are we in the middle of stepping?  */
  
@@ -158,3 +156,30 @@ diff -u -p -r1.241 infrun.c
  }
  
  /* Subroutine call with source code we should not step over.  Do step
+--- ./gdb/linux-nat.c	16 Jun 2007 17:16:25 -0000	1.64
++++ ./gdb/linux-nat.c	25 Jun 2007 20:33:02 -0000
+@@ -1720,7 +1720,10 @@ count_events_callback (struct lwp_info *
+ static int
+ select_singlestep_lwp_callback (struct lwp_info *lp, void *data)
+ {
+-  if (lp->step && lp->status != 0)
++  /* We do not focus on software watchpoints as we would not catch
++     STEPPING_PAST_SINGLESTEP_BREAKPOINT breakpoints in some other thread
++     as they would remain pending due to `Push back breakpoint for %s'.  */
++  if (lp->step == RESUME_STEP_USER && lp->status != 0)
+     return 1;
+   else
+     return 0;
+--- ./gdb/linux-nat.h	10 May 2007 21:36:00 -0000	1.18
++++ ./gdb/linux-nat.h	25 Jun 2007 20:33:02 -0000
+@@ -53,8 +53,8 @@ struct lwp_info
+   /* If non-zero, a pending wait status.  */
+   int status;
+ 
+-  /* Non-zero if we were stepping this LWP.  */
+-  int step;
++  /* The kind of stepping of this LWP.  */
++  enum resume_step step;
+ 
+   /* If WAITSTATUS->KIND != TARGET_WAITKIND_SPURIOUS, the waitstatus
+      for this LWP's last event.  This may correspond to STATUS above,

@@ -1,7 +1,10 @@
-Index: gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.c	2007-06-18 20:24:04.000000000 +0200
+2007-06-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/atomic-seq-threaded.c,
+	gdb.threads/atomic-seq-threaded.exp: New files.
+
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/atomic-seq-threaded.c	25 Jun 2007 20:38:21 -0000
 @@ -0,0 +1,171 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -163,22 +166,20 @@ Index: gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.c
 +  int i;
 +
 +  i = pthread_create (&thread, NULL, start1, NULL);	/* _create_ */
-+  assert (i == 0);					/* _create_behind_ */
++  assert (i == 0);					/* _create_after_ */
 +
-+  sleep(1);
++  sleep (1);
 +
 +  start2 (NULL);
 +
 +  i = pthread_join (thread, NULL);			/* _delete_ */
 +  assert (i == 0);
 +
-+  return 0;						/* _success_ */
++  return 0;						/* _exit_ */
 +}
-Index: gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.exp	2007-06-18 20:24:04.000000000 +0200
-@@ -0,0 +1,110 @@
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/atomic-seq-threaded.exp	25 Jun 2007 20:38:21 -0000
+@@ -0,0 +1,84 @@
 +# atomic-seq-threaded.exp -- Test case for stepping over RISC atomic code seqs.
 +# This variant testcases the code for stepping another thread while skipping
 +# over the atomic sequence in the former thread
@@ -226,15 +227,14 @@ Index: gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.exp
 +}
 +
 +# pthread_create () will not pass even on x86_64 with software watchpoint.
-+# Skip behind pthread_create () without any watchpoint active.
-+
-+set line [gdb_get_line_number "_create_behind_"]
++# Pass after pthread_create () without any watchpoint active.
++set line [gdb_get_line_number "_create_after_"]
 +gdb_test "tbreak $line" \
 +	 "Breakpoint (\[0-9\]+) at .*$srcfile, line $line\..*" \
-+	 "set breakpoint behind pthread_create ()"
++	 "set breakpoint after pthread_create ()"
 +gdb_test "c" \
-+	 ".*/\\* _create_behind_ \\*/.*" \
-+	 "run till behind pthread_create ()"
++	 ".*/\\* _create_after_ \\*/.*" \
++	 "run till after pthread_create ()"
 +
 +# Without a watchpoint being software no single-stepping would be used.
 +set test "Start (software) watchpoint"
@@ -247,45 +247,20 @@ Index: gdb-6.6/gdb/testsuite/gdb.threads/atomic-seq-threaded.exp
 +	unsupported $test
 +    }
 +}
-+gdb_test "set \$watchnum=\$bpnum" "" "Store the watchpoint number"
 +
-+# pthread_join () will not pass even on x86_64 with software watchpoint.
-+# Now pass the __sync_* () functions and remove the watchpoint.
++# More thorough testing of the scheduling logic.
++gdb_test "set scheduler-locking step" ""
 +
-+#set line [gdb_get_line_number "_delete_"]
-+#gdb_test "break $line" \
-+#	 "Breakpoint \[0-9\]+ at .*$srcfile, line $line\..*" \
-+#	 "set breakpoint at _delete_"
-+#gdb_test "set \$deletenum=\$bpnum" "" "Store the _delete_ breakpoint number"
-+#set line1 [gdb_get_line_number "_delete1_"]
-+#gdb_test "break $line1" \
-+#	 "Breakpoint \[0-9\]+ at .*$srcfile, line $line1\..*" \
-+#	 "set breakpoint at _delete1_"
-+#gdb_test "set \$delete1num=\$bpnum" "" "Store the _delete1_ breakpoint number"
-+#set line2 [gdb_get_line_number "_delete2_"]
-+#gdb_test "break $line2" \
-+#	 "Breakpoint \[0-9\]+ at .*$srcfile, line $line2\..*" \
-+#	 "set breakpoint at _delete2_"
-+#gdb_test "set \$delete2num=\$bpnum" "" "Store the _delete2_ breakpoint number"
-+#gdb_test "c" \
-+#	 ".*/\\* (_delete_|_delete1_|_delete2_) \\*/.*" \
-+#	 "run till (_delete_|_delete1_|_delete2_)"
-+#gdb_test "delete \$watchnum" "" "Delete the watchpoint"
-+#gdb_test "delete \$deletenum" "" "Delete the _delete_ breakpoint"
-+#gdb_test "delete \$delete1num" "" "Delete the _delete1_ breakpoint"
-+#gdb_test "delete \$delete2num" "" "Delete the _delete2_ breakpoint"
-+
-+# Pass pthread_join () without the software watchpoint being active.
-+
-+set line [gdb_get_line_number "_success_"]
++# Critical code path is stepped through at this point.
++set line [gdb_get_line_number "_exit_"]
 +gdb_test "tbreak $line" \
 +	 "Breakpoint \[0-9\]+ at .*$srcfile, line $line\..*" \
-+	 "set breakpoint at _success_"
-+set timeout 1800
++	 "set breakpoint at _exit_"
 +gdb_test "c" \
-+	 ".*/\\* _success_ \\*/.*" \
-+	 "run till _success_"
++	 ".*/\\* _exit_ \\*/.*" \
++	 "run till _exit_"
 +
++# Just a nonproblematic program exit.
 +gdb_test "c" \
 +	 ".*Program exited normally\\..*" \
 +	 "run till program exit"
