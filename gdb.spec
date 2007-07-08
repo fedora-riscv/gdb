@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -337,8 +337,8 @@ Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 # Notify user of a child forked process being detached (BZ 235197).
 Patch247: gdb-6.6-bz234468-fork-detach-info.patch
 
-# Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232014).
-Patch248: gdb-6.6-bz232014-gcore-ppc-on-ppc64.patch
+# Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232015).
+Patch248: gdb-6.6-bz232015-gcore-ppc-on-ppc64.patch
 
 # New testcase for gcore of 32bit inferiors on 64bit hosts.
 Patch249: gdb-6.6-gcore32-test.patch
@@ -359,6 +359,13 @@ Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
 
 # Link with libreadline provided by the operating system.
 Patch261: gdb-6.6-readline-system.patch
+
+# Test kernel VDSO decoding while attaching to an i386 process.
+Patch263: gdb-6.3-attach-see-vdso-test.patch
+
+# Do not hang on exit of a thread group leader (BZ 247354).
+Patch265: gdb-6.6-bz247354-leader-exit-fix.patch
+Patch266: gdb-6.6-bz247354-leader-exit-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -511,6 +518,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch258 -p1
 %patch260 -p1
 %patch261 -p1
+%patch263 -p1
+%patch265 -p1
+%patch266 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -663,6 +673,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Jul  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-20
+- Do not hang on exit of a thread group leader (BZ 247354).
+- New test for upstream fix of VDSO decoding while attaching to an i386 process.
+- Fixed BZ # 232014 -> 232015.
+
 * Thu Jul  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-19
 - Link with libreadline provided by the operating system.
 
