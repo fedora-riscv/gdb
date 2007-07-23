@@ -1,0 +1,28 @@
+Compatibility with: linux-2.6-elf-core-sysctl.patch
+fs.binfmt_elf.core_dump_elf_headers=1
+
+--- ./bfd/elf.c	18 Jul 2007 11:23:37 -0000	1.399
++++ ./bfd/elf.c	22 Jul 2007 11:45:33 -0000
+@@ -2592,6 +2592,11 @@ _bfd_elf_new_section_hook (bfd *abfd, as
+    by the difference between the two sizes.  In effect, the segment is split
+    into it's initialized and uninitialized parts.
+ 
++   Meaning of files size different than the memory size is different for core
++   files by Linux kernel with its fs.binfmt_elf.core_dump_elf_headers = 1.
++   Missing memory data should be fetched there from the readonly segments of
++   the executable file.
++
+  */
+ 
+ bfd_boolean
+@@ -2606,8 +2611,8 @@ _bfd_elf_make_section_from_phdr (bfd *ab
+   size_t len;
+   int split;
+ 
+-  split = ((hdr->p_memsz > 0)
+-	    && (hdr->p_filesz > 0)
++  split = (abfd->format != bfd_core
++	    && (hdr->p_memsz > 0) && (hdr->p_filesz > 0)
+ 	    && (hdr->p_memsz > hdr->p_filesz));
+   sprintf (namebuf, "%s%d%s", typename, index, split ? "a" : "");
+   len = strlen (namebuf) + 1;
