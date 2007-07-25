@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -677,6 +677,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Jul 25 2007 Jesse Keating <jkeating@redhat.com> - 6.6-22
+- Rebuild for RH #249435
+
 * Mon Jul 23 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-21
 - Fixed compatibility with Rawhide kernel fs.binfmt_elf.core_dump_elf_headers=1.
 - .spec file updates to mostly pass RPMLINT - Fedora merge review (BZ 225783).
