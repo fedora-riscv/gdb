@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -287,13 +287,9 @@ Patch222: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-test.patch
 Patch224: gdb-6.5-bz109921-DW_AT_decl_file-fix.patch
 Patch225: gdb-6.5-bz109921-DW_AT_decl_file-test.patch
 
-# Fix unwinding of non-CFI (w/o debuginfo) PPC code by recent GCC (BZ 140532).
-Patch226: gdb-6.3-bz140532-ppcnoncfi-skip_prologue-PIC.patch
-# Fix unwinding of non-debug (.eh_frame) PPC code, Andreas Schwab (BZ 140532).
-Patch227: gdb-6.5-bz140532-ppc-eh_frame-regnum.patch
-# Fix unwinding of debug (.debug_frame) PPC code, workaround GCC (BZ 140532).
-Patch228: gdb-6.5-bz140532-ppc-debug_frame-return_address.patch
-Patch229: gdb-6.5-bz140532-ppc-debug_frame-return_address-test.patch
+# Update PPC unwinding patches to their upstream variants (BZ 140532).
+Patch226: gdb-6.3-bz140532-ppc-unwinding-fix.patch
+Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 
 # Fix missing testsuite .log output of testcases using get_compiler_info().
 Patch230: gdb-6.5-testsuite-log.patch
@@ -494,8 +490,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch224 -p1
 %patch225 -p1
 %patch226 -p1
-%patch227 -p1
-%patch228 -p1
 %patch229 -p1
 %patch230 -p1
 %patch231 -p1
@@ -677,6 +671,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Aug  6 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-23
+- Update PPC unwinding patches to their upstream variants (BZ 140532).
+
 * Wed Jul 25 2007 Jesse Keating <jkeating@redhat.com> - 6.6-22
 - Rebuild for RH #249435
 

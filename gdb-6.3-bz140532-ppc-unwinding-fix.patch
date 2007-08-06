@@ -1,0 +1,427 @@
+2007-02-08  Joel Brobecker  <brobecker@gnat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* rs6000-tdep.c (bl_to_blrl_insn_p): New function.
+	(skip_prologue): Allow bl->blrl used by PIC code.
+
+--- ./gdb/rs6000-tdep.c	9 Jan 2007 17:58:57 -0000	1.260
++++ ./gdb/rs6000-tdep.c	8 Feb 2007 14:22:53 -0000	1.261
+@@ -902,6 +902,30 @@ store_param_on_stack_p (unsigned long op
+   return 0;
+ }
+ 
++/* Assuming that INSN is a "bl" instruction located at PC, return
++   nonzero if the destination of the branch is a "blrl" instruction.
++   
++   This sequence is sometimes found in certain function prologues.
++   It allows the function to load the LR register with a value that
++   they can use to access PIC data using PC-relative offsets.  */
++
++static int
++bl_to_blrl_insn_p (CORE_ADDR pc, int insn)
++{
++  const int opcode = 18;
++  const CORE_ADDR dest = branch_dest (opcode, insn, pc, -1);
++  int dest_insn;
++
++  if (dest == -1)
++    return 0;  /* Should never happen, but just return zero to be safe.  */
++  
++  dest_insn = read_memory_integer (dest, 4);
++  if ((dest_insn & 0xfc00ffff) == 0x4c000021) /* blrl */
++    return 1;
++
++  return 0;
++}
++
+ static CORE_ADDR
+ skip_prologue (CORE_ADDR pc, CORE_ADDR lim_pc, struct rs6000_framedata *fdata)
+ {
+@@ -1133,6 +1157,12 @@ skip_prologue (CORE_ADDR pc, CORE_ADDR l
+ 				   to save fprs??? */
+ 
+ 	  fdata->frameless = 0;
++
++	  /* If the return address has already been saved, we can skip
++	     calls to blrl (for PIC).  */
++          if (lr_reg != -1 && bl_to_blrl_insn_p (pc, op))
++	    continue;
++
+ 	  /* Don't skip over the subroutine call if it is not within
+ 	     the first three instructions of the prologue and either
+ 	     we have no line table information or the line info tells
+
+
+
+2007-03-27  Andreas Schwab  <schwab@suse.de>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* dwarf2-frame.c (dwarf2_frame_eh_frame_regnum): Rename to...
+	(dwarf2_frame_adjust_regnum): ...this.  Make static.  Add eh_frame_p
+	argument.  Update all callers.
+	(struct dwarf2_frame_ops): Replace eh_frame_regnum with adjust_regnum.
+	(dwarf2_frame_set_eh_frame_regnum): Rename to...
+	(dwarf2_frame_set_adjust_regnum): ...this.  Update argument type.
+	* dwarf2frame.h (dwarf2_frame_set_eh_frame_regnum): Rename to...
+	(dwarf2_frame_set_adjust_regnum): ...this.
+	(dwarf2_frame_eh_frame_regnum): Delete prototype.
+	* rs6000-tdep.c: Include "dwarf2-frame.h".
+	(rs6000_adjust_frame_regnum): Define.
+	(rs6000_gdbarch_init): Enable use of DWARF CFI frame unwinder.
+	Register rs6000_adjust_frame_regnum.
+
+	* Makefile.in (rs6000-tdep.o): Update dependencies.
+
+--- ./gdb/dwarf2-frame.c	27 Feb 2007 20:17:18 -0000	1.68
++++ ./gdb/dwarf2-frame.c	27 Mar 2007 19:02:42 -0000	1.69
+@@ -107,6 +107,9 @@ struct dwarf2_fde
+ };
+ 
+ static struct dwarf2_fde *dwarf2_frame_find_fde (CORE_ADDR *pc);
++
++static int dwarf2_frame_adjust_regnum (struct gdbarch *gdbarch, int regnum,
++				       int eh_frame_p);
+ 
+ 
+ /* Structure describing a frame state.  */
+@@ -314,8 +317,7 @@ execute_cfa_program (gdb_byte *insn_ptr,
+       else if ((insn & 0xc0) == DW_CFA_offset)
+ 	{
+ 	  reg = insn & 0x3f;
+-	  if (eh_frame_p)
+-	    reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	  reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	  insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
+ 	  offset = utmp * fs->data_align;
+ 	  dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+@@ -326,8 +328,7 @@ execute_cfa_program (gdb_byte *insn_ptr,
+ 	{
+ 	  gdb_assert (fs->initial.reg);
+ 	  reg = insn & 0x3f;
+-	  if (eh_frame_p)
+-	    reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	  reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	  dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	  if (reg < fs->initial.num_regs)
+ 	    fs->regs.reg[reg] = fs->initial.reg[reg];
+@@ -368,8 +369,7 @@ register %s (#%d) at 0x%s"),
+ 
+ 	    case DW_CFA_offset_extended:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
+ 	      offset = utmp * fs->data_align;
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+@@ -380,35 +380,30 @@ register %s (#%d) at 0x%s"),
+ 	    case DW_CFA_restore_extended:
+ 	      gdb_assert (fs->initial.reg);
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	      fs->regs.reg[reg] = fs->initial.reg[reg];
+ 	      break;
+ 
+ 	    case DW_CFA_undefined:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_UNDEFINED;
+ 	      break;
+ 
+ 	    case DW_CFA_same_value:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAME_VALUE;
+ 	      break;
+ 
+ 	    case DW_CFA_register:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
+-	      if (eh_frame_p)
+-		utmp = dwarf2_frame_eh_frame_regnum (gdbarch, utmp);
++	      utmp = dwarf2_frame_adjust_regnum (gdbarch, utmp, eh_frame_p);
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	      fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAVED_REG;
+ 	      fs->regs.reg[reg].loc.reg = utmp;
+@@ -456,9 +451,8 @@ bad CFI data; mismatched DW_CFA_restore_
+ 
+ 	    case DW_CFA_def_cfa_register:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &fs->cfa_reg);
+-	      if (eh_frame_p)
+-		fs->cfa_reg = dwarf2_frame_eh_frame_regnum (gdbarch,
+-							    fs->cfa_reg);
++	      fs->cfa_reg = dwarf2_frame_adjust_regnum (gdbarch, fs->cfa_reg,
++							eh_frame_p);
+ 	      fs->cfa_how = CFA_REG_OFFSET;
+ 	      break;
+ 
+@@ -484,8 +478,7 @@ bad CFI data; mismatched DW_CFA_restore_
+ 
+ 	    case DW_CFA_expression:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &utmp);
+ 	      fs->regs.reg[reg].loc.exp = insn_ptr;
+@@ -496,8 +489,7 @@ bad CFI data; mismatched DW_CFA_restore_
+ 
+ 	    case DW_CFA_offset_extended_sf:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
+-	      if (eh_frame_p)
+-		reg = dwarf2_frame_eh_frame_regnum (gdbarch, reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      insn_ptr = read_sleb128 (insn_ptr, insn_end, &offset);
+ 	      offset *= fs->data_align;
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+@@ -535,9 +527,8 @@ bad CFI data; mismatched DW_CFA_restore_
+ 
+ 	    case DW_CFA_def_cfa_sf:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &fs->cfa_reg);
+-	      if (eh_frame_p)
+-		fs->cfa_reg = dwarf2_frame_eh_frame_regnum (gdbarch,
+-							    fs->cfa_reg);
++	      fs->cfa_reg = dwarf2_frame_adjust_regnum (gdbarch, fs->cfa_reg,
++							eh_frame_p);
+ 	      insn_ptr = read_sleb128 (insn_ptr, insn_end, &offset);
+ 	      fs->cfa_offset = offset * fs->data_align;
+ 	      fs->cfa_how = CFA_REG_OFFSET;
+@@ -581,6 +572,7 @@ bad CFI data; mismatched DW_CFA_restore_
+ 
+ 	    case DW_CFA_GNU_negative_offset_extended:
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &reg);
++	      reg = dwarf2_frame_adjust_regnum (gdbarch, reg, eh_frame_p);
+ 	      insn_ptr = read_uleb128 (insn_ptr, insn_end, &offset);
+ 	      offset *= fs->data_align;
+ 	      dwarf2_frame_state_alloc_regs (&fs->regs, reg + 1);
+@@ -617,8 +607,9 @@ struct dwarf2_frame_ops
+      trampoline.  */
+   int (*signal_frame_p) (struct gdbarch *, struct frame_info *);
+ 
+-  /* Convert .eh_frame register number to DWARF register number.  */
+-  int (*eh_frame_regnum) (struct gdbarch *, int);
++  /* Convert .eh_frame register number to DWARF register number, or
++     adjust .debug_frame register number.  */
++  int (*adjust_regnum) (struct gdbarch *, int, int);
+ };
+ 
+ /* Default architecture-specific register state initialization
+@@ -726,29 +717,30 @@ dwarf2_frame_signal_frame_p (struct gdba
+   return ops->signal_frame_p (gdbarch, next_frame);
+ }
+ 
+-/* Set the architecture-specific mapping of .eh_frame register numbers to
+-   DWARF register numbers.  */
++/* Set the architecture-specific adjustment of .eh_frame and .debug_frame
++   register numbers.  */
+ 
+ void
+-dwarf2_frame_set_eh_frame_regnum (struct gdbarch *gdbarch,
+-				  int (*eh_frame_regnum) (struct gdbarch *,
+-							  int))
++dwarf2_frame_set_adjust_regnum (struct gdbarch *gdbarch,
++				int (*adjust_regnum) (struct gdbarch *,
++						      int, int))
+ {
+   struct dwarf2_frame_ops *ops = gdbarch_data (gdbarch, dwarf2_frame_data);
+ 
+-  ops->eh_frame_regnum = eh_frame_regnum;
++  ops->adjust_regnum = adjust_regnum;
+ }
+ 
+-/* Translate a .eh_frame register to DWARF register.  */
++/* Translate a .eh_frame register to DWARF register, or adjust a .debug_frame
++   register.  */
+ 
+-int
+-dwarf2_frame_eh_frame_regnum (struct gdbarch *gdbarch, int regnum)
++static int
++dwarf2_frame_adjust_regnum (struct gdbarch *gdbarch, int regnum, int eh_frame_p)
+ {
+   struct dwarf2_frame_ops *ops = gdbarch_data (gdbarch, dwarf2_frame_data);
+ 
+-  if (ops->eh_frame_regnum == NULL)
++  if (ops->adjust_regnum == NULL)
+     return regnum;
+-  return ops->eh_frame_regnum (gdbarch, regnum);
++  return ops->adjust_regnum (gdbarch, regnum, eh_frame_p);
+ }
+ 
+ static void
+@@ -1726,10 +1718,10 @@ decode_frame_entry_1 (struct comp_unit *
+       else
+ 	cie->return_address_register = read_unsigned_leb128 (unit->abfd, buf,
+ 							     &bytes_read);
+-      if (eh_frame_p)
+-	cie->return_address_register
+-	  = dwarf2_frame_eh_frame_regnum (current_gdbarch,
+-					  cie->return_address_register);
++      cie->return_address_register
++	= dwarf2_frame_adjust_regnum (current_gdbarch,
++				      cie->return_address_register,
++				      eh_frame_p);
+ 
+       buf += bytes_read;
+ 
+--- ./gdb/dwarf2-frame.h	9 Jan 2007 17:58:50 -0000	1.14
++++ ./gdb/dwarf2-frame.h	27 Mar 2007 19:02:42 -0000	1.15
+@@ -94,18 +94,13 @@ extern void
+ 				   int (*signal_frame_p) (struct gdbarch *,
+ 							  struct frame_info *));
+ 
+-/* Set the architecture-specific mapping of .eh_frame register numbers to
+-   DWARF register numbers.  */
++/* Set the architecture-specific adjustment of .eh_frame and .debug_frame
++   register numbers.  */
+ 
+ extern void
+-  dwarf2_frame_set_eh_frame_regnum (struct gdbarch *gdbarch,
+-				    int (*eh_frame_regnum) (struct gdbarch *,
+-							    int));
+-
+-/* Translate a .eh_frame register to DWARF register.  */
+-
+-extern int
+-  dwarf2_frame_eh_frame_regnum (struct gdbarch *gdbarch, int regnum);
++  dwarf2_frame_set_adjust_regnum (struct gdbarch *gdbarch,
++				  int (*adjust_regnum) (struct gdbarch *,
++							int, int));
+ 
+ /* Return the frame unwind methods for the function that contains PC,
+    or NULL if it can't be handled by DWARF CFI frame unwinder.  */
+--- ./gdb/rs6000-tdep.c	13 Mar 2007 17:34:22 -0000	1.266
++++ ./gdb/rs6000-tdep.c	27 Mar 2007 19:02:42 -0000	1.267
+@@ -40,6 +40,7 @@
+ #include "sim-regno.h"
+ #include "gdb/sim-ppc.h"
+ #include "reggroups.h"
++#include "dwarf2-frame.h"
+ 
+ #include "libbfd.h"		/* for bfd_default_set_arch_mach */
+ #include "coff/internal.h"	/* for libcoff.h */
+@@ -2294,6 +2295,69 @@ rs6000_dwarf2_reg_to_regnum (int num)
+       }
+ }
+ 
++/* Translate a .eh_frame register to DWARF register, or adjust a
++   .debug_frame register.  */
++
++static int
++rs6000_adjust_frame_regnum (struct gdbarch *gdbarch, int num, int eh_frame_p)
++{
++  /* GCC releases before 3.4 use GCC internal register numbering in
++     .debug_frame (and .debug_info, et cetera).  The numbering is
++     different from the standard SysV numbering for everything except
++     for GPRs and FPRs.  We can not detect this problem in most cases
++     - to get accurate debug info for variables living in lr, ctr, v0,
++     et cetera, use a newer version of GCC.  But we must detect
++     one important case - lr is in column 65 in .debug_frame output,
++     instead of 108.
++
++     GCC 3.4, and the "hammer" branch, have a related problem.  They
++     record lr register saves in .debug_frame as 108, but still record
++     the return column as 65.  We fix that up too.
++
++     We can do this because 65 is assigned to fpsr, and GCC never
++     generates debug info referring to it.  To add support for
++     handwritten debug info that restores fpsr, we would need to add a
++     producer version check to this.  */
++  if (!eh_frame_p)
++    {
++      if (num == 65)
++	return 108;
++      else
++	return num;
++    }
++
++  /* .eh_frame is GCC specific.  For binary compatibility, it uses GCC
++     internal register numbering; translate that to the standard DWARF2
++     register numbering.  */
++  if (0 <= num && num <= 63)	/* r0-r31,fp0-fp31 */
++    return num;
++  else if (68 <= num && num <= 75) /* cr0-cr8 */
++    return num - 68 + 86;
++  else if (77 <= num && num <= 108) /* vr0-vr31 */
++    return num - 77 + 1124;
++  else
++    switch (num)
++      {
++      case 64: /* mq */
++	return 100;
++      case 65: /* lr */
++	return 108;
++      case 66: /* ctr */
++	return 109;
++      case 76: /* xer */
++	return 101;
++      case 109: /* vrsave */
++	return 356;
++      case 110: /* vscr */
++	return 67;
++      case 111: /* spe_acc */
++	return 99;
++      case 112: /* spefscr */
++	return 612;
++      default:
++	return num;
++      }
++}
+ 
+ /* Support for CONVERT_FROM_FUNC_PTR_ADDR (ARCH, ADDR, TARG).
+ 
+@@ -3428,6 +3492,10 @@ rs6000_gdbarch_init (struct gdbarch_info
+     (gdbarch, rs6000_in_solib_return_trampoline);
+   set_gdbarch_skip_trampoline_code (gdbarch, rs6000_skip_trampoline_code);
+ 
++  /* Hook in the DWARF CFI frame unwinder.  */
++  frame_unwind_append_sniffer (gdbarch, dwarf2_frame_sniffer);
++  dwarf2_frame_set_adjust_regnum (gdbarch, rs6000_adjust_frame_regnum);
++
+   /* Hook in ABI-specific overrides, if they have been registered.  */
+   gdbarch_init_osabi (info, gdbarch);
+ 
+--- ./gdb/Makefile.in.orig	2007-07-31 16:42:29.000000000 -0400
++++ ./gdb/Makefile.in	2007-08-01 13:42:51.000000000 -0400
+@@ -2468,7 +2468,7 @@ rs6000-tdep.o: rs6000-tdep.c $(defs_h) $
+ 	$(reggroups_h) $(libbfd_h) $(coff_internal_h) $(libcoff_h) \
+ 	$(coff_xcoff_h) $(libxcoff_h) $(elf_bfd_h) $(solib_svr4_h) \
+ 	$(ppc_tdep_h) $(gdb_assert_h) $(dis_asm_h) $(trad_frame_h) \
+-	$(frame_unwind_h) $(frame_base_h) $(rs6000_tdep_h)
++	$(frame_unwind_h) $(frame_base_h) $(rs6000_tdep_h) $(dwarf2_frame_h)
+ rs6000-aix-tdep.o: rs6000-aix-tdep.c $(defs_h) $(osabi_h) $(rs6000_tdep_h)
+ s390-nat.o: s390-nat.c $(defs_h) $(tm_h) $(regcache_h) $(inferior_h) \
+ 	$(s390_tdep_h) $(observer_h) $(linux_nat_h)
+ s390-tdep.o: s390-tdep.c $(defs_h) $(arch_utils_h) $(frame_h) $(inferior_h) \
+
+
+
+2007-04-10  Andreas Schwab  <schwab@suse.de>
+
+	* rs6000-tdep.c (rs6000_dwarf2_reg_to_regnum): Decode 64 as CR
+	register.
+
+--- ./gdb/rs6000-tdep.c	1 Apr 2007 18:24:59 -0000	1.269
++++ ./gdb/rs6000-tdep.c	10 Apr 2007 16:02:41 -0000	1.270
+@@ -2274,6 +2274,8 @@ rs6000_dwarf2_reg_to_regnum (int num)
+   else
+     switch (num)
+       {
++      case 64:
++	return tdep->ppc_cr_regnum;
+       case 67:
+         return tdep->ppc_vrsave_regnum - 1; /* vscr */
+       case 99:
