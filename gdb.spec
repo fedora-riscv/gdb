@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -366,6 +366,9 @@ Patch266: gdb-6.6-bz247354-leader-exit-test.patch
 # Fixed compatibility with Rawhide kernel fs.binfmt_elf.core_dump_elf_headers=1.
 Patch269: gdb-6.6-bfd-core-dump_elf_headers.patch
 
+# Fixed compatibility with the Rawhide glibc open(2) syscall sanity checking.
+Patch272: gdb-6.6-glibc-open-fcntl2-compat.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -518,6 +521,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch265 -p1
 %patch266 -p1
 %patch269 -p1
+%patch272 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -671,6 +675,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Wed Aug  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-24
+- Fixed compatibility with the Rawhide glibc open(2) syscall sanity checking.
+- Update the core_dump_elf_headers=1 compatibility code to the upstream variant.
+
 * Mon Aug  6 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-23
 - Update PPC unwinding patches to their upstream variants (BZ 140532).
 

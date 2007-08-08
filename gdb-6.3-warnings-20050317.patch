@@ -662,3 +662,32 @@ diff -u -rup gdb-6.6-orig/gdb/utils.c gdb-6.6/gdb/utils.c
  	exit (1);
        }
    }
+--- ./gdb/gdbserver/gdbreplay.c	29 Mar 2007 01:06:47 -0000	1.14
++++ ./gdb/gdbserver/gdbreplay.c	8 Aug 2007 20:32:12 -0000
+@@ -358,7 +358,12 @@ expect (FILE *fp)
+ 	{
+ 	  break;
+ 	}
+-      read (remote_desc, &fromgdb, 1);
++      if (read (remote_desc, &fromgdb, 1) != 1)
++        {
++	  /* Error gets reported below.  */
++	  fromlog = 0;
++	  break;
++	}
+     }
+   while (fromlog == fromgdb);
+   if (fromlog != EOL)
+@@ -385,7 +390,11 @@ play (FILE *fp)
+   while ((fromlog = logchar (fp)) != EOL)
+     {
+       ch = fromlog;
+-      write (remote_desc, &ch, 1);
++      if (write (remote_desc, &ch, 1) != 1)
++        {
++	  sync_error (fp, "Sync error during write of gdb packet", ch, 0);
++	  break;
++	}
+     }
+ }
+ 

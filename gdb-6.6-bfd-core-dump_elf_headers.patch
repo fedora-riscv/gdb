@@ -1,28 +1,116 @@
 Compatibility with: linux-2.6-elf-core-sysctl.patch
 fs.binfmt_elf.core_dump_elf_headers=1
 
---- ./bfd/elf.c	18 Jul 2007 11:23:37 -0000	1.399
-+++ ./bfd/elf.c	22 Jul 2007 11:45:33 -0000
-@@ -2592,6 +2592,11 @@ _bfd_elf_new_section_hook (bfd *abfd, as
+2007-08-07  Alan Modra  <amodra@bigpond.net.au>
+
+	* elf.c: (_bfd_elf_make_section_from_phdr): Properly handle
+	bss segments.
+
+--- ./bfd/elf.c	6 Aug 2007 18:35:18 -0000	1.405
++++ ./bfd/elf.c	6 Aug 2007 22:53:27 -0000	1.406
+@@ -2223,7 +2223,7 @@ _bfd_elf_new_section_hook (bfd *abfd, as
+    for the single program segment.  The first has the length specified by
+    the file size of the segment, and the second has the length specified
     by the difference between the two sizes.  In effect, the segment is split
-    into it's initialized and uninitialized parts.
+-   into it's initialized and uninitialized parts.
++   into its initialized and uninitialized parts.
  
-+   Meaning of files size different than the memory size is different for core
-+   files by Linux kernel with its fs.binfmt_elf.core_dump_elf_headers = 1.
-+   Missing memory data should be fetched there from the readonly segments of
-+   the executable file.
-+
   */
  
- bfd_boolean
-@@ -2606,8 +2611,8 @@ _bfd_elf_make_section_from_phdr (bfd *ab
-   size_t len;
-   int split;
- 
--  split = ((hdr->p_memsz > 0)
--	    && (hdr->p_filesz > 0)
-+  split = (abfd->format != bfd_core
-+	    && (hdr->p_memsz > 0) && (hdr->p_filesz > 0)
+@@ -2242,40 +2242,46 @@ _bfd_elf_make_section_from_phdr (bfd *ab
+   split = ((hdr->p_memsz > 0)
+ 	    && (hdr->p_filesz > 0)
  	    && (hdr->p_memsz > hdr->p_filesz));
-   sprintf (namebuf, "%s%d%s", typename, index, split ? "a" : "");
-   len = strlen (namebuf) + 1;
+-  sprintf (namebuf, "%s%d%s", typename, index, split ? "a" : "");
+-  len = strlen (namebuf) + 1;
+-  name = bfd_alloc (abfd, len);
+-  if (!name)
+-    return FALSE;
+-  memcpy (name, namebuf, len);
+-  newsect = bfd_make_section (abfd, name);
+-  if (newsect == NULL)
+-    return FALSE;
+-  newsect->vma = hdr->p_vaddr;
+-  newsect->lma = hdr->p_paddr;
+-  newsect->size = hdr->p_filesz;
+-  newsect->filepos = hdr->p_offset;
+-  newsect->flags |= SEC_HAS_CONTENTS;
+-  newsect->alignment_power = bfd_log2 (hdr->p_align);
+-  if (hdr->p_type == PT_LOAD)
++
++  if (hdr->p_filesz > 0)
+     {
+-      newsect->flags |= SEC_ALLOC;
+-      newsect->flags |= SEC_LOAD;
+-      if (hdr->p_flags & PF_X)
++      sprintf (namebuf, "%s%d%s", typename, index, split ? "a" : "");
++      len = strlen (namebuf) + 1;
++      name = bfd_alloc (abfd, len);
++      if (!name)
++	return FALSE;
++      memcpy (name, namebuf, len);
++      newsect = bfd_make_section (abfd, name);
++      if (newsect == NULL)
++	return FALSE;
++      newsect->vma = hdr->p_vaddr;
++      newsect->lma = hdr->p_paddr;
++      newsect->size = hdr->p_filesz;
++      newsect->filepos = hdr->p_offset;
++      newsect->flags |= SEC_HAS_CONTENTS;
++      newsect->alignment_power = bfd_log2 (hdr->p_align);
++      if (hdr->p_type == PT_LOAD)
+ 	{
+-	  /* FIXME: all we known is that it has execute PERMISSION,
+-	     may be data.  */
+-	  newsect->flags |= SEC_CODE;
++	  newsect->flags |= SEC_ALLOC;
++	  newsect->flags |= SEC_LOAD;
++	  if (hdr->p_flags & PF_X)
++	    {
++	      /* FIXME: all we known is that it has execute PERMISSION,
++		 may be data.  */
++	      newsect->flags |= SEC_CODE;
++	    }
++	}
++      if (!(hdr->p_flags & PF_W))
++	{
++	  newsect->flags |= SEC_READONLY;
+ 	}
+-    }
+-  if (!(hdr->p_flags & PF_W))
+-    {
+-      newsect->flags |= SEC_READONLY;
+     }
+ 
+-  if (split)
++  if (hdr->p_memsz > hdr->p_filesz)
+     {
+-      sprintf (namebuf, "%s%db", typename, index);
++      bfd_vma align;
++
++      sprintf (namebuf, "%s%d%s", typename, index, split ? "b" : "");
+       len = strlen (namebuf) + 1;
+       name = bfd_alloc (abfd, len);
+       if (!name)
+@@ -2287,8 +2293,21 @@ _bfd_elf_make_section_from_phdr (bfd *ab
+       newsect->vma = hdr->p_vaddr + hdr->p_filesz;
+       newsect->lma = hdr->p_paddr + hdr->p_filesz;
+       newsect->size = hdr->p_memsz - hdr->p_filesz;
++      newsect->filepos = hdr->p_offset + hdr->p_filesz;
++      align = newsect->vma & -newsect->vma;
++      if (align == 0 || align > hdr->p_align)
++	align = hdr->p_align;
++      newsect->alignment_power = bfd_log2 (align);
+       if (hdr->p_type == PT_LOAD)
+ 	{
++	  /* Hack for gdb.  Segments that have not been modified do
++	     not have their contents written to a core file, on the
++	     assumption that a debugger can find the contents in the
++	     executable.  We flag this case by setting the fake
++	     section size to zero.  Note that "real" bss sections will
++	     always have their contents dumped to the core file.  */
++	  if (bfd_get_format (abfd) == bfd_core)
++	    newsect->size = 0;
+ 	  newsect->flags |= SEC_ALLOC;
+ 	  if (hdr->p_flags & PF_X)
+ 	    newsect->flags |= SEC_CODE;
