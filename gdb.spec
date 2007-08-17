@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -569,6 +569,7 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 	--infodir=%{_infodir}				\
 	$enable_build_warnings				\
 	--with-separate-debug-dir=/usr/lib/debug	\
+	--disable-rpath					\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -675,6 +676,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Aug 17 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-25
+- Fixed excessive RPATH (related to BZ 228891).
+
 * Wed Aug  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-24
 - Fixed compatibility with the Rawhide glibc open(2) syscall sanity checking.
 - Update the core_dump_elf_headers=1 compatibility code to the upstream variant.
