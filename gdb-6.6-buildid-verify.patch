@@ -1,0 +1,715 @@
+http://sources.redhat.com/ml/gdb-patches/2007-08/msg00478.html
+v2
+[ Backported for GDB-6.6. ]
+
+2007-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (symfile.o): Update dependencies.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Initialize the
+	DEBUGFILE variable.  FIND_SEPARATE_DEBUG_FILE called only if !PSYMTABS.
+	(struct build_id): New structure.
+	(build_id_bfd_get, build_id_verify, build_id_to_debug_filename): New.
+	(find_separate_debug_file): New variable BUILD_ID.
+	Call BUILD_ID_BFD_GET with BUILD_ID_TO_DEBUG_FILENAME as the first try.
+
+2007-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdb.exp (build_id_debug_filename_get): New function.
+	* gdb.base/sepdebug.exp: Reflect the changes in the heading comment.
+	Remove the generate DEBUG file for the future testcase runs.
+	New testcase for the NT_GNU_BUILD_ID retrieval.
+	Move the final testing step to ...
+	(test_different_dir): ... a new function.
+	New parameter XFAIL to XFAIL all the tests performed.
+	New parameter TEST_DIFFERENT_DIR parametrizing the directory.
+	New parameter TYPE to PF_PREFIX all the tests performed.
+
+2007-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Separate Debug Files): Included a BUILD ID description.
+	Enlisted BUILD ID to the debug file searching example.
+	Included a BUILD ID `.note.gnu.build-id' section description.
+	Updated/added the debug files splitting instructions for OBJCOPY.
+
+diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
+--- gdb-6.6-orig/gdb/Makefile.in	2007-08-28 14:32:18.000000000 +0200
++++ gdb-6.6/gdb/Makefile.in	2007-08-28 14:33:56.000000000 +0200
+@@ -2785,7 +2785,7 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
+ 	$(gdb_stabs_h) $(gdb_obstack_h) $(completer_h) $(bcache_h) \
+ 	$(hashtab_h) $(readline_h) $(gdb_assert_h) $(block_h) \
+ 	$(gdb_string_h) $(gdb_stat_h) $(observer_h) $(exec_h) \
+-	$(parser_defs_h)
++	$(parser_defs_h) $(elf_bfd_h)
+ symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
+ 	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
+ 	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
+diff -u -rup gdb-6.6-orig/gdb/doc/gdb.texinfo gdb-6.6/gdb/doc/gdb.texinfo
+--- gdb-6.6-orig/gdb/doc/gdb.texinfo	2007-08-28 14:32:18.000000000 +0200
++++ gdb-6.6/gdb/doc/gdb.texinfo	2007-08-28 14:33:03.000000000 +0200
+@@ -11857,18 +11857,32 @@ than the executable code itself --- some
+ information for their executables in separate files, which users can
+ install only when they need to debug a problem.
+ 
+-If an executable's debugging information has been extracted to a
+-separate file, the executable should contain a @dfn{debug link} giving
+-the name of the debugging information file (with no directory
+-components), and a checksum of its contents.  (The exact form of a
+-debug link is described below.)  If the full name of the directory
+-containing the executable is @var{execdir}, and the executable has a
+-debug link that specifies the name @var{debugfile}, then @value{GDBN}
+-will automatically search for the debugging information file in three
+-places:
++There are two identificators how the separate debug file may be found:
+ 
+ @itemize @bullet
+ @item
++@dfn{debug link} is present only in the executable if its debug information has
++been split out.  It is not present in the separate debug file.  It provides the
++separate debug file filename, usually as @file{executable.debug}.
++@item
++@dfn{build id} is present in all the files (if the operating system supports
++it).  The executable file and its separate debug file have the same unique
++@dfn{build id} content.
++@end itemize
++
++If the full name of the directory containing the executable is @var{execdir},
++the executable has a debug link that specifies the name @var{debugfile},
++@var{bu} is the first byte (two hexadecimal characters) of the build id
++content, @var{ild-id} are the remaining bytes / hexadecimal characters and
++@var{globaldebugdir} is the global debug file directory then @value{GDBN} will
++automatically search for the debugging information file in four places:
++
++@itemize @bullet
++@item
++a specific file in the subdirectory of the global debug file directory
++according to the @dfn{build id} content (if present), the file tried is
++@file{@var{globaldebugdir}/.debug-id/@var{bu}/@var{ild-id}.debug}.
++@item
+ the directory containing the executable file (that is, it will look
+ for a file named @file{@var{execdir}/@var{debugfile}},
+ @item
+@@ -11883,15 +11897,17 @@ executable's full path, and the name fro
+ @end itemize
+ @noindent
+ @value{GDBN} checks under each of these names for a debugging
+-information file whose checksum matches that given in the link, and
+-reads the debugging information from the first one it finds.
+-
+-So, for example, if you ask @value{GDBN} to debug @file{/usr/bin/ls},
+-which has a link containing the name @file{ls.debug}, and the global
+-debug directory is @file{/usr/lib/debug}, then @value{GDBN} will look
+-for debug information in @file{/usr/bin/ls.debug},
+-@file{/usr/bin/.debug/ls.debug}, and
+-@file{/usr/lib/debug/usr/bin/ls.debug}.
++information file with build id content matching the build id content of the
++executable file - or - whose checksum matches the one given in the link in the
++debug link case.  In each case @value{GDBN} reads the debugging information
++from the first debug file it finds.
++
++So, for example, if you ask @value{GDBN} to debug @file{/usr/bin/ls}, which has
++a @dfn{debug link} containing the name @file{ls.debug}, its @dfn{build id}
++value in hexadecimal is @code{abcdef} and the global debug directory is
++@file{/usr/lib/debug}, then @value{GDBN} will look for debug information in
++@file{/usr/lib/debug/.build-id/ab/cdef.debug}, @file{/usr/bin/ls.debug},
++@file{/usr/bin/.debug/ls.debug}, and @file{/usr/lib/debug/usr/bin/ls.debug}.
+ 
+ You can set the global debugging info directory's name, and view the
+ name @value{GDBN} is currently using.
+@@ -11933,6 +11949,16 @@ Any executable file format can carry a d
+ contain a section named @code{.gnu_debuglink} with the contents
+ described above.
+ 
++@cindex @code{.note.gnu.build-id} sections
++@cindex build id
++Build id is a special section of the executable file named
++@code{.note.gnu.build-id}.  The section contains unique identification hash
++derived from the built files - it remains the same across multiple builds of
++the same build tree.  The default algorithm SHA1 produces 160 bits (40
++hexadecimal characters) of the content.  The same section and value is present
++in the original built binary with symbols, in its stripped variant and in the
++separate debug information file.
++
+ The debugging information file itself should be an ordinary
+ executable, containing a full set of linker symbols, sections, and
+ debugging information.  The sections of the debugging information file
+@@ -11940,18 +11966,21 @@ should have the same names, addresses an
+ but they need not contain any data --- much like a @code{.bss} section
+ in an ordinary executable.
+ 
+-As of December 2002, there is no standard GNU utility to produce
+-separated executable / debugging information file pairs.  Ulrich
+-Drepper's @file{elfutils} package, starting with version 0.53,
+-contains a version of the @code{strip} command such that the command
+-@kbd{strip foo -f foo.debug} removes the debugging information from
+-the executable file @file{foo}, places it in the file
+-@file{foo.debug}, and leaves behind a debug link in @file{foo}.
+-
+-Since there are many different ways to compute CRC's (different
+-polynomials, reversals, byte ordering, etc.), the simplest way to
+-describe the CRC used in @code{.gnu_debuglink} sections is to give the
+-complete code for a function that computes it:
++@sc{gnu} binary utilities contain the @samp{objcopy} utility able to produce
++the separated executable / debugging information file pairs by commands
++@kbd{objcopy --only-keep-debug foo foo.debug; strip -g foo; objcopy
++--add-gnu-debuglink="foo.debug" "foo"}.  These commands remove the debugging
++information from the executable file @file{foo}, place it in the file
++@file{foo.debug}, and leave behind a debug link in @file{foo}.  Ulrich
++Drepper's @file{elfutils} package, starting with version 0.53, contains
++a version of the @code{strip} command such that the command @kbd{strip foo -f
++foo.debug} has the same functionality as the three commands above.
++
++Since there are many different ways to compute CRC's for the debug link
++(different polynomials, reversals, byte ordering, etc.).  This computation does
++not apply to the build id section.  The simplest way to describe the CRC used
++in @code{.gnu_debuglink} sections is to give the complete code for a function
++that computes it:
+ 
+ @kindex gnu_debuglink_crc32
+ @smallexample
+diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
+--- gdb-6.6-orig/gdb/symfile.c	2007-08-28 14:32:17.000000000 +0200
++++ gdb-6.6/gdb/symfile.c	2007-08-28 14:34:12.000000000 +0200
+@@ -53,6 +53,7 @@
+ #include "observer.h"
+ #include "exec.h"
+ #include "parser-defs.h"
++#include "elf-bfd.h"
+ 
+ #include <sys/types.h>
+ #include <fcntl.h>
+@@ -904,7 +905,7 @@ symbol_file_add_with_addrs_or_offsets (b
+ {
+   struct objfile *objfile;
+   struct partial_symtab *psymtab;
+-  char *debugfile;
++  char *debugfile = NULL;
+   struct section_addr_info *orig_addrs = NULL;
+   struct cleanup *my_cleanups;
+   const char *name = bfd_get_filename (abfd);
+@@ -968,7 +969,11 @@ symbol_file_add_with_addrs_or_offsets (b
+ 	}
+     }
+ 
+-  debugfile = find_separate_debug_file (objfile);
++  /* If the file has its own symbol tables it has no separate debug info.
++     `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
++     `.gnu_debuglink' may no longer be present with `.note.gnu.build-id'.  */
++  if (objfile->psymtabs == NULL)
++    debugfile = find_separate_debug_file (objfile);
+   if (debugfile)
+     {
+       if (addrs != NULL)
+@@ -1115,6 +1120,99 @@ symbol_file_clear (int from_tty)
+       printf_unfiltered (_("No symbol file now.\n"));
+ }
+ 
++struct build_id
++  {
++    size_t size;
++    gdb_byte data[1];
++  };
++
++/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
++
++static struct build_id *
++build_id_bfd_get (bfd *abfd)
++{
++  struct build_id *retval;
++
++  if (!bfd_check_format (abfd, bfd_object)
++      || bfd_get_flavour (abfd) != bfd_target_elf_flavour
++      || elf_tdata (abfd)->build_id == NULL)
++    return NULL;
++
++  retval = xmalloc (sizeof *retval - 1 + elf_tdata (abfd)->build_id_size);
++  retval->size = elf_tdata (abfd)->build_id_size;
++  memcpy (retval->data, elf_tdata (abfd)->build_id, retval->size);
++
++  return retval;
++}
++
++/* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
++
++static int
++build_id_verify (const char *filename, struct build_id *check)
++{
++  bfd *abfd;
++  struct build_id *found = NULL;
++  int retval = 0;
++
++  /* We expect to be silent on the non-existing files.  */
++  abfd = bfd_openr (filename, gnutarget);
++  if (abfd == NULL)
++    return 0;
++
++  found = build_id_bfd_get (abfd);
++
++  if (found == NULL)
++    warning (_("File \"%s\" has no build-id, file skipped"), filename);
++  else if (found->size != check->size
++           || memcmp (found->data, check->data, found->size) != 0)
++    warning (_("File \"%s\" has a different build-id, file skipped"), filename);
++  else
++    retval = 1;
++
++  if (!bfd_close (abfd))
++    warning (_("cannot close \"%s\": %s"), filename,
++	     bfd_errmsg (bfd_get_error ()));
++  return retval;
++}
++
++static char *debug_file_directory = NULL;
++
++static char *
++build_id_to_debug_filename (struct build_id *build_id)
++{
++  char *link, *s, *retval = NULL;
++  gdb_byte *data = build_id->data;
++  size_t size = build_id->size;
++
++  /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
++  link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
++		  + 2 * size + (sizeof ".debug" - 1) + 1);
++  s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
++  if (size > 0)
++    {
++      size--;
++      s += sprintf (s, "%02x", (unsigned) *data++);
++    }
++  if (size > 0)
++    *s++ = '/';
++  while (size-- > 0)
++    s += sprintf (s, "%02x", (unsigned) *data++);
++  strcpy (s, ".debug");
++
++  /* lrealpath() is expensive even for the usually non-existent files.  */
++  if (access (link, F_OK) == 0)
++    retval = lrealpath (link);
++  xfree (link);
++
++  if (retval != NULL && !build_id_verify (retval, build_id))
++    {
++      xfree (retval);
++      retval = NULL;
++    }
++
++  return retval;
++}
++
+ static char *
+ get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
+ {
+@@ -1278,7 +1280,6 @@ separate_debug_file_exists (const char *
+   return 1;
+ }
+ 
+-static char *debug_file_directory = NULL;
+ static void
+ show_debug_file_directory (struct ui_file *file, int from_tty,
+ 			   struct cmd_list_element *c, const char *value)
+@@ -1207,6 +1303,25 @@ find_separate_debug_file (struct objfile
+   bfd_size_type debuglink_size;
+   unsigned long crc32;
+   int i;
++  struct build_id *build_id;
++
++  build_id = build_id_bfd_get (objfile->obfd);
++  if (build_id != NULL)
++    {
++      char *build_id_name;
++
++      build_id_name = build_id_to_debug_filename (build_id);
++      free (build_id);
++      /* Prevent looping on a stripped .debug file.  */
++      if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
++        {
++	  warning (_("\"%s\": separate debug info file has no debug info"),
++		   build_id_name);
++	  xfree (build_id_name);
++	}
++      else if (build_id_name != NULL)
++        return build_id_name;
++    }
+ 
+   basename = get_debug_link_info (objfile, &crc32);
+ 
+diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.base/sepdebug.exp gdb-6.6/gdb/testsuite/gdb.base/sepdebug.exp
+--- gdb-6.6-orig/gdb/testsuite/gdb.base/sepdebug.exp	2007-08-28 14:32:17.000000000 +0200
++++ gdb-6.6/gdb/testsuite/gdb.base/sepdebug.exp	2007-08-28 14:46:38.000000000 +0200
+@@ -21,11 +21,14 @@
+ 
+ # Based on break.exp, written by Rob Savoye. (rob@cygnus.com)
+ # Modified to test gdb's handling of separate debug info files.
++# Modified to test gdb's handling of a debug-id retrieval.
+ 
+ # This file has two parts. The first is testing that gdb behaves
+ # normally after reading in an executable and its corresponding
+ # separate debug file. The second moves the .debug file to a different
+ # location and tests the "set debug-file-directory" command.
++# The third is for testing build-id retrievel by finding the separate
++# ".debug-id/ab/cdef.debug" file.
+ 
+ 
+ if $tracelevel then {
+@@ -851,110 +854,6 @@ proc test_next_with_recursion {} { 
+ test_next_with_recursion
+ 
+ 
+-#********
+-
+-# now move the .debug file to a different location so that we can test
+-# the "set debug-file-directory" command.
+-  
+-remote_exec build "mv ${objdir}/${subdir}/.debug/${testfile}.debug ${objdir}/${subdir}"
+-gdb_exit
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-gdb_test "set debug-file-directory ${objdir}/${subdir}" ".*" "set separate debug location"
+-gdb_load ${binfile}
+-
+-if [target_info exists gdb_stub] {
+-    gdb_step_for_stub;
+-}
+-
+-#
+-# test break at function
+-#
+-gdb_test "break main" \
+-    "Breakpoint.*at.* file .*$srcfile, line.*" \
+-    "breakpoint function, optimized file"
+-
+-#
+-# test break at function
+-#
+-gdb_test "break marker4" \
+-    "Breakpoint.*at.* file .*$srcfile, line.*" \
+-    "breakpoint small function, optimized file"
+-
+-#
+-# run until the breakpoint at main is hit. For non-stubs-using targets.
+-#
+-if ![target_info exists use_gdb_stub] {
+-  if [istarget "*-*-vxworks*"] then {
+-    send_gdb "run vxmain \"2\"\n"
+-    set timeout 120
+-    verbose "Timeout is now $timeout seconds" 2
+-  } else {
+-	send_gdb "run\n"
+-  }
+-  gdb_expect {
+-    -re "The program .* has been started already.*y or n. $" {
+-	send_gdb "y\n"
+-	exp_continue
+-    }
+-    -re "Starting program.*Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$srcfile:$bp_location6.*$bp_location6\[\t \]+if .argc.* \{.*$gdb_prompt $"\
+-	                    { pass "run until function breakpoint, optimized file" }
+-    -re "Starting program.*Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$gdb_prompt $"\
+-	                    { pass "run until function breakpoint, optimized file (code motion)" }
+-    -re ".*$gdb_prompt $"       { fail "run until function breakpoint, optimized file" }
+-    timeout	            { fail "run until function breakpoint, optimized file (timeout)" }
+-  }
+-} else {
+-    if ![target_info exists gdb_stub] {
+-	gdb_test continue ".*Continuing\\..*Breakpoint \[0-9\]+, main \\(argc=.*, argv=.*, envp=.*\\) at .*$srcfile:$bp_location6.*$bp_location6\[\t \]+if .argc.*\{.*" "stub continue, optimized file"
+-    }
+-}
+-
+-#
+-# run until the breakpoint at a small function
+-#
+-
+-#
+-# Add a second pass pattern.  The behavior differs here between stabs
+-# and dwarf for one-line functions.  Stabs preserves two line symbols
+-# (one before the prologue and one after) with the same line number, 
+-# but dwarf regards these as duplicates and discards one of them.
+-# Therefore the address after the prologue (where the breakpoint is)
+-# has no exactly matching line symbol, and GDB reports the breakpoint
+-# as if it were in the middle of a line rather than at the beginning.
+-
+-set bp_location13 [gdb_get_line_number "set breakpoint 13 here"]
+-set bp_location14 [gdb_get_line_number "set breakpoint 14 here"]
+-send_gdb "continue\n"
+-gdb_expect {
+-    -re "Breakpoint $decimal, marker4 \\(d=177601976\\) at .*$srcfile:$bp_location13\[\r\n\]+$bp_location13\[\t \]+void marker4.*" {
+-	pass "run until breakpoint set at small function, optimized file"
+-    }
+-    -re "Breakpoint $decimal, $hex in marker4 \\(d=177601976\\) at .*$srcfile:$bp_location13\[\r\n\]+$bp_location13\[\t \]+void marker4.*" {
+-	pass "run until breakpoint set at small function, optimized file"
+-    }
+-    -re "Breakpoint $decimal, marker4 \\(d=177601976\\) at .*$srcfile:$bp_location14\[\r\n\]+$bp_location14\[\t \]+void marker4.*" {
+-        # marker4() is defined at line 46 when compiled with -DPROTOTYPES
+-	pass "run until breakpoint set at small function, optimized file (line bp_location14)"
+-    }
+-    -re ".*$gdb_prompt " {
+-	fail "run until breakpoint set at small function, optimized file"
+-    }
+-    timeout {
+-	fail "run until breakpoint set at small function, optimized file (timeout)"
+-    }
+-}
+-
+-
+-# Reset the default arguments for VxWorks
+-if [istarget "*-*-vxworks*"] {
+-    set timeout 10
+-    verbose "Timeout is now $timeout seconds" 2
+-    send_gdb "set args main\n"
+-    gdb_expect -re ".*$gdb_prompt $" {}
+-}
+-
+-
+ # Compile up a second, different, object file.  Copy its debug info
+ # over the top of the new debug info.  Note that somewhere in the
+ # above the "set debug-file-directory" variable is set to
+@@ -973,6 +872,7 @@ if [gdb_gnu_strip_debug $binfile] {
+     unsupported "cannot produce separate debug info files"
+     return -1
+ }
++remote_exec build "cp ${existing_binfile}.debug ${existing_binfile}.debug-backup"
+ remote_exec build "cp $corrupt_debug_file ${existing_binfile}.debug"
+ 
+ gdb_exit
+@@ -990,3 +890,188 @@ gdb_test_multiple "file $existing_binfil
+ 	exp_continue
+     }
+ }
++
++remote_exec build "cp ${existing_binfile}.debug-backup ${existing_binfile}.debug"
++
++#********
++
++proc test_different_dir {type test_different_dir xfail} {
++    global srcdir subdir objdir binfile srcfile timeout gdb_prompt
++    global pf_prefix
++    global bp_location6 decimal hex
++
++    set pf_prefix "$type:"
++
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_test "set debug-file-directory ${test_different_dir}" ".*" "set separate debug location"
++    gdb_load ${binfile}
++
++    if [target_info exists gdb_stub] {
++        gdb_step_for_stub;
++    }
++
++    #
++    # test break at function
++    #
++    if {$xfail} {
++        setup_xfail "*-*-*"
++    }
++    gdb_test "break main" \
++        "Breakpoint.*at.* file .*$srcfile, line.*" \
++        "breakpoint function, optimized file"
++
++    #
++    # test break at function
++    #
++    if {$xfail} {
++        setup_xfail "*-*-*"
++    }
++    gdb_test "break marker4" \
++        "Breakpoint.*at.* file .*$srcfile, line.*" \
++        "breakpoint small function, optimized file"
++
++    #
++    # run until the breakpoint at main is hit. For non-stubs-using targets.
++    #
++    gdb_run_cmd
++    if {$xfail} {
++        setup_xfail "*-*-*"
++    }
++    gdb_expect {
++        -re "Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$srcfile:$bp_location6.*$bp_location6\[\t \]+if .argc.* \{.*$gdb_prompt $" {
++            pass "run until function breakpoint, optimized file"
++        }
++        -re "Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$gdb_prompt $" {
++            pass "run until function breakpoint, optimized file (code motion)"
++        }
++        -re "$gdb_prompt $" {
++            fail "run until function breakpoint, optimized file"
++        }
++        timeout {
++            fail "run until function breakpoint, optimized file (timeout)"
++        }
++    }
++
++    if ![target_info exists use_gdb_stub] {
++      if [istarget "*-*-vxworks*"] then {
++        send_gdb "run vxmain \"2\"\n"
++        set timeout 120
++        verbose "Timeout is now $timeout seconds" 2
++      } else {
++            send_gdb "run\n"
++      }
++      if {$xfail} {
++        setup_xfail "*-*-*"
++      }
++      gdb_expect {
++        -re "The program .* has been started already.*y or n. $" {
++            send_gdb "y\n"
++            exp_continue
++        }
++        -re "Starting program.*Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$srcfile:$bp_location6.*$bp_location6\[\t \]+if .argc.* \{.*$gdb_prompt $"\
++                                { pass "run until function breakpoint, optimized file" }
++        -re "Starting program.*Breakpoint \[0-9\]+,.*main .*argc.*argv.* at .*$gdb_prompt $"\
++                                { pass "run until function breakpoint, optimized file (code motion)" }
++        -re ".*$gdb_prompt $"       { fail "run until function breakpoint, optimized file" }
++        timeout                    { fail "run until function breakpoint, optimized file (timeout)" }
++      }
++    } else {
++        if ![target_info exists gdb_stub] {
++            gdb_test continue ".*Continuing\\..*Breakpoint \[0-9\]+, main \\(argc=.*, argv=.*, envp=.*\\) at .*$srcfile:$bp_location6.*$bp_location6\[\t \]+if .argc.*\{.*" "stub continue, optimized file"
++        }
++    }
++
++
++
++    #
++    # run until the breakpoint at a small function
++    #
++
++    #
++    # Add a second pass pattern.  The behavior differs here between stabs
++    # and dwarf for one-line functions.  Stabs preserves two line symbols
++    # (one before the prologue and one after) with the same line number, 
++    # but dwarf regards these as duplicates and discards one of them.
++    # Therefore the address after the prologue (where the breakpoint is)
++    # has no exactly matching line symbol, and GDB reports the breakpoint
++    # as if it were in the middle of a line rather than at the beginning.
++
++    set bp_location13 [gdb_get_line_number "set breakpoint 13 here"]
++    set bp_location14 [gdb_get_line_number "set breakpoint 14 here"]
++    send_gdb "continue\n"
++    if {$xfail} {
++        setup_xfail "*-*-*"
++    }
++    gdb_expect {
++        -re "Breakpoint $decimal, marker4 \\(d=177601976\\) at .*$srcfile:$bp_location13\[\r\n\]+$bp_location13\[\t \]+void marker4.*" {
++            pass "run until breakpoint set at small function, optimized file"
++        }
++        -re "Breakpoint $decimal, $hex in marker4 \\(d=177601976\\) at .*$srcfile:$bp_location13\[\r\n\]+$bp_location13\[\t \]+void marker4.*" {
++            pass "run until breakpoint set at small function, optimized file"
++        }
++        -re "Breakpoint $decimal, marker4 \\(d=177601976\\) at .*$srcfile:$bp_location14\[\r\n\]+$bp_location14\[\t \]+void marker4.*" {
++            # marker4() is defined at line 46 when compiled with -DPROTOTYPES
++            pass "run until breakpoint set at small function, optimized file (line bp_location14)"
++        }
++        -re ".*$gdb_prompt " {
++            fail "run until breakpoint set at small function, optimized file"
++        }
++        timeout {
++            fail "run until breakpoint set at small function, optimized file (timeout)"
++        }
++    }
++
++
++    # Reset the default arguments for VxWorks
++    if [istarget "*-*-vxworks*"] {
++        set timeout 10
++        verbose "Timeout is now $timeout seconds" 2
++        send_gdb "set args main\n"
++        gdb_expect -re ".*$gdb_prompt $" {}
++    }
++
++    unset pf_prefix
++# proc test_different_dir
++}
++
++
++# now move the .debug file to a different location so that we can test
++# the "set debug-file-directory" command.
++  
++remote_exec build "mv ${objdir}/${subdir}/.debug/${testfile}.debug ${objdir}/${subdir}"
++set debugfile "${objdir}/${subdir}/${testfile}.debug"
++
++test_different_dir debuglink "${objdir}/${subdir}" 0
++
++
++# NT_GNU_BUILD_ID / .note.gnu.build-id test:
++
++set build_id_debug_filename [build_id_debug_filename_get $binfile]
++if {$build_id_debug_filename eq ""} {
++    unsupported "build-id is not supported by the compiler"
++
++    # Spare debug files may confuse testsuite runs in the future.
++    remote_exec build "rm -f $debugfile"
++} else {
++    set build_id_debugself_filename [build_id_debug_filename_get $debugfile]
++    set test "build-id support by binutils"
++    set xfail 0
++    if {$build_id_debugself_filename eq ""} {
++        unsupported $test
++        set xfail 1
++    } elseif {$build_id_debugself_filename ne $build_id_debug_filename} {
++        fail $test
++    } else {
++        pass $test
++    }
++
++    file mkdir [file dirname ${objdir}/${subdir}/${build_id_debug_filename}]
++    remote_exec build "mv $debugfile ${objdir}/${subdir}/${build_id_debug_filename}"
++
++    test_different_dir build-id "${objdir}/${subdir}" $xfail
++
++    # Spare debug files may confuse testsuite runs in the future.
++    remote_exec build "rm -f ${objdir}/${subdir}/${build_id_debug_filename}"
++}
+diff -u -rup gdb-6.6-orig/gdb/testsuite/lib/gdb.exp gdb-6.6/gdb/testsuite/lib/gdb.exp
+--- gdb-6.6-orig/gdb/testsuite/lib/gdb.exp	2007-08-28 14:32:18.000000000 +0200
++++ gdb-6.6/gdb/testsuite/lib/gdb.exp	2007-08-28 14:33:03.000000000 +0200
+@@ -2323,6 +2323,27 @@ proc separate_debug_filename { exec } {
+     return $debug_file
+ }
+ 
++# Return the build-id hex string (usually 160 bits as 40 hex characters)
++# converted to the form: .build-id/ab/cdef1234...89.debug
++# Return "" if no build-id found.
++proc build_id_debug_filename_get { exec } {
++    set tmp "${exec}-tmp"
++    exec objcopy -j .note.gnu.build-id -O binary $exec $tmp
++    set fi [open $tmp]
++    # Skip the NOTE header.
++    read $fi 16
++    set data [read $fi]
++    close $fi
++    file delete $tmp
++    if {$data eq ""} {
++	return ""
++    }
++    # Convert it to hex.
++    binary scan $data H* data
++    set data [regsub {^..} $data {\0/}]
++    return ".build-id/${data}.debug";
++}
++
+ # Create stripped files for DEST, replacing it.  If ARGS is passed, it is a
+ # list of optional flags.  The only currently supported flag is no-main,
+ # which removes the symbol entry for main from the separate debug file.
+--- gdb-6.6/gdb/testsuite/gdb.base/sepdebug.exp	2007-08-28 15:27:36.000000000 +0200
++++ gdb-6.6/gdb/testsuite/gdb.base/sepdebug.exp	2007-08-28 15:25:23.000000000 +0200
+@@ -860,14 +860,14 @@ test_next_with_recursion
+ # ${objdir}/${subdir} so need to move things there.
+ 
+ set existing_binfile $binfile
+-set testfile "sepdebug2"
+-set srcfile ${testfile}.c
+-set binfile ${objdir}/${subdir}/${testfile}
+-set corrupt_debug_file [separate_debug_filename $binfile]
+-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-w}] != "" } {
++set testfile2 "sepdebug2"
++set srcfile2 ${testfile2}.c
++set binfile2 ${objdir}/${subdir}/${testfile2}
++set corrupt_debug_file [separate_debug_filename $binfile2]
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" executable {debug additional_flags=-w}] != "" } {
+     return -1
+ }
+-if [gdb_gnu_strip_debug $binfile] {
++if [gdb_gnu_strip_debug $binfile2] {
+     # check that you have a recent version of strip and objcopy installed
+     unsupported "cannot produce separate debug info files"
+     return -1

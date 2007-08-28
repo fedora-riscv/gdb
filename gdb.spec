@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -369,6 +369,11 @@ Patch269: gdb-6.6-bfd-core-dump_elf_headers.patch
 # Fixed compatibility with the Rawhide glibc open(2) syscall sanity checking.
 Patch272: gdb-6.6-glibc-open-fcntl2-compat.patch
 
+# New fast verification whether the .debug file matches its peer (build-id).
+# New locating of the matching binaries from the pure core file (build-id).
+Patch273: gdb-6.6-buildid-verify.patch
+Patch274: gdb-6.6-buildid-locate.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -522,6 +527,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch266 -p1
 %patch269 -p1
 %patch272 -p1
+%patch273 -p1
+%patch274 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -676,6 +683,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Aug 28 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-26
+- New fast verification whether the .debug file matches its peer (build-id).
+- New locating of the matching binaries from the pure core file (build-id).
+
 * Fri Aug 17 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-25
 - Fixed excessive RPATH (related to BZ 228891).
 

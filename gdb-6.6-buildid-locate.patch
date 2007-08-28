@@ -1,0 +1,781 @@
+diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
+--- gdb-6.6-orig/gdb/Makefile.in	2007-08-28 15:31:19.000000000 +0200
++++ gdb-6.6/gdb/Makefile.in	2007-08-28 15:32:40.000000000 +0200
+@@ -1917,7 +1917,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
+ 	$(inferior_h) $(symtab_h) $(command_h) $(bfd_h) $(target_h) \
+ 	$(gdbcore_h) $(gdbthread_h) $(regcache_h) $(regset_h) $(symfile_h) \
+ 	$(exec_h) $(readline_h) $(gdb_assert_h) \
+-	$(exceptions_h) $(solib_h)
++	$(exceptions_h) $(solib_h) $(auxv_h) $(elf_common_h) $(objfiles_h) \
++	$(gdbcmd_h)
+ core-regset.o: core-regset.c $(defs_h) $(command_h) $(gdbcore_h) \
+ 	$(inferior_h) $(target_h) $(gdb_string_h) $(gregset_h)
+ cp-abi.o: cp-abi.c $(defs_h) $(value_h) $(cp_abi_h) $(command_h) $(gdbcmd_h) \
+@@ -2785,7 +2786,8 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
+ 	$(gdb_stabs_h) $(gdb_obstack_h) $(completer_h) $(bcache_h) \
+ 	$(hashtab_h) $(readline_h) $(gdb_assert_h) $(block_h) \
+ 	$(gdb_string_h) $(gdb_stat_h) $(observer_h) $(exec_h) \
+-	$(parser_defs_h) $(elf_bfd_h)
++	$(parser_defs_h) $(elf_bfd_h) $(gdb_stdint_h) $(libbfd_h) $(elf_bfd_h) \
++	$(elf_external_h)
+ symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
+ 	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
+ 	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
+diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
+--- gdb-6.6-orig/gdb/corelow.c	2006-04-18 21:20:06.000000000 +0200
++++ gdb-6.6/gdb/corelow.c	2007-08-28 15:31:56.000000000 +0200
+@@ -46,6 +46,10 @@
+ #include "gdb_assert.h"
+ #include "exceptions.h"
+ #include "solib.h"
++#include "auxv.h"
++#include "elf/common.h"
++#include "objfiles.h"
++#include "gdbcmd.h"
+ 
+ 
+ #ifndef O_LARGEFILE
+@@ -253,6 +257,70 @@ add_to_thread_list (bfd *abfd, asection 
+     inferior_ptid = pid_to_ptid (thread_id);	/* Yes, make it current */
+ }
+ 
++static int build_id_core_loads = 1;
++static void
++show_build_id_core_loads (struct ui_file *file, int from_tty,
++			  struct cmd_list_element *c, const char *value)
++{
++  fprintf_filtered (file, _("Automatic loading of the matching binaries "
++			    "for core files is %s.\n"), value);
++}
++
++static void 
++build_id_locate_exec (int from_tty)
++{
++  CORE_ADDR at_entry;
++  struct build_id *build_id;
++  char *exec_filename, *debug_filename;
++  char *build_id_filename;
++
++  if (exec_bfd != NULL)
++    return;
++
++  if (target_auxv_search (&current_target, AT_ENTRY, &at_entry) <= 0)
++    return;
++
++  build_id = build_id_addr_get (at_entry);
++  if (build_id == NULL)
++    return;
++
++  exec_filename = build_id_to_filename (build_id, &build_id_filename, 0);
++  if (exec_filename != NULL)
++    exec_file_attach (exec_filename, from_tty);
++  else
++    warning (_("Missing the matching executable file: %s"), build_id_filename);
++  xfree (build_id_filename);
++
++  /* `.note.gnu.build-id' section exists even for files without a separate
++     debuginfo.  */
++  debug_filename = build_id_to_filename (build_id, &build_id_filename, 1);
++  if (debug_filename != NULL)
++    {
++      symbol_file_add_main (debug_filename, from_tty);
++      xfree (debug_filename);
++    }
++  else
++    {
++      if (exec_filename != NULL)
++	symbol_file_add_main (exec_filename, from_tty);
++      if (symfile_objfile == NULL)
++	warning (_("Missing the matching executable's debug info file: %s"),
++		 build_id_filename);
++    }
++  xfree (build_id_filename);
++
++  xfree (exec_filename);
++
++  if (exec_filename != NULL)
++    {
++#ifdef SOLIB_ADD
++      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
++#else
++      solib_add (NULL, 0, &current_target, auto_solib_add);
++#endif
++    }
++}
++
+ /* This routine opens and sets up the core file bfd.  */
+ 
+ static void
+@@ -377,6 +445,10 @@ core_open (char *filename, int from_tty)
+       /* Fetch all registers from core file.  */
+       target_fetch_registers (-1);
+ 
++      /* Find build_id identifiers.  */
++      if (build_id_core_loads != 0)
++        build_id_locate_exec (from_tty);
++
+       /* Now, set up the frame cache, and print the top of stack.  */
+       flush_cached_frames ();
+       select_frame (get_current_frame ());
+@@ -662,4 +734,13 @@ _initialize_corelow (void)
+ 
+   if (!coreops_suppress_target)
+     add_target (&core_ops);
++
++  add_setshow_zinteger_cmd ("build-id-core-loads", class_files,
++			    &build_id_core_loads, _("\
++Set debugging of the build-id locator."), _("\
++Show debugging of the build-id locator."), _("\
++Enables printf debugging output."),
++			    NULL,
++			    show_build_id_core_loads,
++			    &setlist, &showlist);
+ }
+diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
+--- gdb-6.6-orig/gdb/solib-svr4.c	2007-08-28 15:31:19.000000000 +0200
++++ gdb-6.6/gdb/solib-svr4.c	2007-08-28 15:34:02.000000000 +0200
+@@ -943,10 +943,34 @@ svr4_current_sos (void)
+ 		}
+               else
+                 {
+-		  strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
+-		  new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+-		  xfree (buffer);
+-		  strcpy (new->so_original_name, new->so_name);
++		  struct build_id *build_id;
++
++		  strncpy (new->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
++		  new->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
++		  /* May get overwritten below.  */
++		  strcpy (new->so_name, new->so_original_name);
++
++		  build_id = build_id_addr_get (LM_DYNAMIC_FROM_LINK_MAP (new));
++		  if (build_id != NULL)
++		    {
++		      char *name, *build_id_filename;
++
++		      /* Missing the build-id matching separate debug info file
++			 would be handled while SO_NAME gets loaded.  */
++		      name = build_id_to_filename (build_id, &build_id_filename, 0);
++		      if (name != NULL)
++			{
++			  strncpy (new->so_name, name, SO_NAME_MAX_PATH_SIZE - 1);
++			  new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
++			  xfree (name);
++			}
++		      else
++			warning (_("Missing the matching library file: %s"),
++				 build_id_filename);
++		      xfree (build_id_filename);
++		      xfree (build_id);
++		    }
++
+ 		  if (debug_solib)
+ 		    {
+ 		      fprintf_unfiltered (gdb_stdlog, 
+diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
+--- gdb-6.6-orig/gdb/symfile.c	2007-08-28 15:31:19.000000000 +0200
++++ gdb-6.6/gdb/symfile.c	2007-08-28 15:36:22.000000000 +0200
+@@ -54,6 +54,9 @@
+ #include "exec.h"
+ #include "parser-defs.h"
+ #include "elf-bfd.h"
++#include "gdb_stdint.h"
++#include "libbfd.h"
++#include "elf/external.h"
+ 
+ #include <sys/types.h>
+ #include <fcntl.h>
+@@ -62,6 +65,7 @@
+ #include <ctype.h>
+ #include <time.h>
+ #include <sys/time.h>
++#include <sys/param.h>
+ 
+ 
+ int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
+@@ -1120,16 +1124,62 @@ symbol_file_clear (int from_tty)
+       printf_unfiltered (_("No symbol file now.\n"));
+ }
+ 
++/* Locate NT_GNU_BUILD_ID and return its matching debug filename.
++   FIXME: NOTE decoding should be unified with the BFD core notes decoding.  */
++
++static int build_id_debug;
++static void
++show_build_id_debug (struct ui_file *file, int from_tty,
++		     struct cmd_list_element *c, const char *value)
++{
++  fprintf_filtered (file, _("Debugging of the build-id locator is %s.\n"),
++		    value);
++}
++
+ struct build_id
+   {
+     size_t size;
+     gdb_byte data[1];
+   };
+ 
+-/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
++struct build_id *
++build_id_buf_get (bfd *templ, gdb_byte *buf, bfd_size_type size)
++{
++  bfd_byte *p;
++
++  p = buf;
++  while (p < buf + size)
++    {
++      /* FIXME: bad alignment assumption.  */
++      Elf_External_Note *xnp = (Elf_External_Note *) p;
++      size_t namesz = H_GET_32 (templ, xnp->namesz);
++      size_t descsz = H_GET_32 (templ, xnp->descsz);
++      bfd_byte *descdata = xnp->name + BFD_ALIGN (namesz, 4);
++
++      if (H_GET_32 (templ, xnp->type) == NT_GNU_BUILD_ID
++	  && namesz == sizeof "GNU"
++	  && memcmp (xnp->name, "GNU", sizeof "GNU") == 0)
++	{
++	  size_t size = descsz;
++	  gdb_byte *data = (void *) descdata;
++	  struct build_id *retval;
++
++	  retval = xmalloc (sizeof *retval - 1 + size);
++	  retval->size = size;
++	  memcpy (retval->data, data, size);
++
++	  return retval;
++	}
++      p = descdata + BFD_ALIGN (descsz, 4);
++    }
++  return NULL;
++}
++
++/* Separate debuginfo files have corrupted PHDR but SHDR is correct there.
++   Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
+ 
+ static struct build_id *
+-build_id_bfd_get (bfd *abfd)
++build_id_bfd_shdr_get (bfd *abfd)
+ {
+   struct build_id *retval;
+ 
+@@ -1145,6 +1195,348 @@ build_id_bfd_get (bfd *abfd)
+   return retval;
+ }
+ 
++/* Core files may have missing (corrupt) SHDR but PDHR is correct there.
++   bfd_elf_bfd_from_remote_memory () has too much overhead by
++   allocating/reading all the available ELF PT_LOADs.  */
++
++static struct build_id *
++build_id_phdr_get (bfd *templ, bfd_vma loadbase, unsigned e_phnum,
++		   Elf_Internal_Phdr *i_phdr)
++{
++  int i;
++  struct build_id *retval = NULL;
++
++  for (i = 0; i < e_phnum; i++)
++    if (i_phdr[i].p_type == PT_NOTE && i_phdr[i].p_filesz > 0)
++      {
++	Elf_Internal_Phdr *hdr = &i_phdr[i];
++	gdb_byte *buf;
++	int err;
++
++	buf = xmalloc (hdr->p_filesz);
++	err = target_read_memory (loadbase + i_phdr[i].p_vaddr, buf,
++				  hdr->p_filesz);
++	if (err == 0)
++	  retval = build_id_buf_get (templ, buf, hdr->p_filesz);
++	else
++	  retval = NULL;
++	xfree (buf);
++	if (retval != NULL)
++	  break;
++      }
++  return retval;
++}
++
++/* First we validate the file by reading in the ELF header and checking
++   the magic number.  */
++
++static inline bfd_boolean
++elf_file_p (Elf64_External_Ehdr *x_ehdrp64)
++{
++  gdb_assert (sizeof (Elf64_External_Ehdr) >= sizeof (Elf32_External_Ehdr));
++  gdb_assert (offsetof (Elf64_External_Ehdr, e_ident)
++	      == offsetof (Elf32_External_Ehdr, e_ident));
++  gdb_assert (sizeof (((Elf64_External_Ehdr *) 0)->e_ident)
++	      == sizeof (((Elf32_External_Ehdr *) 0)->e_ident));
++
++  return ((x_ehdrp64->e_ident[EI_MAG0] == ELFMAG0)
++	  && (x_ehdrp64->e_ident[EI_MAG1] == ELFMAG1)
++	  && (x_ehdrp64->e_ident[EI_MAG2] == ELFMAG2)
++	  && (x_ehdrp64->e_ident[EI_MAG3] == ELFMAG3));
++}
++
++/* Translate an ELF file header in external format into an ELF file header in
++   internal format.  */
++
++#define H_GET_WORD(bfd, ptr) (is64 ? H_GET_64 (bfd, (ptr))		\
++				   : H_GET_32 (bfd, (ptr)))
++#define H_GET_SIGNED_WORD(bfd, ptr) (is64 ? H_GET_S64 (bfd, (ptr))	\
++					  : H_GET_S32 (bfd, (ptr)))
++
++static void
++elf_swap_ehdr_in (bfd *abfd,
++		  const Elf64_External_Ehdr *src64,
++		  Elf_Internal_Ehdr *dst)
++{
++  int is64 = bfd_get_arch_size (abfd) == 64;
++#define SRC(field) (is64 ? src64->field \
++			 : ((const Elf32_External_Ehdr *) src64)->field)
++
++  int signed_vma = get_elf_backend_data (abfd)->sign_extend_vma;
++  memcpy (dst->e_ident, SRC (e_ident), EI_NIDENT);
++  dst->e_type = H_GET_16 (abfd, SRC (e_type));
++  dst->e_machine = H_GET_16 (abfd, SRC (e_machine));
++  dst->e_version = H_GET_32 (abfd, SRC (e_version));
++  if (signed_vma)
++    dst->e_entry = H_GET_SIGNED_WORD (abfd, SRC (e_entry));
++  else
++    dst->e_entry = H_GET_WORD (abfd, SRC (e_entry));
++  dst->e_phoff = H_GET_WORD (abfd, SRC (e_phoff));
++  dst->e_shoff = H_GET_WORD (abfd, SRC (e_shoff));
++  dst->e_flags = H_GET_32 (abfd, SRC (e_flags));
++  dst->e_ehsize = H_GET_16 (abfd, SRC (e_ehsize));
++  dst->e_phentsize = H_GET_16 (abfd, SRC (e_phentsize));
++  dst->e_phnum = H_GET_16 (abfd, SRC (e_phnum));
++  dst->e_shentsize = H_GET_16 (abfd, SRC (e_shentsize));
++  dst->e_shnum = H_GET_16 (abfd, SRC (e_shnum));
++  dst->e_shstrndx = H_GET_16 (abfd, SRC (e_shstrndx));
++
++#undef SRC
++}
++
++/* Translate an ELF program header table entry in external format into an
++   ELF program header table entry in internal format.  */
++
++void
++elf_swap_phdr_in (bfd *abfd,
++		  const Elf64_External_Phdr *src64,
++		  Elf_Internal_Phdr *dst)
++{
++  int is64 = bfd_get_arch_size (abfd) == 64;
++#define SRC(field) (is64 ? src64->field					\
++			 : ((const Elf32_External_Phdr *) src64)->field)
++
++  int signed_vma = get_elf_backend_data (abfd)->sign_extend_vma;
++
++  dst->p_type = H_GET_32 (abfd, SRC (p_type));
++  dst->p_flags = H_GET_32 (abfd, SRC (p_flags));
++  dst->p_offset = H_GET_WORD (abfd, SRC (p_offset));
++  if (signed_vma)
++    {
++      dst->p_vaddr = H_GET_SIGNED_WORD (abfd, SRC (p_vaddr));
++      dst->p_paddr = H_GET_SIGNED_WORD (abfd, SRC (p_paddr));
++    }
++  else
++    {
++      dst->p_vaddr = H_GET_WORD (abfd, SRC (p_vaddr));
++      dst->p_paddr = H_GET_WORD (abfd, SRC (p_paddr));
++    }
++  dst->p_filesz = H_GET_WORD (abfd, SRC (p_filesz));
++  dst->p_memsz = H_GET_WORD (abfd, SRC (p_memsz));
++  dst->p_align = H_GET_WORD (abfd, SRC (p_align));
++
++#undef SRC
++}
++
++#undef H_GET_SIGNED_WORD
++#undef H_GET_WORD
++
++static Elf_Internal_Phdr *
++elf_get_phdr (bfd *templ, bfd_vma ehdr_vma, unsigned *e_phnum_pointer,
++              bfd_vma *loadbase_pointer)
++{
++  /* sizeof (Elf64_External_Ehdr) >= sizeof (Elf32_External_Ehdr)  */
++  Elf64_External_Ehdr x_ehdr64;	/* Elf file header, external form */
++  Elf_Internal_Ehdr i_ehdr;	/* Elf file header, internal form */
++  bfd_size_type x_phdrs_size;
++  gdb_byte *x_phdrs_ptr;
++  Elf_Internal_Phdr *i_phdrs;
++  int err;
++  unsigned int i;
++  bfd_vma loadbase;
++  int loadbase_set;
++
++  gdb_assert (templ != NULL);
++  gdb_assert (sizeof (Elf64_External_Ehdr) >= sizeof (Elf32_External_Ehdr));
++
++  /* Read in the ELF header in external format.  */
++  err = target_read_memory (ehdr_vma, (bfd_byte *) &x_ehdr64, sizeof x_ehdr64);
++  if (err)
++    {
++      if (build_id_debug)
++        warning (_("build-id: Error reading ELF header at address 0x%lx"),
++		 (unsigned long) ehdr_vma);
++      return NULL;
++    }
++
++  /* Now check to see if we have a valid ELF file, and one that BFD can
++     make use of.  The magic number must match, the address size ('class')
++     and byte-swapping must match our XVEC entry.  */
++
++  if (! elf_file_p (&x_ehdr64)
++      || x_ehdr64.e_ident[EI_VERSION] != EV_CURRENT
++      || !((bfd_get_arch_size (templ) == 64
++            && x_ehdr64.e_ident[EI_CLASS] == ELFCLASS64)
++           || (bfd_get_arch_size (templ) == 32
++	       && x_ehdr64.e_ident[EI_CLASS] == ELFCLASS32)))
++    {
++      if (build_id_debug)
++        warning (_("build-id: Unrecognized ELF header at address 0x%lx"),
++		 (unsigned long) ehdr_vma);
++      return NULL;
++    }
++
++  /* Check that file's byte order matches xvec's */
++  switch (x_ehdr64.e_ident[EI_DATA])
++    {
++    case ELFDATA2MSB:		/* Big-endian */
++      if (! bfd_header_big_endian (templ))
++	{
++	  if (build_id_debug)
++	    warning (_("build-id: Unrecognized "
++		       "big-endian ELF header at address 0x%lx"),
++		     (unsigned long) ehdr_vma);
++	  return NULL;
++	}
++      break;
++    case ELFDATA2LSB:		/* Little-endian */
++      if (! bfd_header_little_endian (templ))
++	{
++	  if (build_id_debug)
++	    warning (_("build-id: Unrecognized "
++		       "little-endian ELF header at address 0x%lx"),
++		     (unsigned long) ehdr_vma);
++	  return NULL;
++	}
++      break;
++    case ELFDATANONE:		/* No data encoding specified */
++    default:			/* Unknown data encoding specified */
++      if (build_id_debug)
++	warning (_("build-id: Unrecognized "
++		   "ELF header endianity at address 0x%lx"),
++		 (unsigned long) ehdr_vma);
++      return NULL;
++    }
++
++  elf_swap_ehdr_in (templ, &x_ehdr64, &i_ehdr);
++
++  /* The file header tells where to find the program headers.
++     These are what we use to actually choose what to read.  */
++
++  if (i_ehdr.e_phentsize != (bfd_get_arch_size (templ) == 64
++                             ? sizeof (Elf64_External_Phdr)
++			     : sizeof (Elf32_External_Phdr))
++      || i_ehdr.e_phnum == 0)
++    {
++      if (build_id_debug)
++	warning (_("build-id: Invalid ELF program headers from the ELF header "
++		   "at address 0x%lx"), (unsigned long) ehdr_vma);
++      return NULL;
++    }
++
++  x_phdrs_size = (bfd_get_arch_size (templ) == 64 ? sizeof (Elf64_External_Phdr)
++						: sizeof (Elf32_External_Phdr));
++
++  i_phdrs = xmalloc (i_ehdr.e_phnum * (sizeof *i_phdrs + x_phdrs_size));
++  x_phdrs_ptr = (void *) &i_phdrs[i_ehdr.e_phnum];
++  err = target_read_memory (ehdr_vma + i_ehdr.e_phoff, (bfd_byte *) x_phdrs_ptr,
++			    i_ehdr.e_phnum * x_phdrs_size);
++  if (err)
++    {
++      free (i_phdrs);
++      if (build_id_debug)
++        warning (_("build-id: Error reading "
++		   "ELF program headers at address 0x%lx"),
++		 (unsigned long) ehdr_vma + i_ehdr.e_phoff);
++      return NULL;
++    }
++
++  loadbase = ehdr_vma;
++  loadbase_set = 0;
++  for (i = 0; i < i_ehdr.e_phnum; ++i)
++    {
++      elf_swap_phdr_in (templ, (Elf64_External_Phdr *)
++			       (x_phdrs_ptr + i * x_phdrs_size), &i_phdrs[i]);
++      /* IA-64 vDSO may have two mappings for one segment, where one mapping
++	 is executable only, and one is read only.  We must not use the
++	 executable one (PF_R is the first one, PF_X the second one).  */
++      if (i_phdrs[i].p_type == PT_LOAD && (i_phdrs[i].p_flags & PF_R))
++	{
++	  /* Only the first PT_LOAD segment indicates the file bias.
++	     Next segments may have P_VADDR arbitrarily higher.
++	     If the first segment has P_VADDR zero any next segment must not
++	     confuse us, the first one sets LOADBASE certainly enough.  */
++	  if (!loadbase_set && i_phdrs[i].p_offset == 0)
++	    {
++	      loadbase = ehdr_vma - i_phdrs[i].p_vaddr;
++	      loadbase_set = 1;
++	    }
++	}
++    }
++
++  if (build_id_debug)
++    warning (_("build-id: Found ELF header at address 0x%lx, loadbase 0x%lx"),
++	     (unsigned long) ehdr_vma, (unsigned long) loadbase);
++
++  *e_phnum_pointer = i_ehdr.e_phnum;
++  *loadbase_pointer = loadbase;
++  return i_phdrs;
++}
++
++/* BUILD_ID_ADDR_GET gets ADDR located somewhere in the object.
++   Find the first section before ADDR containing an ELF header.
++   We rely on the fact the sections from multiple files do not mix.
++   FIXME: We should check ADDR is contained _inside_ the section with possibly
++   missing content (P_FILESZ < P_MEMSZ).  These omitted sections are currently
++   hidden by _BFD_ELF_MAKE_SECTION_FROM_PHDR.  */
++
++static CORE_ADDR build_id_addr;
++struct build_id_addr_sect
++  {
++    struct build_id_addr_sect *next;
++    asection *sect;
++  };
++static struct build_id_addr_sect *build_id_addr_sect;
++
++static void build_id_addr_candidate (bfd *abfd, asection *sect, void *obj)
++{
++  if (build_id_addr >= bfd_section_vma (abfd, sect))
++    {
++      struct build_id_addr_sect *candidate;
++
++      candidate = xmalloc (sizeof *candidate);
++      candidate->next = build_id_addr_sect;
++      build_id_addr_sect = candidate;
++      candidate->sect = sect;
++    }
++}
++
++struct build_id *
++build_id_addr_get (CORE_ADDR addr)
++{
++  struct build_id_addr_sect *candidate;
++  struct build_id *retval = NULL;
++  Elf_Internal_Phdr *i_phdr = NULL;
++  bfd_vma loadbase = 0;
++  unsigned e_phnum = 0;
++
++  if (core_bfd == NULL)
++    return NULL;
++
++  build_id_addr = addr;
++  gdb_assert (build_id_addr_sect == NULL);
++  bfd_map_over_sections (core_bfd, build_id_addr_candidate, NULL);
++
++  /* Sections are sorted in the high-to-low VMAs order.
++     Stop the search on the first ELF header we find.
++     Do not continue the search even if it does not contain NT_GNU_BUILD_ID.  */
++
++  for (candidate = build_id_addr_sect; candidate != NULL;
++       candidate = candidate->next)
++    {
++      i_phdr = elf_get_phdr (core_bfd,
++			     bfd_section_vma (core_bfd, candidate->sect),
++			     &e_phnum, &loadbase);
++      if (i_phdr != NULL)
++	break;
++    }
++
++  if (i_phdr != NULL)
++    {
++      retval = build_id_phdr_get (core_bfd, loadbase, e_phnum, i_phdr);
++      xfree (i_phdr);
++    }
++
++  while (build_id_addr_sect != NULL)
++    {
++      candidate = build_id_addr_sect;
++      build_id_addr_sect = candidate->next;
++      xfree (candidate);
++    }
++
++  return retval;
++}
++
+ /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
+ 
+ static int
+@@ -1159,7 +1551,7 @@ build_id_verify (const char *filename, s
+   if (abfd == NULL)
+     return 0;
+ 
+-  found = build_id_bfd_get (abfd);
++  found = build_id_bfd_shdr_get (abfd);
+ 
+   if (found == NULL)
+     warning (_("File \"%s\" has no build-id, file skipped"), filename);
+@@ -1177,8 +1569,9 @@ build_id_verify (const char *filename, s
+ 
+ static char *debug_file_directory = NULL;
+ 
+-static char *
+-build_id_to_debug_filename (struct build_id *build_id)
++char *
++build_id_to_filename (struct build_id *build_id, char **link_return,
++		      int add_debug_suffix)
+ {
+   char *link, *s, *retval = NULL;
+   gdb_byte *data = build_id->data;
+@@ -1186,7 +1579,9 @@ build_id_to_debug_filename (struct build
+ 
+   /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
+   link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
+-		  + 2 * size + (sizeof ".debug" - 1) + 1);
++		  + 2 * size
++		  + (add_debug_suffix ? sizeof ".debug" - 1 : 0)
++		  + 1);
+   s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
+   if (size > 0)
+     {
+@@ -1197,12 +1592,14 @@ build_id_to_debug_filename (struct build
+     *s++ = '/';
+   while (size-- > 0)
+     s += sprintf (s, "%02x", (unsigned) *data++);
+-  strcpy (s, ".debug");
++  if (add_debug_suffix)
++    strcpy (s, ".debug");
++  else
++    *s = 0;
+ 
+   /* lrealpath() is expensive even for the usually non-existent files.  */
+   if (access (link, F_OK) == 0)
+     retval = lrealpath (link);
+-  xfree (link);
+ 
+   if (retval != NULL && !build_id_verify (retval, build_id))
+     {
+@@ -1210,6 +1607,11 @@ build_id_to_debug_filename (struct build
+       retval = NULL;
+     }
+ 
++  if (link_return != NULL)
++    *link_return = link;
++  else
++    xfree (link);
++
+   return retval;
+ }
+ 
+@@ -1305,23 +1707,27 @@ find_separate_debug_file (struct objfile
+   unsigned long crc32;
+   int i;
+   struct build_id *build_id;
++  char *build_id_filename = NULL;
+ 
+-  build_id = build_id_bfd_get (objfile->obfd);
++  build_id = build_id_bfd_shdr_get (objfile->obfd);
+   if (build_id != NULL)
+     {
+       char *build_id_name;
+ 
+-      build_id_name = build_id_to_debug_filename (build_id);
+-      free (build_id);
++      build_id_name = build_id_to_filename (build_id, &build_id_filename, 1);
++      xfree (build_id);
+       /* Prevent looping on a stripped .debug file.  */
+       if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
+         {
+-	  warning (_("\"%s\": separate debug info file has no debug info"),
++	  warning (_("\"%s\": The separate debug info file has no debug info"),
+ 		   build_id_name);
+ 	  xfree (build_id_name);
+ 	}
+       else if (build_id_name != NULL)
+-        return build_id_name;
++        {
++	  xfree (build_id_filename);
++	  return build_id_name;
++	}
+     }
+ 
+   basename = get_debug_link_info (objfile, &crc32);
+@@ -1329,7 +1735,10 @@ find_separate_debug_file (struct objfile
+   if (basename == NULL)
+     /* There's no separate debug info, hence there's no way we could
+        load it => no warning.  */
+-    return NULL;
++    {
++      xfree (build_id_filename);
++      return NULL;
++    }
+ 
+   dir = xstrdup (objfile->name);
+ 
+@@ -1358,6 +1767,7 @@ find_separate_debug_file (struct objfile
+ 
+   if (separate_debug_file_exists (debugfile, crc32, objfile->name))
+     {
++      xfree (build_id_filename);
+       xfree (basename);
+       xfree (dir);
+       return xstrdup (debugfile);
+@@ -1371,6 +1781,7 @@ find_separate_debug_file (struct objfile
+ 
+   if (separate_debug_file_exists (debugfile, crc32, objfile->name))
+     {
++      xfree (build_id_filename);
+       xfree (basename);
+       xfree (dir);
+       return xstrdup (debugfile);
+@@ -1384,11 +1795,19 @@ find_separate_debug_file (struct objfile
+ 
+   if (separate_debug_file_exists (debugfile, crc32, objfile->name))
+     {
++      xfree (build_id_filename);
+       xfree (basename);
+       xfree (dir);
+       return xstrdup (debugfile);
+     }
+ 
++  if (build_id_filename != NULL)
++    {
++      warning (_("Missing the separate debug info file: %s"),
++	       build_id_filename);
++      xfree (build_id_filename);
++    }
++
+   xfree (basename);
+   xfree (dir);
+   return NULL;
+@@ -4024,4 +4443,12 @@ the global debug-file directory prepende
+ 				     NULL,
+ 				     show_debug_file_directory,
+ 				     &setlist, &showlist);
++
++  add_setshow_zinteger_cmd ("build-id", no_class, &build_id_debug, _("\
++Set debugging of the build-id locator."), _("\
++Show debugging of the build-id locator."), _("\
++Enables printf debugging output."),
++			    NULL,
++			    show_build_id_debug,
++			    &setdebuglist, &showdebuglist);
+ }
+diff -u -rup gdb-6.6-orig/gdb/symfile.h gdb-6.6/gdb/symfile.h
+--- gdb-6.6-orig/gdb/symfile.h	2005-12-17 23:34:03.000000000 +0100
++++ gdb-6.6/gdb/symfile.h	2007-08-28 15:31:56.000000000 +0200
+@@ -322,6 +322,12 @@ extern bfd_byte *symfile_relocate_debug_
+ extern void dwarf_build_psymtabs (struct objfile *, int, file_ptr,
+ 				  unsigned int, file_ptr, unsigned int);
+ 
++/* build-id support.  */
++struct build_id;
++extern struct build_id *build_id_addr_get (CORE_ADDR addr);
++extern char *build_id_to_filename (struct build_id *build_id,
++				   char **link_return, int add_debug_suffix);
++
+ /* From dwarf2read.c */
+ 
+ extern int dwarf2_has_info (struct objfile *);
