@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -345,7 +345,7 @@ Patch251: gdb-6.5-bz237872-ppc-long-double.patch
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
 Patch254: gdb-6.6-testsuite-timeouts.patch
 
-# Fix attaching a stopped nonthreaded/threaded process (BZ 219118, 233852).
+# Fix attaching to stopped processes (BZ 219118, 233852).
 # Fix attaching during a pending signal being delivered.
 Patch256: gdb-6.6-bz233852-attach-signalled.patch
 
@@ -683,6 +683,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Sep 16 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-27
+- Fix attaching to stopped processes and/or pending signals.
+
 * Tue Aug 28 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-26
 - New fast verification whether the .debug file matches its peer (build-id).
 - New locating of the matching binaries from the pure core file (build-id).

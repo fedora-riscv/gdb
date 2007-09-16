@@ -1,271 +1,117 @@
-diff -u -rup gdb-6.6-orig/gdb/inf-ptrace.c gdb-6.6/gdb/inf-ptrace.c
---- gdb-6.6-orig/gdb/inf-ptrace.c	2006-01-24 23:34:34.000000000 +0100
-+++ gdb-6.6/gdb/inf-ptrace.c	2007-06-06 13:33:11.000000000 +0200
-@@ -38,6 +38,9 @@
+2007-07-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.h (struct lwp_info): New field WAS_STOPPED.
+	* linux-nat.c (STRINGIFY, STRINGIFY_ARG): New macros.
+	(kill_lwp): New declaration.
+	(linux_ptrace_post_attach, pid_is_stopped): New function.
+	(linux_child_follow_fork): New comment about WAS_STOPPED.
+	(lin_lwp_attach_lwp): Variable PID removed.  Part replaced by a call to
+	LINUX_PTRACE_POST_ATTACH.
+	(linux_nat_attach): Likewise.
+	(linux_nat_detach): Optionally stop the detached process.
+	(linux_nat_resume): Clear WAS_STOPPED if appropriate.
+	* NEWS: Document the new behaviour.
+
+2007-06-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/attach-into-signal.c, gdb.threads/attach-into-signal.exp,
+	gdb.threads/attach-stopped.c, gdb.threads/attach-stopped.exp: New files.
+
+2007-06-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Attach): Document the ATTACH and DETACH commands for
+	stopped processes.  Document the messages on the seen pending signals.
+
+[ Backport for GDB-6.6. ]
+
+--- ./gdb/NEWS	21 Jun 2007 15:18:50 -0000	1.232
++++ ./gdb/NEWS	30 Jun 2007 16:27:37 -0000
+@@ -44,6 +44,9 @@ segment base addresses (rather than offs
+ * The /i format now outputs any trailing branch delay slot instructions 
+ immediately following the last instruction within the count specified.
  
- /* HACK: Save the ptrace ops returned by inf_ptrace_target.  */
- static struct target_ops *ptrace_ops_hack;
++* On GNU/Linux, stopped processes may get attached to now.  Signals being
++delivered at the time of the attach command no longer get lost.
 +
-+/* Stored PID of the process being stopped during attach.  */
-+static pid_t stopped_pid;
- 
+ * New commands
  
- #ifdef PT_GET_PROCESS_STATE
-@@ -69,14 +72,20 @@ inf_ptrace_follow_fork (struct target_op
- 
-   if (follow_child)
-     {
-+      unsigned long sig = 0;
-+
-       inferior_ptid = pid_to_ptid (fpid);
-       detach_breakpoints (pid);
- 
-       /* Reset breakpoints in the child as appropriate.  */
-       follow_inferior_reset_breakpoints ();
- 
--      if (ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, 0) == -1)
--	perror_with_name (("ptrace"));
-+      /* Stop the process again if it was stopped during the attachment.  */
-+      if (pid == stopped_pid)
-+	sig = target_signal_to_host (TARGET_SIGNAL_STOP));
-+
-+      if (ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, (void *) sig) == -1)
-+	perror_with_name (("ptrace PT_DETACH"));
-     }
-   else
-     {
-@@ -173,6 +182,21 @@ inf_ptrace_mourn_inferior (void)
-   generic_mourn_inferior ();
- }
- 
-+/* Wrapper function for waitpid which handles EINTR.  */
-+
-+static int
-+my_waitpid (int pid, int *status, int flags)
-+{
-+  int ret;
-+  do
-+    {
-+      ret = waitpid (pid, status, flags);
-+    }
-+  while (ret == -1 && errno == EINTR);
-+
-+  return ret;
-+}
-+
- /* Attach to the process specified by ARGS.  If FROM_TTY is non-zero,
-    be chatty about it.  */
- 
-@@ -180,8 +204,14 @@ static void
- inf_ptrace_attach (char *args, int from_tty)
- {
-   char *exec_file;
--  pid_t pid;
-+  pid_t pid, got_pid;
-   char *dummy;
-+  int status;
-+  unsigned long sig;
-+  FILE *status_file;
-+  char name[40];
-+  char buf[100]; 
-+  int sigstop = target_signal_to_host (TARGET_SIGNAL_STOP);
- 
-   if (!args)
-     error_no_arg (_("process-id to attach"));
-@@ -210,11 +240,64 @@ inf_ptrace_attach (char *args, int from_
-     }
- 
- #ifdef PT_ATTACH
-+  stopped_pid = 0;
-+  /* There is a small moment after PTRACE_ATTACH where PTRACE_CONT will
-+     succeed only for originally stopped processes.  Unfortunately in a moment
-+     PTRACE_ATTACH will deliver its SIGSTOP and PTRACE_CONT shows no difference
-+     since that moment.
-+     "/proc/%d/status" is also a race but it is safe for unstopped cases.  */
-+  sprintf (name, "/proc/%d/status", (int) pid);
-+  status_file = fopen (name, "r");
-+  if (status_file != NULL)
-+    {
-+      int have_state = 0;
-+
-+      while (fgets (buf, 100, status_file))
-+	{
-+	  if (strncmp (buf, "State:", 6) == 0)
-+	    {
-+	      have_state = 1;
-+	      break;
-+	    }
-+	} 
-+      if (have_state != 0 && strstr (buf, "T (stopped)") != NULL)
-+	stopped_pid = pid;
-+      fclose (status_file);
-+    }
-+
-   errno = 0;
-   ptrace (PT_ATTACH, pid, (PTRACE_TYPE_ARG3)0, 0);
-   if (errno != 0)
-     perror_with_name (("ptrace"));
-   attach_flag = 1;
-+
-+  /* Deliver one SIGSTOP just for sure.
-+     If the process was already stopped AND some other process (like shell)
-+     has already waited for it we would get stuck in waitpid ().  */
-+  sig = sigstop;
-+  do
-+    {
-+      if (sig != sigstop)
-+	printf_unfiltered (_("Redelivering pending %s.\n"),
-+		       target_signal_to_string (target_signal_from_host (sig)));
-+      errno = 0;
-+      ptrace (PT_CONTINUE, pid, (PTRACE_TYPE_ARG3)1, (void *) sig);
-+      /* For unstopped processes the preventive signal may ESRCH.  */
-+      if (errno != 0 && sig != sigstop)
-+	perror_with_name ("ptrace PT_CONTINUE");
-+
-+      got_pid = my_waitpid (pid, &status, 0);
-+      gdb_assert (got_pid == pid);
-+
-+      /* Check if the thread has exited.  */
-+      if (WIFEXITED (status) || WIFSIGNALED (status))
-+	error (_("Program %s exited.\n"),
-+	       target_pid_to_str (pid_to_ptid (pid)));
-+      gdb_assert (WIFSTOPPED (status));
-+      sig = WSTOPSIG (status);
-+      gdb_assert (sig != 0);
-+    }
-+  while (sig != sigstop);
- #else
-   error (_("This system does not support attaching to a process"));
- #endif
-@@ -240,14 +323,16 @@ inf_ptrace_post_attach (int pid)
- 
+ set remoteflow
+--- gdb-6.6/gdb/linux-nat.c-orig-orig	2007-09-16 20:57:13.000000000 +0200
++++ gdb-6.6/gdb/linux-nat.c	2007-09-16 21:02:28.000000000 +0200
+@@ -87,6 +87,12 @@
+ #define __WALL          0x40000000 /* Wait for any child.  */
  #endif
  
--/* Detach from the inferior, optionally passing it the signal
--   specified by ARGS.  If FROM_TTY is non-zero, be chatty about it.  */
-+/* Detach from the inferior.  If FROM_TTY is non-zero, be chatty about it.  */
- 
- static void
- inf_ptrace_detach (char *args, int from_tty)
- {
-   pid_t pid = ptid_get_pid (inferior_ptid);
--  int sig = 0;
-+  unsigned long sig = 0;
++#define STRINGIFY_ARG(x) #x
++#define STRINGIFY(x) STRINGIFY_ARG (x)
 +
-+  if (args)
-+    error (_("Too many arguments"));
- 
-   if (from_tty)
-     {
-@@ -258,18 +343,19 @@ inf_ptrace_detach (char *args, int from_
- 			 target_pid_to_str (pid_to_ptid (pid)));
-       gdb_flush (gdb_stdout);
-     }
--  if (args)
--    sig = atoi (args);
- 
- #ifdef PT_DETACH
-   /* We'd better not have left any breakpoints in the program or it'll
-      die when it hits one.  Also note that this may only work if we
-      previously attached to the inferior.  It *might* work if we
-      started the process ourselves.  */
-+  /* Stop the process again if it was stopped during the attachment.  */
-+  if (pid == stopped_pid)
-+    sig = target_signal_to_host (TARGET_SIGNAL_STOP);
-   errno = 0;
--  ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, sig);
-+  ptrace (PT_DETACH, pid, (PTRACE_TYPE_ARG3)1, (void *) sig);
-   if (errno != 0)
--    perror_with_name (("ptrace"));
-+    perror_with_name (("ptrace PT_DETACH"));
-   attach_flag = 0;
- #else
-   error (_("This system does not support detaching from a process"));
-@@ -324,6 +410,12 @@ inf_ptrace_resume (ptid_t ptid, int step
-        single-threaded processes, so simply resume the inferior.  */
-     pid = ptid_get_pid (inferior_ptid);
- 
-+  /* At this point, we are going to resume the inferior and if we
-+     have attached to a stopped process, we no longer should leave
-+     it as stopped if the user detaches.  */
-+  if (!step && pid == stopped_pid)
-+    stopped_pid = 0;
++static int linux_ptrace_post_attach (struct lwp_info *lp);
++static int kill_lwp (int lwpid, int signo);
 +
-   if (step)
+ /* The single-threaded native GNU/Linux target_ops.  We save a pointer for
+    the use of the multi-threaded target.  */
+ static struct target_ops *linux_ops;
+@@ -533,6 +539,11 @@ child_follow_fork (struct target_ops *op
+ 	}
+       else
+ 	{
++	  /* We should check LP->WAS_STOPPED and detach it stopped accordingly.
++	     In this point of code it cannot be 1 as we would not get FORK
++	     executed without CONTINUE first which resets LP->WAS_STOPPED.
++	     We would have to first TARGET_STOP and WAITPID it as with running
++	     inferior PTRACE_DETACH, SIGSTOP will ignore the signal.  */
+ 	  target_detach (NULL, 0);
+ 	}
+ 
+@@ -992,7 +1003,6 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+      to happen.  */
+   if (GET_LWP (ptid) != GET_PID (ptid) && lp == NULL)
      {
-       /* If this system does not support PT_STEP, a higher level
-diff -u -rup gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
---- gdb-6.6-orig/gdb/linux-nat.c	2007-06-06 13:30:52.000000000 +0200
-+++ gdb-6.6/gdb/linux-nat.c	2007-06-06 13:57:18.000000000 +0200
-@@ -994,6 +994,7 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
-     {
-       pid_t pid;
+-      pid_t pid;
        int status;
-+      unsigned long sig;
  
        if (ptrace (PTRACE_ATTACH, GET_LWP (ptid), 0, 0) < 0)
- 	{
-@@ -1015,32 +1016,54 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
- 			    "LLAL: PTRACE_ATTACH %s, 0, 0 (OK)\n",
- 			    target_pid_to_str (ptid));
+@@ -1002,45 +1012,23 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+ 	     creation is interrupted; as of Linux 2.6.19, a kernel
+ 	     bug may place threads in the thread list and then fail
+ 	     to create them.  */
+-	  warning (_("Can't attach %s: %s"), target_pid_to_str (ptid),
+-		   safe_strerror (errno));
+-	  return -1;
++	  error (_("Can't attach %s: %s"), target_pid_to_str (ptid),
++		 safe_strerror (errno));
+ 	}
  
+       if (lp == NULL)
+ 	lp = add_lwp (ptid);
+ 
+-      if (debug_linux_nat)
+-	fprintf_unfiltered (gdb_stdlog,
+-			    "LLAL: PTRACE_ATTACH %s, 0, 0 (OK)\n",
+-			    target_pid_to_str (ptid));
+-
 -      pid = my_waitpid (GET_LWP (ptid), &status, 0);
 -      if (pid == -1 && errno == ECHILD)
-+      sig = SIGSTOP;
-+      do
- 	{
+-	{
 -	  /* Try again with __WCLONE to check cloned processes.  */
 -	  pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
-+	  if (sig != SIGSTOP)
-+	    printf_unfiltered (_("Redelivering pending %s.\n"),
-+		       target_signal_to_string (target_signal_from_host (sig)));
-+	  /* For unstopped processes the preventive signal may ESRCH.  */
-+	  if (ptrace (PTRACE_CONT, GET_LWP (ptid), (PTRACE_TYPE_ARG3)1,
-+		      (void *) sig) != 0 && sig != SIGSTOP)
-+	    perror_with_name ("ptrace");
-+
-+	  pid = my_waitpid (GET_LWP (ptid), &status, 0);
- 	  if (pid == -1 && errno == ECHILD)
+-	  if (pid == -1 && errno == ECHILD)
 -	    error (_("Can't attach %s (%s) - possible SELinux denial,"
 -		     " check your /var/log/messages for `avc: denied'"),
 -		   target_pid_to_str (ptid), safe_strerror (errno));
 -	  lp->cloned = 1;
--	}
-+	    {
-+	      /* Try again with __WCLONE to check cloned processes.  */
-+	      pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
-+	      if (pid == -1 && errno == ECHILD)
-+		error (_("Can't attach %s (%s) - possible SELinux denial,"
-+			 " check your /var/log/messages for `avc: denied'"),
-+		       target_pid_to_str (ptid), safe_strerror (errno));
-+	      lp->cloned = 1;
-+	    }
-+	  gdb_assert (pid == GET_LWP (ptid));
++      status = linux_ptrace_post_attach (lp);
++      if (status != 0)
++        {
++	  error (_("Thread %s exited: %s"), target_pid_to_str (ptid),
++		 status_to_str (status));
+ 	}
  
 -      gdb_assert (pid == GET_LWP (ptid)
 -		  && WIFSTOPPED (status) && WSTOPSIG (status));
-+	  if (debug_linux_nat)
-+	    {
-+	      fprintf_unfiltered (gdb_stdlog,
-+				  "LLAL: waitpid %s received %s\n",
-+				  target_pid_to_str (ptid),
-+				  status_to_str (status));
-+	    }
-+
-+	  /* Check if the thread has exited.  */
-+	  if (WIFEXITED (status) || WIFSIGNALED (status))
-+	    {
-+	      warning (_("Thread %s exited: %s"), target_pid_to_str (ptid),
-+		       status_to_str (status));
-+	      return -1;
-+	    }
-+	  gdb_assert (WIFSTOPPED (status));
-+	  sig = WSTOPSIG (status);
-+	  gdb_assert (sig != 0);
-+	}
-+      while (sig != SIGSTOP);
- 
-       target_post_attach (pid);
+-
+-      target_post_attach (pid);
++      target_post_attach (GET_LWP (ptid));
  
        lp->stopped = 1;
 -
@@ -279,16 +125,181 @@ diff -u -rup gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
      }
    else
      {
-@@ -1065,8 +1088,6 @@ static void
+@@ -1061,11 +1049,172 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+   return 0;
+ }
+ 
++/* Detect `T (stopped)' in `/proc/PID/status'.
++   Other states including `T (tracing stop)' are reported as false.  */
++
++static int
++pid_is_stopped (pid_t pid)
++{
++  FILE *status_file;
++  char buf[100]; 
++  int retval = 0;
++
++  snprintf (buf, sizeof (buf), "/proc/%d/status", (int) pid);
++  status_file = fopen (buf, "r");
++  if (status_file != NULL)
++    {
++      int have_state = 0;
++
++      while (fgets (buf, sizeof (buf), status_file))
++	{
++	  if (strncmp (buf, "State:", 6) == 0)
++	    {
++	      have_state = 1;
++	      break;
++	    }
++	} 
++      if (have_state && strstr (buf, "T (stopped)") != NULL)
++	retval = 1;
++      fclose (status_file);
++    }
++  return retval;
++}
++
++/* Handle the processing after PTRACE_ATTACH, the first WAITPID -> SIGSTOP.
++   Returns STATUS if the thread has exited, 0 otherwise.
++   Sets LP->WAS_STOPPED if the process was originally stopped.
++   Sets LP->CLONED if the given LWP is not the thread leader.
++
++   Scenario for a standard unstopped inferior:
++    * `S (sleeping)' or `R (running)' or similiar states.
++    * PTRACE_ATTACH is called.
++    * `S (sleeping)' (or similiar) for some while.
++    * `T (tracing stop)'.
++    * WAITPID succeeds here returning SIGSTOP (signalled by PTRACE_ATTACH).
++
++   Scenario for a formerly stopped inferior:
++    * `T (stopped)'.
++    * PTRACE_ATTACH is called.
++    * `T (stopped)' would stay indefinitely
++      Note since this moment the `TracerPid' field gets filled
++      (by PTRACE_ATTACH), it is no longer just the common `T (stopped)' state.
++       * If no one did WAITPID since sending SIGSTOP our WAITPID would return
++         SIGSTOP.  The state still would not turn to `T (tracing stop)'.
++       * Usually its original parent (before PTRACE_ATTACH was applied) already
++         did WAITPID.  The original parent already received our SIGSTOP
++         sinalled by our PTRACE_ATTACH.
++         In this case our own WAITPID would hang.  Therefore...
++    * ... we do artificial: tkill (SIGCONT);
++      `PTRACE_CONT, SIGSTOP' does not work in 100% cases as sometimes SIGSTOP
++      gets remembered by kernel during the first PTRACE_CONT later and we get
++      spurious SIGSTOP event.  Expecting the signal may get delivered to
++      a different task of the thread group.
++      `kill_lwp (SIGSTOP)' has no effect in this moment (it is already stopped).
++    * WAITPID returns the artifical SIGCONT.
++      (The possibly pending SIGSTOP gets vanished by specifically SIGCONT.)
++    * State turns `T (tracing stop)'.
++   In this moment everything is almost fine but we need a workaround as final
++   `PTRACE_DETACH, SIGSTOP' would leave the process unstopped otherwise:
++    * tkill (SIGSTOP);
++    * `PTRACE_CONT, 0'
++    * WAITPID returns the artifical SIGSTOP.
++
++   With the pending (unwaited for) SIGSTOP the artifical signal effects are:
++   kill (SIGSTOP)
++   PTRACE_ATTACH
++    /-tkill (SIGCONT), WAITPID: SIGCONT, WAITPID: hang !
++   //-tkill (SIGCONT), WAITPID: SIGCONT, PTRACE_CONT (SIG_0), WAITPID: wait (OK)
++   \\-tkill (SIGALRM), WAITPID: SIGSTOP, WAITPID: hang !
++    \-tkill (SIGALRM), WAITPID: SIGSTOP, PTRACE_CONT (SIG_0), WAITPID: SIGALRM !
++   Therefore we signal artifical SIGCONT and stop waiting after its reception.
++
++   For the detection whether the process was formerly stopped we need to
++   read `/proc/PID/status'.  `PTRACE_CONT, SIGSTOP' returns ESRCH
++   for `S (sleeping)' and succeeds for `T (stopped)' but it unfortunately
++   succeeds even for `T (tracing stop)'.  Depending on PTRACE_CONT, SIGSTOP
++   success value for formerly stopped processes would mean a race condition
++   as we would get false stopped processes detection if we get too slow.
++
++   `waitid (..., WSTOPPED)' hangs the same way as WAITPID.
++
++   Signals get queued for WAITPID.  PTRACE_ATTACH (or TKILL) enqueues SIGSTOP
++   there but WAITPID may return an already pending signal.
++   Redeliver it by PTRACE_CONT, SIGxxx as otherwise it would get lost.
++   Similiar processing is being done in this file by WAIT_LWP.  */
++
++static int
++linux_ptrace_post_attach (struct lwp_info *lp)
++{
++  ptid_t ptid = lp->ptid;
++  unsigned long sig;
++
++  if (debug_linux_nat)
++    fprintf_unfiltered (gdb_stdlog,
++			"LLAL: PTRACE_ATTACH %s, 0, 0 (OK)\n",
++			target_pid_to_str (ptid));
++
++  lp->was_stopped = pid_is_stopped (GET_LWP (ptid));
++  if (lp->was_stopped)
++    {
++      if (kill_lwp (GET_LWP (ptid), SIGCONT) != 0)
++	perror_with_name (("kill_lwp (SIGCONT)"));
++    }
++
++  for (;;)
++    {
++      pid_t pid;
++      int status;
++
++      pid = my_waitpid (GET_LWP (ptid), &status, 0);
++      if (pid == -1 && errno == ECHILD)
++	{
++	  /* Try again with __WCLONE to check cloned processes.  */
++	  pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
++	  lp->cloned = 1;
++	}
++      gdb_assert (pid == GET_LWP (ptid));
++
++      if (debug_linux_nat)
++	{
++	  fprintf_unfiltered (gdb_stdlog,
++			      "LLAL: waitpid %s received %s\n",
++			      target_pid_to_str (ptid),
++			      status_to_str (status));
++	}
++
++      /* Check if the thread has exited.  */
++      if (WIFEXITED (status) || WIFSIGNALED (status))
++        return status;
++      gdb_assert (WIFSTOPPED (status));
++      sig = WSTOPSIG (status);
++      gdb_assert (sig != 0);
++      if (sig == SIGSTOP)
++        break;
++
++      /* As the second signal for stopped processes we send SIGSTOP.  */
++      if (lp->was_stopped && sig == SIGCONT)
++	sig = SIGSTOP;
++
++      printf_unfiltered (_("Redelivering pending %s.\n"),
++		 target_signal_to_string (target_signal_from_host (sig)));
++      if (sig == SIGSTOP)
++	{
++	  if (kill_lwp (GET_LWP (ptid), sig) != 0)
++	    perror_with_name (("kill_lwp"));
++	  /* We now must resume the inferior to get SIGSTOP delivered.  */
++	  sig = 0;
++	}
++      if (ptrace (PTRACE_CONT, GET_LWP (ptid), NULL, (void *) sig) != 0)
++	perror_with_name (("ptrace"));
++    }
++
++  return 0;
++}
++
+ static void
  linux_nat_attach (char *args, int from_tty)
  {
    struct lwp_info *lp;
 -  pid_t pid;
--  int status;
+   int status;
  
    /* FIXME: We should probably accept a list of process id's, and
-      attach all of them.  */
-@@ -1076,22 +1097,6 @@ linux_nat_attach (char *args, int from_t
+@@ -1076,21 +1225,12 @@ linux_nat_attach (char *args, int from_t
    inferior_ptid = BUILD_LWP (GET_PID (inferior_ptid), GET_PID (inferior_ptid));
    lp = add_lwp (inferior_ptid);
  
@@ -307,11 +318,16 @@ diff -u -rup gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
 -
 -  gdb_assert (pid == GET_PID (inferior_ptid)
 -	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP);
--
++  status = linux_ptrace_post_attach (lp);
++  if (status != 0)
++    error (_("Program %s exited: %s\n"), target_pid_to_str (inferior_ptid),
++	   status_to_str (status));
++  if (lp->cloned)
++    warning (_("%s is a cloned process"), target_pid_to_str (inferior_ptid));
+ 
    lp->stopped = 1;
  
-   /* Fake the SIGSTOP that core GDB expects.  */
-@@ -1099,8 +1104,8 @@ linux_nat_attach (char *args, int from_t
+@@ -1099,8 +1239,8 @@ linux_nat_attach (char *args, int from_t
    lp->resumed = 1;
    if (debug_linux_nat)
      {
@@ -322,26 +338,44 @@ diff -u -rup gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
      }
  }
  
-diff -u -rup gdb-6.6-orig/gdb/target.h gdb-6.6/gdb/target.h
---- gdb-6.6-orig/gdb/target.h	2007-06-06 13:30:52.000000000 +0200
-+++ gdb-6.6/gdb/target.h	2007-06-06 13:33:11.000000000 +0200
-@@ -529,9 +529,9 @@ void target_close (struct target_ops *ta
-    to the `attach' command by the user.  This routine can be called
-    when the target is not on the target-stack, if the target_can_run
-    routine returns 1; in that case, it must push itself onto the stack.
--   Upon exit, the target should be ready for normal operations, and
--   should be ready to deliver the status of the process immediately
--   (without waiting) to an upcoming target_wait call.  */
-+   Upon exit, the target should be ready for normal operations.
-+   The status of the inferior is already processed and possibly pending
-+   signals redelivered.  */
+@@ -1173,6 +1313,9 @@ linux_nat_detach (char *args, int from_t
  
- #define	target_attach(args, from_tty)	\
-      (*current_target.to_attach) (args, from_tty)
-diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.6/gdb/testsuite/gdb.threads/attach-into-signal.c
---- gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.c	2007-06-06 16:36:34.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.threads/attach-into-signal.c	2007-06-06 13:33:11.000000000 +0200
-@@ -0,0 +1,65 @@
+   trap_ptid = null_ptid;
+ 
++  if (lwp_list->was_stopped)
++    args = STRINGIFY (SIGSTOP);
++
+   /* Destroy LWP info; it's no longer valid.  */
+   init_lwp_list ();
+ 
+@@ -1310,6 +1453,12 @@ linux_nat_resume (ptid_t ptid, int step_
+       lp->stopped = 0;
+     }
+ 
++  /* At this point, we are going to resume the inferior and if we
++     have attached to a stopped process, we no longer should leave
++     it as stopped if the user detaches.  */
++  if (!step && lp != NULL)
++    lp->was_stopped = 0;
++
+   if (resume_all)
+     iterate_over_lwps (resume_callback, NULL);
+ 
+--- ./gdb/linux-nat.h	10 May 2007 21:36:00 -0000	1.18
++++ ./gdb/linux-nat.h	29 Jun 2007 22:06:05 -0000
+@@ -42,6 +42,9 @@ struct lwp_info
+   /* Non-zero if this LWP is stopped.  */
+   int stopped;
+ 
++  /* Non-zero if this LWP was stopped by SIGSTOP before attaching.  */
++  int was_stopped;
++
+   /* Non-zero if this LWP will be/has been resumed.  Note that an LWP
+      can be marked both as stopped and resumed at the same time.  This
+      happens if we try to resume an LWP that has a wait status
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/attach-into-signal.c	29 Jun 2007 22:06:05 -0000
+@@ -0,0 +1,70 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
 +   Copyright 2007 Free Software Foundation, Inc.
@@ -385,6 +419,11 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.6
 +
 +  raise (SIGALRM);
 +
++  /* It is an upstream kernel bug (2.6.22-rc4-git7.x86_64, PREEMPT, SMP).
++     We never get here without ptrace(2) but we get while under ptrace(2).  */
++  for (;;)
++    pause ();
++
 +  abort ();
 +  /* NOTREACHED */
 +  return NULL;
@@ -407,10 +446,9 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.6
 +
 +  return 0;
 +}
-diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6.6/gdb/testsuite/gdb.threads/attach-into-signal.exp
---- gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp	2007-06-06 16:36:34.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.threads/attach-into-signal.exp	2007-06-06 13:33:11.000000000 +0200
-@@ -0,0 +1,153 @@
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/attach-into-signal.exp	29 Jun 2007 22:06:06 -0000
+@@ -0,0 +1,176 @@
 +# Copyright 2007
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -472,12 +510,33 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6
 +
 +    # linux-2.6.20.4.x86_64 had maximal attempt # 20 in 4 test runs.
 +    set attempts 100
-+    set attempt 0
++    set attempt 1
 +    set passes 1
-+    while { $passes < 3 && $attempt < $attempts } {
++    while { $passes < 3 && $attempt <= $attempts } {
 +
 +	# Start with clean gdb
 +	gdb_exit
++
++	set stoppedtry 0
++	while { $stoppedtry < 10 } {
++	    set fileid [open /proc/${testpid}/status r];
++	    gets $fileid line1;
++	    gets $fileid line2;
++	    close $fileid;
++
++	    if {![string match "*(stopped)*" $line2]} {
++		# No PASS message as we may be looping in multiple attempts.
++		break
++	    }
++	    sleep 1
++	    set stoppedtry [expr $stoppedtry + 1]
++	}
++	if { $stoppedtry >= 10 } {
++	    verbose -log $line2
++	    set test "$threadtype: process is still running on the attempt # $attempt of $attempts"
++	    break
++	}
++
 +	gdb_start
 +	gdb_reinitialize_dir $srcdir/$subdir
 +	gdb_load ${binfile}
@@ -528,7 +587,11 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6
 +	}
 +    }
 +    if {$passes < 3} {
-+	fail $test
++	if {$attempt > $attempts} {
++	    unresolved $test
++	} else {
++	    fail $test
++	}
 +    }
 +
 +    # Exit and detach the process.
@@ -555,18 +618,15 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6
 +
 +corefunc nonthreaded
 +
-+# build the test case first without threads
++# build the test case also with threads
 +#
 +if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DUSE_THREADS}] != "" } {
 +    gdb_suppress_entire_file "Testcase threaded compile failed, so all tests in this file will automatically fail."
 +}
 +
 +corefunc threaded
-+
-+return 0
-diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.c gdb-6.6/gdb/testsuite/gdb.threads/attach-stopped.c
---- gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.c	2007-06-06 16:36:34.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.threads/attach-stopped.c	2007-06-06 13:33:11.000000000 +0200
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/attach-stopped.c	29 Jun 2007 22:06:06 -0000
 @@ -0,0 +1,51 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -619,10 +679,9 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.c gdb-6.6/gdb
 +
 +  return 0;
 +}
-diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.6/gdb/testsuite/gdb.threads/attach-stopped.exp
---- gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp	2007-06-06 16:36:34.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.threads/attach-stopped.exp	2007-06-06 13:33:11.000000000 +0200
-@@ -0,0 +1,208 @@
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.threads/attach-stopped.exp	29 Jun 2007 22:06:06 -0000
+@@ -0,0 +1,213 @@
 +# Copyright 2005-2007
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -682,8 +741,10 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.6/g
 +    # that it can be attached to.
 +
 +    set testpid [eval exec $binfile &]
-+    exec sleep 2
-+       
++
++    # Avoid some race:
++    sleep 2
++
 +    # Stop the program 
 +    remote_exec build "kill -s STOP ${testpid}"
 +
@@ -724,6 +785,9 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.6/g
 +    # Exit and detach the process.
 +       
 +    gdb_exit
++
++    # Avoid some race:
++    sleep 2
 +
 +    set fileid [open /proc/${testpid}/status r];
 +    gets $fileid line1;
@@ -790,7 +854,7 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.6/g
 +    gdb_exit
 +
 +    # Avoid some race:
-+    exec sleep 2
++    sleep 2
 +
 +    # At this point, the process should be sleeping
 +
@@ -831,3 +895,41 @@ diff -u -rup gdb-6.6-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.6/g
 +corefunc threaded
 +
 +return 0
+--- ./gdb/doc/gdb.texinfo	1 Jul 2007 09:13:05 -0000	1.418
++++ ./gdb/doc/gdb.texinfo	1 Jul 2007 09:55:14 -0000
+@@ -2167,16 +2167,29 @@ can step and continue; you can modify st
+ process continue running, you may use the @code{continue} command after
+ attaching @value{GDBN} to the process.
+ 
++For a process already being stopped before the @code{attach} command executed
++you get the informational message below.  Other signals may be occasionally
++shown if they were being delivered right the time the @code{attach} command
++executed.  Such process is left still stopped after the @code{detach} command
++as long as you have not used the @code{continue} command (or similiar one)
++during your debugging session.
++
++@smallexample
++Attaching to program: /bin/sleep, process 16289
++Redelivering pending Stopped (signal).
++@end smallexample
++
+ @table @code
+ @kindex detach
+ @item detach
+ When you have finished debugging the attached process, you can use the
+-@code{detach} command to release it from @value{GDBN} control.  Detaching
+-the process continues its execution.  After the @code{detach} command,
+-that process and @value{GDBN} become completely independent once more, and you
+-are ready to @code{attach} another process or start one with @code{run}.
+-@code{detach} does not repeat if you press @key{RET} again after
+-executing the command.
++@code{detach} command to release it from @value{GDBN} control.  Detaching the
++process continues its execution unless it was already stopped before the
++attachment and a @code{continue} type command has not been executed.  After the
++@code{detach} command, that process and @value{GDBN} become completely
++independent once more, and you are ready to @code{attach} another process or
++start one with @code{run}.  @code{detach} does not repeat if you press
++@key{RET} again after executing the command.
+ @end table
+ 
+ If you exit @value{GDBN} while you have an attached process, you detach
