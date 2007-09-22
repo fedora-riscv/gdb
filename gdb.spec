@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -683,6 +683,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Sep 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-28
+- Support also the `$allocate' and `$delete' ctor/dtor variants (BZ 301701).
+- Fix the build compatibility with texinfo >= 4.10.
+- Fix the testcase for pending signals (from BZ 233852).
+
 * Sun Sep 16 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-27
 - Fix attaching to stopped processes and/or pending signals.
 

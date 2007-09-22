@@ -1,3 +1,10 @@
+[base]
+
+2007-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (add_minsym_members): Support also the `$allocate' and
+	`$delete' variants.
+
 Index: gdb-6.5/gdb/linespec.c
 ===================================================================
 --- gdb-6.5.orig/gdb/linespec.c	2006-01-10 20:14:43.000000000 -0200
@@ -68,7 +75,7 @@ Index: gdb-6.5/gdb/linespec.c
  	  else if (strncmp (class_name, name, name_len) == 0
  		   && (class_name[name_len] == '\0'
  		       || class_name[name_len] == '<'))
-@@ -261,21 +274,83 @@ find_methods (struct type *t, char *name
+@@ -261,21 +274,101 @@ find_methods (struct type *t, char *name
  
    if (i1 == 0)
      for (ibase = 0; ibase < TYPE_N_BASECLASSES (t); ibase++)
@@ -131,6 +138,24 @@ Index: gdb-6.5/gdb/linespec.c
 +      ++counter;
 +    }
 +  xfree (list);
++
++  /* Target also the allocating/deleting variants.  */
++  if (member_name[0] == '~')
++    strcpy (completion_name + comp_len - 1, "$delete(");
++  else
++    strcpy (completion_name + comp_len - 1, "$allocate(");
++  list = make_symbol_completion_list (completion_name,
++				      completion_name+1);
++
++  /* Again we have a list.  Add their minimal symbols to the array.  */
++  i = 0;
++  while (list && list[i] != NULL)
++    {
++      msym_arr[counter] = lookup_minimal_symbol (list[i++], NULL, NULL);
++      ++counter;
++    }
++  xfree (list);
++
 +  xfree (completion_name);
 +
 +  return counter;

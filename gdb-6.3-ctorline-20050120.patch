@@ -21,6 +21,14 @@
 	* tui/tui-win.c (make_visible_with_new_height): Ditto.
 	* tui/tui-winsource.c (tui_update_source_windows_with_addr): Ditto.
 
+2007-09-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (find_line_pc): Support also the `$allocate' and `$delete'
+	variants.  Support searching for the `$base' name even if the bare name
+	was found first.
+	* breakpoint.c (breakpoint_sals_to_pc): Support more than two returned
+	PC values.
+
 Index: gdb-6.5/gdb/mi/mi-cmd-disas.c
 ===================================================================
 --- gdb-6.5.orig/gdb/mi/mi-cmd-disas.c	2006-07-11 01:30:43.000000000 -0300
@@ -259,55 +267,78 @@ Index: gdb-6.5/gdb/symtab.c
    if (symtab == 0)
      return 0;
  
-@@ -2336,7 +2357,50 @@ find_line_pc (struct symtab *symtab, int
+@@ -2336,7 +2357,73 @@ find_line_pc (struct symtab *symtab, int
    if (symtab != NULL)
      {
        l = LINETABLE (symtab);
 -      *pc = l->item[ind].pc;
 +      main_pc = l->item[ind].pc;
++      *pc_array = xmalloc (sizeof (CORE_ADDR) * 3);
++      *num_elements = 0;
++      (*pc_array)[(*num_elements)++] = main_pc;
 +      minsym = lookup_minimal_symbol_by_pc (main_pc);
 +      if (minsym != NULL && minsym->ginfo.language == language_cplus)
-+        {
-+	  char *base_name = 
-+            minsym->ginfo.language_specific.cplus_specific.demangled_name;
-+          char *tmp_ptr = strstr (base_name, "$base(");
-+          if (tmp_ptr != NULL)
-+            {
-+              char *regular_name = (char *)xmalloc (strlen (base_name));
-+              memcpy (regular_name, base_name, tmp_ptr - base_name);
-+              strcpy (regular_name + (tmp_ptr - base_name), 
-+                      tmp_ptr + sizeof ("$base") - 1);
-+              minsym2 = lookup_minimal_symbol (regular_name, NULL, NULL);
-+              xfree (regular_name);
-+              if (minsym2 != NULL)
-+                {
-+		  /* We have recognized we have a ctor or dtor and have
-+		     located our line in the not-in-charge version.  We
-+		     also have located the in-charge version's minsym.
-+		     From this, we can find the index for the first line
-+		     line in the in-charge ctor/dtor and then search forward
-+		     for the specified line, thereby finding the 2nd match.  */
-+		  int exact;
-+		  int ind = find_line_by_pc (l, minsym2->ginfo.value.address,
-+				             &exact);
-+		  if (ind >= 0)
++	{
++	  char *src = minsym->ginfo.language_specific.cplus_specific.demangled_name;
++	  char *src_point = strchr (src, '(');
++	  char *s, *point;
++	  /* Keep "" last as the trimming part always matches it.  */
++	  const char *variants[] = {"$base","$allocate","$delete",""};
++	  int i;
++
++	  if (src_point != NULL)
++	    {
++	      char *dst = xmalloc (strlen (src) + strlen ("$allocate") + 1);
++	      char *dst_point = dst + (src_point - src);
++
++	      memcpy (dst, src, src_point - src);
++
++	      /* Trim out any variant markers there first.  */
++	      for (i = 0; i < ARRAY_SIZE (variants); i++)
++		{
++		  size_t len = strlen (variants[i]);
++
++		  if (dst_point - dst >= len
++		      && memcmp (dst_point - len, variants[i], len) == 0)
 +		    {
-+		      ind = find_line_common (l, line, ind, &exact);
++		      dst_point -= len;
++		      /* In fact it should not be needed here.  */
++		      break;
++		    }
++		}
++
++	      /* And now try to append all of them.  */
++	      for (i = 0; i < ARRAY_SIZE (variants); i++)
++		{
++		  size_t len = strlen (variants[i]);
++		  struct minimal_symbol *minsym2;
++
++		  memcpy (dst_point, variants[i], len);
++		  strcpy (dst_point + len, src_point);
++	      
++		  minsym2 = lookup_minimal_symbol (dst, NULL, NULL);
++		  if (minsym2 != NULL)
++		    {
++		      /* We have recognized we have a ctor or dtor and have
++			 located our line in the not-in-charge version.  We
++			 also have located the in-charge version's minsym.
++			 From this, we can find the index for the first line
++			 line in the in-charge ctor/dtor and then search forward
++			 for the specified line, thereby finding the 2nd match.  */
++		      int exact;
++		      int ind = find_line_by_pc (l, minsym2->ginfo.value.address,
++						 &exact);
 +		      if (ind >= 0)
-+		        {
-+                          *pc_array = xmalloc (2 * sizeof (CORE_ADDR));
-+                          (*pc_array)[0] = main_pc;
-+                          (*pc_array)[1] = l->item[ind].pc;
-+                          *num_elements = 2;
-+                          return 1;
++			{
++			  ind = find_line_common (l, line, ind, &exact);
++			  if (ind >= 0 && l->item[ind].pc != main_pc)
++			    (*pc_array)[(*num_elements)++] = l->item[ind].pc;
 +			}
 +		    }
-+                }
-+            }
-+        }
-+      *pc_array = xmalloc (sizeof (CORE_ADDR));
-+      (*pc_array)[0] = main_pc;
-+      *num_elements = 1;
++		}
++	      xfree (dst);
++	    }
++	}
        return 1;
      }
    else
@@ -441,7 +472,7 @@ Index: gdb-6.5/gdb/breakpoint.c
 ===================================================================
 --- gdb-6.5.orig/gdb/breakpoint.c	2006-07-11 01:30:53.000000000 -0300
 +++ gdb-6.5/gdb/breakpoint.c	2006-07-11 01:39:20.000000000 -0300
-@@ -5268,10 +5268,40 @@ static void
+@@ -5268,10 +5268,44 @@ static void
  breakpoint_sals_to_pc (struct symtabs_and_lines *sals,
  		       char *address)
  {    
@@ -469,8 +500,12 @@ Index: gdb-6.5/gdb/breakpoint.c
 +                     * sizeof (struct symtab_and_line));
 +          memcpy (new_sals, sals->sals, (i + 1) 
 +                  * sizeof (struct symtab_and_line));
-+          memcpy (&(new_sals[i + 1]), &sals->sals[i], 
-+                  sizeof (struct symtab_and_line));
++	  /* The one returned SALS entry is copied for all the PCs.  */
++          for (j = 1; j < num_pc_values; ++j)
++            {
++	      memcpy (&(new_sals[i + j]), &sals->sals[i], 
++		      sizeof (struct symtab_and_line));
++	    }
 +          xfree (sals->sals);
 +          sals->sals = new_sals;
 +          sals->nelts += num_pc_values - 1;
