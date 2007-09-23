@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -374,6 +374,9 @@ Patch272: gdb-6.6-glibc-open-fcntl2-compat.patch
 Patch273: gdb-6.6-buildid-verify.patch
 Patch274: gdb-6.6-buildid-locate.patch
 
+# Fixed the kernel VDSO loading (producing `no loadable sections found').
+Patch276: gdb-6.6-bfd-vdso8k.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -529,6 +532,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch272 -p1
 %patch273 -p1
 %patch274 -p1
+%patch276 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -683,6 +687,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Sep 23 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-29
+- Fixed the kernel VDSO loading (`warning: no loadable sections found in ...').
+- Fix the testcase for pending signals (from BZ 233852).
+
 * Sat Sep 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-28
 - Support also the `$allocate' and `$delete' ctor/dtor variants (BZ 301701).
 - Fix the build compatibility with texinfo >= 4.10.
