@@ -35,7 +35,7 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
  
  
  #ifndef O_LARGEFILE
-@@ -253,6 +257,70 @@ add_to_thread_list (bfd *abfd, asection 
+@@ -253,6 +257,63 @@ add_to_thread_list (bfd *abfd, asection 
      inferior_ptid = pid_to_ptid (thread_id);	/* Yes, make it current */
  }
  
@@ -93,30 +93,28 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
 +
 +  xfree (exec_filename);
 +
-+  if (exec_filename != NULL)
-+    {
-+#ifdef SOLIB_ADD
-+      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-+#else
-+      solib_add (NULL, 0, &current_target, auto_solib_add);
-+#endif
-+    }
++  /* No automatic SOLIB_ADD as the libraries would get read twice.  */
 +}
 +
  /* This routine opens and sets up the core file bfd.  */
  
  static void
-@@ -377,6 +445,10 @@ core_open (char *filename, int from_tty)
-       /* Fetch all registers from core file.  */
-       target_fetch_registers (-1);
+@@ -417,6 +420,15 @@ core_open (char *filename, int from_tty)
+   ontop = !push_target (&core_ops);
+   discard_cleanups (old_chain);
  
-+      /* Find build_id identifiers.  */
++  if (ontop)
++    {
++      /* Find the build_id identifiers.  If it gets executed after
++         POST_CREATE_INFERIOR we would clash with asking to discard the already
++         loaded VDSO symbols.  */
 +      if (build_id_core_loads != 0)
 +        build_id_locate_exec (from_tty);
++    }
 +
-       /* Now, set up the frame cache, and print the top of stack.  */
-       flush_cached_frames ();
-       select_frame (get_current_frame ());
+   /* This is done first, before anything has a chance to query the
+      inferior for information such as symbols.  */
+   post_create_inferior (&core_ops, from_tty);
 @@ -662,4 +734,13 @@ _initialize_corelow (void)
  
    if (!coreops_suppress_target)

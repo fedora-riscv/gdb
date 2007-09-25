@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -687,6 +687,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Sep 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-30
+- Fix re-setting of the ctors/dtors breakpoints with multiple PCs (BZ 301701).
+- Avoid one useless user question in the core files locator (build-id).
+
 * Sun Sep 23 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-29
 - Fixed the kernel VDSO loading (`warning: no loadable sections found in ...').
 - Fix the testcase for pending signals (from BZ 233852).

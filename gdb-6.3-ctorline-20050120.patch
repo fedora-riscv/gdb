@@ -29,6 +29,13 @@
 	* breakpoint.c (breakpoint_sals_to_pc): Support more than two returned
 	PC values.
 
+2007-09-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (breakpoint_sals_to_pc): New parameter ADDR_STRING_P.
+	Expand also *ADDR_STRING_P if multiple PCs were found.
+	(break_command_1, do_captured_breakpoint): Pass also the ADDR_STRING
+	variable to be updated.
+
 Index: gdb-6.5/gdb/mi/mi-cmd-disas.c
 ===================================================================
 --- gdb-6.5.orig/gdb/mi/mi-cmd-disas.c	2006-07-11 01:30:43.000000000 -0300
@@ -472,9 +479,12 @@ Index: gdb-6.5/gdb/breakpoint.c
 ===================================================================
 --- gdb-6.5.orig/gdb/breakpoint.c	2006-07-11 01:30:53.000000000 -0300
 +++ gdb-6.5/gdb/breakpoint.c	2006-07-11 01:39:20.000000000 -0300
-@@ -5268,10 +5268,44 @@ static void
+@@ -5268,12 +5268,69 @@ static void
+ 
+ static void
  breakpoint_sals_to_pc (struct symtabs_and_lines *sals,
- 		       char *address)
+-		       char *address)
++		       char *address, char ***addr_string_p)
  {    
 -  int i;
 -  for (i = 0; i < sals->nelts; i++)
@@ -498,6 +508,9 @@ Index: gdb-6.5/gdb/breakpoint.c
 +          struct symtab_and_line *new_sals = 
 +            xmalloc ((sals->nelts + num_pc_values - 1) 
 +                     * sizeof (struct symtab_and_line));
++          char **new_addr_string;
++
++          /* Expand the SALS array.  */
 +          memcpy (new_sals, sals->sals, (i + 1) 
 +                  * sizeof (struct symtab_and_line));
 +	  /* The one returned SALS entry is copied for all the PCs.  */
@@ -513,6 +526,26 @@ Index: gdb-6.5/gdb/breakpoint.c
 +            {
 +              sals->sals[i + j].pc = pc_list[j];
 +            }
++
++          /* Expand the *ADDR_STRING_P array.  */
++          new_addr_string = xmalloc ((sals->nelts + num_pc_values - 1)
++                                     * sizeof *new_addr_string);
++          memcpy (new_addr_string, *addr_string_p,
++                  (i + 1) * sizeof *new_addr_string);
++          /* The existing *ADDR_STRING_P entry must be deleted for all the
++             multiple PCs as BREAKPOINT_RE_SET currently does not set all the
++             PCs for a sinle line back again.  For NULL values "*0x%x" direct
++             address will be provided by CREATE_BREAKPOINTS.  */
++          xfree ((*addr_string_p)[i]);
++           for (j = 0; j < num_pc_values; ++j)
++             {
++              new_addr_string[i + j] = NULL;
++            }
++          memcpy (&new_addr_string[i + num_pc_values], &(*addr_string_p)[i + 1],
++                  (sals->nelts - (i + num_pc_values)) * sizeof *new_addr_string);
++          xfree (*addr_string_p);
++          *addr_string_p = new_addr_string;
++
 +          incr = num_pc_values;
 +        }
 +
@@ -527,7 +560,7 @@ Index: gdb-6.5/gdb/breakpoint.c
      {
 +      /* Resolve all line numbers to PC's and verify that the addresses
 +         are ok for the target.  */
-+      breakpoint_sals_to_pc (&sals, addr_start);
++      breakpoint_sals_to_pc (&sals, addr_start, &addr_string);
 +
        /* Make sure that all storage allocated to SALS gets freed.  */
        make_cleanup (xfree, sals.sals);
@@ -544,6 +577,15 @@ Index: gdb-6.5/gdb/breakpoint.c
    /* Verify that condition can be parsed, before setting any
       breakpoints.  Allocate a separate condition expression for each
       breakpoint. */
+@@ -5665,7 +5688,7 @@ do_captured_breakpoint (struct ui_out *u
+     error (_("Garbage %s following breakpoint address"), address_end);
+ 
+   /* Resolve all line numbers to PC's.  */
+-  breakpoint_sals_to_pc (&sals, args->address);
++  breakpoint_sals_to_pc (&sals, args->address, &addr_string);
+ 
+   /* Verify that conditions can be parsed, before setting any
+      breakpoints.  */
 @@ -5670,14 +5699,16 @@ gdb_breakpoint (char *address, char *con
  void
  resolve_sal_pc (struct symtab_and_line *sal)
