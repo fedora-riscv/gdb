@@ -36,6 +36,13 @@
 	(break_command_1, do_captured_breakpoint): Pass also the ADDR_STRING
 	variable to be updated.
 
+2007-10-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (breakpoint_sals_to_pc): Provide "%42" suffix to the
+	multiple-PC breakpoints' ADDR_STRINGs.
+	(breakpoint_re_set_one): New variables ID_S, ID, PC_LIST, NUM_PC_VALUES.
+	Parse the "%42" suffix of the multiple-PC breakpoints's ADDR_STRINGs.
+
 Index: gdb-6.5/gdb/mi/mi-cmd-disas.c
 ===================================================================
 --- gdb-6.5.orig/gdb/mi/mi-cmd-disas.c	2006-07-11 01:30:43.000000000 -0300
@@ -479,7 +486,7 @@ Index: gdb-6.5/gdb/breakpoint.c
 ===================================================================
 --- gdb-6.5.orig/gdb/breakpoint.c	2006-07-11 01:30:53.000000000 -0300
 +++ gdb-6.5/gdb/breakpoint.c	2006-07-11 01:39:20.000000000 -0300
-@@ -5268,12 +5268,69 @@ static void
+@@ -5268,12 +5268,70 @@ static void
  
  static void
  breakpoint_sals_to_pc (struct symtabs_and_lines *sals,
@@ -509,6 +516,7 @@ Index: gdb-6.5/gdb/breakpoint.c
 +            xmalloc ((sals->nelts + num_pc_values - 1) 
 +                     * sizeof (struct symtab_and_line));
 +          char **new_addr_string;
++          char *addr_string_base;
 +
 +          /* Expand the SALS array.  */
 +          memcpy (new_sals, sals->sals, (i + 1) 
@@ -532,15 +540,15 @@ Index: gdb-6.5/gdb/breakpoint.c
 +                                     * sizeof *new_addr_string);
 +          memcpy (new_addr_string, *addr_string_p,
 +                  (i + 1) * sizeof *new_addr_string);
-+          /* The existing *ADDR_STRING_P entry must be deleted for all the
-+             multiple PCs as BREAKPOINT_RE_SET currently does not set all the
-+             PCs for a sinle line back again.  For NULL values "*0x%x" direct
-+             address will be provided by CREATE_BREAKPOINTS.  */
-+          xfree ((*addr_string_p)[i]);
-+           for (j = 0; j < num_pc_values; ++j)
-+             {
-+              new_addr_string[i + j] = NULL;
-+            }
++          /* The existing *ADDR_STRING_P entry must be copied for all the
++             multiple PCs. BREAKPOINT_RE_SET will follow the new trailing "%id"
++             syntax so it will get resolved right even later.  Do not use the
++             unambiguous NULL values (resolved to "0x%x" by CREATE_BREAKPOINTS)
++             as the address may change for the shared libraries.  */
++          addr_string_base = (*addr_string_p)[i];
++          for (j = 0; j < num_pc_values; ++j)
++            new_addr_string[i + j] = xstrprintf ("%s%%%d", addr_string_base, j);
++          xfree (addr_string_base);
 +          memcpy (&new_addr_string[i + num_pc_values], &(*addr_string_p)[i + 1],
 +                  (sals->nelts - (i + num_pc_values)) * sizeof *new_addr_string);
 +          xfree (*addr_string_p);
@@ -661,3 +669,58 @@ Index: gdb-6.5/gdb/breakpoint.c
  void
  break_command (char *arg, int from_tty)
  {
+@@ -7304,6 +7305,8 @@ breakpoint_re_set_one (void *bint)
+   int *not_found_ptr = NULL;
+   struct symtabs_and_lines sals;
+   char *s;
++  char *id_s;
++  int id = -1;
+   enum enable_state save_enable;
+ 
+   switch (b->type)
+@@ -7364,11 +7367,44 @@ breakpoint_re_set_one (void *bint)
+       set_language (b->language);
+       input_radix = b->input_radix;
+       s = b->addr_string;
++      for (id_s = s + strlen (s) - 1; id_s >= s; id_s--)
++        {
++	  if (isdigit (*id_s))
++	    continue;
++	  if (*id_s == '%')
++	    break;
++	  id_s = NULL;
++	  break;
++	}
++      if (id_s >= s)
++        {
++	  s = alloca (id_s - b->addr_string + 1);
++	  memcpy (s, b->addr_string, id_s - b->addr_string);
++	  s[id_s - b->addr_string] = 0;
++	  id = atoi (id_s + 1);
++	}
+       sals = decode_line_1 (&s, 1, (struct symtab *) NULL, 0, (char ***) NULL,
+ 		            not_found_ptr);
+       for (i = 0; i < sals.nelts; i++)
+ 	{
+-	  resolve_sal_pc (&sals.sals[i]);
++	  CORE_ADDR *pc_list;
++	  int num_pc_values;
++
++	  resolve_sal_pc_list (&sals.sals[i], &pc_list, &num_pc_values);
++	  if (num_pc_values > 0)
++	    {
++	      if (id != -1)
++		{
++		  /* The number of PC values should not usually change.  */
++		  if (id >= num_pc_values)
++		    {
++		      delete_breakpoint (b);
++		      return 0;
++		    }
++		  sals.sals[i].pc = pc_list[id];
++		}
++	      xfree (pc_list);
++	    }
+ 
+ 	  /* Reparse conditions, they might contain references to the
+ 	     old symtab.  */

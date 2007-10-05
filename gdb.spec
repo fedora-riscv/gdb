@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -542,6 +542,8 @@ _FOO
 
 # Remove the info and other generated files added by the FSF release
 # process.
+rm -f bfd/doc/*.info
+rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
 
@@ -687,6 +689,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Oct  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-31
+- Fix address changes of the ctors/dtors breakpoints w/multiple PCs (BZ 301701).
+- Delete an info doc file on `rpmbuild -bp' later rebuilt during `rpmbuild -bc'.
+
 * Tue Sep 25 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-30
 - Fix re-setting of the ctors/dtors breakpoints with multiple PCs (BZ 301701).
 - Avoid one useless user question in the core files locator (build-id).
