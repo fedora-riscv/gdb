@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -374,8 +374,11 @@ Patch272: gdb-6.6-glibc-open-fcntl2-compat.patch
 Patch273: gdb-6.6-buildid-verify.patch
 Patch274: gdb-6.6-buildid-locate.patch
 
-# Fixed the kernel VDSO loading (producing `no loadable sections found').
+# Fixed the kernel 8KB VDSO loading (producing `no loadable sections found').
 Patch276: gdb-6.6-bfd-vdso8k.patch
+
+# Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
+Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -533,6 +536,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch273 -p1
 %patch274 -p1
 %patch276 -p1
+%patch277 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -689,6 +693,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Oct  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-32
+- Set the breakpoints always to all the ctors/dtors variants (BZ 301701).
+- Fix a TUI visual corruption due to the build-id warnings (BZ 320061).
+- Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
+
 * Fri Oct  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-31
 - Fix address changes of the ctors/dtors breakpoints w/multiple PCs (BZ 301701).
 - Delete an info doc file on `rpmbuild -bp' later rebuilt during `rpmbuild -bc'.
