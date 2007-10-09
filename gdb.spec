@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -380,6 +380,9 @@ Patch276: gdb-6.6-bfd-vdso8k.patch
 # Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
 Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 
+# Fix debug load for sparse assembler files (such as vDSO32 for i386-on-x86_64).
+Patch278: gdb-6.6-cu-ranges.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -537,6 +540,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch274 -p1
 %patch276 -p1
 %patch277 -p1
+%patch278 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -693,6 +697,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Tue Oct  9 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-33
+- Fix debug load for sparse assembler files (such as vDSO32 for i386-on-x86_64).
+
 * Mon Oct  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-32
 - Set the breakpoints always to all the ctors/dtors variants (BZ 301701).
 - Fix a TUI visual corruption due to the build-id warnings (BZ 320061).
