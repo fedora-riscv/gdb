@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -697,6 +697,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Oct 11 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-33
+- Fix gdbserver for threaded applications and recent glibc (BZ 328021).
+
 * Wed Oct 10 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-32
 - Fix debug load for sparse assembler files (such as vDSO32 for i386-on-x86_64).
 - Fix a TUI visual corruption due to the build-id warnings (BZ 320061).
