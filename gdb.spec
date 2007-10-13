@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -697,6 +697,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Oct 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-35
+- Fix non-threaded watchpoints CTRL-C regression on `set follow child'.
+
 * Fri Oct 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-34
 - Fix gdbserver for threaded applications and recent glibc (BZ 328021).
 
