@@ -1,0 +1,284 @@
+2007-10-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Handle multiple different PIDs for the DR registers.
+	* i386-nat.c: Include "inferior.h".
+	(struct dr_mirror_status, dr_mirror_active, dr_mirror_fetch): New.
+	(dr_mirror, dr_status_mirror, dr_control_mirror, dr_ref_count):
+	Redefined using DR_MIRROR_ACTIVE.
+	(i386_cleanup_dregs): Clear the DR_MIRROR_ACTIVE content instead.
+	(i386_show_dr, i386_insert_aligned_watchpoint)
+	(i386_remove_aligned_watchpoint, i386_stopped_data_address)
+	(i386_stopped_by_hwbp): Call DR_MIRROR_FETCH.
+	* Makefile.in (i386-nat.o): Update dependencies.
+
+2007-10-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-fork.exp, gdb.base/watchpoint-fork.c: New files.
+
+[ Backported for GDB-6.6 (only removed the new file inclusion). ]
+
+--- ./gdb/i386-nat.c	23 Aug 2007 18:08:34 -0000	1.16
++++ ./gdb/i386-nat.c	14 Oct 2007 15:00:31 -0000
+@@ -165,11 +166,22 @@
+ 
+ /* Mirror the inferior's DRi registers.  We keep the status and
+    control registers separated because they don't hold addresses.  */
+-static CORE_ADDR dr_mirror[DR_NADDR];
+-static unsigned dr_status_mirror, dr_control_mirror;
++struct dr_mirror_status
++  {
++    /* Cyclic list.  */
++    struct dr_mirror_status *next;
++    long lwp;
++    CORE_ADDR addr[DR_NADDR];
++    unsigned status, control;
++    int ref_count[DR_NADDR];
++  };
++struct dr_mirror_status *dr_mirror_active;
++#define dr_mirror (dr_mirror_active->addr)
++#define dr_status_mirror (dr_mirror_active->status)
++#define dr_control_mirror (dr_mirror_active->control)
+ 
+ /* Reference counts for each debug register.  */
+-static int dr_ref_count[DR_NADDR];
++#define dr_ref_count (dr_mirror_active->ref_count)
+ 
+ /* Whether or not to print the mirrored debug registers.  */
+ static int maint_show_dr;
+@@ -218,15 +230,19 @@ static int i386_handle_nonaligned_watchp
+ void
+ i386_cleanup_dregs (void)
+ {
+-  int i;
++  struct dr_mirror_status *first = dr_mirror_active;
+ 
+-  ALL_DEBUG_REGISTERS(i)
++  if (first == NULL)
++    return;
++  do
+     {
+-      dr_mirror[i] = 0;
+-      dr_ref_count[i] = 0;
++      struct dr_mirror_status *next = dr_mirror_active->next;
++
++      xfree (dr_mirror_active);
++      dr_mirror_active = next;
+     }
+-  dr_control_mirror = 0;
+-  dr_status_mirror  = 0;
++  while (dr_mirror_active != first);
++  dr_mirror_active = NULL;
+ }
+ 
+ /* Reset all debug registers at each new startup to avoid missing
+@@ -238,6 +254,40 @@ child_post_startup_inferior (ptid_t ptid
+   i386_cleanup_dregs ();
+ }
+ 
++static void
++dr_mirror_fetch (void)
++{
++  long lwp;
++  int i;
++
++  lwp = ptid_get_lwp (inferior_ptid);
++  if (lwp == 0)
++    lwp = ptid_get_pid (inferior_ptid);
++
++  if (dr_mirror_active == NULL)
++    {
++      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
++      dr_mirror_active->next = dr_mirror_active;
++    }
++  else
++    {
++      struct dr_mirror_status *first = dr_mirror_active;
++      do
++	{
++	  if (dr_mirror_active->lwp == lwp)
++	    return;
++	  dr_mirror_active = dr_mirror_active->next;
++	}
++      while (dr_mirror_active != first);
++      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
++      dr_mirror_active->next = first->next;
++      first->next = dr_mirror_active;
++    }
++  dr_mirror_active->lwp = lwp;
++
++  /* All the registers left 0.  */
++}
++
+ /* Print the values of the mirrored debug registers.  This is called
+    when maint_show_dr is non-zero.  To set that up, type "maint
+    show-debug-regs" at GDB's prompt.  */
+@@ -248,6 +298,8 @@ i386_show_dr (const char *func, CORE_ADD
+ {
+   int i;
+ 
++  dr_mirror_fetch ();
++
+   puts_unfiltered (func);
+   if (addr || len)
+     printf_unfiltered (" (addr=%lx, len=%d, type=%s)",
+@@ -337,6 +389,8 @@ i386_insert_aligned_watchpoint (CORE_ADD
+ {
+   int i;
+ 
++  dr_mirror_fetch ();
++
+   /* First, look for an occupied debug register with the same address
+      and the same RW and LEN definitions.  If we find one, we can
+      reuse it for this watchpoint as well (and save a register).  */
+@@ -397,6 +451,8 @@ i386_remove_aligned_watchpoint (CORE_ADD
+ {
+   int i, retval = -1;
+ 
++  dr_mirror_fetch ();
++
+   ALL_DEBUG_REGISTERS(i)
+     {
+       if (!I386_DR_VACANT (i)
+@@ -569,6 +625,8 @@ i386_stopped_data_address (CORE_ADDR *ad
+   int i;
+   int rc = 0;
+ 
++  dr_mirror_fetch ();
++
+   dr_status_mirror = I386_DR_LOW_GET_STATUS ();
+ 
+   ALL_DEBUG_REGISTERS(i)
+@@ -610,6 +668,8 @@ i386_stopped_by_hwbp (void)
+ {
+   int i;
+ 
++  dr_mirror_fetch ();
++
+   dr_status_mirror = I386_DR_LOW_GET_STATUS ();
+   if (maint_show_dr)
+     i386_show_dr ("stopped_by_hwbp", 0, 0, hw_execute);
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/watchpoint-fork.c	14 Oct 2007 15:00:32 -0000
+@@ -0,0 +1,73 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2007
++   Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <assert.h>
++#include <unistd.h>
++#include <sys/wait.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++static volatile int var;
++
++static void breakpoint (void)
++{
++}
++
++static void forkoff (int nr)
++{
++  pid_t child, pid_got;
++  int exit_code = 42 + nr;
++  int status;
++
++  child = fork ();
++  switch (child)
++    {
++      case -1:
++	assert (0);
++      case 0:
++	printf ("child%d: %d\n", nr, (int) getpid ());
++	breakpoint ();
++        exit (exit_code);
++      default:
++	printf ("parent%d: %d\n", nr, (int) child);
++	pid_got = wait (&status);
++	assert (pid_got == child);
++	assert (WIFEXITED (status));
++	assert (WEXITSTATUS (status) == exit_code);
++    }
++}
++
++int main (void)
++{
++  setbuf (stdout, NULL);
++  printf ("main: %d\n", (int) getpid ());
++
++  /* Hardware watchpoints got disarmed here.  */
++  forkoff (1);
++  /* This watchpoint got lost before.  */
++  var++;
++  /* A sanity check for double hardware watchpoints removal.  */
++  forkoff (2);
++  var++;
++
++  return 0;
++}
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/watchpoint-fork.exp	14 Oct 2007 15:00:32 -0000
+@@ -0,0 +1,46 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile watchpoint-fork
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++gdb_test "watch var" "atchpoint 1: var"
++# It is never hit but it should not be left over in the fork()ed-off child.
++gdb_breakpoint "breakpoint"
++gdb_run_cmd
++gdb_test "" \
++	 "atchpoint 1: var.*Old value = 0.*New value = 1.*" "watchpoint first hit"
++gdb_test "continue" \
++	 "atchpoint 1: var.*Old value = 1.*New value = 2.*" "watchpoint second hit"
++gdb_test "continue" "Continuing..*Program exited normally." "finish"

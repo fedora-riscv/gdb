@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -383,6 +383,9 @@ Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 # Fix debug load for sparse assembler files (such as vDSO32 for i386-on-x86_64).
 Patch278: gdb-6.6-cu-ranges.patch
 
+# Fix hardware watchpoints after inferior forks-off some process.
+Patch280: gdb-6.6-multifork-debugreg-for-i386-and-x86_64.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -541,6 +544,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch276 -p1
 %patch277 -p1
 %patch278 -p1
+%patch280 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -697,6 +701,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Oct 14 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-36
+- Fix hardware watchpoints after inferior forks-off some process.
+
 * Fri Oct 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-35
 - Fix non-threaded watchpoints CTRL-C regression on `set follow child'.
 
