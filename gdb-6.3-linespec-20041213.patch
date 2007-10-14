@@ -5,10 +5,28 @@
 	* linespec.c (add_minsym_members): Support also the `$allocate' and
 	`$delete' variants.
 
+2007-10-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (add_minsym_members): Support also the `$allocate' and
+	`$delete' variants.
+	(decode_variable): Renamed to ...
+	(decode_variable_1) ... here, its parameter NOT_FOUND_PTR and its
+	exception throwing was moved to ...
+	(decode_variable_not_found): ... a new function here.
+	(decode_variable): New function.
+
 Index: gdb-6.5/gdb/linespec.c
 ===================================================================
 --- gdb-6.5.orig/gdb/linespec.c	2006-01-10 20:14:43.000000000 -0200
 +++ gdb-6.5/gdb/linespec.c	2006-07-07 01:04:56.000000000 -0300
+@@ -37,6 +37,7 @@
+ #include "objc-lang.h"
+ #include "linespec.h"
+ #include "exceptions.h"
++#include "gdb_assert.h"
+ 
+ /* We share this one with symtab.c, but it is not exported widely. */
+ 
 @@ -75,7 +75,8 @@ static struct symtabs_and_lines find_met
  					     struct symbol *sym_class);
  
@@ -438,3 +456,191 @@ Index: gdb-6.5/gdb/linespec.c
  
    return i1;
  }
+@@ -1976,12 +2021,13 @@ decode_dollar (char *copy, int funfirstl
+    and do not issue an error message.  */ 
+ 
+ static struct symtabs_and_lines
+-decode_variable (char *copy, int funfirstline, char ***canonical,
+-		 struct symtab *file_symtab, int *not_found_ptr)
++decode_variable_1 (char *copy, int funfirstline, char ***canonical,
++		   struct symtab *file_symtab)
+ {
+   struct symbol *sym;
+   /* The symtab that SYM was found in.  */
+   struct symtab *sym_symtab;
++  struct symtabs_and_lines retval;
+ 
+   struct minimal_symbol *msymbol;
+ 
+@@ -2001,8 +2047,25 @@ decode_variable (char *copy, int funfirs
+   msymbol = lookup_minimal_symbol (copy, NULL, NULL);
+ 
+   if (msymbol != NULL)
+-    return minsym_found (funfirstline, msymbol);
++    {
++      retval = minsym_found (funfirstline, msymbol);
++
++      /* Create a `filename:linkage_symbol_name' reference.  */
++      if (file_symtab == 0)
++	build_canonical_line_spec (retval.sals, SYMBOL_LINKAGE_NAME (msymbol),
++				   canonical);
++
++      return retval;
++    }
+ 
++  retval.nelts = 0;
++  retval.sals = NULL;
++  return retval;
++}
++
++static void
++decode_variable_not_found (char *copy, int *not_found_ptr)
++{
+   if (!have_full_symbols () &&
+       !have_partial_symbols () && !have_minimal_symbols ())
+     error (_("No symbol table is loaded.  Use the \"file\" command."));
+@@ -2010,6 +2064,132 @@ decode_variable (char *copy, int funfirs
+   throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), copy);
+ }
+ 
++/* Wrapper of DECODE_VARIABLE_1 collecting the results for all the found
++   VARIANTS of the symbol COPY.  */
++
++static struct symtabs_and_lines
++decode_variable (char *copy, int funfirstline, char ***canonical,
++		 struct symtab *file_symtab, int *not_found_ptr)
++{
++  char *src;
++  char *src_point;
++  char *s, *point;
++  /* Keep "" last as the trimming part always matches it.  */
++  const char *variants[] = {"$base","$allocate","$delete",""};
++  int i;
++  char *dst, *dst_point;
++  struct
++    {
++      struct symtabs_and_lines sals;
++      char **canonical;
++    } found[ARRAY_SIZE (variants)];
++  struct symtabs_and_lines retval_sals;
++  char **retval_canonical = NULL;	/* Shut up GCC.  */
++  int filled;
++  int canonicals = 0;	/* Shut up GCC.  */
++
++  src = copy;
++  src_point = strchr (src, '(');
++  if (src_point == NULL)
++    {
++      struct symtabs_and_lines sals;
++
++      sals = decode_variable_1 (src, funfirstline, canonical, file_symtab);
++      if (sals.nelts > 0)
++        return sals;
++      decode_variable_not_found (copy, not_found_ptr);
++      /* NOTREACHED */
++    }
++
++  dst = xmalloc (strlen (src) + strlen ("$allocate") + 1);
++  dst_point = dst + (src_point - src);
++
++  memcpy (dst, src, src_point - src);
++
++  /* Trim out any variant markers there first.  */
++  for (i = 0; i < ARRAY_SIZE (variants); i++)
++    {
++      size_t len = strlen (variants[i]);
++
++      if (dst_point - dst >= len
++	  && memcmp (dst_point - len, variants[i], len) == 0)
++	{
++	  dst_point -= len;
++	  /* In fact it should not be needed here.  */
++	  break;
++	}
++    }
++
++  filled = 0;
++  /* And now try to append all of them.  */
++  for (i = 0; i < ARRAY_SIZE (variants); i++)
++    {
++      size_t len = strlen (variants[i]);
++      struct minimal_symbol *minsym2;
++
++      memcpy (dst_point, variants[i], len);
++      strcpy (dst_point + len, src_point);
++
++      found[i].canonical = NULL;
++      found[i].sals = decode_variable_1 (dst, funfirstline,
++					 (canonical == NULL ? NULL
++							 : &found[i].canonical),
++					 file_symtab);
++      filled += found[i].sals.nelts;
++    }
++  xfree (dst);
++  if (filled == 0)
++    {
++      decode_variable_not_found (copy, not_found_ptr);
++      /* NOTREACHED */
++    }
++
++  retval_sals.nelts = filled;
++  retval_sals.sals = xmalloc (filled * sizeof *retval_sals.sals);
++  if (canonical != NULL)
++    {
++      retval_canonical = xmalloc (filled * sizeof *retval_canonical);
++      canonicals = 0;
++    }
++  filled = 0;
++  for (i = 0; i < ARRAY_SIZE (variants); i++)
++    {
++      memcpy (&retval_sals.sals[filled], found[i].sals.sals,
++              found[i].sals.nelts * sizeof *retval_sals.sals);
++      xfree (found[i].sals.sals);
++      if (canonical != NULL)
++        {
++          if (found[i].canonical == NULL)
++	    memset (&retval_canonical[filled], 0,
++	            found[i].sals.nelts * sizeof *retval_canonical);
++	  else
++	    {
++	      int j;
++
++	      memcpy (&retval_canonical[filled], found[i].canonical,
++		      found[i].sals.nelts * sizeof *retval_canonical);
++	      for (j = 0; j < found[i].sals.nelts; j++)
++	        if (found[i].canonical[j] != NULL)
++		  canonicals++;
++	      xfree (found[i].canonical);
++	    }
++	}
++      filled += found[i].sals.nelts;
++    }
++  gdb_assert (filled == retval_sals.nelts);
++
++  if (canonical != NULL)
++    {
++      if (canonicals != 0)
++	*canonical = retval_canonical;
++      else
++	{
++	  *canonical = NULL;
++	  xfree (retval_canonical);
++	}
++    }
++  return retval_sals;
++}
+ 
+ 
+ 
+diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
+--- gdb-6.6-orig/gdb/Makefile.in	2007-10-05 15:22:37.000000000 +0200
++++ gdb-6.6/gdb/Makefile.in	2007-10-05 16:29:10.000000000 +0200
+@@ -2266,7 +2266,7 @@ libunwind-frame.o: libunwind-frame.c $(d
+ linespec.o: linespec.c $(defs_h) $(symtab_h) $(frame_h) $(command_h) \
+ 	$(symfile_h) $(objfiles_h) $(source_h) $(demangle_h) $(value_h) \
+ 	$(completer_h) $(cp_abi_h) $(parser_defs_h) $(block_h) \
+-	$(objc_lang_h) $(linespec_h) $(exceptions_h)
++	$(objc_lang_h) $(linespec_h) $(exceptions_h) $(gdb_assert_h)
+ linux-fork.o: linux-fork.c $(defs_h) $(inferior_h) $(regcache_h) $(gdbcmd_h) \
+ 	$(infcall_h) $(gdb_assert_h) $(gdb_string_h) $(linux_fork_h) \
+ 	$(linux_nat_h)
