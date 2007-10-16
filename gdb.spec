@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -637,6 +637,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Oct 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-16
+- Fix the build compatibility with texinfo >= 4.10.
+
 * Tue Jun  5 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-15
 - Fix crash on missing filenames debug info (BZ 242155).
 
