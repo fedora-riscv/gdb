@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -701,6 +701,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Fri Oct 19 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-37
+- Fix hiding unexpected breakpoints on intentional step/next commands.
+- Fix s390 compilation warning/failure due to a wrongly sized type-cast.
+
 * Sun Oct 14 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-36
 - Fix hardware watchpoints after inferior forks-off some process.
 
