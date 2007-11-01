@@ -1,7 +1,14 @@
-diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
---- gdb-6.6-orig/gdb/Makefile.in	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/Makefile.in	2007-08-28 15:32:40.000000000 +0200
-@@ -1917,7 +1917,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
+[base]
+
+2007-10-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.
+
+Index: gdb-6.7/gdb/Makefile.in
+===================================================================
+--- gdb-6.7.orig/gdb/Makefile.in	2007-10-16 16:19:18.000000000 +0200
++++ gdb-6.7/gdb/Makefile.in	2007-10-16 16:42:34.000000000 +0200
+@@ -1932,7 +1932,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
  	$(inferior_h) $(symtab_h) $(command_h) $(bfd_h) $(target_h) \
  	$(gdbcore_h) $(gdbthread_h) $(regcache_h) $(regset_h) $(symfile_h) \
  	$(exec_h) $(readline_h) $(gdb_assert_h) \
@@ -9,22 +16,23 @@ diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
 +	$(exceptions_h) $(solib_h) $(auxv_h) $(elf_common_h) $(objfiles_h) \
 +	$(gdbcmd_h)
  core-regset.o: core-regset.c $(defs_h) $(command_h) $(gdbcore_h) \
- 	$(inferior_h) $(target_h) $(gdb_string_h) $(gregset_h)
+ 	$(inferior_h) $(target_h) $(regcache_h) $(gdb_string_h) $(gregset_h)
  cp-abi.o: cp-abi.c $(defs_h) $(value_h) $(cp_abi_h) $(command_h) $(gdbcmd_h) \
-@@ -2785,7 +2786,8 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
+@@ -2769,7 +2770,8 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
  	$(gdb_stabs_h) $(gdb_obstack_h) $(completer_h) $(bcache_h) \
  	$(hashtab_h) $(readline_h) $(gdb_assert_h) $(block_h) \
  	$(gdb_string_h) $(gdb_stat_h) $(observer_h) $(exec_h) \
--	$(parser_defs_h) $(elf_bfd_h)
-+	$(parser_defs_h) $(elf_bfd_h) $(gdb_stdint_h) $(libbfd_h) $(elf_bfd_h) \
-+	$(elf_external_h)
+-	$(parser_defs_h) $(varobj_h) $(elf_bfd_h)
++	$(parser_defs_h) $(varobj_h) $(elf_bfd_h) $(gdb_stdint_h) $(libbfd_h) \
++	$(elf_bfd_h) $(elf_external_h)
  symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
  	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
  	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
-diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
---- gdb-6.6-orig/gdb/corelow.c	2006-04-18 21:20:06.000000000 +0200
-+++ gdb-6.6/gdb/corelow.c	2007-08-28 15:31:56.000000000 +0200
-@@ -46,6 +46,10 @@
+Index: gdb-6.7/gdb/corelow.c
+===================================================================
+--- gdb-6.7.orig/gdb/corelow.c	2007-09-04 01:06:35.000000000 +0200
++++ gdb-6.7/gdb/corelow.c	2007-10-16 16:41:50.000000000 +0200
+@@ -44,6 +44,10 @@
  #include "gdb_assert.h"
  #include "exceptions.h"
  #include "solib.h"
@@ -35,7 +43,7 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
  
  
  #ifndef O_LARGEFILE
-@@ -253,6 +257,66 @@ add_to_thread_list (bfd *abfd, asection 
+@@ -251,6 +255,66 @@ add_to_thread_list (bfd *abfd, asection 
      inferior_ptid = pid_to_ptid (thread_id);	/* Yes, make it current */
  }
  
@@ -102,7 +110,7 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
  /* This routine opens and sets up the core file bfd.  */
  
  static void
-@@ -417,6 +420,15 @@ core_open (char *filename, int from_tty)
+@@ -347,6 +411,15 @@ core_open (char *filename, int from_tty)
    ontop = !push_target (&core_ops);
    discard_cleanups (old_chain);
  
@@ -118,7 +126,7 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
    /* This is done first, before anything has a chance to query the
       inferior for information such as symbols.  */
    post_create_inferior (&core_ops, from_tty);
-@@ -662,4 +734,13 @@ _initialize_corelow (void)
+@@ -678,4 +751,13 @@ _initialize_corelow (void)
  
    if (!coreops_suppress_target)
      add_target (&core_ops);
@@ -132,16 +140,16 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
 +			    show_build_id_core_loads,
 +			    &setlist, &showlist);
  }
-diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
---- gdb-6.6-orig/gdb/solib-svr4.c	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/solib-svr4.c	2007-08-28 15:34:02.000000000 +0200
-@@ -943,10 +943,35 @@ svr4_current_sos (void)
- 		}
-               else
-                 {
+Index: gdb-6.7/gdb/solib-svr4.c
+===================================================================
+--- gdb-6.7.orig/gdb/solib-svr4.c	2007-10-16 15:43:56.000000000 +0200
++++ gdb-6.7/gdb/solib-svr4.c	2007-10-16 16:44:44.000000000 +0200
+@@ -957,9 +957,35 @@ svr4_current_sos (void)
+ 		free_so (new);
+ 	      else
+ 		{
 -		  strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
 -		  new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
--		  xfree (buffer);
 -		  strcpy (new->so_original_name, new->so_name);
 +		  struct build_id *build_id;
 +
@@ -175,12 +183,13 @@ diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
  		  if (debug_solib)
  		    {
  		      fprintf_unfiltered (gdb_stdlog, 
-diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
---- gdb-6.6-orig/gdb/symfile.c	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/symfile.c	2007-08-28 15:36:22.000000000 +0200
-@@ -54,6 +54,9 @@
- #include "exec.h"
+Index: gdb-6.7/gdb/symfile.c
+===================================================================
+--- gdb-6.7.orig/gdb/symfile.c	2007-10-15 21:42:26.000000000 +0200
++++ gdb-6.7/gdb/symfile.c	2007-10-16 16:46:30.000000000 +0200
+@@ -53,6 +53,9 @@
  #include "parser-defs.h"
+ #include "varobj.h"
  #include "elf-bfd.h"
 +#include "gdb_stdint.h"
 +#include "libbfd.h"
@@ -188,7 +197,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
  #include <sys/types.h>
  #include <fcntl.h>
-@@ -62,6 +65,7 @@
+@@ -61,6 +64,7 @@
  #include <ctype.h>
  #include <time.h>
  #include <sys/time.h>
@@ -196,7 +205,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
  
  int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
-@@ -1120,16 +1124,62 @@ symbol_file_clear (int from_tty)
+@@ -1238,16 +1242,62 @@ symbol_file_clear (int from_tty)
        printf_unfiltered (_("No symbol file now.\n"));
  }
  
@@ -261,7 +270,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  {
    struct build_id *retval;
  
-@@ -1145,6 +1195,348 @@ build_id_bfd_get (bfd *abfd)
+@@ -1263,6 +1313,348 @@ build_id_bfd_get (bfd *abfd)
    return retval;
  }
  
@@ -610,7 +619,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
  
  static int
-@@ -1159,7 +1551,7 @@ build_id_verify (const char *filename, s
+@@ -1277,7 +1669,7 @@ build_id_verify (const char *filename, s
    if (abfd == NULL)
      return 0;
  
@@ -619,9 +628,9 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"), filename);
-@@ -1177,8 +1569,9 @@ build_id_verify (const char *filename, s
- 
- static char *debug_file_directory = NULL;
+@@ -1293,8 +1685,9 @@ build_id_verify (const char *filename, s
+   return retval;
+ }
  
 -static char *
 -build_id_to_debug_filename (struct build_id *build_id)
@@ -631,7 +640,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  {
    char *link, *s, *retval = NULL;
    gdb_byte *data = build_id->data;
-@@ -1186,7 +1579,9 @@ build_id_to_debug_filename (struct build
+@@ -1302,7 +1695,9 @@ build_id_to_debug_filename (struct build
  
    /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
    link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
@@ -642,7 +651,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
    s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
    if (size > 0)
      {
-@@ -1197,12 +1592,14 @@ build_id_to_debug_filename (struct build
+@@ -1313,12 +1708,14 @@ build_id_to_debug_filename (struct build
      *s++ = '/';
    while (size-- > 0)
      s += sprintf (s, "%02x", (unsigned) *data++);
@@ -659,7 +668,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1210,6 +1607,11 @@ build_id_to_debug_filename (struct build
+@@ -1326,6 +1723,11 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -671,7 +680,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
    return retval;
  }
  
-@@ -1305,23 +1707,27 @@ find_separate_debug_file (struct objfile
+@@ -1423,23 +1825,27 @@ find_separate_debug_file (struct objfile
    unsigned long crc32;
    int i;
    struct build_id *build_id;
@@ -704,7 +713,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
      }
  
    basename = get_debug_link_info (objfile, &crc32);
-@@ -1329,7 +1735,10 @@ find_separate_debug_file (struct objfile
+@@ -1447,7 +1853,10 @@ find_separate_debug_file (struct objfile
    if (basename == NULL)
      /* There's no separate debug info, hence there's no way we could
         load it => no warning.  */
@@ -716,7 +725,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    dir = xstrdup (objfile->name);
  
-@@ -1358,6 +1767,7 @@ find_separate_debug_file (struct objfile
+@@ -1476,6 +1885,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -724,7 +733,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1371,6 +1781,7 @@ find_separate_debug_file (struct objfile
+@@ -1489,6 +1899,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -732,7 +741,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1384,11 +1795,20 @@ find_separate_debug_file (struct objfile
+@@ -1502,6 +1913,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -740,8 +749,18 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
+@@ -1521,6 +1933,7 @@ find_separate_debug_file (struct objfile
+ 
+       if (separate_debug_file_exists (debugfile, crc32, objfile->name))
+ 	{
++	  xfree (build_id_filename);
+ 	  xfree (canon_name);
+ 	  xfree (basename);
+ 	  xfree (dir);
+@@ -1528,6 +1941,14 @@ find_separate_debug_file (struct objfile
+ 	}
      }
- 
+   
 +  if (build_id_filename != NULL)
 +    {
 +      fprintf_unfiltered (gdb_stdlog,
@@ -750,10 +769,10 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
 +      xfree (build_id_filename);
 +    }
 +
-   xfree (basename);
-   xfree (dir);
-   return NULL;
-@@ -4024,4 +4443,12 @@ the global debug-file directory prepende
+   if (canon_name)
+     xfree (canon_name);
+ 
+@@ -4223,4 +4644,12 @@ the global debug-file directory prepende
  				     NULL,
  				     show_debug_file_directory,
  				     &setlist, &showlist);
@@ -766,12 +785,13 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
 +			    show_build_id_debug,
 +			    &setdebuglist, &showdebuglist);
  }
-diff -u -rup gdb-6.6-orig/gdb/symfile.h gdb-6.6/gdb/symfile.h
---- gdb-6.6-orig/gdb/symfile.h	2005-12-17 23:34:03.000000000 +0100
-+++ gdb-6.6/gdb/symfile.h	2007-08-28 15:31:56.000000000 +0200
-@@ -322,6 +322,12 @@ extern bfd_byte *symfile_relocate_debug_
- extern void dwarf_build_psymtabs (struct objfile *, int, file_ptr,
- 				  unsigned int, file_ptr, unsigned int);
+Index: gdb-6.7/gdb/symfile.h
+===================================================================
+--- gdb-6.7.orig/gdb/symfile.h	2007-09-24 23:48:05.000000000 +0200
++++ gdb-6.7/gdb/symfile.h	2007-10-16 16:41:50.000000000 +0200
+@@ -353,6 +353,12 @@ extern int symfile_map_offsets_to_segmen
+ struct symfile_segment_data *get_symfile_segment_data (bfd *abfd);
+ void free_symfile_segment_data (struct symfile_segment_data *data);
  
 +/* build-id support.  */
 +struct build_id;

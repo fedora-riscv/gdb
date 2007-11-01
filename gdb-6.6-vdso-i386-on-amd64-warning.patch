@@ -1,12 +1,18 @@
 Fix i386-on-x86_64 debugging giving the warning:
 	warning: Lowest section in system-supplied DSO at 0xffffe000 is .hash at ffffe0b4
 
-[ Backport for RH GDB-6.6. ]
+[base]
 
---- gdb-6.6/gdb/symfile.c	2007-10-08 19:52:06.000000000 +0200
-+++ gdb-6.6/gdb/symfile.c	2007-10-08 19:49:27.000000000 +0200
-@@ -597,6 +597,37 @@ default_symfile_offsets (struct objfile 
-   init_objfile_sect_indices (objfile);
+2007-10-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.
+
+Index: gdb-6.7/gdb/symfile.c
+===================================================================
+--- gdb-6.7.orig/gdb/symfile.c	2007-10-16 16:46:30.000000000 +0200
++++ gdb-6.7/gdb/symfile.c	2007-10-16 20:08:42.000000000 +0200
+@@ -717,6 +717,38 @@ default_symfile_segments (bfd *abfd)
+   return data;
  }
  
 +/* Find lowest loadable section to be used as starting point for continguous
@@ -40,10 +46,11 @@ Fix i386-on-x86_64 debugging giving the warning:
 +  else
 +    return 0;
 +}
- 
++
  /* Process a symbol file, as either the main file or as a dynamically
     loaded file.
-@@ -696,32 +727,11 @@ syms_from_objfile (struct objfile *objfi
+ 
+@@ -815,32 +847,11 @@ syms_from_objfile (struct objfile *objfi
       happens for the PA64 port.  */
    if (/*!mainline &&*/ addrs && addrs->other[0].name)
      {
@@ -78,30 +85,38 @@ Fix i386-on-x86_64 debugging giving the warning:
        /* Calculate offsets for the loadable sections.
   	 FIXME! Sections must be in order of increasing loadable section
   	 so that contiguous sections can use the lower-offset!!!
-@@ -743,6 +753,7 @@ syms_from_objfile (struct objfile *objfi
+@@ -862,6 +873,7 @@ syms_from_objfile (struct objfile *objfi
                      addrs->other[i].addr
                        -= bfd_section_vma (objfile->obfd, sect);
                      lower_offset = addrs->other[i].addr;
-+		    lower_offset_set = 1;
++                    lower_offset_set = 1;
                      /* This is the index used by BFD. */
                      addrs->other[i].sectindex = sect->index ;
                    }
-@@ -755,7 +766,17 @@ syms_from_objfile (struct objfile *objfi
+@@ -874,7 +886,17 @@ syms_from_objfile (struct objfile *objfi
                    }
                }
              else
 -              addrs->other[i].addr = lower_offset;
-+	      {
-+		/* Delay finding LOWER_OFFSET only if it is needed.  Otherwise
-+		   we would print a warning to detect a values never used.  */
-+		if (!lower_offset_set)
-+		  {
-+		    lower_offset = find_lower_offset (objfile);
-+		    lower_offset_set = 1;
-+		  }
++              {
++                /* Delay finding LOWER_OFFSET only if it is needed.  Otherwise
++                   we would print a warning to detect a values never used.  */
++                if (!lower_offset_set)
++                  {
++                    lower_offset = find_lower_offset (objfile);
++                    lower_offset_set = 1;
++                  }
 +
-+		addrs->other[i].addr = lower_offset;
-+	      }
++                addrs->other[i].addr = lower_offset;
++              }
            }
      }
  
+@@ -1174,7 +1196,6 @@ symbol_file_add_from_bfd (bfd *abfd, int
+                                                 mainline, flags);
+ }
+ 
+-
+ /* Process a symbol file, as either the main file or as a dynamically
+    loaded file.  See symbol_file_add_with_addrs_or_offsets's comments
+    for details.  */

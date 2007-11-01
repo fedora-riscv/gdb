@@ -1,0 +1,54 @@
+2007-10-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (reread_symbols): Reread also EXEC_BFD if changed.
+
+Testcase: Regressed by the gdb-6.7 version of `gdb-6.3-pie-20050110.patch':
+ Running ../../../gdb/testsuite/gdb.base/reread.exp ...
+ PASS: gdb.base/reread.exp: breakpoint foo in first file (PRMS 13484)
+ PASS: gdb.base/reread.exp: run to foo() (PRMS 13484)
+-PASS: gdb.base/reread.exp: run to foo() second time
++FAIL: gdb.base/reread.exp: run to foo() second time
+ PASS: gdb.base/reread.exp: second pass: breakpoint foo in first file
+-PASS: gdb.base/reread.exp: second pass: run to foo()
+-PASS: gdb.base/reread.exp: second pass: continue to completion
+-PASS: gdb.base/reread.exp: second pass: run to foo() second time
++FAIL: gdb.base/reread.exp: second pass: run to foo()
++FAIL: gdb.base/reread.exp: second pass: continue to completion
++FAIL: gdb.base/reread.exp: second pass: run to foo() second time
+
+--- gdb-6.7-orig/gdb/symfile.c	2007-10-29 01:04:35.000000000 +0100
++++ gdb-6.7-patched/gdb/symfile.c	2007-10-29 01:03:13.000000000 +0100
+@@ -2810,6 +2810,33 @@ reread_symbols (void)
+ 	      /* We need to do this whenever any symbols go away.  */
+ 	      make_cleanup (clear_symtab_users_cleanup, 0 /*ignore*/);
+ 
++	      if (exec_bfd != NULL && strcmp (bfd_get_filename (objfile->obfd),
++					      bfd_get_filename (exec_bfd)) == 0)
++		{
++		  char *exec_filename = bfd_get_filename (exec_bfd);
++		  bfd *exec_bfd_new;
++
++		  /* We have to leak the memory here as there are stale
++		     references to EXEC_BFD, at least by
++		     `(struct section_table *)->bfd'.  So far we need to update
++		     only START_ADDRESS there.  */
++#if 0
++		  if (!bfd_close (exec_bfd))
++		    error (_("Can't close BFD for %s: %s"), exec_filename,
++			   bfd_errmsg (bfd_get_error ()));
++#endif
++		  exec_bfd_new = bfd_openr (exec_filename, gnutarget);
++		  if (exec_bfd_new == NULL)
++		    error (_("Can't open %s as a new main executable."),
++			   exec_filename);
++		  /* bfd_openr sets cacheable to true, which is what we want.  */
++		  if (!bfd_check_format (exec_bfd_new, bfd_object))
++		    error (_("Can't reopen the main executable %s: %s."),
++			   exec_filename, bfd_errmsg (bfd_get_error ()));
++		  /* FIXME: The non-freeing hack.  */
++		  memcpy (exec_bfd, exec_bfd_new, sizeof (*exec_bfd));
++		}
++
+ 	      /* Clean up any state BFD has sitting around.  We don't need
+ 	         to close the descriptor but BFD lacks a way of closing the
+ 	         BFD without closing the descriptor.  */

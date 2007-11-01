@@ -12,15 +12,15 @@ The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 	* solib-svr4.c (svr4_fetch_objfile_link_map): Match even absolute
 	requested pathnames to the internal loaded relative pathnames.
 
+2007-10-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
-Index: gdb-6.5/gdb/solib-svr4.c
+	Port to GDB-6.7.
+
+Index: gdb-6.7/gdb/solib-svr4.c
 ===================================================================
-RCS file: /cvs/src/src/gdb/solib-svr4.c,v
-retrieving revision 1.58
-diff -u -p -r1.58 gdb-6.5/gdb/solib-svr4.c
---- gdb-6.5.orig/gdb/solib-svr4.c	18 May 2006 20:38:56 -0000	1.58
-+++ gdb-6.5/gdb/solib-svr4.c	1 Sep 2006 18:47:10 -0000
-@@ -774,62 +774,81 @@ CORE_ADDR
+--- gdb-6.7.orig/gdb/solib-svr4.c	2007-10-14 23:04:45.000000000 +0200
++++ gdb-6.7/gdb/solib-svr4.c	2007-10-16 15:43:56.000000000 +0200
+@@ -1009,10 +1009,14 @@ CORE_ADDR
  svr4_fetch_objfile_link_map (struct objfile *objfile)
  {
    CORE_ADDR lm;
@@ -29,136 +29,48 @@ diff -u -p -r1.58 gdb-6.5/gdb/solib-svr4.c
    if ((debug_base = locate_base ()) == 0)
      return 0;   /* failed somehow... */
  
--  /* Position ourselves on the first link map.  */
--  lm = solib_svr4_r_map ();  
--  while (lm)
-+  for (resolve = 0; resolve <= 1; resolve++)
-     {
--      /* Get info on the layout of the r_debug and link_map structures. */
--      struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
--      int errcode;
--      char *buffer;
--      struct lm_info objfile_lm_info;
--      struct cleanup *old_chain;
--      CORE_ADDR name_address;
--      gdb_byte *l_name_buf = xmalloc (lmo->l_name_size);
--      old_chain = make_cleanup (xfree, l_name_buf);
--
--      /* Set up the buffer to contain the portion of the link_map
--         structure that gdb cares about.  Note that this is not the
--         whole link_map structure.  */
--      objfile_lm_info.lm = xzalloc (lmo->link_map_size);
--      make_cleanup (xfree, objfile_lm_info.lm);
--
--      /* Read the link map into our internal structure.  */
--      read_memory (lm, objfile_lm_info.lm, lmo->link_map_size);
--
--      /* Read address of name from target memory to GDB.  */
--      read_memory (lm + lmo->l_name_offset, l_name_buf, lmo->l_name_size);
--
--      /* Extract this object's name.  Assume that the address is
--         unsigned.  */
--      name_address = extract_unsigned_integer (l_name_buf, lmo->l_name_size);
--      target_read_string (name_address, &buffer,
--      			  SO_NAME_MAX_PATH_SIZE - 1, &errcode);
--      make_cleanup (xfree, buffer);
--      if (errcode != 0)
--	warning (_("Can't read pathname for load map: %s."),
--		 safe_strerror (errcode));
--      else
--  	{
--	  /* Is this the linkmap for the file we want?  */
--	  /* If the file is not a shared library and has no name,
--	     we are sure it is the main executable, so we return that.  */
--	  if ((buffer && strcmp (buffer, objfile->name) == 0)
--              || (!(objfile->flags & OBJF_SHARED) && (strcmp (buffer, "") == 0)))
--  	    {
--    	      do_cleanups (old_chain);
--    	      return lm;
--      	    }
--  	}
--      /* Not the file we wanted, continue checking.  Assume that the
--         address is unsigned.  */
--      lm = extract_unsigned_integer (objfile_lm_info.lm + lmo->l_next_offset,
--				     lmo->l_next_size);
--      do_cleanups (old_chain);
-+      /* Position ourselves on the first link map.  */
-+      lm = solib_svr4_r_map ();  
-+      while (lm)
-+	{
-+	  /* Get info on the layout of the r_debug and link_map structures. */
-+	  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-+	  int errcode;
-+	  char *buffer;
-+	  struct lm_info objfile_lm_info;
-+	  struct cleanup *old_chain;
-+	  CORE_ADDR name_address;
-+	  gdb_byte *l_name_buf = xmalloc (lmo->l_name_size);
-+	  old_chain = make_cleanup (xfree, l_name_buf);
++for (resolve = 0; resolve <= 1; resolve++)
++{
 +
-+	  /* Set up the buffer to contain the portion of the link_map
-+	     structure that gdb cares about.  Note that this is not the
-+	     whole link_map structure.  */
-+	  objfile_lm_info.lm = xzalloc (lmo->link_map_size);
-+	  make_cleanup (xfree, objfile_lm_info.lm);
-+
-+	  /* Read the link map into our internal structure.  */
-+	  read_memory (lm, objfile_lm_info.lm, lmo->link_map_size);
-+
-+	  /* Read address of name from target memory to GDB.  */
-+	  read_memory (lm + lmo->l_name_offset, l_name_buf, lmo->l_name_size);
-+
-+	  /* Extract this object's name.  Assume that the address is
-+	     unsigned.  */
-+	  name_address = extract_unsigned_integer (l_name_buf, lmo->l_name_size);
-+	  target_read_string (name_address, &buffer,
-+			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
-+	  make_cleanup (xfree, buffer);
-+	  if (errcode != 0)
-+	    warning (_("Can't read pathname for load map: %s."),
-+		     safe_strerror (errcode));
-+	  else
+   /* Position ourselves on the first link map.  */
+   lm = solib_svr4_r_map ();  
+   while (lm)
+@@ -1051,6 +1055,21 @@ svr4_fetch_objfile_link_map (struct objf
+ 		 safe_strerror (errcode));
+       else
+   	{
++	  /* solib_svr4_r_map() may contain relative pathnames while
++	     `objfile->name' is absolute.  */
++	  if (resolve && buffer && buffer[0] != '/')
 +	    {
-+	      /* solib_svr4_r_map() may contain relative pathnames while
-+	         `objfile->name' is absolute.  */
-+	      if (resolve && buffer && buffer[0] != '/')
-+	        {
-+		  char *absolute;
-+		  int fd;
++	      char *absolute;
++	      int fd;
 +
-+		  fd = solib_open (buffer, &absolute);
-+		  if (fd != -1)
-+		    {
-+		      make_cleanup (xfree, absolute);
-+		      buffer = absolute;
-+		      close (fd);
-+		    }
-+		}
-+	      /* Is this the linkmap for the file we want?  */
-+	      /* If the file is not a shared library and has no name,
-+		 we are sure it is the main executable, so we return that.  */
-+	      if ((buffer && strcmp (buffer, objfile->name) == 0)
-+		  || (!(objfile->flags & OBJF_SHARED) && (strcmp (buffer, "") == 0)))
++	      fd = solib_open (buffer, &absolute);
++	      if (fd != -1)
 +		{
-+		  do_cleanups (old_chain);
-+		  return lm;
++		  make_cleanup (xfree, absolute);
++		  buffer = absolute;
++		  close (fd);
 +		}
 +	    }
-+	  /* Not the file we wanted, continue checking.  Assume that the
-+	     address is unsigned.  */
-+	  lm = extract_unsigned_integer (objfile_lm_info.lm + lmo->l_next_offset,
-+					 lmo->l_next_size);
-+	  do_cleanups (old_chain);
-+	}
+ 	  /* Is this the linkmap for the file we want?  */
+ 	  /* If the file is not a shared library and has no name,
+ 	     we are sure it is the main executable, so we return that.  */
+@@ -1069,6 +1088,9 @@ svr4_fetch_objfile_link_map (struct objf
+ 				  builtin_type_void_data_ptr);
+       do_cleanups (old_chain);
      }
++
++}	/* resolve */
++
    return 0;
  }
-Index: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
+ 
+Index: gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
 ===================================================================
-RCS file: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
-diff -N gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
---- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-main.c	1 Sep 2006 18:47:14 -0000
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug-main.c	2007-10-16 15:40:01.000000000 +0200
 @@ -0,0 +1,25 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -185,12 +97,10 @@ diff -N gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
 +{
 +  return 0;
 +}
-Index: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
+Index: gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
 ===================================================================
-RCS file: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
-diff -N gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
---- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c	1 Sep 2006 18:47:14 -0000
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c	2007-10-16 15:40:01.000000000 +0200
 @@ -0,0 +1,22 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -214,12 +124,10 @@ diff -N gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
 +   bug-gdb@prep.ai.mit.edu  */
 +
 +__thread int var = 42;
-Index: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug.exp
+Index: gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug.exp
 ===================================================================
-RCS file: gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug.exp
-diff -N gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug.exp
---- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ gdb-6.5/gdb/testsuite/gdb.threads/tls-sepdebug.exp	1 Sep 2006 18:47:14 -0000
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.7/gdb/testsuite/gdb.threads/tls-sepdebug.exp	2007-10-16 15:40:01.000000000 +0200
 @@ -0,0 +1,81 @@
 +# Copyright 2006 Free Software Foundation, Inc.
 +

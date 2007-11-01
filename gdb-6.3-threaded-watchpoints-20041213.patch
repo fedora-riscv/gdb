@@ -28,15 +28,18 @@
 	* doc/observer.texi: Add two new observers for linux_new_thread
 	and sigtrap.
 
-Index: gdb-6.5/gdb/doc/observer.texi
+2007-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.
+
+Index: gdb-6.7/gdb/doc/observer.texi
 ===================================================================
---- gdb-6.5.orig/gdb/doc/observer.texi	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/doc/observer.texi	2006-07-11 15:00:15.000000000 -0300
-@@ -122,3 +122,13 @@ haven't been loaded yet.
- @deftypefun void solib_unloaded (struct so_list *@var{solib})
- The shared library specified by @var{solib} has been unloaded.
+--- gdb-6.7.orig/gdb/doc/observer.texi	2007-05-11 21:55:20.000000000 +0200
++++ gdb-6.7/gdb/doc/observer.texi	2007-10-13 04:51:21.000000000 +0200
+@@ -129,3 +129,12 @@ Called with @var{objfile} equal to @code
+ previously loaded symbol table data has now been invalidated.
  @end deftypefun
-+
+ 
 +@deftypefun void linux_new_thread (ptid_t @var{ptid})
 +A new linux thread described by @var{ptid} has been officially attached
 +to by gdb.
@@ -46,11 +49,11 @@ Index: gdb-6.5/gdb/doc/observer.texi
 +A low-level SIGTRAP has been discovered.  This notification can be used to save
 +additional state necessary if the trap is deferred for later handling.
 +@end deftypefun
-Index: gdb-6.5/gdb/infrun.c
+Index: gdb-6.7/gdb/infrun.c
 ===================================================================
---- gdb-6.5.orig/gdb/infrun.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/infrun.c	2006-07-11 15:00:17.000000000 -0300
-@@ -1703,9 +1703,19 @@ handle_inferior_event (struct execution_
+--- gdb-6.7.orig/gdb/infrun.c	2007-10-12 22:35:58.000000000 +0200
++++ gdb-6.7/gdb/infrun.c	2007-10-13 04:50:11.000000000 +0200
+@@ -1784,9 +1784,19 @@ handle_inferior_event (struct execution_
       single step over a watchpoint without disabling the watchpoint.  */
    if (HAVE_STEPPABLE_WATCHPOINT && STOPPED_BY_WATCHPOINT (ecs->ws))
      {
@@ -71,16 +74,16 @@ Index: gdb-6.5/gdb/infrun.c
        prepare_to_wait (ecs);
        return;
      }
-@@ -1715,6 +1725,8 @@ handle_inferior_event (struct execution_
-      register or page protection watchpoint scheme need here?  */
-   if (HAVE_NONSTEPPABLE_WATCHPOINT && STOPPED_BY_WATCHPOINT (ecs->ws))
+@@ -1797,6 +1807,8 @@ handle_inferior_event (struct execution_
+   if (gdbarch_have_nonsteppable_watchpoint (current_gdbarch)
+       && STOPPED_BY_WATCHPOINT (ecs->ws))
      {
 +      CORE_ADDR addr = 0;
 +
        /* At this point, we are stopped at an instruction which has
           attempted to write to a piece of memory under control of
           a watchpoint.  The instruction hasn't actually executed
-@@ -1722,15 +1734,12 @@ handle_inferior_event (struct execution_
+@@ -1804,15 +1816,12 @@ handle_inferior_event (struct execution_
           now, we would get the old value, and therefore no change
           would seem to have occurred.
  
@@ -102,7 +105,7 @@ Index: gdb-6.5/gdb/infrun.c
  
        if (debug_infrun)
  	fprintf_unfiltered (gdb_stdlog, "infrun: STOPPED_BY_WATCHPOINT\n");
-@@ -1801,6 +1810,41 @@ handle_inferior_event (struct execution_
+@@ -1883,6 +1892,41 @@ handle_inferior_event (struct execution_
  	}
      }
  
@@ -144,7 +147,7 @@ Index: gdb-6.5/gdb/infrun.c
    /* Look at the cause of the stop, and decide what to do.
       The alternatives are:
       1) break; to really stop and return to the debugger,
-@@ -1852,6 +1896,8 @@ handle_inferior_event (struct execution_
+@@ -1935,6 +1979,8 @@ handle_inferior_event (struct execution_
           See more comments in inferior.h.  */
        if (stop_soon == STOP_QUIETLY_NO_SIGSTOP)
  	{
@@ -153,11 +156,11 @@ Index: gdb-6.5/gdb/infrun.c
  	  stop_stepping (ecs);
  	  if (stop_signal == TARGET_SIGNAL_STOP)
  	    stop_signal = TARGET_SIGNAL_0;
-Index: gdb-6.5/gdb/breakpoint.c
+Index: gdb-6.7/gdb/breakpoint.c
 ===================================================================
---- gdb-6.5.orig/gdb/breakpoint.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/breakpoint.c	2006-07-11 15:00:19.000000000 -0300
-@@ -748,6 +748,90 @@ insert_catchpoint (struct ui_out *uo, vo
+--- gdb-6.7.orig/gdb/breakpoint.c	2007-08-30 00:07:47.000000000 +0200
++++ gdb-6.7/gdb/breakpoint.c	2007-10-13 04:50:11.000000000 +0200
+@@ -806,6 +806,90 @@ insert_catchpoint (struct ui_out *uo, vo
      }
  }
  
@@ -247,8 +250,8 @@ Index: gdb-6.5/gdb/breakpoint.c
 +
  /* Helper routine: free the value chain for a breakpoint (watchpoint).  */
  
- static void free_valchain (struct bp_location *b)
-@@ -1190,6 +1274,7 @@ remove_breakpoints (void)
+ static void
+@@ -1294,6 +1378,7 @@ remove_breakpoints (void)
  {
    struct bp_location *b;
    int val;
@@ -256,7 +259,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  
    ALL_BP_LOCATIONS (b)
    {
-@@ -1197,10 +1282,10 @@ remove_breakpoints (void)
+@@ -1301,10 +1386,10 @@ remove_breakpoints (void)
        {
  	val = remove_breakpoint (b, mark_uninserted);
  	if (val != 0)
@@ -269,7 +272,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  }
  
  int
-@@ -2126,8 +2211,13 @@ print_it_typical (bpstat bs)
+@@ -2187,8 +2272,13 @@ print_it_typical (bpstat bs)
        break;
  
      case bp_thread_event:
@@ -285,7 +288,7 @@ Index: gdb-6.5/gdb/breakpoint.c
        printf_filtered (_("Thread Event Breakpoint: gdb should not stop!\n"));
        return PRINT_NOTHING;
        break;
-@@ -2567,6 +2657,54 @@ which its expression is valid.\n");     
+@@ -2636,6 +2726,54 @@ which its expression is valid.\n");     
      }
  }
  
@@ -340,7 +343,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  /* Get a bpstat associated with having just stopped at address
     BP_ADDR in thread PTID.  STOPPED_BY_WATCHPOINT is 1 if the
     target thinks we stopped due to a hardware watchpoint, 0 if we
-@@ -2697,82 +2835,61 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+@@ -2766,82 +2904,61 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
      bs->stop = 1;
      bs->print = 1;
  
@@ -468,7 +471,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  	  {
  	    char *message = xstrprintf ("Error evaluating expression for watchpoint %d\n",
  					b->number);
-@@ -2801,6 +2918,15 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+@@ -2870,6 +2987,15 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
  		break;
  	      case WP_VALUE_NOT_CHANGED:
  		/* Stop.  */
@@ -484,7 +487,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  		++(b->hit_count);
  		break;
  	      default:
-@@ -2816,7 +2942,7 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+@@ -2885,7 +3011,7 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
  		break;
  	      }
  	  }
@@ -493,7 +496,7 @@ Index: gdb-6.5/gdb/breakpoint.c
  	  {
  	    /* This is a case where some watchpoint(s) triggered,
  	       but not at the address of this watchpoint (FOUND
-@@ -4112,6 +4238,7 @@ set_raw_breakpoint (struct symtab_and_li
+@@ -4186,6 +4312,7 @@ set_raw_breakpoint (struct symtab_and_li
    b->exec_pathname = NULL;
    b->ops = NULL;
    b->pending = 0;
@@ -501,11 +504,11 @@ Index: gdb-6.5/gdb/breakpoint.c
  
    /* Add this breakpoint to the end of the chain
       so that a list of breakpoints will come out in order
-Index: gdb-6.5/gdb/breakpoint.h
+Index: gdb-6.7/gdb/breakpoint.h
 ===================================================================
---- gdb-6.5.orig/gdb/breakpoint.h	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/breakpoint.h	2006-07-11 15:00:17.000000000 -0300
-@@ -426,6 +426,11 @@ struct breakpoint
+--- gdb-6.7.orig/gdb/breakpoint.h	2007-08-23 20:08:26.000000000 +0200
++++ gdb-6.7/gdb/breakpoint.h	2007-10-13 04:50:11.000000000 +0200
+@@ -420,6 +420,11 @@ struct breakpoint
  
      /* Is breakpoint pending on shlib loads?  */
      int pending;
@@ -517,7 +520,7 @@ Index: gdb-6.5/gdb/breakpoint.h
    };
  
  /* The following stuff is an abstract data type "bpstat" ("breakpoint
-@@ -692,6 +697,14 @@ extern void tbreak_command (char *, int)
+@@ -688,6 +693,14 @@ extern void tbreak_command (char *, int)
  
  extern int insert_breakpoints (void);
  
@@ -532,11 +535,11 @@ Index: gdb-6.5/gdb/breakpoint.h
  extern int remove_breakpoints (void);
  
  /* This function can be used to physically insert eventpoints from the
-Index: gdb-6.5/gdb/linux-nat.c
+Index: gdb-6.7/gdb/linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/linux-nat.c	2006-07-11 12:32:29.000000000 -0300
-+++ gdb-6.5/gdb/linux-nat.c	2006-07-11 15:00:15.000000000 -0300
-@@ -36,6 +36,7 @@
+--- gdb-6.7.orig/gdb/linux-nat.c	2007-10-12 22:35:58.000000000 +0200
++++ gdb-6.7/gdb/linux-nat.c	2007-10-13 04:50:11.000000000 +0200
+@@ -34,6 +34,7 @@
  #include "gdbthread.h"
  #include "gdbcmd.h"
  #include "regcache.h"
@@ -544,7 +547,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  #include "regset.h"
  #include "inf-ptrace.h"
  #include "auxv.h"
-@@ -764,6 +765,9 @@ delete_lwp (ptid_t ptid)
+@@ -704,6 +705,9 @@ delete_lwp (ptid_t ptid)
    else
      lwp_list = lp->next;
  
@@ -554,7 +557,7 @@ Index: gdb-6.5/gdb/linux-nat.c
    xfree (lp);
  }
  
-@@ -1478,6 +1482,13 @@ stop_wait_callback (struct lwp_info *lp,
+@@ -1501,6 +1505,13 @@ stop_wait_callback (struct lwp_info *lp,
  	         user will delete or disable the breakpoint, but the
  	         thread will have already tripped on it.  */
  
@@ -568,7 +571,7 @@ Index: gdb-6.5/gdb/linux-nat.c
  	      /* Now resume this LWP and get the SIGSTOP event. */
  	      errno = 0;
  	      ptrace (PTRACE_CONT, GET_LWP (lp->ptid), 0, 0);
-@@ -2054,6 +2065,14 @@ retry:
+@@ -2061,6 +2072,14 @@ retry:
  				 target_pid_to_str (lp->ptid));
  	    }
  
@@ -583,11 +586,11 @@ Index: gdb-6.5/gdb/linux-nat.c
  	  /* Handle GNU/Linux's extended waitstatus for trace events.  */
  	  if (WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP && status >> 16 != 0)
  	    {
-Index: gdb-6.5/gdb/linux-nat.h
+Index: gdb-6.7/gdb/linux-nat.h
 ===================================================================
---- gdb-6.5.orig/gdb/linux-nat.h	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/linux-nat.h	2006-07-11 12:32:29.000000000 -0300
-@@ -63,6 +63,18 @@ struct lwp_info
+--- gdb-6.7.orig/gdb/linux-nat.h	2007-10-12 22:35:58.000000000 +0200
++++ gdb-6.7/gdb/linux-nat.h	2007-10-13 04:50:11.000000000 +0200
+@@ -61,6 +61,18 @@ struct lwp_info
  
    /* Next LWP in list.  */
    struct lwp_info *next;
@@ -606,41 +609,41 @@ Index: gdb-6.5/gdb/linux-nat.h
  };
  
  /* Attempt to initialize libthread_db.  */
-Index: gdb-6.5/gdb/Makefile.in
+Index: gdb-6.7/gdb/Makefile.in
 ===================================================================
---- gdb-6.5.orig/gdb/Makefile.in	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/Makefile.in	2006-07-11 15:00:19.000000000 -0300
-@@ -2113,7 +2113,7 @@ i387-tdep.o: i387-tdep.c $(defs_h) $(dou
+--- gdb-6.7.orig/gdb/Makefile.in	2007-09-05 02:14:02.000000000 +0200
++++ gdb-6.7/gdb/Makefile.in	2007-10-13 04:50:53.000000000 +0200
+@@ -2160,7 +2160,7 @@ i387-tdep.o: i387-tdep.c $(defs_h) $(dou
  	$(gdb_assert_h) $(gdb_string_h) $(i386_tdep_h) $(i387_tdep_h)
  ia64-linux-nat.o: ia64-linux-nat.c $(defs_h) $(gdb_string_h) $(inferior_h) \
  	$(target_h) $(gdbcore_h) $(regcache_h) $(ia64_tdep_h) $(gdb_wait_h) \
 -	$(gregset_h) $(linux_nat_h)
 +	$(gregset_h) $(observer_h) $(linux_nat_h)
  ia64-linux-tdep.o: ia64-linux-tdep.c $(defs_h) $(ia64_tdep_h) \
- 	$(arch_utils_h) $(gdbcore_h) $(regcache_h) $(osabi_h) $(solib_svr4_h)
- ia64-tdep.o: ia64-tdep.c $(defs_h) $(inferior_h) $(gdbcore_h) \
-@@ -2518,7 +2518,7 @@ rs6000-tdep.o: rs6000-tdep.c $(defs_h) $
- 	$(frame_unwind_h) $(frame_base_h) $(rs6000_tdep_h)
- rs6000-aix-tdep.o: rs6000-aix-tdep.c $(defs_h) $(osabi_h) $(rs6000_tdep_h)
- s390-nat.o: s390-nat.c $(defs_h) $(tm_h) $(regcache_h) $(inferior_h) \
+ 	$(arch_utils_h) $(gdbcore_h) $(regcache_h) $(osabi_h) $(solib_svr4_h) \
+ 	$(symtab_h)
+@@ -2541,7 +2541,7 @@ rs6000-tdep.o: rs6000-tdep.c $(defs_h) $
+ rs6000-aix-tdep.o: rs6000-aix-tdep.c $(defs_h) $(gdb_string_h) $(osabi_h) \
+ 	$(regcache_h) $(regset_h) $(rs6000_tdep_h) $(ppc_tdep_h)
+ s390-nat.o: s390-nat.c $(defs_h) $(regcache_h) $(inferior_h) \
 -	$(s390_tdep_h) $(target_h) $(linux_nat_h)
-+	$(s390_tdep_h) $(target_h) $(observer_h) $(linux_nat_h)
++	$(s390_tdep_h) $(target_h) $(linux_nat_h) $(observer_h)
  s390-tdep.o: s390-tdep.c $(defs_h) $(arch_utils_h) $(frame_h) $(inferior_h) \
  	$(symtab_h) $(target_h) $(gdbcore_h) $(gdbcmd_h) $(objfiles_h) \
  	$(floatformat_h) $(regcache_h) $(trad_frame_h) $(frame_base_h) \
-Index: gdb-6.5/gdb/linux-thread-db.c
+Index: gdb-6.7/gdb/linux-thread-db.c
 ===================================================================
---- gdb-6.5.orig/gdb/linux-thread-db.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/linux-thread-db.c	2006-07-11 15:00:18.000000000 -0300
-@@ -36,6 +36,7 @@
+--- gdb-6.7.orig/gdb/linux-thread-db.c	2007-08-23 20:08:35.000000000 +0200
++++ gdb-6.7/gdb/linux-thread-db.c	2007-10-13 04:53:59.000000000 +0200
+@@ -34,6 +34,7 @@
  #include "target.h"
  #include "regcache.h"
  #include "solib-svr4.h"
 +#include "observer.h"
  #include "gdbcore.h"
+ #include "observer.h"
  #include "linux-nat.h"
- 
-@@ -718,6 +719,7 @@ attach_thread (ptid_t ptid, const td_thr
+@@ -673,6 +674,7 @@ attach_thread (ptid_t ptid, const td_thr
  {
    struct thread_info *tp;
    td_err_e err;
@@ -648,17 +651,21 @@ Index: gdb-6.5/gdb/linux-thread-db.c
  
    /* If we're being called after a TD_CREATE event, we may already
       know about this thread.  There are two ways this can happen.  We
-@@ -753,11 +755,18 @@ attach_thread (ptid_t ptid, const td_thr
+@@ -700,8 +702,10 @@ attach_thread (ptid_t ptid, const td_thr
    if (ti_p->ti_state == TD_THR_UNKNOWN || ti_p->ti_state == TD_THR_ZOMBIE)
      return;			/* A zombie thread -- do not attach.  */
  
 +  new_ptid = BUILD_LWP (ti_p->ti_lid, GET_PID (ptid));
 +
    /* Under GNU/Linux, we have to attach to each and every thread.  */
- #ifdef ATTACH_LWP
--  ATTACH_LWP (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid)), 0);
-+  ATTACH_LWP (new_ptid, 0);
- #endif
+-  if (lin_lwp_attach_lwp (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid)), 0) < 0)
++  if (lin_lwp_attach_lwp (new_ptid, 0) < 0)
+     return;
+ 
+   /* Add the thread to GDB's thread list.  */
+@@ -712,6 +716,11 @@ attach_thread (ptid_t ptid, const td_thr
+   if (verbose)
+     printf_unfiltered (_("[New %s]\n"), target_pid_to_str (ptid));
  
 +  /* Notify any observers of a new linux thread.  This
 +     would include any linux platforms that have to insert hardware
@@ -668,8 +675,8 @@ Index: gdb-6.5/gdb/linux-thread-db.c
    /* Enable thread event reporting for this thread.  */
    err = td_thr_event_enable_p (th_p, 1);
    if (err != TD_OK)
-@@ -946,7 +955,8 @@ thread_db_wait (ptid_t ptid, struct targ
-     return pid_to_ptid (-1);
+@@ -891,7 +900,8 @@ thread_db_wait (ptid_t ptid, struct targ
+     thread_db_find_new_threads ();
  
    if (ourstatus->kind == TARGET_WAITKIND_STOPPED
 -      && ourstatus->value.sig == TARGET_SIGNAL_TRAP)
@@ -678,11 +685,11 @@ Index: gdb-6.5/gdb/linux-thread-db.c
      /* Check for a thread event.  */
      check_event (ptid);
  
-Index: gdb-6.5/gdb/i386-linux-nat.c
+Index: gdb-6.7/gdb/i386-linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/i386-linux-nat.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/i386-linux-nat.c	2006-07-11 15:00:09.000000000 -0300
-@@ -619,10 +619,9 @@ i386_linux_dr_get (int regnum)
+--- gdb-6.7.orig/gdb/i386-linux-nat.c	2007-08-23 20:08:34.000000000 +0200
++++ gdb-6.7/gdb/i386-linux-nat.c	2007-10-13 04:50:11.000000000 +0200
+@@ -585,10 +585,9 @@ i386_linux_dr_get (int regnum)
    int tid;
    unsigned long value;
  
@@ -696,7 +703,7 @@ Index: gdb-6.5/gdb/i386-linux-nat.c
  
    /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
       ptrace call fails breaks debugging remote targets.  The correct
-@@ -647,10 +646,9 @@ i386_linux_dr_set (int regnum, unsigned 
+@@ -613,10 +612,9 @@ i386_linux_dr_set (int regnum, unsigned 
  {
    int tid;
  
@@ -710,11 +717,11 @@ Index: gdb-6.5/gdb/i386-linux-nat.c
  
    errno = 0;
    ptrace (PTRACE_POKEUSER, tid,
-Index: gdb-6.5/gdb/ia64-linux-nat.c
+Index: gdb-6.7/gdb/ia64-linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/ia64-linux-nat.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/ia64-linux-nat.c	2006-07-11 15:00:00.000000000 -0300
-@@ -29,6 +29,7 @@
+--- gdb-6.7.orig/gdb/ia64-linux-nat.c	2007-08-23 20:08:35.000000000 +0200
++++ gdb-6.7/gdb/ia64-linux-nat.c	2007-10-13 05:07:58.000000000 +0200
+@@ -27,6 +27,7 @@
  #include "regcache.h"
  #include "ia64-tdep.h"
  #include "linux-nat.h"
@@ -722,25 +729,27 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
  
  #include <signal.h>
  #include <sys/ptrace.h>
-@@ -561,8 +562,9 @@ is_power_of_2 (int val)
+@@ -550,10 +551,10 @@ is_power_of_2 (int val)
    return onecount <= 1;
  }
  
--int
--ia64_linux_insert_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int rw)
 +/* Internal routine to insert one watchpoint for a specified thread.  */
-+static int
+ static int
+-ia64_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw)
 +ia64_linux_insert_one_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int rw)
  {
+-  ptid_t ptid = inferior_ptid;
    int idx;
    long dbr_addr, dbr_mask;
-@@ -608,8 +610,38 @@ ia64_linux_insert_watchpoint (ptid_t pti
+   int max_watchpoints = 4;
+@@ -598,10 +599,39 @@ ia64_linux_insert_watchpoint (CORE_ADDR 
    return 0;
  }
  
 +/* Internal callback routine which can be used via iterate_over_lwps
 +   to insert a specific watchpoint from all active threads.  */
-+static int
+ static int
+-ia64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type)
 +ia64_linux_insert_watchpoint_callback (struct lwp_info *lwp, void *data)
 +{
 +  struct linux_watchpoint *args = (struct linux_watchpoint *)data;
@@ -750,9 +759,8 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +}
 +
 +/* Insert a watchpoint for all threads.  */
- int
--ia64_linux_remove_watchpoint (ptid_t ptid, CORE_ADDR addr, int len)
-+ia64_linux_insert_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int rw)
++static int
++ia64_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw)
 +{
 +  struct linux_watchpoint args;
 +
@@ -770,11 +778,13 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +
 +/* Internal routine to remove one watchpoint for a specified thread.  */
 +static int
-+ia64_linux_remove_one_watchpoint (ptid_t ptid, CORE_ADDR addr, int len)
++ia64_linux_remove_one_watchpoint (ptid_t ptid, CORE_ADDR addr, int len, int type)
  {
+-  ptid_t ptid = inferior_ptid;
    int idx;
    long dbr_addr, dbr_mask;
-@@ -632,23 +664,74 @@ ia64_linux_remove_watchpoint (ptid_t pti
+   int max_watchpoints = 4;
+@@ -623,13 +653,55 @@ ia64_linux_remove_watchpoint (CORE_ADDR 
    return -1;
  }
  
@@ -790,8 +800,8 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +}
 +
 +/* Remove a watchpoint for all threads.  */
-+int
-+ia64_linux_remove_watchpoint (ptid_t ptid, CORE_ADDR addr, int len)
++static int
++ia64_linux_remove_watchpoint (CORE_ADDR addr, int len)
 +{
 +  struct linux_watchpoint args;
 +
@@ -818,8 +828,8 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +  return 0;
 +}
 +
- int
- ia64_linux_stopped_data_address (CORE_ADDR *addr_p)
+ static int
+ ia64_linux_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
  {
    CORE_ADDR psr;
    int tid;
@@ -827,9 +837,10 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +  struct siginfo *siginfo_p;
    ptid_t ptid = inferior_ptid;
 +  struct lwp_info *lp;
+   struct regcache *regcache = get_current_regcache ();
  
    tid = TIDGET(ptid);
-   if (tid == 0)
+@@ -637,10 +709,19 @@ ia64_linux_stopped_data_address (struct 
      tid = PIDGET (ptid);
    
    errno = 0;
@@ -851,17 +862,17 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +      (siginfo_p->si_code & 0xffff) != 0x0004 /* TRAP_HWBKPT */)
      return 0;
  
-   psr = read_register_pid (IA64_PSR_REGNUM, ptid);
-@@ -656,7 +739,7 @@ ia64_linux_stopped_data_address (CORE_AD
+   regcache_cooked_read_unsigned (regcache, IA64_PSR_REGNUM, &psr);
+@@ -648,7 +729,7 @@ ia64_linux_stopped_data_address (struct 
                             for the next instruction */
-   write_register_pid (IA64_PSR_REGNUM, psr, ptid);
+   regcache_cooked_write_unsigned (regcache, IA64_PSR_REGNUM, psr);
  
 -  *addr_p = (CORE_ADDR)siginfo.si_addr;
 +  *addr_p = (CORE_ADDR)siginfo_p->si_addr;
    return 1;
  }
  
-@@ -685,6 +768,31 @@ ia64_linux_xfer_partial (struct target_o
+@@ -796,6 +877,31 @@ ia64_linux_xfer_partial (struct target_o
  			     offset, len);
  }
  
@@ -893,7 +904,7 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
  void _initialize_ia64_linux_nat (void);
  
  void
-@@ -701,4 +809,7 @@ _initialize_ia64_linux_nat (void)
+@@ -834,4 +940,7 @@ _initialize_ia64_linux_nat (void)
  
    /* Register the target.  */
    linux_nat_add_target (t);
@@ -901,11 +912,11 @@ Index: gdb-6.5/gdb/ia64-linux-nat.c
 +  observer_attach_linux_new_thread (ia64_linux_new_thread);
 +  observer_attach_sigtrap (ia64_linux_save_sigtrap_info);
  }
-Index: gdb-6.5/gdb/amd64-linux-nat.c
+Index: gdb-6.7/gdb/amd64-linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/amd64-linux-nat.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/amd64-linux-nat.c	2006-07-11 15:00:09.000000000 -0300
-@@ -234,10 +234,9 @@ amd64_linux_dr_get (int regnum)
+--- gdb-6.7.orig/gdb/amd64-linux-nat.c	2007-08-23 20:08:26.000000000 +0200
++++ gdb-6.7/gdb/amd64-linux-nat.c	2007-10-13 04:50:11.000000000 +0200
+@@ -240,10 +240,9 @@ amd64_linux_dr_get (int regnum)
    int tid;
    unsigned long value;
  
@@ -919,7 +930,7 @@ Index: gdb-6.5/gdb/amd64-linux-nat.c
  
    /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
       ptrace call fails breaks debugging remote targets.  The correct
-@@ -262,10 +261,9 @@ amd64_linux_dr_set (int regnum, unsigned
+@@ -268,10 +267,9 @@ amd64_linux_dr_set (int regnum, unsigned
  {
    int tid;
  
@@ -933,11 +944,11 @@ Index: gdb-6.5/gdb/amd64-linux-nat.c
  
    errno = 0;
    ptrace (PT_WRITE_U, tid, offsetof (struct user, u_debugreg[regnum]), value);
-Index: gdb-6.5/gdb/s390-nat.c
+Index: gdb-6.7/gdb/s390-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/s390-nat.c	2006-07-11 12:30:23.000000000 -0300
-+++ gdb-6.5/gdb/s390-nat.c	2006-07-11 15:00:26.000000000 -0300
-@@ -30,6 +30,7 @@
+--- gdb-6.7.orig/gdb/s390-nat.c	2007-08-23 20:08:37.000000000 +0200
++++ gdb-6.7/gdb/s390-nat.c	2007-10-13 04:50:11.000000000 +0200
+@@ -27,6 +27,7 @@
  #include "linux-nat.h"
  
  #include "s390-tdep.h"
@@ -945,8 +956,8 @@ Index: gdb-6.5/gdb/s390-nat.c
  
  #include <asm/ptrace.h>
  #include <sys/ptrace.h>
-@@ -114,14 +115,14 @@ fill_fpregset (fpregset_t *regp, int reg
- 			      ((char *)regp) + regmap_fpregset[i]);
+@@ -111,14 +112,14 @@ fill_fpregset (const struct regcache *re
+ 			      (char *)regp + regmap_fpregset[i]);
  }
  
 -/* Find the TID for the current inferior thread to use with ptrace.  */
@@ -964,25 +975,25 @@ Index: gdb-6.5/gdb/s390-nat.c
  
    return tid;
  }
-@@ -205,7 +206,7 @@ store_fpregs (int tid, int regnum)
+@@ -202,7 +203,7 @@ store_fpregs (const struct regcache *reg
  static void
- s390_linux_fetch_inferior_registers (int regnum)
+ s390_linux_fetch_inferior_registers (struct regcache *regcache, int regnum)
  {
 -  int tid = s390_inferior_tid ();
 +  int tid = s390_tid (inferior_ptid);
  
    if (regnum == -1 
        || (regnum < S390_NUM_REGS && regmap_gregset[regnum] != -1))
-@@ -221,7 +222,7 @@ s390_linux_fetch_inferior_registers (int
+@@ -218,7 +219,7 @@ s390_linux_fetch_inferior_registers (str
  static void
- s390_linux_store_inferior_registers (int regnum)
+ s390_linux_store_inferior_registers (struct regcache *regcache, int regnum)
  {
 -  int tid = s390_inferior_tid ();
 +  int tid = s390_tid (inferior_ptid);
  
    if (regnum == -1 
        || (regnum < S390_NUM_REGS && regmap_gregset[regnum] != -1))
-@@ -263,7 +264,7 @@ s390_stopped_by_watchpoint (void)
+@@ -260,7 +261,7 @@ s390_stopped_by_watchpoint (void)
    parea.len = sizeof (per_lowcore);
    parea.process_addr = (addr_t) & per_lowcore;
    parea.kernel_addr = offsetof (struct user_regs_struct, per_info.lowcore);
@@ -991,7 +1002,7 @@ Index: gdb-6.5/gdb/s390-nat.c
      perror_with_name (_("Couldn't retrieve watchpoint status"));
  
    return per_lowcore.perc_storage_alteration == 1
-@@ -271,9 +272,9 @@ s390_stopped_by_watchpoint (void)
+@@ -268,9 +269,9 @@ s390_stopped_by_watchpoint (void)
  }
  
  static void
@@ -1003,7 +1014,7 @@ Index: gdb-6.5/gdb/s390-nat.c
  
    per_struct per_info;
    ptrace_area parea;
-@@ -310,6 +311,16 @@ s390_fix_watch_points (void)
+@@ -307,6 +308,16 @@ s390_fix_watch_points (void)
      perror_with_name (_("Couldn't modify watchpoint status"));
  }
  
@@ -1020,7 +1031,7 @@ Index: gdb-6.5/gdb/s390-nat.c
  static int
  s390_insert_watchpoint (CORE_ADDR addr, int len, int type)
  {
-@@ -323,10 +334,24 @@ s390_insert_watchpoint (CORE_ADDR addr, 
+@@ -320,10 +331,24 @@ s390_insert_watchpoint (CORE_ADDR addr, 
    area->next = watch_base;
    watch_base = area;
  
@@ -1046,7 +1057,7 @@ Index: gdb-6.5/gdb/s390-nat.c
  static int
  s390_remove_watchpoint (CORE_ADDR addr, int len, int type)
  {
-@@ -348,7 +373,11 @@ s390_remove_watchpoint (CORE_ADDR addr, 
+@@ -345,7 +370,11 @@ s390_remove_watchpoint (CORE_ADDR addr, 
    *parea = area->next;
    xfree (area);
  
@@ -1059,7 +1070,7 @@ Index: gdb-6.5/gdb/s390-nat.c
    return 0;
  }
  
-@@ -364,6 +393,15 @@ s390_region_ok_for_hw_watchpoint (CORE_A
+@@ -361,6 +390,15 @@ s390_region_ok_for_hw_watchpoint (CORE_A
    return 1;
  }
  
@@ -1075,7 +1086,7 @@ Index: gdb-6.5/gdb/s390-nat.c
  
  void _initialize_s390_nat (void);
  
-@@ -389,4 +427,6 @@ _initialize_s390_nat (void)
+@@ -386,4 +424,6 @@ _initialize_s390_nat (void)
  
    /* Register the target.  */
    linux_nat_add_target (t);

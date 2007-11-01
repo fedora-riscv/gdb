@@ -15,44 +15,49 @@
 	(decode_variable_not_found): ... a new function here.
 	(decode_variable): New function.
 
-Index: gdb-6.5/gdb/linespec.c
+2007-10-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.
+
+Index: gdb-6.7/gdb/linespec.c
 ===================================================================
---- gdb-6.5.orig/gdb/linespec.c	2006-01-10 20:14:43.000000000 -0200
-+++ gdb-6.5/gdb/linespec.c	2006-07-07 01:04:56.000000000 -0300
-@@ -37,6 +37,7 @@
- #include "objc-lang.h"
+--- gdb-6.7.orig/gdb/linespec.c	2007-08-23 20:08:35.000000000 +0200
++++ gdb-6.7/gdb/linespec.c	2007-10-13 05:26:33.000000000 +0200
+@@ -36,6 +36,7 @@
  #include "linespec.h"
  #include "exceptions.h"
+ #include "language.h"
 +#include "gdb_assert.h"
  
  /* We share this one with symtab.c, but it is not exported widely. */
  
-@@ -75,7 +75,8 @@ static struct symtabs_and_lines find_met
- 					     struct symbol *sym_class);
+@@ -75,7 +76,8 @@ static struct symtabs_and_lines find_met
  
  static int collect_methods (char *copy, struct type *t,
+ 			    struct symbol *sym_class,
 -			    struct symbol **sym_arr);
 +			    struct symbol **sym_arr,
 +			    struct minimal_symbol **msym_arr);
  
  static NORETURN void cplusplus_error (const char *name,
  				      const char *fmt, ...)
-@@ -83,10 +84,12 @@ static NORETURN void cplusplus_error (co
- 
+@@ -84,11 +86,13 @@ static NORETURN void cplusplus_error (co
  static int total_number_of_methods (struct type *type);
  
--static int find_methods (struct type *, char *, struct symbol **);
-+static int find_methods (struct type *, char *, struct symbol **,
+ static int find_methods (struct type *, char *,
+-			 enum language, struct symbol **);
++			 enum language, struct symbol **,
 +			 struct minimal_symbol **);
  
  static int add_matching_methods (int method_counter, struct type *t,
+ 				 enum language language,
 -				 struct symbol **sym_arr);
 +				 struct symbol **sym_arr,
 +				 struct minimal_symbol **msym_arr);
  
  static int add_constructors (int method_counter, struct type *t,
- 			     struct symbol **sym_arr);
-@@ -101,6 +104,9 @@ static int is_objc_method_format (const 
+ 			     enum language language,
+@@ -104,6 +108,9 @@ static int is_objc_method_format (const 
  static struct symtabs_and_lines decode_line_2 (struct symbol *[],
  					       int, int, char ***);
  
@@ -62,7 +67,7 @@ Index: gdb-6.5/gdb/linespec.c
  static struct symtab *symtab_from_filename (char **argptr,
  					    char *p, int is_quote_enclosed,
  					    int *not_found_ptr);
-@@ -191,12 +197,18 @@ total_number_of_methods (struct type *ty
+@@ -194,13 +201,18 @@ total_number_of_methods (struct type *ty
  /* Recursive helper function for decode_line_1.
     Look for methods named NAME in type T.
     Return number of matches.
@@ -77,29 +82,27 @@ Index: gdb-6.5/gdb/linespec.c
     Note that this function is g++ specific.  */
  
  static int
--find_methods (struct type *t, char *name, struct symbol **sym_arr)
-+find_methods (struct type *t, char *name, struct symbol **sym_arr,
-+	      struct minimal_symbol **msym_arr)
+ find_methods (struct type *t, char *name, enum language language,
+-	      struct symbol **sym_arr)
++	      struct symbol **sym_arr, struct minimal_symbol **msym_arr)
  {
    int i1 = 0;
    int ibase;
-@@ -239,7 +251,8 @@ find_methods (struct type *t, char *name
+@@ -243,7 +255,7 @@ find_methods (struct type *t, char *name
  	  if (strcmp_iw (name, method_name) == 0)
  	    /* Find all the overloaded methods with that name.  */
- 	    i1 += add_matching_methods (method_counter, t,
+ 	    i1 += add_matching_methods (method_counter, t, language,
 -					sym_arr + i1);
-+					sym_arr + i1,
-+					msym_arr);
++					sym_arr + i1, msym_arr);
  	  else if (strncmp (class_name, name, name_len) == 0
  		   && (class_name[name_len] == '\0'
  		       || class_name[name_len] == '<'))
-@@ -261,21 +274,101 @@ find_methods (struct type *t, char *name
- 
+@@ -266,21 +278,100 @@ find_methods (struct type *t, char *name
    if (i1 == 0)
      for (ibase = 0; ibase < TYPE_N_BASECLASSES (t); ibase++)
--      i1 += find_methods (TYPE_BASECLASS (t, ibase), name, sym_arr + i1);
-+      i1 += find_methods (TYPE_BASECLASS (t, ibase), name, sym_arr + i1,
-+			  msym_arr);
+       i1 += find_methods (TYPE_BASECLASS (t, ibase), name,
+-			  language, sym_arr + i1);
++			  language, sym_arr + i1, msym_arr);
  
    return i1;
  }
@@ -185,8 +188,8 @@ Index: gdb-6.5/gdb/linespec.c
  
  static int
  add_matching_methods (int method_counter, struct type *t,
--		      struct symbol **sym_arr)
-+		      struct symbol **sym_arr,
+-		      enum language language, struct symbol **sym_arr)
++		      enum language language, struct symbol **sym_arr,
 +		      struct minimal_symbol **msym_arr)
  {
    int field_counter;
@@ -197,11 +200,10 @@ Index: gdb-6.5/gdb/linespec.c
  
    for (field_counter = TYPE_FN_FIELDLIST_LENGTH (t, method_counter) - 1;
         field_counter >= 0;
-@@ -299,6 +374,16 @@ add_matching_methods (int method_counter
- 	}
+@@ -305,6 +396,16 @@ add_matching_methods (int method_counter
        else
  	phys_name = TYPE_FN_FIELD_PHYSNAME (f, field_counter);
-+
+ 
 +      /* Check for special case of looking for member that
 +	 doesn't have a mangled name provided.  This will happen
 +	 when we have in-charge and not-in-charge constructors.
@@ -211,10 +213,11 @@ Index: gdb-6.5/gdb/linespec.c
 +	 table which has the full member name information we need.  */
 +      if (strlen (phys_name) <= strlen (class_name))
 +	return add_minsym_members (class_name, phys_name, msym_arr);
- 		
++
        /* Destructor is handled by caller, don't add it to
  	 the list.  */
-@@ -324,6 +409,9 @@ add_matching_methods (int method_counter
+       if (is_destructor_name (phys_name) != 0)
+@@ -330,6 +431,9 @@ add_matching_methods (int method_counter
  	}
      }
  
@@ -224,7 +227,7 @@ Index: gdb-6.5/gdb/linespec.c
    return i1;
  }
  
-@@ -603,6 +691,146 @@ decode_line_2 (struct symbol *sym_arr[],
+@@ -610,6 +714,146 @@ decode_line_2 (struct symbol *sym_arr[],
    discard_cleanups (old_chain);
    return return_values;
  }
@@ -371,20 +374,20 @@ Index: gdb-6.5/gdb/linespec.c
  
  /* The parser of linespec itself. */
  
-@@ -1406,36 +1634,46 @@ find_method (int funfirstline, char ***c
-   int i1;	/*  Counter for the symbol array.  */
+@@ -1414,35 +1658,46 @@ find_method (int funfirstline, char ***c
    struct symbol **sym_arr =  alloca (total_number_of_methods (t)
  				     * sizeof (struct symbol *));
+ 
 +  struct minimal_symbol **msym_arr =  alloca (total_number_of_methods (t)
 +				     * sizeof (struct minimal_symbol *));
 +
 +  msym_arr[0] = NULL;
- 
++
    /* Find all methods with a matching name, and put them in
       sym_arr.  */
  
--  i1 = collect_methods (copy, t, sym_arr);
-+  i1 = collect_methods (copy, t, sym_arr, msym_arr);
+-  i1 = collect_methods (copy, t, sym_class, sym_arr);
++  i1 = collect_methods (copy, t, sym_class, sym_arr, msym_arr);
  
    if (i1 == 1)
      {
@@ -428,11 +431,11 @@ Index: gdb-6.5/gdb/linespec.c
        /* There is more than one field with that name
  	 (overloaded).  Ask the user which one to use.  */
 +      if (msym_arr[0] != NULL)
-+        return decode_line_3 (msym_arr, i1, funfirstline, canonical);
++	return decode_line_3 (msym_arr, i1, funfirstline, canonical);
        return decode_line_2 (sym_arr, i1, funfirstline, canonical);
      }
    else
-@@ -1462,11 +1700,12 @@ find_method (int funfirstline, char ***c
+@@ -1469,11 +1722,12 @@ find_method (int funfirstline, char ***c
  }
  
  /* Find all methods named COPY in the class whose type is T, and put
@@ -441,22 +444,22 @@ Index: gdb-6.5/gdb/linespec.c
  
  static int
  collect_methods (char *copy, struct type *t,
--		 struct symbol **sym_arr)
-+		 struct symbol **sym_arr,
+-		 struct symbol *sym_class, struct symbol **sym_arr)
++		 struct symbol *sym_class, struct symbol **sym_arr,
 +		 struct minimal_symbol **msym_arr)
  {
    int i1 = 0;	/*  Counter for the symbol array.  */
  
-@@ -1488,7 +1727,7 @@ collect_methods (char *copy, struct type
+@@ -1495,7 +1749,7 @@ collect_methods (char *copy, struct type
  	}
      }
    else
--    i1 = find_methods (t, copy, sym_arr);
-+    i1 = find_methods (t, copy, sym_arr, msym_arr);
+-    i1 = find_methods (t, copy, SYMBOL_LANGUAGE (sym_class), sym_arr);
++    i1 = find_methods (t, copy, SYMBOL_LANGUAGE (sym_class), sym_arr, msym_arr);
  
    return i1;
  }
-@@ -1976,12 +2021,13 @@ decode_dollar (char *copy, int funfirstl
+@@ -1717,12 +1971,13 @@ decode_dollar (char *copy, int funfirstl
     and do not issue an error message.  */ 
  
  static struct symtabs_and_lines
@@ -472,7 +475,7 @@ Index: gdb-6.5/gdb/linespec.c
  
    struct minimal_symbol *msymbol;
  
-@@ -2001,8 +2047,25 @@ decode_variable (char *copy, int funfirs
+@@ -1740,8 +1995,25 @@ decode_variable (char *copy, int funfirs
    msymbol = lookup_minimal_symbol (copy, NULL, NULL);
  
    if (msymbol != NULL)
@@ -484,10 +487,10 @@ Index: gdb-6.5/gdb/linespec.c
 +      if (file_symtab == 0)
 +	build_canonical_line_spec (retval.sals, SYMBOL_LINKAGE_NAME (msymbol),
 +				   canonical);
-+
+ 
 +      return retval;
 +    }
- 
++
 +  retval.nelts = 0;
 +  retval.sals = NULL;
 +  return retval;
@@ -499,7 +502,7 @@ Index: gdb-6.5/gdb/linespec.c
    if (!have_full_symbols () &&
        !have_partial_symbols () && !have_minimal_symbols ())
      error (_("No symbol table is loaded.  Use the \"file\" command."));
-@@ -2010,6 +2064,132 @@ decode_variable (char *copy, int funfirs
+@@ -1751,6 +2023,132 @@ decode_variable (char *copy, int funfirs
    throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), copy);
  }
  
@@ -632,15 +635,17 @@ Index: gdb-6.5/gdb/linespec.c
  
  
  
-diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
---- gdb-6.6-orig/gdb/Makefile.in	2007-10-05 15:22:37.000000000 +0200
-+++ gdb-6.6/gdb/Makefile.in	2007-10-05 16:29:10.000000000 +0200
-@@ -2266,7 +2266,7 @@ libunwind-frame.o: libunwind-frame.c $(d
+Index: gdb-6.7/gdb/Makefile.in
+===================================================================
+--- gdb-6.7.orig/gdb/Makefile.in	2007-10-13 05:09:50.000000000 +0200
++++ gdb-6.7/gdb/Makefile.in	2007-10-13 05:15:13.000000000 +0200
+@@ -2233,7 +2233,8 @@ libunwind-frame.o: libunwind-frame.c $(d
  linespec.o: linespec.c $(defs_h) $(symtab_h) $(frame_h) $(command_h) \
  	$(symfile_h) $(objfiles_h) $(source_h) $(demangle_h) $(value_h) \
  	$(completer_h) $(cp_abi_h) $(parser_defs_h) $(block_h) \
--	$(objc_lang_h) $(linespec_h) $(exceptions_h)
-+	$(objc_lang_h) $(linespec_h) $(exceptions_h) $(gdb_assert_h)
+-	$(objc_lang_h) $(linespec_h) $(exceptions_h) $(language_h)
++	$(objc_lang_h) $(linespec_h) $(exceptions_h) $(language_h) \
++	$(gdb_assert_h)
  linux-fork.o: linux-fork.c $(defs_h) $(inferior_h) $(regcache_h) $(gdbcmd_h) \
  	$(infcall_h) $(gdb_assert_h) $(gdb_string_h) $(linux_fork_h) \
  	$(linux_nat_h)

@@ -8,19 +8,19 @@ Name: gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.6
+Version: 6.7
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 37%{?dist}
+Release: 1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.6.tar.bz2
+Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.7.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%define gdb_src gdb-6.6
+%define gdb_src gdb-%{version}
 %define gdb_build build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -149,9 +149,6 @@ Patch147: gdb-6.3-warnings-20050317.patch
 # Fix printing of inherited members
 Patch148: gdb-6.3-inheritance-20050324.patch
 
-# Add vsyscall page support for ia64.
-Patch149: gdb-6.3-ia64-vsyscall-20050330.patch
-
 # Print a warning when the separate debug info's CRC doesn't match.
 Patch150: gdb-6.3-test-sepcrc-20050402.patch
 Patch151: gdb-6.3-sepcrc-20050402.patch
@@ -225,9 +222,6 @@ Patch188: gdb-6.5-bz203661-emit-relocs.patch
 # CVE-2006-4146
 Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
-# Fix gdb printf command argument using "%p" (BZ 205551).
-Patch191: gdb-6.5-bz205551-printf-p.patch
-
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
 # FIXME: Still to be updated.
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
@@ -252,22 +246,12 @@ Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 # Testcase for deadlocking on last address space byte; for corrupted backtraces.
 Patch211: gdb-6.5-last-address-space-byte-test.patch
 
-# Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
-Patch206: gdb-6.5-relativedebug.patch
-
-# Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
-Patch207: gdb-6.5-symbols-overlap.patch
-
 # Improved testsuite results by the testsuite provided by the courtesy of BEA.
 Patch208: gdb-6.5-BEA-testsuite.patch
 
 # Fix readline segfault on excessively long hand-typed lines.
 Patch209: gdb-6.5-readline-long-line-crash.patch
 Patch213: gdb-6.5-readline-long-line-crash-test.patch
-
-# Fix readline history for input mode commands like `command' (BZ 215816).
-Patch212: gdb-6.5-bz215816-readline-from-callback.patch
-Patch219: gdb-6.5-bz215816-readline-from-callback-test.patch
 
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
@@ -279,26 +263,17 @@ Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
 Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
 
-# Fix unwinding crash on older gcj(1) code (extended CFI support) (BZ 165025).
-Patch221: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-fix.patch
-Patch222: gdb-6.5-bz165025-DW_CFA_GNU_negative_offset_extended-test.patch
-
 # Find symbols properly at their original (included) file (BZ 109921).
-Patch224: gdb-6.5-bz109921-DW_AT_decl_file-fix.patch
 Patch225: gdb-6.5-bz109921-DW_AT_decl_file-test.patch
 
 # Update PPC unwinding patches to their upstream variants (BZ 140532).
-Patch226: gdb-6.3-bz140532-ppc-unwinding-fix.patch
 Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
-
-# Fix missing testsuite .log output of testcases using get_compiler_info().
-Patch230: gdb-6.5-testsuite-log.patch
 
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.6 release fixups.
-Patch232: gdb-6.6-upstream.patch
+# Backported post gdb-6.7 release fixups.
+Patch232: gdb-6.7-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -309,20 +284,11 @@ Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 # Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
 Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
 
-# Use definition of an empty structure as it is not an opaque type (BZ 233716).
-Patch238: gdb-6.6-bz233716-empty-structure-override.patch
-
 # Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
 Patch240: gdb-6.6-bz225783-prelink-path.patch
 
 # Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
 Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
-
-# Fix harmless GCORE stack buffer overflow, by _FORTIFY_SOURCE=2 (BZ 238285).
-Patch243: gdb-6.6-bz238285-gcore-strings-overflow.patch
-
-# Use the runtime variant of `libunwind-ARCH.so.7' rather than the `.so' one.
-Patch244: gdb-6.6-libunwind-major-version.patch
 
 # Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
 Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
@@ -332,9 +298,6 @@ Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 
 # Notify user of a child forked process being detached (BZ 235197).
 Patch247: gdb-6.6-bz234468-fork-detach-info.patch
-
-# Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232015).
-Patch248: gdb-6.6-bz232015-gcore-ppc-on-ppc64.patch
 
 # New testcase for gcore of 32bit inferiors on 64bit hosts.
 Patch249: gdb-6.6-gcore32-test.patch
@@ -350,7 +313,6 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 Patch256: gdb-6.6-bz233852-attach-signalled.patch
 
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
-Patch257: gdb-6.6-bz237572-ppc-atomic-sequence-upstream.patch
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
 
 # Link with libreadline provided by the operating system.
@@ -363,15 +325,7 @@ Patch263: gdb-6.3-attach-see-vdso-test.patch
 Patch265: gdb-6.6-bz247354-leader-exit-fix.patch
 Patch266: gdb-6.6-bz247354-leader-exit-test.patch
 
-# Fixed compatibility with Rawhide kernel fs.binfmt_elf.core_dump_elf_headers=1.
-Patch269: gdb-6.6-bfd-core-dump_elf_headers.patch
-
-# Fixed compatibility with the Rawhide glibc open(2) syscall sanity checking.
-Patch272: gdb-6.6-glibc-open-fcntl2-compat.patch
-
-# New fast verification whether the .debug file matches its peer (build-id).
 # New locating of the matching binaries from the pure core file (build-id).
-Patch273: gdb-6.6-buildid-verify.patch
 Patch274: gdb-6.6-buildid-locate.patch
 
 # Fixed the kernel 8KB VDSO loading (producing `no loadable sections found').
@@ -385,6 +339,12 @@ Patch278: gdb-6.6-cu-ranges.patch
 
 # Fix hardware watchpoints after inferior forks-off some process.
 Patch280: gdb-6.6-multifork-debugreg-for-i386-and-x86_64.patch
+
+# Fix displaying of numeric char arrays as strings (BZ 224128).
+Patch282: gdb-6.7-charsign-test.patch
+
+# Fix rereading of the main executable on its change.
+Patch283: gdb-6.7-reread-exec_bfd.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -461,7 +421,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch145 -p1
 %patch147 -p1
 %patch148 -p1
-%patch149 -p1
 %patch150 -p1
 %patch151 -p1
 %patch153 -p1
@@ -486,65 +445,49 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch187 -p1
 %patch188 -p1
 %patch190 -p1
-%patch191 -p1
 %patch194 -p1
 %patch195 -p1
 %patch196 -p1
 %patch199 -p1
 %patch200 -p1
 %patch201 -p1
-%patch206 -p1
-%patch207 -p1
 %patch208 -p1
 %patch209 -p1
 %patch211 -p1
-%patch212 -p1
 %patch213 -p1
 %patch214 -p1
 %patch215 -p1
 %patch216 -p1
 %patch217 -p1
-%patch219 -p1
-%patch221 -p1
-%patch222 -p1
-%patch224 -p1
 %patch225 -p1
-%patch226 -p1
 %patch229 -p1
-%patch230 -p1
 %patch231 -p1
 %patch232 -p1
 %patch234 -p1
 %patch235 -p1
 %patch236 -p1
-%patch238 -p1
 %patch240 -p1
 %patch241 -p1
-%patch243 -p1
-%patch244 -p1
 %patch245 -p1
 %patch246 -p1
 %patch247 -p1
-%patch248 -p1
 %patch249 -p1
 %patch251 -p1
 %patch254 -p1
 %patch256 -p1
-%patch257 -p1
 %patch258 -p1
 %patch260 -p1
 %patch261 -p1
 %patch263 -p1
 %patch265 -p1
 %patch266 -p1
-%patch269 -p1
-%patch272 -p1
-%patch273 -p1
 %patch274 -p1
 %patch276 -p1
 %patch277 -p1
 %patch278 -p1
 %patch280 -p1
+%patch282 -p1
+%patch283 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -558,9 +501,6 @@ rm -f bfd/doc/*.info
 rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
-
-# Force the use of system readline includes as we link with the system readline.
-rm -rf readline
 
 %build
 
@@ -595,6 +535,7 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 	$enable_build_warnings				\
 	--with-separate-debug-dir=/usr/lib/debug	\
 	--disable-rpath					\
+	--with-system-readline				\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -701,6 +642,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Nov  1 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7-1
+- Upgrade to GDB 6.7.  Drop redundant patches, forward-port remaining ones.
+- Fix rereading of the main executable on its change.
+
 * Fri Oct 19 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-37
 - Fix hiding unexpected breakpoints on intentional step/next commands.
 - Fix s390 compilation warning/failure due to a wrongly sized type-cast.

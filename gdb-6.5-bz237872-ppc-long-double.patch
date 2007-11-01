@@ -122,3 +122,56 @@ Index: ./gdb/ppc-linux-tdep.c
  
    if (tdep->wordsize == 4)
      {
+
+
+
+2007-10-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.
+
+diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-patched/gdb/gdbtypes.c gdb-6.7/gdb/gdbtypes.c
+--- gdb-6.7-patched/gdb/gdbtypes.c	2007-09-05 02:51:48.000000000 +0200
++++ gdb-6.7/gdb/gdbtypes.c	2007-10-17 12:09:00.000000000 +0200
+@@ -95,6 +95,10 @@ const struct floatformat *floatformats_v
+   &floatformat_vax_d,
+   &floatformat_vax_d
+ };
++const struct floatformat *floatformat_ppc64_long_double[BFD_ENDIAN_UNKNOWN] = {
++  &floatformat_ppc64_long_double_big,
++  &floatformat_ppc64_long_double_little
++};
+ 
+ struct type *builtin_type_ieee_single;
+ struct type *builtin_type_ieee_double;
+diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-patched/gdb/gdbtypes.h gdb-6.7/gdb/gdbtypes.h
+--- gdb-6.7-patched/gdb/gdbtypes.h	2007-09-05 02:51:48.000000000 +0200
++++ gdb-6.7/gdb/gdbtypes.h	2007-10-17 12:08:30.000000000 +0200
+@@ -1121,6 +1121,7 @@ extern const struct floatformat *floatfo
+ extern const struct floatformat *floatformats_ia64_quad[BFD_ENDIAN_UNKNOWN];
+ extern const struct floatformat *floatformats_vax_f[BFD_ENDIAN_UNKNOWN];
+ extern const struct floatformat *floatformats_vax_d[BFD_ENDIAN_UNKNOWN];
++extern const struct floatformat *floatformat_ppc64_long_double[BFD_ENDIAN_UNKNOWN];
+ 
+ extern struct type *builtin_type_ieee_single;
+ extern struct type *builtin_type_ieee_double;
+diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-patched/gdb/rs6000-tdep.c gdb-6.7/gdb/rs6000-tdep.c
+--- gdb-6.7-patched/gdb/rs6000-tdep.c	2007-10-16 20:52:45.000000000 +0200
++++ gdb-6.7/gdb/rs6000-tdep.c	2007-10-17 12:07:54.000000000 +0200
+@@ -3755,16 +3755,7 @@ rs6000_gdbarch_init (struct gdbarch_info
+   set_gdbarch_double_bit (gdbarch, 8 * TARGET_CHAR_BIT);
+   if (sysv_abi)
+     {
+-      int byte_order = gdbarch_byte_order (gdbarch);
+-
+-      if (byte_order == BFD_ENDIAN_BIG)
+-        set_gdbarch_long_double_format (gdbarch, &floatformat_ppc64_long_double_big);
+-      else if (byte_order == BFD_ENDIAN_LITTLE) 
+-        set_gdbarch_long_double_format (gdbarch, &floatformat_ppc64_long_double_little);
+-      else
+-        internal_error (__FILE__, __LINE__,
+-                      _("rs6000_gdbarch_init: "
+-                        "bad byte order"));
++      set_gdbarch_long_double_format (gdbarch, floatformat_ppc64_long_double);
+       set_gdbarch_long_double_bit (gdbarch, 16 * TARGET_CHAR_BIT);
+     }
+   else
