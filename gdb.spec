@@ -8,14 +8,14 @@ Name: gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.7
+Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 Release: 1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.7.tar.bz2
+Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.7.1.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -273,7 +273,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.7 release fixups.
-Patch232: gdb-6.7-upstream.patch
+Patch232: gdb-6.7.1-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -642,6 +642,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Nov  1 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-1
+- Upgrade to GDB 6.7.1.  Drop redundant patches, forward-port remaining ones.
+
 * Thu Nov  1 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7-1
 - Upgrade to GDB 6.7.  Drop redundant patches, forward-port remaining ones.
 - Fix rereading of the main executable on its change.
