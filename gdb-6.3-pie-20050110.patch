@@ -1,7 +1,15 @@
-Index: gdb-6.7/gdb/dwarf2read.c
+2007-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.7.1.
+
+2007-11-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to post-GDB-6.7.1 multi-PC breakpoints.
+
+Index: gdb-6.7.1/gdb/dwarf2read.c
 ===================================================================
---- gdb-6.7.orig/gdb/dwarf2read.c	2007-10-13 05:27:15.000000000 +0200
-+++ gdb-6.7/gdb/dwarf2read.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/dwarf2read.c	2007-11-02 15:24:10.000000000 +0100
++++ gdb-6.7.1/gdb/dwarf2read.c	2007-11-02 15:24:19.000000000 +0100
 @@ -1226,7 +1226,7 @@ dwarf2_build_psymtabs (struct objfile *o
    else
      dwarf2_per_objfile->loc_buffer = NULL;
@@ -11,10 +19,10 @@ Index: gdb-6.7/gdb/dwarf2read.c
        || (objfile->global_psymbols.size == 0
  	  && objfile->static_psymbols.size == 0))
      {
-Index: gdb-6.7/gdb/auxv.c
+Index: gdb-6.7.1/gdb/auxv.c
 ===================================================================
---- gdb-6.7.orig/gdb/auxv.c	2007-08-23 20:08:26.000000000 +0200
-+++ gdb-6.7/gdb/auxv.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/auxv.c	2007-08-23 20:08:26.000000000 +0200
++++ gdb-6.7.1/gdb/auxv.c	2007-11-02 15:24:19.000000000 +0100
 @@ -80,7 +80,7 @@ procfs_xfer_auxv (struct target_ops *ops
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  int
@@ -86,10 +94,10 @@ Index: gdb-6.7/gdb/auxv.c
        switch (flavor)
  	{
  	case dec:
-Index: gdb-6.7/gdb/auxv.h
+Index: gdb-6.7.1/gdb/auxv.h
 ===================================================================
---- gdb-6.7.orig/gdb/auxv.h	2007-08-23 20:08:26.000000000 +0200
-+++ gdb-6.7/gdb/auxv.h	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/auxv.h	2007-08-23 20:08:26.000000000 +0200
++++ gdb-6.7.1/gdb/auxv.h	2007-11-02 15:24:19.000000000 +0100
 @@ -35,14 +35,14 @@ struct target_ops;		/* Forward declarati
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  extern int target_auxv_parse (struct target_ops *ops,
@@ -107,11 +115,11 @@ Index: gdb-6.7/gdb/auxv.h
  
  /* Print the contents of the target's AUXV on the specified file. */
  extern int fprint_target_auxv (struct ui_file *file, struct target_ops *ops);
-Index: gdb-6.7/gdb/breakpoint.h
+Index: gdb-6.7.1/gdb/breakpoint.h
 ===================================================================
---- gdb-6.7.orig/gdb/breakpoint.h	2007-10-13 05:09:50.000000000 +0200
-+++ gdb-6.7/gdb/breakpoint.h	2007-10-13 05:29:58.000000000 +0200
-@@ -153,6 +153,7 @@ enum enable_state
+--- gdb-6.7.1.orig/gdb/breakpoint.h	2007-11-02 15:22:24.000000000 +0100
++++ gdb-6.7.1/gdb/breakpoint.h	2007-11-02 15:24:59.000000000 +0100
+@@ -150,6 +150,7 @@ enum enable_state
  			   automatically enabled and reset when the call 
  			   "lands" (either completes, or stops at another 
  			   eventpoint). */
@@ -119,23 +127,21 @@ Index: gdb-6.7/gdb/breakpoint.h
      bp_permanent	/* There is a breakpoint instruction hard-wired into
  			   the target's code.  Don't try to write another
  			   breakpoint instruction on top of it, or restore
-@@ -807,8 +808,12 @@ extern void remove_thread_event_breakpoi
+@@ -826,6 +827,10 @@ extern void remove_thread_event_breakpoi
  
  extern void disable_breakpoints_in_shlibs (void);
  
 +extern void disable_breakpoints_at_startup (int silent);
 +
- extern void re_enable_breakpoints_in_shlibs (void);
- 
-+void re_enable_breakpoints_at_startup (void);
++extern void re_enable_breakpoints_at_startup (void);
 +
  extern void create_solib_load_event_breakpoint (char *, int, char *, char *);
  
  extern void create_solib_unload_event_breakpoint (char *, int,
-Index: gdb-6.7/gdb/symfile-mem.c
+Index: gdb-6.7.1/gdb/symfile-mem.c
 ===================================================================
---- gdb-6.7.orig/gdb/symfile-mem.c	2007-08-23 20:08:39.000000000 +0200
-+++ gdb-6.7/gdb/symfile-mem.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/symfile-mem.c	2007-08-23 20:08:39.000000000 +0200
++++ gdb-6.7.1/gdb/symfile-mem.c	2007-11-02 15:24:19.000000000 +0100
 @@ -108,7 +108,7 @@ symbol_file_add_from_memory (struct bfd 
        }
  
@@ -145,13 +151,13 @@ Index: gdb-6.7/gdb/symfile-mem.c
  
    /* This might change our ideas about frames already looked at.  */
    reinit_frame_cache ();
-Index: gdb-6.7/gdb/infrun.c
+Index: gdb-6.7.1/gdb/infrun.c
 ===================================================================
---- gdb-6.7.orig/gdb/infrun.c	2007-10-13 05:09:50.000000000 +0200
-+++ gdb-6.7/gdb/infrun.c	2007-10-13 05:29:58.000000000 +0200
-@@ -2305,6 +2305,11 @@ process_event_stop_test:
- 	     code segments in shared libraries might be mapped in now. */
- 	  re_enable_breakpoints_in_shlibs ();
+--- gdb-6.7.1.orig/gdb/infrun.c	2007-11-02 15:21:57.000000000 +0100
++++ gdb-6.7.1/gdb/infrun.c	2007-11-02 15:24:19.000000000 +0100
+@@ -2298,6 +2298,11 @@ process_event_stop_test:
+ #endif
+ 	  target_terminal_inferior ();
  
 +	  /* For PIE executables, we dont really know where the
 +	     breakpoints are going to be until we start up the
@@ -161,10 +167,10 @@ Index: gdb-6.7/gdb/infrun.c
  	  /* If requested, stop when the dynamic linker notifies
  	     gdb of events.  This allows the user to get control
  	     and place breakpoints in initializer routines for
-Index: gdb-6.7/gdb/objfiles.c
+Index: gdb-6.7.1/gdb/objfiles.c
 ===================================================================
---- gdb-6.7.orig/gdb/objfiles.c	2007-08-23 20:08:36.000000000 +0200
-+++ gdb-6.7/gdb/objfiles.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/objfiles.c	2007-08-23 20:08:36.000000000 +0200
++++ gdb-6.7.1/gdb/objfiles.c	2007-11-02 15:24:19.000000000 +0100
 @@ -48,6 +48,9 @@
  #include "dictionary.h"
  #include "source.h"
@@ -196,10 +202,10 @@ Index: gdb-6.7/gdb/objfiles.c
  }
  
  /* Create the terminating entry of OBJFILE's minimal symbol table.
-Index: gdb-6.7/gdb/solib-svr4.c
+Index: gdb-6.7.1/gdb/solib-svr4.c
 ===================================================================
---- gdb-6.7.orig/gdb/solib-svr4.c	2007-10-12 22:34:03.000000000 +0200
-+++ gdb-6.7/gdb/solib-svr4.c	2007-10-14 23:04:45.000000000 +0200
+--- gdb-6.7.1.orig/gdb/solib-svr4.c	2007-11-02 15:21:46.000000000 +0100
++++ gdb-6.7.1/gdb/solib-svr4.c	2007-11-02 15:24:19.000000000 +0100
 @@ -31,6 +31,8 @@
  #include "gdbcore.h"
  #include "target.h"
@@ -355,7 +361,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  	     *ptr = dyn_ptr;
  	   }
  	 return 1;
-@@ -547,6 +638,10 @@ solib_svr4_r_map (void)
+@@ -547,6 +642,10 @@ solib_svr4_r_map (void)
  {
    struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
  
@@ -366,7 +372,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
    return read_memory_typed_address (debug_base + lmo->r_map_offset,
  				    builtin_type_void_data_ptr);
  }
-@@ -704,6 +799,11 @@ svr4_current_sos (void)
+@@ -704,6 +803,11 @@ svr4_current_sos (void)
    struct so_list **link_ptr = &head;
    CORE_ADDR ldsomap = 0;
  
@@ -378,7 +384,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
    /* Make sure we've looked up the inferior's dynamic linker's base
       structure.  */
    if (! debug_base)
-@@ -713,11 +813,21 @@ svr4_current_sos (void)
+@@ -713,11 +817,21 @@ svr4_current_sos (void)
        /* If we can't find the dynamic linker's base structure, this
  	 must not be a dynamically linked executable.  Hmm.  */
        if (! debug_base)
@@ -401,7 +407,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
    lm = solib_svr4_r_map ();
  
    while (lm)
-@@ -733,23 +843,103 @@ svr4_current_sos (void)
+@@ -733,23 +847,103 @@ svr4_current_sos (void)
        new->lm_info->lm = xzalloc (lmo->link_map_size);
        make_cleanup (xfree, new->lm_info->lm);
  
@@ -506,7 +512,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  	  target_read_string (LM_NAME (new), &buffer,
  			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
  	  if (errcode != 0)
-@@ -757,23 +947,35 @@ svr4_current_sos (void)
+@@ -757,23 +951,35 @@ svr4_current_sos (void)
  		     safe_strerror (errcode));
  	  else
  	    {
@@ -558,7 +564,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  	}
  
        /* On Solaris, the dynamic linker is not in the normal list of
-@@ -789,6 +991,11 @@ svr4_current_sos (void)
+@@ -789,6 +995,11 @@ svr4_current_sos (void)
    if (head == NULL)
      return svr4_default_sos ();
  
@@ -570,7 +576,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
    return head;
  }
  
-@@ -868,7 +1075,7 @@ svr4_fetch_objfile_link_map (struct objf
+@@ -868,7 +1079,7 @@ svr4_fetch_objfile_link_map (struct objf
  /* On some systems, the only way to recognize the link map entry for
     the main executable file is by looking at its name.  Return
     non-zero iff SONAME matches one of the known main executable names.  */
@@ -579,7 +585,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  static int
  match_main (char *soname)
  {
-@@ -882,6 +1089,7 @@ match_main (char *soname)
+@@ -882,6 +1093,7 @@ match_main (char *soname)
  
    return (0);
  }
@@ -587,7 +593,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  
  /* Return 1 if PC lies in the dynamic symbol resolution code of the
     SVR4 run time loader.  */
-@@ -979,6 +1187,11 @@ enable_break (void)
+@@ -979,6 +1191,11 @@ enable_break (void)
    /* Find the .interp section; if not found, warn the user and drop
       into the old breakpoint at symbol code.  */
    interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
@@ -599,7 +605,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
    if (interp_sect)
      {
        unsigned int interp_sect_size;
-@@ -1018,6 +1231,9 @@ enable_break (void)
+@@ -1018,6 +1235,9 @@ enable_break (void)
        if (tmp_fd >= 0)
  	tmp_bfd = bfd_fopen (tmp_pathname, gnutarget, FOPEN_RB, tmp_fd);
  
@@ -609,7 +615,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
        if (tmp_bfd == NULL)
  	goto bkpt_at_symbol;
  
-@@ -1115,6 +1331,9 @@ enable_break (void)
+@@ -1115,6 +1335,9 @@ enable_break (void)
        if (sym_addr != 0)
  	{
  	  create_solib_event_breakpoint (load_addr + sym_addr);
@@ -619,7 +625,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  	  return 1;
  	}
  
-@@ -1375,6 +1594,8 @@ svr4_solib_create_inferior_hook (void)
+@@ -1375,6 +1598,8 @@ svr4_solib_create_inferior_hook (void)
    while (stop_signal != TARGET_SIGNAL_TRAP);
    stop_soon = NO_STOP_QUIETLY;
  #endif /* defined(_SCO_DS) */
@@ -628,7 +634,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  }
  
  static void
-@@ -1551,6 +1772,75 @@ svr4_lp64_fetch_link_map_offsets (void)
+@@ -1551,6 +1776,75 @@ svr4_lp64_fetch_link_map_offsets (void)
  
    return lmp;
  }
@@ -704,7 +710,7 @@ Index: gdb-6.7/gdb/solib-svr4.c
  
  
  struct target_so_ops svr4_so_ops;
-@@ -1592,4 +1882,8 @@ _initialize_svr4_solib (void)
+@@ -1592,4 +1886,8 @@ _initialize_svr4_solib (void)
  
    /* FIXME: Don't do this here.  *_gdbarch_init() should set so_ops. */
    current_target_so_ops = &svr4_so_ops;
@@ -713,10 +719,10 @@ Index: gdb-6.7/gdb/solib-svr4.c
 +            "Display the inferior's linkmap.");
 +
  }
-Index: gdb-6.7/gdb/varobj.c
+Index: gdb-6.7.1/gdb/varobj.c
 ===================================================================
---- gdb-6.7.orig/gdb/varobj.c	2007-08-31 21:01:17.000000000 +0200
-+++ gdb-6.7/gdb/varobj.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/varobj.c	2007-08-31 21:01:17.000000000 +0200
++++ gdb-6.7.1/gdb/varobj.c	2007-11-02 15:24:19.000000000 +0100
 @@ -1116,6 +1116,62 @@ install_new_value (struct varobj *var, s
    return changed;
  }
@@ -780,10 +786,10 @@ Index: gdb-6.7/gdb/varobj.c
  /* Update the values for a variable and its children.  This is a
     two-pronged attack.  First, re-parse the value for the root's
     expression to see if it's changed.  Then go all the way
-Index: gdb-6.7/gdb/solist.h
+Index: gdb-6.7.1/gdb/solist.h
 ===================================================================
---- gdb-6.7.orig/gdb/solist.h	2007-08-23 20:08:38.000000000 +0200
-+++ gdb-6.7/gdb/solist.h	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/solist.h	2007-08-23 20:08:38.000000000 +0200
++++ gdb-6.7.1/gdb/solist.h	2007-11-02 15:24:19.000000000 +0100
 @@ -61,6 +61,8 @@ struct so_list
      bfd *abfd;
      char symbols_loaded;	/* flag: symbols read in yet? */
@@ -816,10 +822,10 @@ Index: gdb-6.7/gdb/solist.h
 +/* Controls the printing of debugging output.  */
 +extern int debug_solib;
  #endif
-Index: gdb-6.7/gdb/varobj.h
+Index: gdb-6.7.1/gdb/varobj.h
 ===================================================================
---- gdb-6.7.orig/gdb/varobj.h	2007-08-31 20:52:05.000000000 +0200
-+++ gdb-6.7/gdb/varobj.h	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/varobj.h	2007-08-31 20:52:05.000000000 +0200
++++ gdb-6.7.1/gdb/varobj.h	2007-11-02 15:24:19.000000000 +0100
 @@ -114,4 +114,6 @@ extern int varobj_update (struct varobj 
  
  extern void varobj_invalidate (void);
@@ -827,10 +833,10 @@ Index: gdb-6.7/gdb/varobj.h
 +extern void varobj_refresh(void);
 +
  #endif /* VAROBJ_H */
-Index: gdb-6.7/gdb/symfile.c
+Index: gdb-6.7.1/gdb/symfile.c
 ===================================================================
---- gdb-6.7.orig/gdb/symfile.c	2007-09-24 23:48:05.000000000 +0200
-+++ gdb-6.7/gdb/symfile.c	2007-10-13 05:32:14.000000000 +0200
+--- gdb-6.7.1.orig/gdb/symfile.c	2007-09-24 23:48:05.000000000 +0200
++++ gdb-6.7.1/gdb/symfile.c	2007-11-02 15:24:19.000000000 +0100
 @@ -47,6 +47,7 @@
  #include "readline/readline.h"
  #include "gdb_assert.h"
@@ -918,11 +924,11 @@ Index: gdb-6.7/gdb/symfile.c
    observer_notify_new_objfile (NULL);
  
    /* Clear globals which might have pointed into a removed objfile.
-Index: gdb-6.7/gdb/breakpoint.c
+Index: gdb-6.7.1/gdb/breakpoint.c
 ===================================================================
---- gdb-6.7.orig/gdb/breakpoint.c	2007-10-13 05:27:15.000000000 +0200
-+++ gdb-6.7/gdb/breakpoint.c	2007-10-13 05:29:58.000000000 +0200
-@@ -840,15 +840,15 @@ insert_watchpoints_for_new_thread (ptid_
+--- gdb-6.7.1.orig/gdb/breakpoint.c	2007-11-02 15:24:10.000000000 +0100
++++ gdb-6.7.1/gdb/breakpoint.c	2007-11-02 15:26:50.000000000 +0100
+@@ -847,15 +847,15 @@ insert_watchpoints_for_new_thread (ptid_
  	  struct value *v = b->owner->val_chain;
  
  	  /* Look at each value on the value chain.  */
@@ -941,7 +947,7 @@ Index: gdb-6.7/gdb/breakpoint.c
  		  
  		  /* We only watch structs and arrays if user asked
  		     for it explicitly, never if they just happen to
-@@ -860,8 +860,8 @@ insert_watchpoints_for_new_thread (ptid_
+@@ -867,8 +867,8 @@ insert_watchpoints_for_new_thread (ptid_
  		      CORE_ADDR addr;
  		      int len, type;
  		      
@@ -952,7 +958,7 @@ Index: gdb-6.7/gdb/breakpoint.c
  		      type = hw_write;
  		      if (b->owner->type == bp_read_watchpoint)
  			type = hw_read;
-@@ -2749,12 +2749,12 @@ mark_triggered_watchpoints (CORE_ADDR st
+@@ -2767,12 +2767,12 @@ mark_triggered_watchpoints (CORE_ADDR st
  	|| b->type == bp_read_watchpoint
  	|| b->type == bp_access_watchpoint)
        {
@@ -968,7 +974,7 @@ Index: gdb-6.7/gdb/breakpoint.c
  		    
  		if (v == b->val_chain
  		    || (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
-@@ -2762,11 +2762,11 @@ mark_triggered_watchpoints (CORE_ADDR st
+@@ -2780,11 +2780,11 @@ mark_triggered_watchpoints (CORE_ADDR st
  		  {
  		    CORE_ADDR vaddr;
  			
@@ -982,7 +988,7 @@ Index: gdb-6.7/gdb/breakpoint.c
  		      b->watchpoint_triggered = 1;
  		  }
  	      }
-@@ -2936,12 +2936,12 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+@@ -2957,12 +2957,12 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
  		bs->stop = 0;
  		continue;
  	      }
@@ -998,7 +1004,7 @@ Index: gdb-6.7/gdb/breakpoint.c
  		    
  		    if (v == b->val_chain
  			|| (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
-@@ -2949,11 +2949,11 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+@@ -2970,11 +2970,11 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
  		      {
  			CORE_ADDR vaddr;
  			
@@ -1012,15 +1018,17 @@ Index: gdb-6.7/gdb/breakpoint.c
  			  must_check_value = 1;
  		      }
  		  }
-@@ -3996,6 +3996,7 @@ describe_other_breakpoints (CORE_ADDR pc
- 	      printf_filtered ("%s%s ",
- 			       ((b->enable_state == bp_disabled || 
- 				 b->enable_state == bp_shlib_disabled || 
-+				 b->enable_state == bp_startup_disabled || 
- 				 b->enable_state == bp_call_disabled) 
- 				? " (disabled)"
- 				: b->enable_state == bp_permanent 
-@@ -4669,6 +4670,62 @@ re_enable_breakpoints_in_shlibs (void)
+@@ -4118,7 +4118,8 @@ describe_other_breakpoints (CORE_ADDR pc
+ 	      printf_filtered (" (thread %d)", b->thread);
+ 	    printf_filtered ("%s%s ",
+ 			     ((b->enable_state == bp_disabled || 
+-			       b->enable_state == bp_call_disabled) 
++			       b->enable_state == bp_call_disabled ||
++			       b->enable_state == bp_startup_disabled)
+ 			      ? " (disabled)"
+ 			      : b->enable_state == bp_permanent 
+ 			      ? " (permanent)"
+@@ -4773,6 +4774,62 @@ disable_breakpoints_in_unloaded_shlib (s
    }
  }
  
@@ -1083,28 +1091,10 @@ Index: gdb-6.7/gdb/breakpoint.c
  static void
  solib_load_unload_1 (char *hookname, int tempflag, char *dll_pathname,
  		     char *cond_string, enum bptype bp_kind)
-@@ -7084,6 +7141,7 @@ delete_breakpoint (struct breakpoint *bp
- 	    && !b->loc->duplicate
- 	    && b->enable_state != bp_disabled
- 	    && b->enable_state != bp_shlib_disabled
-+	    && b->enable_state != bp_startup_disabled
- 	    && !b->pending
- 	    && b->enable_state != bp_call_disabled)
- 	{
-@@ -7308,7 +7366,8 @@ breakpoint_re_set_one (void *bint)
- 	break;
- 
-       save_enable = b->enable_state;
--      if (b->enable_state != bp_shlib_disabled)
-+      if (b->enable_state != bp_shlib_disabled
-+          || b->enable_state != bp_shlib_disabled)
-         b->enable_state = bp_disabled;
-       else
- 	/* If resetting a shlib-disabled breakpoint, we don't want to
-Index: gdb-6.7/gdb/solib.c
+Index: gdb-6.7.1/gdb/solib.c
 ===================================================================
---- gdb-6.7.orig/gdb/solib.c	2007-08-23 20:08:38.000000000 +0200
-+++ gdb-6.7/gdb/solib.c	2007-10-13 05:32:46.000000000 +0200
+--- gdb-6.7.1.orig/gdb/solib.c	2007-08-23 20:08:38.000000000 +0200
++++ gdb-6.7.1/gdb/solib.c	2007-11-02 15:24:19.000000000 +0100
 @@ -78,6 +78,8 @@ set_solib_ops (struct gdbarch *gdbarch, 
  
  /* external data declarations */
@@ -1279,10 +1269,10 @@ Index: gdb-6.7/gdb/solib.c
 +			   NULL, NULL,
 +			   &setdebuglist, &showdebuglist);
  }
-Index: gdb-6.7/gdb/elfread.c
+Index: gdb-6.7.1/gdb/elfread.c
 ===================================================================
---- gdb-6.7.orig/gdb/elfread.c	2007-08-23 20:08:28.000000000 +0200
-+++ gdb-6.7/gdb/elfread.c	2007-10-13 05:29:58.000000000 +0200
+--- gdb-6.7.1.orig/gdb/elfread.c	2007-08-23 20:08:28.000000000 +0200
++++ gdb-6.7.1/gdb/elfread.c	2007-11-02 15:24:19.000000000 +0100
 @@ -611,7 +611,7 @@ elf_symfile_read (struct objfile *objfil
    /* If we are reinitializing, or if we have never loaded syms yet,
       set table to empty.  MAINLINE is cleared so that *_read_psymtab
@@ -1292,15 +1282,11 @@ Index: gdb-6.7/gdb/elfread.c
      {
        init_psymbol_list (objfile, 0);
        mainline = 0;
-
-2007-10-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Port to GDB-6.7 - workaround too early breakpoint address analysis.
-
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-orig/gdb/Makefile.in gdb-6.7-patched/gdb/Makefile.in
---- gdb-6.7-orig/gdb/Makefile.in	2007-10-31 12:50:10.000000000 +0100
-+++ gdb-6.7-patched/gdb/Makefile.in	2007-10-31 00:38:11.000000000 +0100
-@@ -1824,7 +1824,7 @@ amd64-tdep.o: amd64-tdep.c $(defs_h) $(a
+Index: gdb-6.7.1/gdb/Makefile.in
+===================================================================
+--- gdb-6.7.1.orig/gdb/Makefile.in	2007-11-02 15:24:10.000000000 +0100
++++ gdb-6.7.1/gdb/Makefile.in	2007-11-02 15:24:19.000000000 +0100
+@@ -1819,7 +1819,7 @@ amd64-tdep.o: amd64-tdep.c $(defs_h) $(a
  	$(dummy_frame_h) $(frame_h) $(frame_base_h) $(frame_unwind_h) \
  	$(inferior_h) $(gdbcmd_h) $(gdbcore_h) $(objfiles_h) $(regcache_h) \
  	$(regset_h) $(symfile_h) $(gdb_assert_h) $(amd64_tdep_h) \
@@ -1309,9 +1295,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-orig/gdb/Makefile.in gdb-6.7-
  annotate.o: annotate.c $(defs_h) $(annotate_h) $(value_h) $(target_h) \
  	$(gdbtypes_h) $(breakpoint_h)
  arch-utils.o: arch-utils.c $(defs_h) $(arch_utils_h) $(buildsym_h) \
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7-orig/gdb/amd64-tdep.c gdb-6.7-patched/gdb/amd64-tdep.c
---- gdb-6.7-orig/gdb/amd64-tdep.c	2007-10-31 12:50:09.000000000 +0100
-+++ gdb-6.7-patched/gdb/amd64-tdep.c	2007-10-31 00:46:13.000000000 +0100
+Index: gdb-6.7.1/gdb/amd64-tdep.c
+===================================================================
+--- gdb-6.7.1.orig/gdb/amd64-tdep.c	2007-11-02 15:21:46.000000000 +0100
++++ gdb-6.7.1/gdb/amd64-tdep.c	2007-11-02 15:24:19.000000000 +0100
 @@ -36,6 +36,7 @@
  #include "symfile.h"
  #include "dwarf2-frame.h"

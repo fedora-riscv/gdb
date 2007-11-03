@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -85,12 +85,6 @@ Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
 # Threaded watchpoint support
 Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
 
-# Fix to expose multiple constructors to end-user
-Patch115: gdb-6.3-constructor-20041216.patch
-
-# Fix to display base constructors from list and breakpoint commands
-Patch116: gdb-6.3-linespec-20041213.patch
-
 # Continue removing breakpoints even when failure occurs.
 Patch117: gdb-6.3-removebp-20041130.patch
 
@@ -113,13 +107,6 @@ Patch125: gdb-6.3-test-self-20050110.patch
 
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
-
-# Add PPC .symbols to min-symtable.
-Patch130: gdb-6.3-ctorline-20050120.patch
-
-# Fix to support multiple destructors just like multiple constructors
-Patch133: gdb-6.3-test-dtorfix-20050121.patch
-Patch134: gdb-6.3-dtorfix-20050121.patch
 
 # Fix to support executable moving
 Patch136: gdb-6.3-test-movedir-20050125.patch
@@ -180,9 +167,6 @@ Patch163: gdb-6.3-inheritancetest-20050726.patch
 # Add readnever option
 Patch164: gdb-6.3-readnever-20050907.patch
 
-# Remove extraneous xfree
-Patch165: gdb-6.3-xfree-20050922.patch
-
 # Fix frame pointer for ia64 sigtramp frame
 Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 
@@ -205,12 +189,6 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 # Cope with waitpid modifying status even when returning zero, as on
 # ia32el.
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
-
-# Bugfix segv on the source display by ^X 1 (fixes Patch130, BZ 200048).
-Patch181: gdb-6.5-bz200048-find_line_pc-segv.patch
-
-# Bugfix object names completion (fixes Patch116, BZ 193763).
-Patch185: gdb-6.3-bz193763-object-name-completion.patch
 
 # Testcase for corrupted or missing location list information (BZ 196439).
 Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
@@ -385,6 +363,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 # Apply patches defined above.
 
+%patch232 -p1
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
@@ -399,8 +378,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch111 -p1
 %patch112 -p1
 %patch113 -p1
-%patch115 -p1
-%patch116 -p1
 %patch117 -p1
 %patch118 -p1
 %patch119 -p1
@@ -409,9 +386,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch124 -p1
 %patch125 -p1
 %patch128 -p1
-%patch130 -p1
-%patch133 -p1
-%patch134 -p1
 %patch136 -p1
 %patch139 -p1
 %patch140 -p1
@@ -432,7 +406,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch162 -p1
 %patch163 -p1
 %patch164 -p1
-%patch165 -p1
 %patch166 -p1
 %patch169 -p1
 %patch170 -p1
@@ -440,8 +413,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch177 -p1
 %patch178 -p1
 %patch179 -p1
-%patch181 -p1
-%patch185 -p1
 %patch187 -p1
 %patch188 -p1
 %patch190 -p1
@@ -462,7 +433,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch225 -p1
 %patch229 -p1
 %patch231 -p1
-%patch232 -p1
 %patch234 -p1
 %patch235 -p1
 %patch236 -p1
@@ -642,6 +612,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Nov  3 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-2
+- Backport `Breakpoints at multiple locations' patch primarily for C++.
+
 * Thu Nov  1 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-1
 - Upgrade to GDB 6.7.1.  Drop redundant patches, forward-port remaining ones.
 
