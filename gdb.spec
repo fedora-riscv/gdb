@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -201,7 +201,6 @@ Patch188: gdb-6.5-bz203661-emit-relocs.patch
 Patch190: gdb-6.5-dwarf-stack-overflow.patch
 
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
-# FIXME: Still to be updated.
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 
 # Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
@@ -323,6 +322,9 @@ Patch282: gdb-6.7-charsign-test.patch
 
 # Fix rereading of the main executable on its change.
 Patch283: gdb-6.7-reread-exec_bfd.patch
+
+# Test PPC hiding of call-volatile parameter register.
+Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -458,6 +460,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch280 -p1
 %patch282 -p1
 %patch283 -p1
+%patch284 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -612,6 +615,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sun Nov  4 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-3
+- Fix `errno' resolving on recent glibc with broken DW_AT_MIPS_linkage_name.
+- Imported new test for 6.7 PPC hiding of call-volatile parameter register.
+
 * Sat Nov  3 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-2
 - Backport `Breakpoints at multiple locations' patch primarily for C++.
 
