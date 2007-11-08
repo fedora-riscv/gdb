@@ -1,7 +1,7 @@
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=185337
 
 
-currently for trivia nonthreaded helloworld with no debug info up to -ggdb2 you
+currently for trivial nonthreaded helloworld with no debug info up to -ggdb2 you
 will get:
         (gdb) p errno
         [some error]
@@ -17,17 +17,155 @@ Attached suggestion patch how to deal with the most common "errno" symbol
 for the most common under-ggdb3 compiled programs.
 
 
-2006-08-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
-	* target.c (target_translate_tls_address): Provided warnings for TLS
-	`errno' on non-TLS targets.
+2007-11-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ./gdb/dwarf2read.c (read_partial_die, dwarf2_linkage_name): Prefer
+	DW_AT_MIPS_linkage_name over DW_AT_name now only for non-C.
+
+glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
+  <81a2>     DW_AT_name        : (indirect string, offset: 0x280e): __errno_location
+  <81a8>     DW_AT_MIPS_linkage_name: (indirect string, offset: 0x2808): *__GI___errno_location
+
+--- ./gdb/dwarf2read.c	25 Oct 2007 20:54:27 -0000	1.236
++++ ./gdb/dwarf2read.c	3 Nov 2007 21:03:43 -0000
+@@ -5550,8 +5550,8 @@ read_partial_die (struct partial_die_inf
+ 	{
+ 	case DW_AT_name:
+ 
+-	  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name.  */
+-	  if (part_die->name == NULL)
++	  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name for non-C.  */
++	  if (cu->language == language_c || part_die->name == NULL)
+ 	    part_die->name = DW_STRING (&attr);
+ 	  break;
+ 	case DW_AT_comp_dir:
+@@ -5559,7 +5559,9 @@ read_partial_die (struct partial_die_inf
+ 	    part_die->dirname = DW_STRING (&attr);
+ 	  break;
+ 	case DW_AT_MIPS_linkage_name:
+-	  part_die->name = DW_STRING (&attr);
++	  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name for non-C.  */
++	  if (cu->language != language_c || part_die->name == NULL)
++	    part_die->name = DW_STRING (&attr);
+ 	  break;
+ 	case DW_AT_low_pc:
+ 	  has_low_pc_attr = 1;
+@@ -7871,9 +7873,13 @@ dwarf2_linkage_name (struct die_info *di
+ {
+   struct attribute *attr;
+ 
+-  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+-  if (attr && DW_STRING (attr))
+-    return DW_STRING (attr);
++  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name for non-C.  */
++  if (cu->language != language_c)
++    {
++      attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
++      if (attr && DW_STRING (attr))
++	return DW_STRING (attr);
++    }
+   attr = dwarf2_attr (die, DW_AT_name, cu);
+   if (attr && DW_STRING (attr))
+     return DW_STRING (attr);
 
 
-Index: gdb-6.6/gdb/target.c
-===================================================================
---- gdb-6.6.orig/gdb/target.c	2007-01-17 01:25:31.000000000 +0100
-+++ gdb-6.6/gdb/target.c	2007-01-20 06:31:36.000000000 +0100
-@@ -898,7 +898,18 @@
+
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/gdbtypes.c gdb-6.6/gdb/gdbtypes.c
+--- gdb-6.6-orig/gdb/gdbtypes.c	2006-08-22 21:45:12.000000000 +0200
++++ gdb-6.6/gdb/gdbtypes.c	2007-11-08 22:23:37.000000000 +0100
+@@ -49,6 +49,7 @@ struct type *builtin_type_char;
+ struct type *builtin_type_true_char;
+ struct type *builtin_type_short;
+ struct type *builtin_type_int;
++struct type *builtin_type_int_ptr;
+ struct type *builtin_type_long;
+ struct type *builtin_type_long_long;
+ struct type *builtin_type_signed_char;
+@@ -3330,6 +3331,7 @@ build_gdbtypes (void)
+     init_type (TYPE_CODE_INT, TARGET_INT_BIT / TARGET_CHAR_BIT,
+ 	       0,
+ 	       "int", (struct objfile *) NULL);
++  builtin_type_int_ptr = make_pointer_type (builtin_type_int, NULL);
+   builtin_type_unsigned_int =
+     init_type (TYPE_CODE_INT, TARGET_INT_BIT / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED,
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/gdbtypes.h gdb-6.6/gdb/gdbtypes.h
+--- gdb-6.6-orig/gdb/gdbtypes.h	2007-11-08 22:07:59.000000000 +0100
++++ gdb-6.6/gdb/gdbtypes.h	2007-11-08 22:24:49.000000000 +0100
+@@ -1024,6 +1024,7 @@ extern struct type *builtin_type_void;
+ extern struct type *builtin_type_char;
+ extern struct type *builtin_type_short;
+ extern struct type *builtin_type_int;
++extern struct type *builtin_type_int_ptr;
+ extern struct type *builtin_type_long;
+ extern struct type *builtin_type_signed_char;
+ extern struct type *builtin_type_unsigned_char;
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/parse.c gdb-6.6/gdb/parse.c
+--- gdb-6.6-orig/gdb/parse.c	2006-11-22 01:05:37.000000000 +0100
++++ gdb-6.6/gdb/parse.c	2007-11-08 22:22:42.000000000 +0100
+@@ -386,6 +386,7 @@ write_exp_bitstring (struct stoken str)
+    the initial rationale is gone.  */
+ 
+ static struct type *msym_text_symbol_type;
++static struct type *msym_text_symbol_errno_location_type;
+ static struct type *msym_data_symbol_type;
+ static struct type *msym_unknown_symbol_type;
+ static struct type *msym_tls_symbol_type;
+@@ -431,7 +432,11 @@ write_exp_msymbol (struct minimal_symbol
+     case mst_text:
+     case mst_file_text:
+     case mst_solib_trampoline:
+-      write_exp_elt_type (msym_text_symbol_type);
++      if (msym_text_symbol_errno_location_type != NULL
++	  && strcmp (SYMBOL_LINKAGE_NAME (msymbol), "__errno_location") == 0)
++	write_exp_elt_type (msym_text_symbol_errno_location_type);
++      else
++	write_exp_elt_type (msym_text_symbol_type);
+       break;
+ 
+     case mst_data:
+@@ -1367,6 +1372,10 @@ build_parse (void)
+   msym_text_symbol_type =
+     init_type (TYPE_CODE_FUNC, 1, 0, "<text variable, no debug info>", NULL);
+   TYPE_TARGET_TYPE (msym_text_symbol_type) = builtin_type_int;
++  msym_text_symbol_errno_location_type =
++    init_type (TYPE_CODE_FUNC,
++	     1, 0, "<text variable for __errno_location, no debug info>", NULL);
++  TYPE_TARGET_TYPE (msym_text_symbol_errno_location_type ) = builtin_type_int_ptr;
+   msym_data_symbol_type =
+     init_type (TYPE_CODE_INT, TARGET_INT_BIT / HOST_CHAR_BIT, 0,
+ 	       "<data variable, no debug info>", NULL);
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/target.c gdb-6.6/gdb/target.c
+--- gdb-6.6-orig/gdb/target.c	2007-11-08 22:07:59.000000000 +0100
++++ gdb-6.6/gdb/target.c	2007-11-08 22:35:34.000000000 +0100
+@@ -817,6 +817,25 @@ pop_target (void)
+   internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
+ }
+ 
++static int
++resolve_errno (void *arg)
++{
++  CORE_ADDR *arg_addr = arg;
++  struct expression *expr;
++  struct cleanup *old_chain = 0;
++  struct value *val;
++
++  expr = parse_expression ("__errno_location()");
++  old_chain = make_cleanup (free_current_contents, &expr);
++  val = evaluate_expression (expr);
++  *arg_addr = value_as_address (val);
++  release_value (val);
++  value_free (val);
++  do_cleanups (old_chain);
++
++  return 1;
++}
++
+ /* Using the objfile specified in BATON, find the address for the
+    current thread's thread-local storage with offset OFFSET.  */
+ CORE_ADDR
+@@ -904,7 +923,28 @@ target_translate_tls_address (struct obj
    /* It wouldn't be wrong here to try a gdbarch method, too; finding
       TLS is an ABI-specific thing.  But we don't do that yet.  */
    else
@@ -38,12 +176,125 @@ Index: gdb-6.6/gdb/target.c
 +      msymbol = lookup_minimal_symbol ("errno", NULL, NULL);
 +      if (msymbol != NULL
 +	  && SYMBOL_VALUE_ADDRESS (msymbol) == offset
-+	  && SYMBOL_BFD_SECTION (msymbol)->owner == objfile->obfd)
-+	error (_("TLS symbol `errno' not resolved for non-TLS program."
-+		 " You should use symbol \"(*__errno_location ())\" or"
-+		 " compile the program with `gcc -ggdb3' or `gcc -pthread'."));
-+      error (_("Cannot find thread-local variables on this target"));
++	  && (SYMBOL_BFD_SECTION (msymbol)->owner == objfile->obfd
++	      || (objfile->separate_debug_objfile != NULL
++	          && SYMBOL_BFD_SECTION (msymbol)->owner
++		     == objfile->separate_debug_objfile->obfd)
++	      || (objfile->separate_debug_objfile_backlink != NULL
++	          && SYMBOL_BFD_SECTION (msymbol)->owner
++		     == objfile->separate_debug_objfile_backlink->obfd)))
++	{
++	  if (!catch_errors (resolve_errno, (void *) &addr, "",
++	                     RETURN_MASK_ALL))
++	    error (_("TLS symbol `errno' not resolved for non-TLS program."
++		     "  You should compile the program with `gcc -pthread'."));
++	}
++      else
++	error (_("Cannot find thread-local variables on this target"));
 +    }
  
    return addr;
  }
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.c gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.c
+--- gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2007-11-04 01:43:41.000000000 +0100
++++ gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2007-11-03 23:29:02.000000000 +0100
+@@ -0,0 +1,28 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2005, 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++#include <errno.h>
++
++int main()
++{
++  errno = 42;
++
++  return 0;	/* breakpoint */
++}
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.exp gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
+--- gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2007-11-04 01:43:39.000000000 +0100
++++ gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2007-11-04 01:41:46.000000000 +0100
+@@ -0,0 +1,67 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile dw2-errno
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++proc prep {} {
++    global srcdir subdir binfile
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    runto_main
++
++    gdb_breakpoint [gdb_get_line_number "breakpoint"]
++    gdb_continue_to_breakpoint "breakpoint"
++}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "additional_flags=-g2"] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++prep
++gdb_test "print errno" ".* = 42" "errno with macros=N threads=N"
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "additional_flags=-g3"] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++prep
++gdb_test "print errno" ".* = 42" "errno with macros=Y threads=N"
++
++if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "additional_flags=-g2"] != "" } {
++    return -1
++}
++prep
++gdb_test "print errno" ".* = 42" "errno with macros=N threads=Y"
++
++if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "additional_flags=-g3"] != "" } {
++    return -1
++}
++prep
++gdb_test "print errno" ".* = 42" "errno with macros=Y threads=Y"
++
++# TODO: Test the error on resolving ERRNO with only libc loaded.
++# Just how to find the current libc filename?

@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -229,7 +229,6 @@ Patch190: gdb-6.5-dwarf-stack-overflow.patch
 Patch191: gdb-6.5-bz205551-printf-p.patch
 
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
-# FIXME: Still to be updated.
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 
 # Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
@@ -385,6 +384,10 @@ Patch278: gdb-6.6-cu-ranges.patch
 
 # Fix hardware watchpoints after inferior forks-off some process.
 Patch280: gdb-6.6-multifork-debugreg-for-i386-and-x86_64.patch
+
+# Fix PPC hiding of call-volatile parameter register.
+Patch285: gdb-6.7-ppc-clobbered-registers-O2-fix.patch
+Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -545,6 +548,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch277 -p1
 %patch278 -p1
 %patch280 -p1
+%patch284 -p1
+%patch285 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -701,6 +706,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Nov  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-36
+- Fix `errno' resolving on glibc with broken DW_AT_MIPS_linkage_name.
+- Imported 6.7 PPC hiding of call-volatile parameter registers.
+
 * Fri Oct 19 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-35
 - Fix hiding unexpected breakpoints on intentional step/next commands.
 - Fix s390 compilation warning/failure due to a wrongly sized type-cast.
