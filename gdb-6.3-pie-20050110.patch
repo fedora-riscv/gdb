@@ -6,6 +6,10 @@
 
 	Port to post-GDB-6.7.1 multi-PC breakpoints.
 
+2007-11-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (svr4_current_sos): Fix segfault on NULL EXEC_BFD.
+
 Index: gdb-6.7.1/gdb/dwarf2read.c
 ===================================================================
 --- gdb-6.7.1.orig/gdb/dwarf2read.c	2007-11-02 15:24:10.000000000 +0100
@@ -375,16 +379,16 @@ Index: gdb-6.7.1/gdb/solib-svr4.c
 @@ -704,6 +803,11 @@ svr4_current_sos (void)
    struct so_list **link_ptr = &head;
    CORE_ADDR ldsomap = 0;
++  const char *filename = exec_bfd ? exec_bfd->filename : "<none>";
  
 +  if (debug_solib)
 +    fprintf_unfiltered (gdb_stdlog, 
-+                        "svr4_current_sos: exec_bfd %s\n",
-+                        exec_bfd->filename);
++                        "svr4_current_sos: exec_bfd %s\n", filename);
 +
    /* Make sure we've looked up the inferior's dynamic linker's base
       structure.  */
    if (! debug_base)
-@@ -713,11 +817,21 @@ svr4_current_sos (void)
+@@ -713,11 +817,20 @@ svr4_current_sos (void)
        /* If we can't find the dynamic linker's base structure, this
  	 must not be a dynamically linked executable.  Hmm.  */
        if (! debug_base)
@@ -393,7 +397,7 @@ Index: gdb-6.7.1/gdb/solib-svr4.c
 +	  if (debug_solib)
 +	    fprintf_unfiltered (gdb_stdlog, 
 +				"svr4_current_sos: no DT_DEBUG found in %s -- return now\n",
-+				exec_bfd->filename);
++				filename);
 +	  return svr4_default_sos ();
 +        }
      }
@@ -402,8 +406,7 @@ Index: gdb-6.7.1/gdb/solib-svr4.c
       `struct so_list' nodes.  */
 +  if (debug_solib)
 +    fprintf_unfiltered (gdb_stdlog, 
-+                        "svr4_current_sos: walk link map in %s\n",
-+                        exec_bfd->filename);
++                        "svr4_current_sos: walk link map in %s\n", filename);
    lm = solib_svr4_r_map ();
  
    while (lm)
@@ -428,8 +431,9 @@ Index: gdb-6.7.1/gdb/solib-svr4.c
           SVR4, it has no name.  For others (Solaris 2.3 for example), it
           does have a name, so we can no longer use a missing name to
           decide when to ignore it. */
-       if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
+-      if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
 -	free_so (new);
++      if (exec_bfd != NULL && IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
 +	{
 +          /* It is the first link map entry, i.e. it is the main executable.  */
 +
@@ -564,14 +568,12 @@ Index: gdb-6.7.1/gdb/solib-svr4.c
  	}
  
        /* On Solaris, the dynamic linker is not in the normal list of
-@@ -789,6 +995,11 @@ svr4_current_sos (void)
+@@ -789,6 +995,9 @@ svr4_current_sos (void)
    if (head == NULL)
      return svr4_default_sos ();
  
 +  if (debug_solib)
-+    fprintf_unfiltered (gdb_stdlog, 
-+                        "svr4_current_sos: ENDS %s\n",
-+                        exec_bfd->filename);
++    fprintf_unfiltered (gdb_stdlog, "svr4_current_sos: ENDS %s\n", filename);
 +
    return head;
  }
