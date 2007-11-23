@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -331,9 +331,9 @@ BuildRequires: flex bison sharutils expat-devel
 Requires: readline
 BuildRequires: readline-devel
 
-# BuildRequires only for the complete testsuite run.
-# Omit them on local user builds.
-%if 0%{?dist:1}
+# BuildRequires are provided here only for the complete testsuite run.
+# Omit them on local user builds. %{_topdir} checks for mock (and so even Koji).
+%if "%{_topdir}" == "/builddir/build"
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
 # Copied from gcc-4.1.2-32
@@ -497,8 +497,8 @@ mkdir %{gdb_build}
 cd %{gdb_build}
 
 # g77 executable is no longer present in Fedora gcc-4.x+.
-g77="`which gfortran 2>/dev/null`"
-test -n "$g77" && ln -s "$g77" ./g77
+g77="`which gfortran 2>/dev/null || true`"
+test -z "$g77" || ln -s "$g77" ./g77
 
 # FIXME: The configure option --enable-gdb-build-warnings=,-Werror
 # below can conflict with user settings. For instance, passing a
@@ -629,6 +629,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Nov 24 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-5
+- Reduce the excessive gcc-* packages dependencies outside of mock/koji.
+
 * Fri Nov 16 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-4
 - Fix `errno' resolving across separate debuginfo files.
 - Fix segfault on no file loaded, `set debug solib 1', `info sharedlibrary'.
