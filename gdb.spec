@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -389,6 +389,9 @@ Patch280: gdb-6.6-multifork-debugreg-for-i386-and-x86_64.patch
 Patch285: gdb-6.7-ppc-clobbered-registers-O2-fix.patch
 Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
+# Testsuite fixes for more stable/comparable results.
+Patch287: gdb-6.7-testsuite-stable-results.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -550,6 +553,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch280 -p1
 %patch284 -p1
 %patch285 -p1
+%patch287 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -706,6 +710,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Dec 10 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-37
+- Testsuite fixes for more stable/comparable results.
+
 * Thu Nov  8 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-36
 - Fix `errno' resolving on glibc with broken DW_AT_MIPS_linkage_name.
 - Imported 6.7 PPC hiding of call-volatile parameter registers.

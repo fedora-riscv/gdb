@@ -1,0 +1,329 @@
+2007-01-03  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.threads/tls.exp: Allow stops in sem_post.
+
+--- src/gdb/testsuite/gdb.threads/tls.exp	2003/07/29 21:51:25	1.4
++++ src/gdb/testsuite/gdb.threads/tls.exp	2007/01/03 17:30:18	1.5
+@@ -246,7 +246,11 @@
+       incr thrs_in_spin
+       select_thread $i
+       set level $spin_threads_level($i)
+-      gdb_test "up $level" ".*spin.*sem_wait.*" "thread $i up"
++      # We expect to be in sem_wait, but if the thread has not yet
++      # been scheduled, we might be in sem_post still.  We could be at
++      # any intermediate point in spin, too, but that is much less
++      # likely.
++      gdb_test "up $level" ".*spin.*sem_(wait|post).*" "thread $i up"
+       check_thread_local $i 
+     }
+ }
+
+2007-01-26  Andreas Schwab  <schwab@suse.de>
+
+	* gdb.base/multi-forks.exp ("restart $i"): Also match
+	__kernel_syscall_via_break.
+
+[ Present in the gdb-6.6 upstream sources although missing in ChangeLog.  ]
+
+2007-07-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/readline.exp (operate_and_get_next): Match the final
+	prompt.
+
+--- ./gdb/testsuite/gdb.base/readline.exp	3 Jan 2007 21:46:12 -0000	1.3
++++ ./gdb/testsuite/gdb.base/readline.exp	27 Jul 2007 15:15:02 -0000	1.4
+@@ -139,6 +139,9 @@ proc operate_and_get_next {name args} {
+     set count [expr {$count + 2}]
+   }
+ 
++  # Match the prompt so the next test starts at the right place.
++  gdb_test "" "" "$name - final prompt"
++
+   return 1
+ }
+ 
+
+2007-09-17  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* schedlock.c (NUM): Change to 1.
+	(main): Use args[0] for the main thread.
+	* schedlock.exp: Only expect two threads.  Only issue one pass or fail
+	regardless of the number of threads.
+
+--- ./gdb/testsuite/gdb.threads/schedlock.exp	23 Aug 2007 18:14:19 -0000	1.6
++++ ./gdb/testsuite/gdb.threads/schedlock.exp	17 Sep 2007 15:38:05 -0000	1.7
+@@ -32,6 +32,9 @@ set testfile "schedlock"
+ set srcfile ${testfile}.c
+ set binfile ${objdir}/${subdir}/${testfile}
+ 
++# The number of threads, including the main thread.
++set NUM 2
++
+ if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable [list debug "incdir=${objdir}"]] != "" } {
+     return -1
+ }
+@@ -44,11 +47,11 @@ proc get_args { } {
+ 
+   send_gdb "print args\n"
+   gdb_expect {
+-    -re "\\\$\[0-9\]+ = {(\[0-9\]+), (\[0-9\]+), (\[0-9\]+), (\[0-9\]+), (\[0-9\]+), (\[0-9\]+)}.*$gdb_prompt"
++    -re "\\\$\[0-9\]+ = {(\[0-9\]+), (\[0-9\]+)}.*$gdb_prompt"
+       {
+ 	set list_count [expr $list_count + 1]
+ 	pass "listed args ($list_count)"
+-	return [list $expect_out(1,string) $expect_out(2,string) $expect_out(3,string) $expect_out(4,string) $expect_out(5,string) $expect_out(6,string)]
++	return [list $expect_out(1,string) $expect_out(2,string)]
+       }
+     -re "$gdb_prompt"
+       {
+@@ -112,7 +115,7 @@ proc my_continue { msg } {
+   stop_process "stop all threads ($msg)"
+ 
+   # Make sure we're in one of the non-main looping threads.
+-  gdb_breakpoint [concat [gdb_get_line_number "schedlock.exp: main loop"] " if arg != 5"]
++  gdb_breakpoint [concat [gdb_get_line_number "schedlock.exp: main loop"] " if arg != 0"]
+   gdb_continue_to_breakpoint "return to loop ($msg)"
+   delete_breakpoints
+ }
+@@ -198,13 +201,17 @@ my_continue "initial"
+ 
+ set cont_args [get_args]
+ 
+-for {set i 0} {[expr $i < 6]} {set i [expr $i + 1]} {
++set ok 1
++for {set i 0} {[expr $i < $NUM]} {set i [expr $i + 1]} {
+   if {[lindex $start_args $i] == [lindex $cont_args $i]} {
+-    fail "thread $i ran (didn't run)"
+-  } else {
+-    pass "thread $i ran"
++    set ok 0
+   }
+ }
++if { $ok } {
++  pass "all threads alive"
++} else {
++  fail "all threads alive"
++}
+ 
+ # We can't change threads, unfortunately, in current GDB.  Use
+ # whichever we stopped in.
+@@ -230,7 +237,7 @@ set start_args $cont_args
+ set cont_args [get_args]
+ 
+ set num_other_threads 0
+-for {set i 0} {[expr $i < 6]} {set i [expr $i + 1]} {
++for {set i 0} {[expr $i < $NUM]} {set i [expr $i + 1]} {
+   if {[lindex $start_args $i] == [lindex $cont_args $i]} {
+     if {$i == $curthread} {
+       fail "current thread stepped (didn't run)"
+@@ -248,9 +255,9 @@ for {set i 0} {[expr $i < 6]} {set i [ex
+   }
+ }
+ if {$num_other_threads > 0} {
+-  pass "other threads ran (1)"
++  pass "other threads ran - unlocked"
+ } else {
+-  fail "other threads ran (no other threads ran) (1)"
++  fail "other threads ran - unlocked"
+ }
+ 
+ # Test continue with scheduler locking
+@@ -269,21 +276,25 @@ if {$curthread == $newthread} {
+ set start_args $cont_args
+ set cont_args [get_args]
+ 
+-for {set i 0} {[expr $i < 6]} {set i [expr $i + 1]} {
++set num_other_threads 0
++for {set i 0} {[expr $i < $NUM]} {set i [expr $i + 1]} {
+   if {[lindex $start_args $i] == [lindex $cont_args $i]} {
+     if {$i == $curthread} {
+       fail "current thread ran (didn't run)"
+-    } else {
+-      pass "other thread $i didn't run"
+     }
+   } else {
+     if {$i == $curthread} {
+       pass "current thread ran"
+     } else {
+-      fail "other thread $i didn't run (ran)"
++      incr num_other_threads
+     }
+   }
+ }
++if {$num_other_threads > 0} {
++  fail "other threads didn't run - locked"
++} else {
++  pass "other threads didn't run - locked"
++}
+ 
+ # Test stepping with scheduler locking
+ step_ten_loops "locked"
+@@ -299,12 +310,11 @@ if {$curthread == $newthread} {
+ set start_args $cont_args
+ set cont_args [get_args]
+ 
+-for {set i 0} {[expr $i < 6]} {set i [expr $i + 1]} {
++set num_other_threads 0
++for {set i 0} {[expr $i < $NUM]} {set i [expr $i + 1]} {
+   if {[lindex $start_args $i] == [lindex $cont_args $i]} {
+     if {$i == $curthread} {
+       fail "current thread stepped locked (didn't run)"
+-    } else {
+-      pass "other thread $i didn't run (stepping)"
+     }
+   } else {
+     if {$i == $curthread} {
+@@ -314,9 +324,14 @@ for {set i 0} {[expr $i < 6]} {set i [ex
+ 	    fail "current thread stepped locked (wrong amount)"
+ 	}
+     } else {
+-      fail "other thread $i didn't run (stepping) (ran)"
++      incr num_other_threads
+     }
+   }
+ }
++if {$num_other_threads > 0} {
++  fail "other threads didn't run - step locked"
++} else {
++  pass "other threads didn't run - step locked"
++}
+ 
+ return 0
+--- ./gdb/testsuite/gdb.threads/schedlock.c	23 Aug 2007 18:08:50 -0000	1.7
++++ ./gdb/testsuite/gdb.threads/schedlock.c	17 Sep 2007 15:38:05 -0000	1.8
+@@ -22,7 +22,7 @@
+ 
+ void *thread_function(void *arg); /* Pointer to function executed by each thread */
+ 
+-#define NUM 5
++#define NUM 1
+ 
+ unsigned int args[NUM+1];
+ 
+@@ -32,7 +32,7 @@ int main() {
+     void *thread_result;
+     long i;
+ 
+-    for (i = 0; i < NUM; i++)
++    for (i = 1; i <= NUM; i++)
+       {
+ 	args[i] = 1;
+ 	res = pthread_create(&threads[i],
+@@ -42,8 +42,8 @@ int main() {
+       }
+ 
+     /* schedlock.exp: last thread start.  */
+-    args[i] = 1;
+-    thread_function ((void *) i);
++    args[0] = 1;
++    thread_function ((void *) 0);
+ 
+     exit(EXIT_SUCCESS);
+ }
+
+2007-12-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/fileio.c (ROOTSUBDIR): New macro.
+	(main): CHDIR into ROOTSUBDIR.  CHOWN ROOTSUBDIR and CHDIR into
+	ROOTSUBDIR if we are being run as root.
+	* gdb.base/fileio.exp: Change the startup and finish cleanup.
+	Change the test file reference to be into the `fileio.dir' directory.
+
+--- ./gdb/testsuite/gdb.base/fileio.c	13 Jun 2006 08:55:22 -0000	1.10
++++ ./gdb/testsuite/gdb.base/fileio.c	8 Dec 2007 16:04:10 -0000
+@@ -58,6 +58,8 @@ system (const char * string);
+ 1) Invalid string/command. -  returns 127.  */
+ static const char *strerrno (int err);
+ 
++#define ROOTSUBDIR "fileio.dir"
++
+ #define FILENAME    "foo.fileio.test"
+ #define RENAMED     "bar.fileio.test"
+ #define NONEXISTANT "nofoo.fileio.test"
+@@ -542,6 +544,37 @@ strerrno (int err)
+ int
+ main ()
+ {
++  /* ROOTSUBDIR is already prepared by fileio.exp.  We use it for easy cleanup
++     (by fileio.exp) if we are run by multiple users in the same directory.  */
++
++  if (chdir (ROOTSUBDIR) != 0)
++    {
++      printf ("chdir " ROOTSUBDIR ": %s\n", strerror (errno));
++      exit (1);
++    }
++
++  /* These tests
++       Open for write but no write permission returns EACCES
++       Unlinking a file in a directory w/o write access returns EACCES
++     fail if we are being run as root - drop the privileges here.  */
++
++  if (geteuid () == 0)
++    {
++      uid_t uid = 99;
++
++      if (chown (".", uid, uid) != 0)
++	{
++	  printf ("chown %d.%d " ROOTSUBDIR ": %s\n", (int) uid, (int) uid,
++		  strerror (errno));
++	  exit (1);
++	}
++      if (setuid (uid) || geteuid () == 0)
++	{
++	  printf ("setuid %d: %s\n", (int) uid, strerror (errno));
++	  exit (1);
++	}
++    }
++
+   /* Don't change the order of the calls.  They partly depend on each other */
+   test_open ();
+   test_write ();
+--- ./gdb/testsuite/gdb.base/fileio.exp	23 Aug 2007 18:14:16 -0000	1.12
++++ ./gdb/testsuite/gdb.base/fileio.exp	8 Dec 2007 16:04:10 -0000
+@@ -46,8 +46,8 @@ if [get_compiler_info ${binfile}] {
+     return -1;
+ }
+ 
+-remote_exec build {sh -xc test\ -r\ dir2.fileio.test\ &&\ chmod\ -f\ +w\ dir2.fileio.test}
+-remote_exec build {sh -xc rm\ -rf\ *.fileio.test}
++remote_exec build {sh -xc rm\ -rf\ fileio.dir}
++remote_exec build {sh -xc mkdir\ -m777\ fileio.dir}
+ 
+ set oldtimeout $timeout
+ set timeout [expr "$timeout + 60"]
+@@ -88,7 +88,7 @@ gdb_test continue \
+ "Opening nonexistant file returns ENOENT"
+ 
+ send_gdb "continue\n" ; gdb_expect -re "$gdb_prompt $"
+-catch "system \"chmod -f -w nowrt.fileio.test\""
++catch "system \"chmod -f -w fileio.dir/nowrt.fileio.test\""
+ 
+ gdb_test continue \
+ "Continuing\\..*open 5:.*EACCES$stop_msg" \
+@@ -252,8 +252,8 @@ gdb_test continue \
+ send_gdb "quit\n"
+ send_gdb "y\n"
+ 
+-remote_exec build {sh -xc test\ -r\ dir2.fileio.test\ &&\ chmod\ -f\ +w\ dir2.fileio.test}
+-remote_exec build {sh -xc rm\ -rf\ *.fileio.test}
++remote_exec build {sh -xc test\ -r\ fileio.dir/dir2.fileio.test\ &&\ chmod\ -f\ +w\ fileio.dir/dir2.fileio.test}
++remote_exec build {sh -xc rm\ -rf\ fileio.dir}
+ 
+ set timeout $oldtimeout
+ return 0
+
+2007-12-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdb.exp (build_id_debug_filename_get): OBJCOPY pipe being read
+	must be set to binary.
+
+--- ./gdb/testsuite/lib/gdb.exp	9 Dec 2007 11:21:21 -0000	1.93
++++ ./gdb/testsuite/lib/gdb.exp	10 Dec 2007 00:14:55 -0000
+@@ -2500,6 +2500,7 @@ proc build_id_debug_filename_get { exec 
+ 	return ""
+     }
+     set fi [open $tmp]
++    fconfigure $fi -translation binary
+     # Skip the NOTE header.
+     read $fi 16
+     set data [read $fi]
