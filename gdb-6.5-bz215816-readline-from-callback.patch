@@ -1,6 +1,5 @@
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=215816
 
-
 2007-01-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
 	    Daniel Jacobowitz  <dan@codesourcery.com>
 
@@ -11,6 +10,13 @@ https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=215816
 	New.
 	(gdb_readline_wrapper): Rewrite to use asynchronous readline.
 
+2007-07-01  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* top.c (gdb_readline_wrapper_line): Call rl_callback_handler_remove.
+	(struct gdb_readline_wrapper_cleanup): Remove prompt_orig.
+	(gdb_readline_wrapper_cleanup): Do not reset the prompt.
+	(gdb_readline_wrapper): Do not save the prompt.  Pass our prompt
+	to display_gdb_prompt.
 
 --- ./gdb/Makefile.in	3 Jan 2007 18:05:43 -0000	1.864
 +++ ./gdb/Makefile.in	3 Jan 2007 21:22:46 -0000
@@ -163,3 +169,52 @@ https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=215816
  }
  
  
+===================================================================
+RCS file: /cvs/src/src/gdb/top.c,v
+retrieving revision 1.120
+retrieving revision 1.121
+diff -u -r1.120 -r1.121
+--- src/gdb/top.c	2007/03/29 18:55:01	1.120
++++ src/gdb/top.c	2007/07/01 22:37:52	1.121
+@@ -751,12 +751,16 @@
+   /* Prevent operate-and-get-next from acting too early.  */
+   saved_after_char_processing_hook = after_char_processing_hook;
+   after_char_processing_hook = NULL;
++
++  /* Prevent parts of the prompt from being redisplayed if annotations
++     are enabled, and readline's state getting out of sync.  */
++  if (async_command_editing_p)
++    rl_callback_handler_remove ();
+ }
+ 
+ struct gdb_readline_wrapper_cleanup
+   {
+     void (*handler_orig) (char *);
+-    char *prompt_orig;
+     int already_prompted_orig;
+   };
+ 
+@@ -766,7 +770,6 @@
+   struct gdb_readline_wrapper_cleanup *cleanup = arg;
+ 
+   rl_already_prompted = cleanup->already_prompted_orig;
+-  PROMPT (0) = cleanup->prompt_orig;
+ 
+   gdb_assert (input_handler == gdb_readline_wrapper_line);
+   input_handler = cleanup->handler_orig;
+@@ -790,14 +793,12 @@
+   cleanup->handler_orig = input_handler;
+   input_handler = gdb_readline_wrapper_line;
+ 
+-  cleanup->prompt_orig = get_prompt ();
+-  PROMPT (0) = prompt;
+   cleanup->already_prompted_orig = rl_already_prompted;
+ 
+   back_to = make_cleanup (gdb_readline_wrapper_cleanup, cleanup);
+ 
+   /* Display our prompt and prevent double prompt display.  */
+-  display_gdb_prompt (NULL);
++  display_gdb_prompt (prompt);
+   rl_already_prompted = 1;
+ 
+   if (after_char_processing_hook)

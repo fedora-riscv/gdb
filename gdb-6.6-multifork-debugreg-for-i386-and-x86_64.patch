@@ -17,6 +17,26 @@
 
 [ Backported for GDB-6.6 (only removed the new file inclusion). ]
 
+http://sources.redhat.com/ml/gdb-patches/2007-07/msg00034.html
+
+2007-07-02  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* breakpoint.c (reattach_breakpoints): Do not use remove_breakpoint.
+	Call insert_bp_location.
+
+[ In `gdb-6.6-upstream.patch'. ]
+
+2007-09-16  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Jeff Johnston  <jjohnstn@redhat.com>
+
+	* gdb.texinfo (Setting Watchpoints): Adjust warning text about
+	multi-threaded watchpoints.
+
+2007-12-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Setting Watchpoints): New paragraph on the software
+	watchpoints safety wrt `set scheduler-locking'.
+
 --- ./gdb/i386-nat.c	23 Aug 2007 18:08:34 -0000	1.16
 +++ ./gdb/i386-nat.c	14 Oct 2007 15:00:31 -0000
 @@ -165,11 +166,22 @@
@@ -282,3 +302,53 @@
 +gdb_test "continue" \
 +	 "atchpoint 1: var.*Old value = 1.*New value = 2.*" "watchpoint second hit"
 +gdb_test "continue" "Continuing..*Program exited normally." "finish"
+===================================================================
+RCS file: /cvs/src/src/gdb/doc/gdb.texinfo,v
+retrieving revision 1.434
+retrieving revision 1.435
+diff -u -r1.434 -r1.435
+--- src/gdb/doc/gdb.texinfo	2007/09/28 11:09:55	1.434
++++ src/gdb/doc/gdb.texinfo	2007/10/01 00:17:58	1.435
+@@ -3346,20 +3346,13 @@
+ way of doing that would be to set a code breakpoint at the entry to the
+ @code{main} function and when it breaks, set all the watchpoints.
+ 
+-@quotation
+ @cindex watchpoints and threads
+ @cindex threads and watchpoints
+-@emph{Warning:} In multi-thread programs, watchpoints have only limited
+-usefulness.  With the current watchpoint implementation, @value{GDBN}
+-can only watch the value of an expression @emph{in a single thread}.  If
+-you are confident that the expression can only change due to the current
+-thread's activity (and if you are also confident that no other thread
+-can become current), then you can use watchpoints as usual.  However,
+-@value{GDBN} may not notice when a non-current thread's activity changes
+-the expression.
++In multi-threaded programs, watchpoints will detect changes to the
++watched expression from every thread.
+ 
+-@c FIXME: this is almost identical to the previous paragraph.
+-@emph{HP-UX Warning:} In multi-thread programs, software watchpoints
++@quotation
++@emph{Warning:} In multi-threaded programs, software watchpoints
+ have only limited usefulness.  If @value{GDBN} creates a software
+ watchpoint, it can only watch the value of an expression @emph{in a
+ single thread}.  If you are confident that the expression can only
+
+--- gdb-6.5/gdb/doc/gdb.texinfo-orig	2007-12-15 13:25:14.000000000 +0100
++++ gdb-6.5/gdb/doc/gdb.texinfo	2007-12-15 13:45:25.000000000 +0100
+@@ -3261,6 +3261,14 @@
+ software watchpoints as usual.  However, @value{GDBN} may not notice
+ when a non-current thread's activity changes the expression.  (Hardware
+ watchpoints, in contrast, watch an expression in all threads.)
++
++Software watchpoints single-step the current thread to track the changes.  
++Other threads are left freely running on @code{continue}; therefore, their
++changes cannot be caught.  To get more reliable software watchpoints, please
++use @code{set scheduler-locking on}.  The default for Red Hat/Fedora
++@value{GDBN} is @code{set scheduler-locking step}, which makes the software
++watchpoints safe for the @code{step} command, but not for the @code{continue}
++command.  @xref{Thread Stops}.
+ @end quotation
+ 
+ @xref{set remote hardware-watchpoint-limit}.

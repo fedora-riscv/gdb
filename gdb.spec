@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 37%{?dist}
+Release: 38%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -330,7 +330,7 @@ Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 
 # Notify user of a child forked process being detached (BZ 235197).
-Patch247: gdb-6.6-bz234468-fork-detach-info.patch
+Patch247: gdb-6.6-bz235197-fork-detach-info.patch
 
 # Fix `gcore' command for 32bit PPC inferiors on 64bit PPC hosts (BZ 232015).
 Patch248: gdb-6.6-bz232015-gcore-ppc-on-ppc64.patch
@@ -710,6 +710,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Dec 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-38
+- Fix crash on parsing duplicite file entries debug info (BZ 426395).
+- Fix (#2) readline history for input mode commands like `command' (BZ 215816).
+- Fix documentation on hardware watchpoints wrt multiple threads.
+- Rename the patch file for BZ 235197 from its former name BZ 234468.
+
 * Mon Dec 10 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-37
 - Testsuite fixes for more stable/comparable results.
 
