@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -392,6 +392,9 @@ Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 # Testsuite fixes for more stable/comparable results.
 Patch287: gdb-6.7-testsuite-stable-results.patch
 
+# Fix (backport) PPC biarch (ppc64->ppc) addresses above 2GB (BZ 426613).
+Patch291: gdb-6.6-bz426613-ppc-biarch-signed-addresses-fix.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -554,6 +557,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch284 -p1
 %patch285 -p1
 %patch287 -p1
+%patch291 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -710,6 +714,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Dec 27 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-39
+- Fix (backport) PPC biarch (ppc64->ppc) addresses above 2GB (BZ 426613).
+- Fix the vendora testcase `attach-32.exp' affecting the other tests results.
+
 * Sat Dec 22 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-38
 - Fix crash on parsing duplicite file entries debug info (BZ 426395).
 - Fix (#2) readline history for input mode commands like `command' (BZ 215816).
