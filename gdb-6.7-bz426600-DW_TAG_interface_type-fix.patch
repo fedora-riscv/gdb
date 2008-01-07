@@ -1,0 +1,129 @@
+http://sourceware.org/ml/gdb-patches/2007-12/msg00397.html
+http://sourceware.org/ml/gdb-cvs/2007-12/msg00123.html
+
+2007-12-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (scan_partial_symbols partial_die_parent_scope)
+	(add_partial_symbol, pdi_needs_namespace, process_die)
+	(is_type_tag_for_partial, load_partial_dies, new_symbol)
+	(read_type_die, determine_prefix): Extend the current code of
+	`DW_TAG_class_type' also for `DW_TAG_interface_type'.
+
+2007-12-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (fixup_partial_die): Provide full
+	`DW_TAG_class_type'-type backing for `DW_TAG_interface_type', even for
+	namespaces which should not apply for Java `DW_TAG_interface_type'.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/dwarf2read.c,v
+retrieving revision 1.242
+retrieving revision 1.243
+diff -u -r1.242 -r1.243
+--- src/gdb/dwarf2read.c	2007/12/17 18:38:30	1.242
++++ src/gdb/dwarf2read.c	2007/12/22 20:58:30	1.243
+@@ -1747,6 +1747,7 @@
+ 		}
+ 	      break;
+ 	    case DW_TAG_class_type:
++	    case DW_TAG_interface_type:
+ 	    case DW_TAG_structure_type:
+ 	      if (!pdi->is_declaration)
+ 		{
+@@ -1829,6 +1830,7 @@
+   if (parent->tag == DW_TAG_namespace
+       || parent->tag == DW_TAG_structure_type
+       || parent->tag == DW_TAG_class_type
++      || parent->tag == DW_TAG_interface_type
+       || parent->tag == DW_TAG_union_type)
+     {
+       if (grandparent_scope == NULL)
+@@ -1976,6 +1978,7 @@
+ 			   0, (CORE_ADDR) 0, cu->language, objfile);
+       break;
+     case DW_TAG_class_type:
++    case DW_TAG_interface_type:
+     case DW_TAG_structure_type:
+     case DW_TAG_union_type:
+     case DW_TAG_enumeration_type:
+@@ -2057,6 +2060,7 @@
+     case DW_TAG_namespace:
+     case DW_TAG_typedef:
+     case DW_TAG_class_type:
++    case DW_TAG_interface_type:
+     case DW_TAG_structure_type:
+     case DW_TAG_union_type:
+     case DW_TAG_enumeration_type:
+@@ -2676,6 +2680,7 @@
+       read_lexical_block_scope (die, cu);
+       break;
+     case DW_TAG_class_type:
++    case DW_TAG_interface_type:
+     case DW_TAG_structure_type:
+     case DW_TAG_union_type:
+       read_structure_type (die, cu);
+@@ -5403,6 +5408,7 @@
+ #endif
+     case DW_TAG_base_type:
+     case DW_TAG_class_type:
++    case DW_TAG_interface_type:
+     case DW_TAG_enumeration_type:
+     case DW_TAG_structure_type:
+     case DW_TAG_subrange_type:
+@@ -5608,6 +5614,7 @@
+ 	      || last_die->tag == DW_TAG_enumeration_type
+ 	      || (cu->language != language_c
+ 		  && (last_die->tag == DW_TAG_class_type
++		      || last_die->tag == DW_TAG_interface_type
+ 		      || last_die->tag == DW_TAG_structure_type
+ 		      || last_die->tag == DW_TAG_union_type))))
+ 	{
+@@ -7358,6 +7365,7 @@
+ 	     (FIXME?) */
+ 	  break;
+ 	case DW_TAG_class_type:
++	case DW_TAG_interface_type:
+ 	case DW_TAG_structure_type:
+ 	case DW_TAG_union_type:
+ 	case DW_TAG_set_type:
+@@ -7677,6 +7685,7 @@
+   switch (die->tag)
+     {
+     case DW_TAG_class_type:
++    case DW_TAG_interface_type:
+     case DW_TAG_structure_type:
+     case DW_TAG_union_type:
+       read_structure_type (die, cu);
+@@ -7781,6 +7790,7 @@
+ 	}
+ 	break;
+       case DW_TAG_class_type:
++      case DW_TAG_interface_type:
+       case DW_TAG_structure_type:
+ 	{
+ 	  if (parent->type != NULL && TYPE_TAG_NAME (parent->type) != NULL)
+Index: ./gdb/dwarf2read.c
+===================================================================
+RCS file: /cvs/src/src/gdb/dwarf2read.c,v
+retrieving revision 1.245
+diff -u -p -r1.245 dwarf2read.c
+--- ./gdb/dwarf2read.c	26 Dec 2007 12:36:18 -0000	1.245
++++ ./gdb/dwarf2read.c	27 Dec 2007 23:25:49 -0000
+@@ -5887,7 +5887,8 @@ fixup_partial_die (struct partial_die_in
+ 
+   /* Set default names for some unnamed DIEs.  */
+   if (part_die->name == NULL && (part_die->tag == DW_TAG_structure_type
+-				 || part_die->tag == DW_TAG_class_type))
++				 || part_die->tag == DW_TAG_class_type
++				 || part_die->tag == DW_TAG_interface_type))
+     part_die->name = "(anonymous class)";
+ 
+   if (part_die->name == NULL && part_die->tag == DW_TAG_namespace)
+@@ -5895,6 +5896,7 @@ fixup_partial_die (struct partial_die_in
+ 
+   if (part_die->tag == DW_TAG_structure_type
+       || part_die->tag == DW_TAG_class_type
++      || part_die->tag == DW_TAG_interface_type
+       || part_die->tag == DW_TAG_union_type)
+     guess_structure_name (part_die, cu);
+ }

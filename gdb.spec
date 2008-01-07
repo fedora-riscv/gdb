@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -274,7 +274,7 @@ Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
 
 # Notify user of a child forked process being detached (BZ 235197).
-Patch247: gdb-6.6-bz234468-fork-detach-info.patch
+Patch247: gdb-6.6-bz235197-fork-detach-info.patch
 
 # New testcase for gcore of 32bit inferiors on 64bit hosts.
 Patch249: gdb-6.6-gcore32-test.patch
@@ -315,7 +315,7 @@ Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 Patch278: gdb-6.6-cu-ranges.patch
 
 # Fix hardware watchpoints after inferior forks-off some process.
-Patch280: gdb-6.6-multifork-debugreg-for-i386-and-x86_64.patch
+Patch280: gdb-6.6-multifork-debugreg.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 Patch282: gdb-6.7-charsign-test.patch
@@ -328,6 +328,10 @@ Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
 # Testsuite fixes for more stable/comparable results.
 Patch287: gdb-6.7-testsuite-stable-results.patch
+
+# Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
+Patch293: gdb-6.7-bz426600-DW_TAG_interface_type-fix.patch
+Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -475,6 +479,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch283 -p1
 %patch284 -p1
 %patch287 -p1
+%patch293 -p1
+%patch294 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -633,6 +639,13 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Mon Jan  7 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-7
+- Backport the gcc-4.3 compatibility -Werror fixes.
+- Fix documentation on hardware watchpoints wrt multiple threads.
+- Rename the patch file for BZ 235197 from its former name 234468.
+- Fix the vendora testcase `attach-32.exp' affecting the other tests results.
+- Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
+
 * Mon Dec 10 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-6
 - Testsuite fixes for more stable/comparable results.
 

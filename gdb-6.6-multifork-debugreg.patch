@@ -1,3 +1,9 @@
+ia64-linux-nat.c patch is missing here, port it either from RHEL-5 for 6.7.1 or
+from the commented-out HEAD patch below.
+
+s390x in RHEL-5 requires a patch but it is no longer required for
+gdb-6.7.1-6.fc9 - the patch was not ported.
+
 2007-10-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Handle multiple different PIDs for the DR registers.
@@ -11,11 +17,103 @@
 	(i386_stopped_by_hwbp): Call DR_MIRROR_FETCH.
 	* Makefile.in (i386-nat.o): Update dependencies.
 
-2007-10-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+2007-12-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/watchpoint-fork.exp, gdb.base/watchpoint-fork.c: New files.
 
 [ Backported for GDB-6.6 (only removed the new file inclusion). ]
+
+2007-09-16  Daniel Jacobowitz  <dan@codesourcery.com>
+	    Jeff Johnston  <jjohnstn@redhat.com>
+
+	* gdb.texinfo (Setting Watchpoints): Adjust warning text about
+	multi-threaded watchpoints.
+
+2007-12-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Setting Watchpoints): New paragraph on the software
+	watchpoints safety wrt `set scheduler-locking'.
+
+#--- ./gdb/ia64-linux-nat.c	13 Oct 2007 00:49:15 -0000	1.43
+#+++ ./gdb/ia64-linux-nat.c	29 Dec 2007 23:52:05 -0000
+#@@ -493,7 +493,49 @@ enable_watchpoints_in_psr (ptid_t ptid)
+#     }
+# }
+# 
+#-static long debug_registers[8];
+#+struct dr_mirror_status
+#+  {
+#+    /* Cyclic list.  */
+#+    struct dr_mirror_status *next;
+#+    long lwp;
+#+    long content[8];
+#+  };
+#+struct dr_mirror_status *dr_mirror_active;
+#+#define debug_registers (dr_mirror_active->content)
+#+
+#+static void
+#+dr_mirror_fetch (void)
+#+{
+#+  long lwp;
+#+  int i;
+#+
+#+  lwp = ptid_get_lwp (inferior_ptid);
+#+  if (lwp == 0)
+#+    lwp = ptid_get_pid (inferior_ptid);
+#+
+#+  if (dr_mirror_active == NULL)
+#+    {
+#+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
+#+      dr_mirror_active->next = dr_mirror_active;
+#+    }
+#+  else
+#+    {
+#+      struct dr_mirror_status *first = dr_mirror_active;
+#+      do
+#+	{
+#+	  if (dr_mirror_active->lwp == lwp)
+#+	    return;
+#+	  dr_mirror_active = dr_mirror_active->next;
+#+	}
+#+      while (dr_mirror_active != first);
+#+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
+#+      dr_mirror_active->next = first->next;
+#+      first->next = dr_mirror_active;
+#+    }
+#+  dr_mirror_active->lwp = lwp;
+#+
+#+  /* All the registers left 0.  */
+#+}
+# 
+# static void
+# store_debug_register (ptid_t ptid, int idx, long val)
+#@@ -538,6 +580,8 @@ ia64_linux_insert_watchpoint (CORE_ADDR 
+#   long dbr_addr, dbr_mask;
+#   int max_watchpoints = 4;
+# 
+#+  dr_mirror_fetch ();
+#+
+#   if (len <= 0 || !is_power_of_2 (len))
+#     return -1;
+# 
+#@@ -590,6 +634,8 @@ ia64_linux_remove_watchpoint (CORE_ADDR 
+#   long dbr_addr, dbr_mask;
+#   int max_watchpoints = 4;
+# 
+#+  dr_mirror_fetch ();
+#+
+#   if (len <= 0 || !is_power_of_2 (len))
+#     return -1;
+# 
+#@@ -621,6 +667,8 @@ ia64_linux_new_thread (ptid_t ptid)
+# {
+#   int i, any;
+# 
+#+  dr_mirror_fetch ();
+#+
+#   any = 0;
+#   for (i = 0; i < 8; i++)
+#     {
 
 --- ./gdb/i386-nat.c	23 Aug 2007 18:08:34 -0000	1.16
 +++ ./gdb/i386-nat.c	14 Oct 2007 15:00:31 -0000
@@ -235,7 +333,7 @@
 +}
 --- /dev/null	1 Jan 1970 00:00:00 -0000
 +++ ./gdb/testsuite/gdb.base/watchpoint-fork.exp	14 Oct 2007 15:00:32 -0000
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,53 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -273,12 +371,69 @@
 +gdb_reinitialize_dir $srcdir/$subdir
 +gdb_load ${binfile}
 +
-+gdb_test "watch var" "atchpoint 1: var"
++if { ![runto_main] } then {
++    gdb_suppress_tests;
++}
++
++# Install the watchpoint only after getting into MAIN - workaround some PPC
++# problem.
++gdb_test "watch var" "atchpoint 2: var"
++
 +# It is never hit but it should not be left over in the fork()ed-off child.
 +gdb_breakpoint "breakpoint"
-+gdb_run_cmd
-+gdb_test "" \
-+	 "atchpoint 1: var.*Old value = 0.*New value = 1.*" "watchpoint first hit"
++
 +gdb_test "continue" \
-+	 "atchpoint 1: var.*Old value = 1.*New value = 2.*" "watchpoint second hit"
++	 "atchpoint 2: var.*Old value = 0.*New value = 1.*" "watchpoint first hit"
++gdb_test "continue" \
++	 "atchpoint 2: var.*Old value = 1.*New value = 2.*" "watchpoint second hit"
 +gdb_test "continue" "Continuing..*Program exited normally." "finish"
+===================================================================
+RCS file: /cvs/src/src/gdb/doc/gdb.texinfo,v
+retrieving revision 1.434
+retrieving revision 1.435
+diff -u -r1.434 -r1.435
+--- src/gdb/doc/gdb.texinfo	2007/09/28 11:09:55	1.434
++++ src/gdb/doc/gdb.texinfo	2007/10/01 00:17:58	1.435
+@@ -3346,20 +3346,13 @@
+ way of doing that would be to set a code breakpoint at the entry to the
+ @code{main} function and when it breaks, set all the watchpoints.
+ 
+-@quotation
+ @cindex watchpoints and threads
+ @cindex threads and watchpoints
+-@emph{Warning:} In multi-thread programs, watchpoints have only limited
+-usefulness.  With the current watchpoint implementation, @value{GDBN}
+-can only watch the value of an expression @emph{in a single thread}.  If
+-you are confident that the expression can only change due to the current
+-thread's activity (and if you are also confident that no other thread
+-can become current), then you can use watchpoints as usual.  However,
+-@value{GDBN} may not notice when a non-current thread's activity changes
+-the expression.
++In multi-threaded programs, watchpoints will detect changes to the
++watched expression from every thread.
+ 
+-@c FIXME: this is almost identical to the previous paragraph.
+-@emph{HP-UX Warning:} In multi-thread programs, software watchpoints
++@quotation
++@emph{Warning:} In multi-threaded programs, software watchpoints
+ have only limited usefulness.  If @value{GDBN} creates a software
+ watchpoint, it can only watch the value of an expression @emph{in a
+ single thread}.  If you are confident that the expression can only
+
+--- gdb-6.5/gdb/doc/gdb.texinfo-orig	2007-12-15 13:25:14.000000000 +0100
++++ gdb-6.5/gdb/doc/gdb.texinfo	2007-12-15 13:45:25.000000000 +0100
+@@ -3261,6 +3261,14 @@
+ software watchpoints as usual.  However, @value{GDBN} may not notice
+ when a non-current thread's activity changes the expression.  (Hardware
+ watchpoints, in contrast, watch an expression in all threads.)
++
++Software watchpoints single-step the current thread to track the changes.  
++Other threads are left freely running on @code{continue}; therefore, their
++changes cannot be caught.  To get more reliable software watchpoints, please
++use @code{set scheduler-locking on}.  The default for Red Hat/Fedora
++@value{GDBN} is @code{set scheduler-locking step}, which makes the software
++watchpoints safe for the @code{step} command, but not for the @code{continue}
++command.  @xref{Thread Stops}.
+ @end quotation
+ 
+ @xref{set remote hardware-watchpoint-limit}.
