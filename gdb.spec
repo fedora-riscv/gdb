@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -287,7 +287,8 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 
 # Fix attaching to stopped processes (BZ 219118, 233852).
 # Fix attaching during a pending signal being delivered.
-Patch256: gdb-6.6-bz233852-attach-signalled.patch
+Patch256: gdb-6.7-bz233852-attach-signalled-fix.patch
+Patch275: gdb-6.7-bz233852-attach-signalled-test.patch
 
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
@@ -329,9 +330,15 @@ Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 # Testsuite fixes for more stable/comparable results.
 Patch287: gdb-6.7-testsuite-stable-results.patch
 
+# Test ia64 memory leaks of the code using libunwind.
+Patch289: gdb-6.5-ia64-libunwind-leak-test.patch
+
 # Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
 Patch293: gdb-6.7-bz426600-DW_TAG_interface_type-fix.patch
 Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
+
+# Test gcore memory and time requirements for large inferiors.
+Patch296: gdb-6.5-gcore-buffer-limit-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -471,6 +478,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch265 -p1
 %patch266 -p1
 %patch274 -p1
+%patch275 -p1
 %patch276 -p1
 %patch277 -p1
 %patch278 -p1
@@ -479,8 +487,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch283 -p1
 %patch284 -p1
 %patch287 -p1
+%patch289 -p1
 %patch293 -p1
 %patch294 -p1
+%patch296 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -560,13 +570,12 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 # "threadcrash.exp" is incompatible on ia64 with old kernels.
 # No `%{?_smp_mflags}' here as it may race.
 # WARNING: can't generate a core file - core tests suppressed - check ulimit
-# "attachstop.exp" - Functionality is currently broken but timeout is long.
 # "readline-overflow.exp" - Testcase is broken, functionality is OK.
 (
   # ULIMIT required for `gdb.base/auxv.exp'.
   ulimit -H -c
   ulimit -c unlimited || :
-  ./orphanripper make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp attachstop.exp readline-overflow.exp"' || :
+  ./orphanripper make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp readline-overflow.exp"' || :
 )
 for t in sum log; do
   ln gdb.$t gdb-%{_target_platform}.$t || :
@@ -639,6 +648,15 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-8
+- Fix detaching from a threaded formerly stopped process with non-primary
+  thread currently active (general BZ 233852).
+  - Enable back again the testcases named `attachstop.exp' (no such exist now).
+  - Rename the testcase `gdb.threads/attachstop' to `gdb.threads/attachstop-mt'.
+- Test ia64 memory leaks of the code using libunwind.
+- Testcase delay increase (for BZ 247354).
+- Test gcore memory and time requirements for large inferiors.
+
 * Mon Jan  7 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-7
 - Backport the gcc-4.3 compatibility -Werror fixes.
 - Fix documentation on hardware watchpoints wrt multiple threads.
