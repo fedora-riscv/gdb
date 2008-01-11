@@ -1165,9 +1165,32 @@ http://sourceware.org/ml/binutils/2007-08/msg00296.html
        MAKEINFO="$MISSING makeinfo"
 
 
-
+gdb/
+https://bugzilla.redhat.com/show_bug.cgi?id=314131
+gdb/gdbserver/
 https://bugzilla.redhat.com/show_bug.cgi?id=328021
 
+http://sourceware.org/ml/gdb-patches/2007-06/msg00479.html
+http://sourceware.org/ml/gdb-cvs/2007-06/msg00175.html
+
+gdb/
+2007-06-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-thread-db.c (thread_db_attach): Delete.
+	(thread_db_detach): Typo fix.  Call target_mourn_inferior
+	instead of fixing up proc_handle.
+	(have_threads_callback, have_threads): New functions.
+	(thread_db_wait): Remove dead proc_handle.pid check.  Only
+	translate PTIDs if we have registered threads.  Check for new
+	threads if we have none.
+	(thread_db_create_inferior, thread_db_post_startup_inferior): Delete.
+	(find_new_threads_callback): Only enable event reporting if TID == 0.
+	(same_ptid_callback): New.
+	(thread_db_get_thread_local_address): Check for new threads.
+	(init_thread_db_ops): Don't set to_attach, to_create_inferior,
+	or to_post_startup_inferior.
+
+gdb/gdbserver/
 2007-06-27  Daniel Jacobowitz  <dan@codesourcery.com>
 
 	* thread-db.c (thread_db_find_new_threads): Add prototype.
@@ -1176,6 +1199,239 @@ https://bugzilla.redhat.com/show_bug.cgi?id=328021
 	(maybe_attach_thread): Only enable event reporting if TID == 0.
 	(thread_db_get_tls_address): Check for new threads.
 
+--- gdb-6.6/gdb/linux-thread-db.c	2008-01-10 19:38:49.000000000 +0100
++++ gdb-6.6-patched/gdb/linux-thread-db.c	2008-01-10 19:35:58.000000000 +0100
+@@ -214,6 +214,21 @@ thread_db_err_str (td_err_e err)
+     }
+ }
+ 
++/* Return 1 if any threads have been registered.  There may be none if
++   the threading library is not fully initialized yet.  */
++
++static int
++have_threads_callback (struct thread_info *thread, void *dummy)
++{
++  return 1;
++}
++
++static int
++have_threads (void)
++{
++  return iterate_over_threads (have_threads_callback, NULL) != NULL;
++}
++
+ /* A callback function for td_ta_thr_iter, which we use to map all
+    threads to LWPs.
+ 
+@@ -706,23 +721,6 @@ attach_thread (ptid_t ptid, const td_thr
+ }
+ 
+ static void
+-thread_db_attach (char *args, int from_tty)
+-{
+-  target_beneath->to_attach (args, from_tty);
+-
+-  /* Destroy thread info; it's no longer valid.  */
+-  init_thread_list ();
+-
+-  /* The child process is now the actual multi-threaded
+-     program.  Snatch its process ID...  */
+-  proc_handle.pid = GET_PID (inferior_ptid);
+-
+-  /* ...and perform the remaining initialization steps.  */
+-  enable_thread_event_reporting ();
+-  thread_db_find_new_threads ();
+-}
+-
+-static void
+ detach_thread (ptid_t ptid, int verbose)
+ {
+   struct thread_info *thread_info;
+@@ -748,14 +746,13 @@ thread_db_detach (char *args, int from_t
+   disable_thread_event_reporting ();
+ 
+   /* There's no need to save & restore inferior_ptid here, since the
+-     inferior is supposed to be survive this function call.  */
++     inferior is not supposed to survive this function call.  */
+   inferior_ptid = lwp_from_thread (inferior_ptid);
+ 
+-  /* Forget about the child's process ID.  We shouldn't need it
+-     anymore.  */
+-  proc_handle.pid = 0;
+-
+   target_beneath->to_detach (args, from_tty);
++
++  /* Should this be done by detach_command?  */
++  target_mourn_inferior ();
+ }
+ 
+ static void
+@@ -860,12 +857,6 @@ thread_db_wait (ptid_t ptid, struct targ
+ 
+   ptid = target_beneath->to_wait (ptid, ourstatus);
+ 
+-  if (proc_handle.pid == 0)
+-    /* The current child process isn't the actual multi-threaded
+-       program yet, so don't try to do any special thread-specific
+-       post-processing and bail out early.  */
+-    return ptid;
+-
+   if (ourstatus->kind == TARGET_WAITKIND_EXITED
+     || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
+     return pid_to_ptid (-1);
+@@ -896,24 +887,33 @@
+       return pid_to_ptid (GET_PID (ptid));
+     }
+ 
++  /* If we do not know about the main thread yet, this would be a good time to
++     find it.  */
++  if (ourstatus->kind == TARGET_WAITKIND_STOPPED && !have_threads ())
++    thread_db_find_new_threads ();
++
+   if (ourstatus->kind == TARGET_WAITKIND_STOPPED
+       && (ourstatus->value.sig == TARGET_SIGNAL_TRAP
+           || ourstatus->value.sig == TARGET_SIGNAL_ILL))
+     /* Check for a thread event.  */
+     check_event (ptid);
+ 
+-  if (!ptid_equal (trap_ptid, null_ptid))
+-    trap_ptid = thread_from_lwp (trap_ptid);
++  if (have_threads ())
++    {
++      /* Change ptids back into the higher level PID + TID format.  If
++	 the thread is dead and no longer on the thread list, we will
++	 get back a dead ptid.  This can occur if the thread death
++	 event gets postponed by other simultaneous events.  In such a
++	 case, we want to just ignore the event and continue on.  */
++
++      if (!ptid_equal (trap_ptid, null_ptid))
++	trap_ptid = thread_from_lwp (trap_ptid);
++
++      ptid = thread_from_lwp (ptid);
++      if (GET_PID (ptid) == -1)
++	ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
++    }
+ 
+-  /* Change the ptid back into the higher level PID + TID format.
+-     If the thread is dead and no longer on the thread list, we will 
+-     get back a dead ptid.  This can occur if the thread death event
+-     gets postponed by other simultaneous events.  In such a case, 
+-     we want to just ignore the event and continue on.  */
+-  ptid = thread_from_lwp (ptid);
+-  if (GET_PID (ptid) == -1)
+-    ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
+-  
+   return ptid;
+ }
+ 
+@@ -935,30 +935,6 @@ thread_db_kill (void)
+ }
+ 
+ static void
+-thread_db_create_inferior (char *exec_file, char *allargs, char **env,
+-			   int from_tty)
+-{
+-  unpush_target (&thread_db_ops);
+-  using_thread_db = 0;
+-  target_beneath->to_create_inferior (exec_file, allargs, env, from_tty);
+-}
+-
+-static void
+-thread_db_post_startup_inferior (ptid_t ptid)
+-{
+-  if (proc_handle.pid == 0)
+-    {
+-      /* The child process is now the actual multi-threaded
+-         program.  Snatch its process ID...  */
+-      proc_handle.pid = GET_PID (ptid);
+-
+-      /* ...and perform the remaining initialization steps.  */
+-      enable_thread_event_reporting ();
+-      thread_db_find_new_threads ();
+-    }
+-}
+-
+-static void
+ thread_db_mourn_inferior (void)
+ {
+   /* Forget about the child's process ID.  We shouldn't need it
+@@ -993,6 +969,22 @@ find_new_threads_callback (const td_thrh
+ 
+   ptid = ptid_build (GET_PID (inferior_ptid), ti.ti_lid, ti.ti_tid);
+ 
++  if (ti.ti_tid == 0)
++    {
++      /* A thread ID of zero means that this is the main thread, but
++	 glibc has not yet initialized thread-local storage and the
++	 pthread library.  We do not know what the thread's TID will
++	 be yet.  Just enable event reporting and otherwise ignore
++	 it.  */
++
++      err = td_thr_event_enable_p (th_p, 1);
++      if (err != TD_OK)
++	error (_("Cannot enable thread event reporting for %s: %s"),
++	       target_pid_to_str (ptid), thread_db_err_str (err));
++
++      return 0;
++    }
++
+   if (!in_thread_list (ptid))
+     attach_thread (ptid, th_p, &ti, 1);
+ 
+@@ -1049,6 +1041,16 @@ thread_db_extra_thread_info (struct thre
+   return NULL;
+ }
+ 
++/* Return 1 if this thread has the same LWP as the passed PTID.  */
++
++static int
++same_ptid_callback (struct thread_info *thread, void *arg)
++{
++  ptid_t *ptid_p = arg;
++
++  return GET_LWP (thread->ptid) == GET_LWP (*ptid_p);
++}
++
+ /* Get the address of the thread local variable in load module LM which
+    is stored at OFFSET within the thread local storage for thread PTID.  */
+ 
+@@ -1057,6 +1059,21 @@ thread_db_get_thread_local_address (ptid
+ 				    CORE_ADDR lm,
+ 				    CORE_ADDR offset)
+ {
++  /* If we have not discovered any threads yet, check now.  */
++  if (!is_thread (ptid) && !have_threads ())
++    thread_db_find_new_threads ();
++
++  /* Try to find a matching thread if we still have the LWP ID instead
++     of the thread ID.  */
++  if (!is_thread (ptid))
++    {
++      struct thread_info *thread;
++
++      thread = iterate_over_threads (same_ptid_callback, &ptid);
++      if (thread != NULL)
++	ptid = thread->ptid;
++    }
++
+   if (is_thread (ptid))
+     {
+       td_err_e err;
+@@ -1116,14 +1133,11 @@ init_thread_db_ops (void)
+   thread_db_ops.to_shortname = "multi-thread";
+   thread_db_ops.to_longname = "multi-threaded child process.";
+   thread_db_ops.to_doc = "Threads and pthreads support.";
+-  thread_db_ops.to_attach = thread_db_attach;
+   thread_db_ops.to_detach = thread_db_detach;
+   thread_db_ops.to_resume = thread_db_resume;
+   thread_db_ops.to_wait = thread_db_wait;
+   thread_db_ops.to_xfer_partial = thread_db_xfer_partial;
+   thread_db_ops.to_kill = thread_db_kill;
+-  thread_db_ops.to_create_inferior = thread_db_create_inferior;
+-  thread_db_ops.to_post_startup_inferior = thread_db_post_startup_inferior;
+   thread_db_ops.to_mourn_inferior = thread_db_mourn_inferior;
+   thread_db_ops.to_find_new_threads = thread_db_find_new_threads;
+   thread_db_ops.to_pid_to_str = thread_db_pid_to_str;
 --- ./gdb/gdbserver/thread-db.c	9 Jan 2007 17:59:08 -0000	1.9
 +++ ./gdb/gdbserver/thread-db.c	27 Jun 2007 11:52:02 -0000	1.10
 @@ -41,6 +41,7 @@ static struct ps_prochandle proc_handle;

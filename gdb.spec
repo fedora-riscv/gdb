@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 39%{?dist}
+Release: 40%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -395,6 +395,10 @@ Patch287: gdb-6.7-testsuite-stable-results.patch
 # Fix (backport) PPC biarch (ppc64->ppc) addresses above 2GB (BZ 426613).
 Patch291: gdb-6.6-bz426613-ppc-biarch-signed-addresses-fix.patch
 
+# Fix+test (backport) threading of statically linked inferiors (BZ 314131).
+#  - It requires recent glibc to work in this case properly.
+Patch298: gdb-6.6-threads-static-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -558,6 +562,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch285 -p1
 %patch287 -p1
 %patch291 -p1
+%patch298 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -714,6 +719,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-40
+- Fix+test (backport) threading of statically linked inferiors (BZ 314131).
+  - It requires recent glibc to work in this case properly.
+
 * Thu Dec 27 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-39
 - Fix (backport) PPC biarch (ppc64->ppc) addresses above 2GB (BZ 426613).
 - Fix the vendora testcase `attach-32.exp' affecting the other tests results.
