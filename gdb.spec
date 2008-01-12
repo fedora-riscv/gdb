@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -655,6 +655,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Jan 12 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-10
+- Compilation fixup (-9 was never released).
+
 * Sat Jan 12 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-9
 - Fix also threaded inferiors for hardware watchpoints after the fork call.
 - Test debugging statically linked threaded inferiors (BZ 239652).
