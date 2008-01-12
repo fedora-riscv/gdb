@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -316,6 +316,8 @@ Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 Patch278: gdb-6.6-cu-ranges.patch
 
 # Fix hardware watchpoints after inferior forks-off some process.
+# Threaded `set follow-fork-mode child' still not fixed there, glibc fixes reqd.
+# `set detach-on-fork off' not fixed there in general - it already assert-fails.
 Patch280: gdb-6.6-multifork-debugreg.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
@@ -339,6 +341,10 @@ Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
 
 # Test gcore memory and time requirements for large inferiors.
 Patch296: gdb-6.5-gcore-buffer-limit-test.patch
+
+# Test debugging statically linked threaded inferiors (BZ 239652).
+#  - It requires recent glibc to work in this case properly.
+Patch298: gdb-6.6-threads-static-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -491,6 +497,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch293 -p1
 %patch294 -p1
 %patch296 -p1
+%patch298 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -648,6 +655,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Sat Jan 12 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-9
+- Fix also threaded inferiors for hardware watchpoints after the fork call.
+- Test debugging statically linked threaded inferiors (BZ 239652).
+  - It requires recent glibc to work in this case properly.
+- Testcase cleanup fixup of the gcore memory and time requirements of 6.7.1-8.
+
 * Thu Jan 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-8
 - Fix detaching from a threaded formerly stopped process with non-primary
   thread currently active (general BZ 233852).

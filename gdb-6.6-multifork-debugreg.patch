@@ -1,27 +1,7 @@
-ia64-linux-nat.c patch is missing here, port it either from RHEL-5 for 6.7.1 or
-from the commented-out HEAD patch below.
-
-s390x in RHEL-5 requires a patch but it is no longer required for
-gdb-6.7.1-6.fc9 - the patch was not ported.
-
-2007-10-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Handle multiple different PIDs for the DR registers.
-	* i386-nat.c: Include "inferior.h".
-	(struct dr_mirror_status, dr_mirror_active, dr_mirror_fetch): New.
-	(dr_mirror, dr_status_mirror, dr_control_mirror, dr_ref_count):
-	Redefined using DR_MIRROR_ACTIVE.
-	(i386_cleanup_dregs): Clear the DR_MIRROR_ACTIVE content instead.
-	(i386_show_dr, i386_insert_aligned_watchpoint)
-	(i386_remove_aligned_watchpoint, i386_stopped_data_address)
-	(i386_stopped_by_hwbp): Call DR_MIRROR_FETCH.
-	* Makefile.in (i386-nat.o): Update dependencies.
-
-2007-12-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	* gdb.base/watchpoint-fork.exp, gdb.base/watchpoint-fork.c: New files.
-
+http://sourceware.org/ml/gdb-patches/2008-01/msg00042.html
 [ Backported for GDB-6.6 (only removed the new file inclusion). ]
+
++
 
 2007-09-16  Daniel Jacobowitz  <dan@codesourcery.com>
 	    Jeff Johnston  <jjohnstn@redhat.com>
@@ -34,233 +14,912 @@ gdb-6.7.1-6.fc9 - the patch was not ported.
 	* gdb.texinfo (Setting Watchpoints): New paragraph on the software
 	watchpoints safety wrt `set scheduler-locking'.
 
-#--- ./gdb/ia64-linux-nat.c	13 Oct 2007 00:49:15 -0000	1.43
-#+++ ./gdb/ia64-linux-nat.c	29 Dec 2007 23:52:05 -0000
-#@@ -493,7 +493,49 @@ enable_watchpoints_in_psr (ptid_t ptid)
-#     }
-# }
-# 
-#-static long debug_registers[8];
-#+struct dr_mirror_status
-#+  {
-#+    /* Cyclic list.  */
-#+    struct dr_mirror_status *next;
-#+    long lwp;
-#+    long content[8];
-#+  };
-#+struct dr_mirror_status *dr_mirror_active;
-#+#define debug_registers (dr_mirror_active->content)
-#+
-#+static void
-#+dr_mirror_fetch (void)
-#+{
-#+  long lwp;
-#+  int i;
-#+
-#+  lwp = ptid_get_lwp (inferior_ptid);
-#+  if (lwp == 0)
-#+    lwp = ptid_get_pid (inferior_ptid);
-#+
-#+  if (dr_mirror_active == NULL)
-#+    {
-#+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
-#+      dr_mirror_active->next = dr_mirror_active;
-#+    }
-#+  else
-#+    {
-#+      struct dr_mirror_status *first = dr_mirror_active;
-#+      do
-#+	{
-#+	  if (dr_mirror_active->lwp == lwp)
-#+	    return;
-#+	  dr_mirror_active = dr_mirror_active->next;
-#+	}
-#+      while (dr_mirror_active != first);
-#+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
-#+      dr_mirror_active->next = first->next;
-#+      first->next = dr_mirror_active;
-#+    }
-#+  dr_mirror_active->lwp = lwp;
-#+
-#+  /* All the registers left 0.  */
-#+}
-# 
-# static void
-# store_debug_register (ptid_t ptid, int idx, long val)
-#@@ -538,6 +580,8 @@ ia64_linux_insert_watchpoint (CORE_ADDR 
-#   long dbr_addr, dbr_mask;
-#   int max_watchpoints = 4;
-# 
-#+  dr_mirror_fetch ();
-#+
-#   if (len <= 0 || !is_power_of_2 (len))
-#     return -1;
-# 
-#@@ -590,6 +634,8 @@ ia64_linux_remove_watchpoint (CORE_ADDR 
-#   long dbr_addr, dbr_mask;
-#   int max_watchpoints = 4;
-# 
-#+  dr_mirror_fetch ();
-#+
-#   if (len <= 0 || !is_power_of_2 (len))
-#     return -1;
-# 
-#@@ -621,6 +667,8 @@ ia64_linux_new_thread (ptid_t ptid)
-# {
-#   int i, any;
-# 
-#+  dr_mirror_fetch ();
-#+
-#   any = 0;
-#   for (i = 0; i < 8; i++)
-#     {
-
---- ./gdb/i386-nat.c	23 Aug 2007 18:08:34 -0000	1.16
-+++ ./gdb/i386-nat.c	14 Oct 2007 15:00:31 -0000
-@@ -165,11 +166,22 @@
- 
- /* Mirror the inferior's DRi registers.  We keep the status and
-    control registers separated because they don't hold addresses.  */
--static CORE_ADDR dr_mirror[DR_NADDR];
--static unsigned dr_status_mirror, dr_control_mirror;
-+struct dr_mirror_status
-+  {
-+    /* Cyclic list.  */
-+    struct dr_mirror_status *next;
-+    long lwp;
-+    CORE_ADDR addr[DR_NADDR];
-+    unsigned status, control;
-+    int ref_count[DR_NADDR];
-+  };
-+struct dr_mirror_status *dr_mirror_active;
-+#define dr_mirror (dr_mirror_active->addr)
-+#define dr_status_mirror (dr_mirror_active->status)
-+#define dr_control_mirror (dr_mirror_active->control)
- 
- /* Reference counts for each debug register.  */
--static int dr_ref_count[DR_NADDR];
-+#define dr_ref_count (dr_mirror_active->ref_count)
- 
- /* Whether or not to print the mirrored debug registers.  */
- static int maint_show_dr;
-@@ -218,15 +230,19 @@ static int i386_handle_nonaligned_watchp
- void
- i386_cleanup_dregs (void)
- {
--  int i;
-+  struct dr_mirror_status *first = dr_mirror_active;
- 
--  ALL_DEBUG_REGISTERS(i)
-+  if (first == NULL)
-+    return;
-+  do
-     {
--      dr_mirror[i] = 0;
--      dr_ref_count[i] = 0;
-+      struct dr_mirror_status *next = dr_mirror_active->next;
-+
-+      xfree (dr_mirror_active);
-+      dr_mirror_active = next;
-     }
--  dr_control_mirror = 0;
--  dr_status_mirror  = 0;
-+  while (dr_mirror_active != first);
-+  dr_mirror_active = NULL;
+diff -u -ruNp gdb-6.7.1-orig/gdb/amd64-linux-nat.c gdb-6.7.1/gdb/amd64-linux-nat.c
+--- gdb-6.7.1-orig/gdb/amd64-linux-nat.c	2008-01-11 20:59:17.000000000 +0100
++++ gdb-6.7.1/gdb/amd64-linux-nat.c	2008-01-11 20:49:42.000000000 +0100
+@@ -501,6 +501,12 @@ amd64_linux_insert_watchpoint (CORE_ADDR
+   return rc;
  }
  
- /* Reset all debug registers at each new startup to avoid missing
-@@ -238,6 +254,40 @@ child_post_startup_inferior (ptid_t ptid
-   i386_cleanup_dregs ();
++/* TO_FOLLOW_FORK stores here the PID under DETACH_BREAKPOINTS for the child
++   process of traced FORK.  We must clear such watchpoints only once during
++   DETACH_BREAKPOINTS.  */
++
++static int amd64_linux_detach_breakpoints_pid;
++
+ /* Remove a watchpoint that watched the memory region which starts at
+    address ADDR, whose length is LEN bytes, and for accesses of the
+    type TYPE.  Return 0 on success, -1 on failure.  */
+@@ -508,12 +514,33 @@ int
+ amd64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type)
+ {
+   int rc;
++
++  if (ptid_get_pid (inferior_ptid) == amd64_linux_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  amd64_linux_detach_breakpoints_pid = 0;
++
+   rc = i386_remove_watchpoint (addr, len, type);
+   if (!rc)
+     amd64_linux_sync_debug_registers_across_threads ();
+   return rc;
  }
  
 +static void
-+dr_mirror_fetch (void)
++amd64_linux_detach_breakpoints (int detached_pid)
 +{
-+  long lwp;
++  struct cleanup *old_chain = save_inferior_ptid ();
 +  int i;
 +
-+  lwp = ptid_get_lwp (inferior_ptid);
-+  if (lwp == 0)
-+    lwp = ptid_get_pid (inferior_ptid);
++  amd64_linux_detach_breakpoints_pid = detached_pid;
++  /* Depend on `!is_lwp (inferior_ptid)' for the I386_* macros.  */
++  inferior_ptid = pid_to_ptid (detached_pid);
 +
-+  if (dr_mirror_active == NULL)
++  i386_detach_breakpoints (detached_pid);
++
++  do_cleanups (old_chain);
++}
++
+ /* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
+    unused.  Return 0 on success, EBUSY on failure.  */
+ int
+@@ -532,6 +559,12 @@ int
+ amd64_linux_remove_hw_breakpoint (struct bp_target_info *bp_tgt)
+ {
+   int rc;
++
++  if (ptid_get_pid (inferior_ptid) == amd64_linux_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  amd64_linux_detach_breakpoints_pid = 0;
++
+   rc = i386_remove_hw_breakpoint (bp_tgt);
+   if (!rc)
+     amd64_linux_sync_debug_registers_across_threads ();
+@@ -620,6 +653,41 @@ amd64_linux_child_post_startup_inferior 
+   i386_cleanup_dregs ();
+   super_post_startup_inferior (ptid);
+ }
++
++static int (*amd64_linux_super_follow_fork) (struct target_ops *ops,
++					     int follow_child);
++
++/* We need to duplicate the LINUX_CHILD_FOLLOW_FORK behavior here and catch its
++   called DETACH_BREAKPOINTS to avoid corrupting our local registers mirror.  */
++
++static int
++amd64_linux_follow_fork (struct target_ops *ops, int follow_child)
++{
++  ptid_t last_ptid;
++  struct target_waitstatus last_status;
++  int has_vforked;
++  int parent_pid, child_pid;
++
++  get_last_target_status (&last_ptid, &last_status);
++  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
++  parent_pid = ptid_get_lwp (last_ptid);
++  if (parent_pid == 0)
++    parent_pid = ptid_get_pid (last_ptid);
++  child_pid = last_status.value.related_pid;
++
++  if (! follow_child)
 +    {
-+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
-+      dr_mirror_active->next = dr_mirror_active;
++      amd64_linux_detach_breakpoints (child_pid);
 +    }
 +  else
 +    {
-+      struct dr_mirror_status *first = dr_mirror_active;
-+      do
-+	{
-+	  if (dr_mirror_active->lwp == lwp)
-+	    return;
-+	  dr_mirror_active = dr_mirror_active->next;
-+	}
-+      while (dr_mirror_active != first);
-+      dr_mirror_active = xzalloc (sizeof *dr_mirror_active);
-+      dr_mirror_active->next = first->next;
-+      first->next = dr_mirror_active;
++      if (! has_vforked)
++	amd64_linux_detach_breakpoints (child_pid);
 +    }
-+  dr_mirror_active->lwp = lwp;
 +
-+  /* All the registers left 0.  */
++  return (*amd64_linux_super_follow_fork) (ops, follow_child);
 +}
 +
- /* Print the values of the mirrored debug registers.  This is called
-    when maint_show_dr is non-zero.  To set that up, type "maint
-    show-debug-regs" at GDB's prompt.  */
-@@ -248,6 +298,8 @@ i386_show_dr (const char *func, CORE_ADD
- {
-   int i;
+ 
  
-+  dr_mirror_fetch ();
-+
-   puts_unfiltered (func);
-   if (addr || len)
-     printf_unfiltered (" (addr=%lx, len=%d, type=%s)",
-@@ -337,6 +389,8 @@ i386_insert_aligned_watchpoint (CORE_ADD
- {
-   int i;
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+@@ -656,6 +724,9 @@ _initialize_amd64_linux_nat (void)
+   linux_elfcore_write_prstatus = amd64_linux_elfcore_write_prstatus;
+   linux_elfcore_write_prfpreg = amd64_linux_elfcore_write_prfpreg;
  
-+  dr_mirror_fetch ();
++  amd64_linux_super_follow_fork = t->to_follow_fork;
++  t->to_follow_fork = amd64_linux_follow_fork;
 +
-   /* First, look for an occupied debug register with the same address
-      and the same RW and LEN definitions.  If we find one, we can
-      reuse it for this watchpoint as well (and save a register).  */
-@@ -397,6 +451,8 @@ i386_remove_aligned_watchpoint (CORE_ADD
- {
-   int i, retval = -1;
+   /* Register the target.  */
+   linux_nat_add_target (t);
  
-+  dr_mirror_fetch ();
+diff -u -ruNp gdb-6.7.1-orig/gdb/config/i386/nm-i386.h gdb-6.7.1/gdb/config/i386/nm-i386.h
+--- gdb-6.7.1-orig/gdb/config/i386/nm-i386.h	2007-08-23 20:08:48.000000000 +0200
++++ gdb-6.7.1/gdb/config/i386/nm-i386.h	2008-01-11 20:47:42.000000000 +0100
+@@ -114,6 +114,8 @@ extern int i386_stopped_by_watchpoint (v
+    reset all debug registers by calling i386_cleanup_dregs ().  */ 
+ #define CHILD_POST_STARTUP_INFERIOR
+ 
++extern void i386_detach_breakpoints (int detached_pid);
 +
-   ALL_DEBUG_REGISTERS(i)
+ #endif /* I386_USE_GENERIC_WATCHPOINTS */
+ 
+ #endif /* NM_I386_H */
+diff -u -ruNp gdb-6.7.1-orig/gdb/i386-linux-nat.c gdb-6.7.1/gdb/i386-linux-nat.c
+--- gdb-6.7.1-orig/gdb/i386-linux-nat.c	2008-01-11 20:59:17.000000000 +0100
++++ gdb-6.7.1/gdb/i386-linux-nat.c	2008-01-11 20:49:52.000000000 +0100
+@@ -745,6 +745,12 @@ i386_linux_insert_watchpoint (CORE_ADDR 
+   return rc;
+ }
+ 
++/* TO_FOLLOW_FORK stores here the PID under DETACH_BREAKPOINTS for the child
++   process of traced FORK.  We must clear such watchpoints only once during
++   DETACH_BREAKPOINTS.  */
++
++static int i386_linux_detach_breakpoints_pid;
++
+ /* Remove a watchpoint that watched the memory region which starts at
+    address ADDR, whose length is LEN bytes, and for accesses of the
+    type TYPE.  Return 0 on success, -1 on failure.  */
+@@ -752,12 +758,33 @@ int
+ i386_linux_remove_watchpoint (CORE_ADDR addr, int len, int type)
+ {
+   int rc;
++
++  if (ptid_get_pid (inferior_ptid) == i386_linux_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  i386_linux_detach_breakpoints_pid = 0;
++
+   rc = i386_remove_watchpoint (addr, len, type);
+   if (!rc)
+     i386_linux_sync_debug_registers_across_threads ();
+   return rc;
+ }
+ 
++static void
++i386_linux_detach_breakpoints (int detached_pid)
++{
++  struct cleanup *old_chain = save_inferior_ptid ();
++  int i;
++
++  i386_linux_detach_breakpoints_pid = detached_pid;
++  /* Depend on `!is_lwp (inferior_ptid)' for the I386_* macros.  */
++  inferior_ptid = pid_to_ptid (detached_pid);
++
++  i386_detach_breakpoints (detached_pid);
++
++  do_cleanups (old_chain);
++}
++
+ /* Insert a hardware-assisted breakpoint at address ADDR.  SHADOW is
+    unused.  Return 0 on success, EBUSY on failure.  */
+ int
+@@ -940,6 +967,40 @@ i386_linux_child_post_startup_inferior (
+   super_post_startup_inferior (ptid);
+ }
+ 
++static int (*i386_linux_super_follow_fork) (struct target_ops *ops,
++					    int follow_child);
++
++/* We need to duplicate the LINUX_CHILD_FOLLOW_FORK behavior here and catch its
++   called DETACH_BREAKPOINTS to avoid corrupting our local registers mirror.  */
++
++static int
++i386_linux_follow_fork (struct target_ops *ops, int follow_child)
++{
++  ptid_t last_ptid;
++  struct target_waitstatus last_status;
++  int has_vforked;
++  int parent_pid, child_pid;
++
++  get_last_target_status (&last_ptid, &last_status);
++  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
++  parent_pid = ptid_get_lwp (last_ptid);
++  if (parent_pid == 0)
++    parent_pid = ptid_get_pid (last_ptid);
++  child_pid = last_status.value.related_pid;
++
++  if (! follow_child)
++    {
++      i386_linux_detach_breakpoints (child_pid);
++    }
++  else
++    {
++      if (! has_vforked)
++	i386_linux_detach_breakpoints (child_pid);
++    }
++
++  return (*i386_linux_super_follow_fork) (ops, follow_child);
++}
++
+ void
+ _initialize_i386_linux_nat (void)
+ {
+@@ -959,6 +1020,9 @@ _initialize_i386_linux_nat (void)
+   t->to_fetch_registers = i386_linux_fetch_inferior_registers;
+   t->to_store_registers = i386_linux_store_inferior_registers;
+ 
++  i386_linux_super_follow_fork = t->to_follow_fork;
++  t->to_follow_fork = i386_linux_follow_fork;
++
+   /* Register the target.  */
+   linux_nat_add_target (t);
+ 
+diff -u -ruNp gdb-6.7.1-orig/gdb/i386-nat.c gdb-6.7.1/gdb/i386-nat.c
+--- gdb-6.7.1-orig/gdb/i386-nat.c	2008-01-11 20:59:17.000000000 +0100
++++ gdb-6.7.1/gdb/i386-nat.c	2008-01-11 20:47:57.000000000 +0100
+@@ -545,6 +546,17 @@ i386_remove_watchpoint (CORE_ADDR addr, 
+   return retval;
+ }
+ 
++void
++i386_detach_breakpoints (int detached_pid)
++{
++  int i;
++
++  /* Do not touch any DR_MIRROR or DR_CONTROL_MIRROR mirrors here.  */
++  I386_DR_LOW_SET_CONTROL (0);
++  ALL_DEBUG_REGISTERS(i)
++    I386_DR_LOW_RESET_ADDR (i);
++}
++
+ /* Return non-zero if we can watch a memory region that starts at
+    address ADDR and whose length is LEN bytes.  */
+ 
+--- gdb-6.5/gdb/ia64-linux-nat.c.orig	2008-01-12 15:47:40.000000000 +0100
++++ gdb-6.5/gdb/ia64-linux-nat.c	2008-01-12 15:57:58.000000000 +0100
+@@ -675,12 +675,23 @@ ia64_linux_remove_watchpoint_callback (s
+ 		 		     	   args->len);
+ }
+ 
++/* TO_FOLLOW_FORK stores here the PID under DETACH_BREAKPOINTS for the child
++   process of traced FORK.  We must clear such watchpoints only once during
++   DETACH_BREAKPOINTS.  */
++
++static int ia64_linux_detach_breakpoints_pid;
++
+ /* Remove a watchpoint for all threads.  */
+ int
+ ia64_linux_remove_watchpoint (ptid_t ptid, CORE_ADDR addr, int len)
+ {
+   struct linux_watchpoint args;
+ 
++  if (ptid_get_pid (inferior_ptid) == ia64_linux_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  ia64_linux_detach_breakpoints_pid = 0;
++
+   args.addr = addr;
+   args.len = len;
+ 
+@@ -771,6 +782,22 @@ ia64_linux_xfer_partial (struct target_o
+ /* Observer function for a new thread attach.  We need to insert
+    existing watchpoints on the new thread.  */
+ static void
++ia64_linux_detach_breakpoints (int detached_pid)
++{
++  int idx, i;
++  long dbr_addr, dbr_mask;
++  int max_watchpoints = 4;
++
++  ia64_linux_detach_breakpoints_pid = detached_pid;
++
++  /* Do not touch any DEBUG_REGISTERS mirrors here.  */
++  dbr_addr = 0;
++  dbr_mask = 0;
++  for (idx = 0; idx < max_watchpoints; idx++)
++    store_debug_register_pair (ptid_build (detached_pid, 0, 0), idx, &dbr_addr, &dbr_mask);
++}
++
++static void
+ ia64_linux_new_thread (ptid_t ptid)
+ {
+   insert_watchpoints_for_new_thread (ptid, 
+@@ -793,6 +820,40 @@ ia64_linux_save_sigtrap_info (void *queu
+           lp->saved_trap_data);
+ }
+ 
++static int (*ia64_linux_super_follow_fork) (struct target_ops *ops,
++					    int follow_child);
++
++/* We need to duplicate the LINUX_CHILD_FOLLOW_FORK behavior here and catch its
++   called DETACH_BREAKPOINTS to avoid corrupting our local registers mirror.  */
++
++int
++ia64_linux_follow_fork (struct target_ops *ops, int follow_child)
++{
++  ptid_t last_ptid;
++  struct target_waitstatus last_status;
++  int has_vforked;
++  int parent_pid, child_pid;
++
++  get_last_target_status (&last_ptid, &last_status);
++  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
++  parent_pid = ptid_get_lwp (last_ptid);
++  if (parent_pid == 0)
++    parent_pid = ptid_get_pid (last_ptid);
++  child_pid = last_status.value.related_pid;
++
++  if (! follow_child)
++    {
++      ia64_linux_detach_breakpoints (child_pid);
++    }
++  else
++    {
++      if (! has_vforked)
++	ia64_linux_detach_breakpoints (child_pid);
++    }
++
++  return (*ia64_linux_super_follow_fork) (ops, follow_child);
++}
++
+ void _initialize_ia64_linux_nat (void);
+ 
+ /*
+@@ -865,6 +926,9 @@ _initialize_ia64_linux_nat (void)
+   super_xfer_partial = t->to_xfer_partial;
+   t->to_xfer_partial = ia64_linux_xfer_partial;
+ 
++  ia64_linux_super_follow_fork = t->to_follow_fork;
++  t->to_follow_fork = ia64_linux_follow_fork;
++
+   /* Register the target.  */
+   linux_nat_add_target (t);
+ 
+diff -u -ruNp gdb-6.7.1-orig/gdb/ppc-linux-nat.c gdb-6.7.1/gdb/ppc-linux-nat.c
+--- gdb-6.7.1-orig/gdb/ppc-linux-nat.c	2007-08-30 15:13:59.000000000 +0200
++++ gdb-6.7.1/gdb/ppc-linux-nat.c	2008-01-11 20:43:12.000000000 +0100
+@@ -837,12 +837,23 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
+   return ptrace (PTRACE_SET_DEBUGREG, tid, 0, dabr_value);
+ }
+ 
++/* TO_FOLLOW_FORK stores here the PID under DETACH_BREAKPOINTS for the child
++   process of traced FORK.  We must clear such watchpoints only once during
++   DETACH_BREAKPOINTS.  */
++
++static int ppc_linux_detach_breakpoints_pid;
++
+ static int
+ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw)
+ {
+   int tid;
+   ptid_t ptid = inferior_ptid;
+ 
++  if (ptid_get_pid (inferior_ptid) == ppc_linux_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  ppc_linux_detach_breakpoints_pid = 0;
++
+   tid = TIDGET (ptid);
+   if (tid == 0)
+     tid = PIDGET (ptid);
+@@ -850,6 +861,15 @@ ppc_linux_remove_watchpoint (CORE_ADDR a
+   return ptrace (PTRACE_SET_DEBUGREG, tid, 0, 0);
+ }
+ 
++static void
++ppc_linux_detach_breakpoints (int detached_pid)
++{
++  ppc_linux_detach_breakpoints_pid = detached_pid;
++
++  /* Do not touch the SAVED_DABR_VALUE mirror here.  */
++  ptrace (PTRACE_SET_DEBUGREG, detached_pid, 0, 0);
++}
++
+ static int
+ ppc_linux_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
+ {
+@@ -945,6 +965,40 @@ fill_fpregset (const struct regcache *re
+ 			fpregsetp, sizeof (*fpregsetp));
+ }
+ 
++static int (*ppc_linux_super_follow_fork) (struct target_ops *ops,
++					   int follow_child);
++
++/* We need to duplicate the LINUX_CHILD_FOLLOW_FORK behavior here and catch its
++   called DETACH_BREAKPOINTS to avoid corrupting our local registers mirror.  */
++
++int
++ppc_linux_follow_fork (struct target_ops *ops, int follow_child)
++{
++  ptid_t last_ptid;
++  struct target_waitstatus last_status;
++  int has_vforked;
++  int parent_pid, child_pid;
++
++  get_last_target_status (&last_ptid, &last_status);
++  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
++  parent_pid = ptid_get_lwp (last_ptid);
++  if (parent_pid == 0)
++    parent_pid = ptid_get_pid (last_ptid);
++  child_pid = last_status.value.related_pid;
++
++  if (! follow_child)
++    {
++      ppc_linux_detach_breakpoints (child_pid);
++    }
++  else
++    {
++      if (! has_vforked)
++	ppc_linux_detach_breakpoints (child_pid);
++    }
++
++  return (*ppc_linux_super_follow_fork) (ops, follow_child);
++}
++
+ void _initialize_ppc_linux_nat (void);
+ 
+ void
+@@ -967,6 +1021,9 @@ _initialize_ppc_linux_nat (void)
+   t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
+   t->to_stopped_data_address = ppc_linux_stopped_data_address;
+ 
++  ppc_linux_super_follow_fork = t->to_follow_fork;
++  t->to_follow_fork = ppc_linux_follow_fork;
++
+   /* Register the target.  */
+   linux_nat_add_target (t);
+ }
+--- gdb-6.7.1-unpatched/gdb/s390-nat.c	2008-01-11 15:33:48.000000000 -0500
++++ gdb-6.7.1/gdb/s390-nat.c	2008-01-11 15:35:50.000000000 -0500
+@@ -269,17 +269,15 @@ s390_stopped_by_watchpoint (void)
+ }
+ 
+ static void
+-s390_fix_watch_points (ptid_t ptid)
++s390_fix_watch_points_list (int tid, struct watch_area *area_list)
+ {
+-  int tid = s390_tid (ptid);
+-
+   per_struct per_info;
+   ptrace_area parea;
+ 
+   CORE_ADDR watch_lo_addr = (CORE_ADDR)-1, watch_hi_addr = 0;
+   struct watch_area *area;
+ 
+-  for (area = watch_base; area; area = area->next)
++  for (area = area_list; area; area = area->next)
      {
-       if (!I386_DR_VACANT (i)
-@@ -569,6 +625,8 @@ i386_stopped_data_address (CORE_ADDR *ad
-   int i;
-   int rc = 0;
+       watch_lo_addr = min (watch_lo_addr, area->lo_addr);
+       watch_hi_addr = max (watch_hi_addr, area->hi_addr);
+@@ -291,7 +289,7 @@ s390_fix_watch_points (ptid_t ptid)
+   if (ptrace (PTRACE_PEEKUSR_AREA, tid, &parea) < 0)
+     perror_with_name (_("Couldn't retrieve watchpoint status"));
  
-+  dr_mirror_fetch ();
+-  if (watch_base)
++  if (area_list)
+     {
+       per_info.control_regs.bits.em_storage_alteration = 1;
+       per_info.control_regs.bits.storage_alt_space_ctl = 1;
+@@ -308,6 +306,12 @@ s390_fix_watch_points (ptid_t ptid)
+     perror_with_name (_("Couldn't modify watchpoint status"));
+ }
+ 
++static void
++s390_fix_watch_points (ptid_t ptid)
++{
++  s390_fix_watch_points_list (s390_tid (ptid), watch_base);
++}
 +
-   dr_status_mirror = I386_DR_LOW_GET_STATUS ();
+ /* Callback routine to use with iterate_over_lwps to insert a specified
+    watchpoint on all threads.  */
+ static int
+@@ -348,12 +352,23 @@ s390_remove_watchpoint_callback (struct 
+   return 0;
+ }
  
-   ALL_DEBUG_REGISTERS(i)
-@@ -610,6 +668,8 @@ i386_stopped_by_hwbp (void)
++/* TO_FOLLOW_FORK stores here the PID under DETACH_BREAKPOINTS for the child
++   process of traced FORK.  We must clear such watchpoints only once during
++   DETACH_BREAKPOINTS.  */
++
++static int s390_detach_breakpoints_pid;
++
+ /* Remove a specified watchpoint from all threads.  */
+ static int
+ s390_remove_watchpoint (CORE_ADDR addr, int len, int type)
  {
-   int i;
+   struct watch_area *area, **parea;
  
-+  dr_mirror_fetch ();
++  if (ptid_get_pid (inferior_ptid) == s390_detach_breakpoints_pid)
++    return 0;
++  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
++  s390_detach_breakpoints_pid = 0;
 +
-   dr_status_mirror = I386_DR_LOW_GET_STATUS ();
-   if (maint_show_dr)
-     i386_show_dr ("stopped_by_hwbp", 0, 0, hw_execute);
---- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ ./gdb/testsuite/gdb.base/watchpoint-fork.c	14 Oct 2007 15:00:32 -0000
-@@ -0,0 +1,73 @@
+   for (parea = &watch_base; *parea; parea = &(*parea)->next)
+     if ((*parea)->lo_addr == addr
+ 	&& (*parea)->hi_addr == addr + len - 1)
+@@ -378,6 +393,15 @@ s390_remove_watchpoint (CORE_ADDR addr, 
+   return 0;
+ }
+ 
++static void
++s390_detach_breakpoints (int detached_pid)
++{
++  s390_detach_breakpoints_pid = detached_pid;
++
++  /* Do not touch the WATCH_BASE here.  */
++  s390_fix_watch_points_list (detached_pid, NULL);
++}
++
+ static int
+ s390_can_use_hw_breakpoint (int type, int cnt, int othertype)
+ {
+@@ -399,6 +423,39 @@ s390_linux_new_thread (ptid_t ptid)
+   s390_fix_watch_points (ptid);
+ }
+ 
++static int (*s390_super_follow_fork) (struct target_ops *ops, int follow_child);
++
++/* We need to duplicate the LINUX_CHILD_FOLLOW_FORK behavior here and catch its
++   called DETACH_BREAKPOINTS to avoid corrupting our local registers mirror.  */
++
++int
++s390_follow_fork (struct target_ops *ops, int follow_child)
++{
++  ptid_t last_ptid;
++  struct target_waitstatus last_status;
++  int has_vforked;
++  int parent_pid, child_pid;
++
++  get_last_target_status (&last_ptid, &last_status);
++  has_vforked = (last_status.kind == TARGET_WAITKIND_VFORKED);
++  parent_pid = ptid_get_lwp (last_ptid);
++  if (parent_pid == 0)
++    parent_pid = ptid_get_pid (last_ptid);
++  child_pid = last_status.value.related_pid;
++
++  if (! follow_child)
++    {
++      s390_detach_breakpoints (child_pid);
++    }
++  else
++    {
++      if (! has_vforked)
++	s390_detach_breakpoints (child_pid);
++    }
++
++  return (*s390_super_follow_fork) (ops, follow_child);
++}
++
+ 
+ void _initialize_s390_nat (void);
+ 
+@@ -422,6 +479,9 @@ _initialize_s390_nat (void)
+   t->to_insert_watchpoint = s390_insert_watchpoint;
+   t->to_remove_watchpoint = s390_remove_watchpoint;
+ 
++  s390_super_follow_fork = t->to_follow_fork;
++  t->to_follow_fork = s390_follow_fork;
++
+   /* Register the target.  */
+   linux_nat_add_target (t);
+ 
+diff -u -ruNp gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
+--- gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c	2008-01-11 20:28:48.000000000 +0100
+@@ -0,0 +1,160 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
-+   Copyright 2007
++   Copyright 2008
++   Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <string.h>
++#include <errno.h>
++
++static void delay (void)
++{
++  int i = usleep (1000000 / 100);
++  assert (i == 0 || errno == EINTR);
++}
++
++#if defined FOLLOW_PARENT
++
++static void forkoff (int nr)
++{
++  pid_t child, pid_got;
++  int exit_code = 42 + nr;
++  int status;
++
++  child = fork ();
++  switch (child)
++    {
++    case -1:
++      assert (0);
++    case 0:
++      printf ("child%d: %d\n", nr, (int) getpid ());
++
++      /* We must not get caught here (against a forgotten breakpoint).  */
++      var++;
++      breakpoint ();
++
++      _exit (exit_code);
++    default:
++      printf ("parent%d: %d\n", nr, (int) child);
++      pid_got = wait (&status);
++      assert (pid_got == child);
++      assert (WIFEXITED (status));
++      assert (WEXITSTATUS (status) == exit_code);
++
++      /* We must get caught here (against a false watchpoint removal).  */
++      breakpoint ();
++    }
++}
++
++#elif defined FOLLOW_CHILD
++
++static volatile int usr1_got;
++
++static void handler_usr1 (int signo)
++{
++  usr1_got++;
++}
++
++static void forkoff (int nr)
++{
++  pid_t child;
++  int i, loop;
++  struct sigaction act, oldact;
++#ifdef THREAD
++  void *thread_result;
++#endif
++
++  memset (&act, 0, sizeof act);
++  act.sa_flags = SA_RESTART;
++  act.sa_handler = handler_usr1;
++  sigemptyset (&act.sa_mask);
++  i = sigaction (SIGUSR1, &act, &oldact);
++  assert (i == 0);
++
++  child = fork ();
++  switch (child)
++    {
++    case -1:
++      assert (0);
++    default:
++      printf ("parent%d: %d\n", nr, (int) child);
++
++      /* Sleep for a while to possibly get incorrectly ATTACH_THREADed by GDB
++         tracing the child fork with no longer valid thread/lwp entries of the
++         parent.  */
++
++      i = sleep (2);
++      assert (i == 0);
++
++      /* We must not get caught here (against a forgotten breakpoint).  */
++
++      var++;
++      breakpoint ();
++
++#ifdef THREAD
++      /* And neither got caught our thread.  */
++
++      step = 99;
++      i = pthread_join (thread, &thread_result);
++      assert (i == 0);
++      assert (thread_result == (void *) 99UL);
++#endif
++
++      /* Be sure our child knows we did not get caught above.  */
++
++      i = kill (child, SIGUSR1);
++      assert (i == 0);
++
++      /* Sleep for a while to check GDB's `info threads' no longer tracks us in
++         the child fork.  */
++
++      i = sleep (2);
++      assert (i == 0);
++
++      _exit (0);
++    case 0:
++      printf ("child%d: %d\n", nr, (int) getpid ());
++
++      /* Let the parent signal us about its success.  Be careful of races.  */
++
++      for (loop = 0; loop < 1000; loop++)
++        {
++	  /* Parent either died (and USR1_GOT is zero) or it succeeded.  */
++	  if (kill (getppid (), 0) != 0)
++	    break;
++	  /* Parent succeeded?  */
++	  if (usr1_got)
++	    break;
++
++	  delay ();
++	}
++      assert (usr1_got);
++
++      /* We must get caught here (against a false watchpoint removal).  */
++
++      breakpoint ();
++    }
++
++  i = sigaction (SIGUSR1, &oldact, NULL);
++  assert (i == 0);
++}
++
++#else
++# error "!FOLLOW_PARENT && !FOLLOW_CHILD"
++#endif
+diff -u -ruNp gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
+--- gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	2008-01-11 20:28:48.000000000 +0100
+@@ -0,0 +1,154 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008
++   Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <assert.h>
++#include <unistd.h>
++#include <sys/wait.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <pthread.h>
++
++#include <asm/unistd.h>
++#include <unistd.h>
++#define gettid() syscall (__NR_gettid)
++
++/* Non-atomic `var++' should not hurt as we synchronize the threads by the STEP
++   variable.  Hit-comments need to be duplicite there to catch both at-stops
++   and behind-stops, depending on the target.  */
++
++static volatile int var;
++
++static void dummy (void)
++{
++}
++
++static void breakpoint (void)
++{
++}
++
++/* Include here the functions:
++   static void forkoff (int nr);
++   static void delay (void);  */
++
++static pthread_t thread;
++static volatile int step;
++#define THREAD
++
++#include "watchpoint-fork-forkoff.c"
++
++static void *start (void *arg)
++{
++  if (step >= 3)
++    goto step_3;
++
++  while (step != 1)
++    delay ();
++
++  var++;	/* validity-thread-B */
++  dummy ();	/* validity-thread-B */
++  step = 2;
++  while (step != 3)
++    {
++      if (step == 99)
++        goto step_99;
++      delay ();
++    }
++
++step_3:
++  if (step >= 5)
++    goto step_5;
++
++  var++;	/* after-fork1-B */
++  dummy ();	/* after-fork1-B */
++  step = 4;
++  while (step != 5)
++    {
++      if (step == 99)
++        goto step_99;
++      delay ();
++    }
++
++step_5:
++  var++;	/* after-fork2-B */
++  dummy ();	/* after-fork2-B */
++  return (void *) 5UL;
++
++step_99:
++  /* We must not get caught here (against a forgotten breakpoint).  */
++  var++;
++  breakpoint ();
++  return (void *) 99UL;
++}
++
++int main (void)
++{ 
++  int i;
++  void *thread_result;
++
++  setbuf (stdout, NULL);
++  printf ("main: %d\n", (int) gettid ());
++
++  /* General watchpoints validity.  */
++  var++;	/* validity-first */
++  dummy ();	/* validity-first */
++
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++
++  var++;	/* validity-thread-A */
++  dummy ();	/* validity-thread-A */
++  step = 1;
++  while (step != 2)
++    delay ();
++
++  /* Hardware watchpoints got disarmed here.  */
++  forkoff (1);
++
++  var++;	/* after-fork1-A */
++  dummy ();	/* after-fork1-A */
++  step = 3;
++#ifdef FOLLOW_CHILD
++  /* Spawn new thread as it was deleted in the child of FORK.  */
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++#endif
++  while (step != 4)
++    delay ();
++
++  /* A sanity check for double hardware watchpoints removal.  */
++  forkoff (2);
++
++  var++;	/* after-fork2-A */
++  dummy ();	/* after-fork2-A */
++  step = 5;
++#ifdef FOLLOW_CHILD
++  /* Spawn new thread as it was deleted in the child of FORK.  */
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++#endif
++
++  i = pthread_join (thread, &thread_result);
++  assert (i == 0);
++  assert (thread_result == (void *) 5UL);
++
++  return 0;
++}
+diff -u -ruNp gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork.c gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork.c
+--- gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork.c	2008-01-11 20:28:48.000000000 +0100
+@@ -0,0 +1,56 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008
 +   Free Software Foundation, Inc.
 +
 +   This file is part of GDB.
@@ -292,35 +951,18 @@ gdb-6.7.1-6.fc9 - the patch was not ported.
 +{
 +}
 +
-+static void forkoff (int nr)
-+{
-+  pid_t child, pid_got;
-+  int exit_code = 42 + nr;
-+  int status;
++/* Include here the function:
++   static void forkoff (int nr);  */
 +
-+  child = fork ();
-+  switch (child)
-+    {
-+      case -1:
-+	assert (0);
-+      case 0:
-+	printf ("child%d: %d\n", nr, (int) getpid ());
-+	breakpoint ();
-+        exit (exit_code);
-+      default:
-+	printf ("parent%d: %d\n", nr, (int) child);
-+	pid_got = wait (&status);
-+	assert (pid_got == child);
-+	assert (WIFEXITED (status));
-+	assert (WEXITSTATUS (status) == exit_code);
-+    }
-+}
++#include "watchpoint-fork-forkoff.c"
 +
 +int main (void)
 +{
 +  setbuf (stdout, NULL);
 +  printf ("main: %d\n", (int) getpid ());
 +
++  /* General watchpoints validity.  */
++  var++;
 +  /* Hardware watchpoints got disarmed here.  */
 +  forkoff (1);
 +  /* This watchpoint got lost before.  */
@@ -331,10 +973,11 @@ gdb-6.7.1-6.fc9 - the patch was not ported.
 +
 +  return 0;
 +}
---- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ ./gdb/testsuite/gdb.base/watchpoint-fork.exp	14 Oct 2007 15:00:32 -0000
-@@ -0,0 +1,53 @@
-+# Copyright 2007 Free Software Foundation, Inc.
+diff -u -ruNp gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork.exp gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork.exp
+--- gdb-6.7.1-orig/gdb/testsuite/gdb.threads/watchpoint-fork.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.7.1/gdb/testsuite/gdb.threads/watchpoint-fork.exp	2008-01-11 20:28:48.000000000 +0100
+@@ -0,0 +1,140 @@
++# Copyright 2008 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -349,44 +992,131 @@ gdb-6.7.1-6.fc9 - the patch was not ported.
 +# You should have received a copy of the GNU General Public License
 +# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 +
-+if $tracelevel then {
-+    strace $tracelevel
++# Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++proc test {type symbol} {
++    global objdir subdir srcdir
++
++    global pf_prefix
++    set prefix_test $pf_prefix
++    lappend pf_prefix "$type:"
++    set prefix_mt $pf_prefix
++
++    # no threads
++
++    set pf_prefix $prefix_mt
++    lappend pf_prefix "singlethreaded:"
++
++    set testfile watchpoint-fork
++    set srcfile ${testfile}.c
++    set binfile ${objdir}/${subdir}/${testfile}
++
++    if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug additional_flags=-D$symbol"] != "" } {
++	untested "Couldn't compile test program"
++	return -1
++    }
++
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    gdb_test "set follow-fork-mode $type"
++    # Testcase uses it for the `follow-fork-mode child' type.
++    gdb_test "handle SIGUSR1 nostop noprint pass"
++
++    if { ![runto_main] } then {
++	gdb_suppress_tests
++	return
++    }
++
++    # Install the watchpoint only after getting into MAIN - workaround some PPC
++    # problem.
++    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++
++    # It is never hit but it should not be left over in the fork()ed-off child.
++    gdb_breakpoint "breakpoint"
++
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 0.*New value = 1.*forkoff *\\(1\\).*" "watchpoints work"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 1.*New value = 2.*forkoff *\\(2\\).*" "watchpoint after the first fork"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 2.*New value = 3.*return *0;" "watchpoint after the second fork"
++    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++
++
++    # threads
++
++    set pf_prefix $prefix_mt
++    lappend pf_prefix "multithreaded:"
++
++    set testfile watchpoint-fork-mt
++    set srcfile ${testfile}.c
++    set binfile ${objdir}/${subdir}/${testfile}
++
++    if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug additional_flags=-D$symbol"] != "" } {
++	untested "Couldn't compile test program"
++	return -1
++    }
++
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    gdb_test "set follow-fork-mode $type"
++    # Testcase uses it for the `follow-fork-mode child' type.
++    gdb_test "handle SIGUSR1 nostop noprint pass"
++
++    if { ![runto_main] } then {
++	gdb_suppress_tests
++	return
++    }
++
++    # Install the watchpoint only after getting into MAIN - workaround some PPC
++    # problem.
++    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++
++    # It is never hit but it should not be left over in the fork()ed-off child.
++    gdb_breakpoint "breakpoint"
++
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 0.*New value = 1.*validity-first.*" "singlethread watchpoints work"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 1.*New value = 2.*validity-thread-A.*" "multithreaded watchpoints work at A"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 2.*New value = 3.*validity-thread-B.*" "multithreaded watchpoints work at B"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 3.*New value = 4.*after-fork1-A.*" "watchpoint A after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 4.*New value = 5.*after-fork1-B.*" "watchpoint B after the first fork"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 5.*New value = 6.*after-fork2-A.*" "watchpoint A after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 6.*New value = 7.*after-fork2-B.*" "watchpoint B after the second fork"
++    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++
++
++    # cleanup
++
++    set pf_prefix $prefix_test
 +}
 +
-+set prms_id 0
-+set bug_id 0
++test parent FOLLOW_PARENT
 +
-+set testfile watchpoint-fork
-+set srcfile ${testfile}.c
-+set binfile ${objdir}/${subdir}/${testfile}
-+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
-+    untested "Couldn't compile test program"
-+    return -1
++# Only GNU/Linux is known to support `set follow-fork-mode child'.
++if {[istarget "*-*-linux*"]} {
++    test child FOLLOW_CHILD
 +}
-+
-+# Get things started.
-+
-+gdb_exit
-+gdb_start
-+gdb_reinitialize_dir $srcdir/$subdir
-+gdb_load ${binfile}
-+
-+if { ![runto_main] } then {
-+    gdb_suppress_tests;
-+}
-+
-+# Install the watchpoint only after getting into MAIN - workaround some PPC
-+# problem.
-+gdb_test "watch var" "atchpoint 2: var"
-+
-+# It is never hit but it should not be left over in the fork()ed-off child.
-+gdb_breakpoint "breakpoint"
-+
-+gdb_test "continue" \
-+	 "atchpoint 2: var.*Old value = 0.*New value = 1.*" "watchpoint first hit"
-+gdb_test "continue" \
-+	 "atchpoint 2: var.*Old value = 1.*New value = 2.*" "watchpoint second hit"
-+gdb_test "continue" "Continuing..*Program exited normally." "finish"
 ===================================================================
 RCS file: /cvs/src/src/gdb/doc/gdb.texinfo,v
 retrieving revision 1.434
