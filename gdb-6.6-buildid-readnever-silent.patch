@@ -1,0 +1,41 @@
+2008-01-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Suppress messages `(no debugging symbols found)' on the commandline
+	option -readnever.
+
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
+--- gdb-6.6-orig/gdb/symfile.c	2008-01-12 22:10:40.000000000 +0100
++++ gdb-6.6/gdb/symfile.c	2008-01-22 02:15:46.000000000 +0100
+@@ -996,8 +996,10 @@ symbol_file_add_with_addrs_or_offsets (b
+ 
+   /* If the file has its own symbol tables it has no separate debug info.
+      `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
+-     `.gnu_debuglink' may no longer be present with `.note.gnu.build-id'.  */
+-  if (objfile->psymtabs == NULL)
++     `.gnu_debuglink' may no longer be present with `.note.gnu.build-id'.
++     READNEVER_SYMBOL_FILES implies zero PSYMTABS and it makes no sense to be
++     finding any debug files.  */
++  if (objfile->psymtabs == NULL && !readnever_symbol_files)
+     debugfile = find_separate_debug_file (objfile);
+   if (debugfile)
+     {
+@@ -1021,7 +1023,8 @@ symbol_file_add_with_addrs_or_offsets (b
+       xfree (debugfile);
+     }
+ 
+-  if (!have_partial_symbols () && !have_full_symbols ())
++  if (!readnever_symbol_files && !have_partial_symbols ()
++      && !have_full_symbols ())
+     {
+       wrap_here ("");
+       printf_filtered (_("(no debugging symbols found)"));
+@@ -2770,7 +2959,8 @@ reread_symbols (void)
+ 	         zero is OK since dbxread.c also does what it needs to do if
+ 	         objfile->global_psymbols.size is 0.  */
+ 	      (*objfile->sf->sym_read) (objfile, 0);
+-	      if (!have_partial_symbols () && !have_full_symbols ())
++	      if (!readnever_symbol_files && !have_partial_symbols ()
++		  && !have_full_symbols ())
+ 		{
+ 		  wrap_here ("");
+ 		  printf_unfiltered (_("(no debugging symbols found)\n"));

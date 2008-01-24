@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -346,10 +346,15 @@ Patch296: gdb-6.5-gcore-buffer-limit-test.patch
 #  - It requires recent glibc to work in this case properly.
 Patch298: gdb-6.6-threads-static-test.patch
 
+# Fix false `(no debugging symbols found)' on `-readnever' runs.
+Patch301: gdb-6.6-buildid-readnever-silent.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
 BuildRequires: readline-devel
+Requires: rpm-libs
+BuildRequires: rpm-devel
 
 # BuildRequires are provided here only for the complete testsuite run.
 # Omit them on local user builds. %{_topdir} checks for mock (and so even Koji).
@@ -498,6 +503,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch294 -p1
 %patch296 -p1
 %patch298 -p1
+%patch301 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -655,6 +661,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-11
+- Improve the text UI messages for the build-id debug files locating.
+  - Require now the rpm libraries.
+- Fix false `(no debugging symbols found)' on `-readnever' runs.
+- Extend the testcase `gdb.arch/powerpc-prologue.exp' for ppc64.
+
 * Sat Jan 12 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-10
 - Compilation fixup (-9 was never released).
 
