@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 40%{?dist}
+Release: 41%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -403,6 +403,8 @@ BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
 BuildRequires: readline-devel
+Requires: rpm-libs
+BuildRequires: rpm-devel
 
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
 %ifarch %{multilib_64_archs} sparc ppc
@@ -719,6 +721,10 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Jan 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-41
+- Improve the text UI messages for the build-id debug files locating.
+  - Require now the rpm libraries.
+
 * Thu Jan 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-40
 - Fix+test (backport) threading of statically linked inferiors (BZ 314131).
   - It requires recent glibc to work in this case properly.

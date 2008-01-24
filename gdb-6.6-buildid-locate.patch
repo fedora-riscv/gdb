@@ -1,6 +1,23 @@
-diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
---- gdb-6.6-orig/gdb/Makefile.in	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/Makefile.in	2007-08-28 15:32:40.000000000 +0200
+[base]
+
+2008-01-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	option "build-id-core-loads": Fix it to be an "on"/"off" type.
+	More intuitive build-id missing files messages.
+	Lookup also the main executable from the rpm database.
+	Suppress duplicite buil-id missing files warnings.
+
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
+--- gdb-6.6-unpatched/gdb/Makefile.in	2008-01-22 02:21:45.000000000 +0100
++++ gdb-6.6/gdb/Makefile.in	2008-01-22 23:26:35.000000000 +0100
+@@ -383,7 +383,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcode
+ CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) \
+ 	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+ 	$(LIBICONV) $(LIBEXPAT) \
+-	$(LIBIBERTY) $(WIN32LIBS)
++	$(LIBIBERTY) $(WIN32LIBS) -lrpm
+ CDEPS = $(XM_CDEPS) $(TM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE) \
+ 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS)
+ 
 @@ -1917,7 +1917,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
  	$(inferior_h) $(symtab_h) $(command_h) $(bfd_h) $(target_h) \
  	$(gdbcore_h) $(gdbthread_h) $(regcache_h) $(regset_h) $(symfile_h) \
@@ -21,9 +38,9 @@ diff -u -rup gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
  symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
  	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
  	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
-diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
---- gdb-6.6-orig/gdb/corelow.c	2006-04-18 21:20:06.000000000 +0200
-+++ gdb-6.6/gdb/corelow.c	2007-08-28 15:31:56.000000000 +0200
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/corelow.c gdb-6.6/gdb/corelow.c
+--- gdb-6.6-unpatched/gdb/corelow.c	2008-01-22 02:21:45.000000000 +0100
++++ gdb-6.6/gdb/corelow.c	2008-01-22 23:39:09.000000000 +0100
 @@ -46,6 +46,10 @@
  #include "gdb_assert.h"
  #include "exceptions.h"
@@ -35,18 +52,11 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
  
  
  #ifndef O_LARGEFILE
-@@ -253,6 +257,66 @@ add_to_thread_list (bfd *abfd, asection 
+@@ -253,6 +257,57 @@ add_to_thread_list (bfd *abfd, asection 
      inferior_ptid = pid_to_ptid (thread_id);	/* Yes, make it current */
  }
  
 +static int build_id_core_loads = 1;
-+static void
-+show_build_id_core_loads (struct ui_file *file, int from_tty,
-+			  struct cmd_list_element *c, const char *value)
-+{
-+  fprintf_filtered (file, _("Automatic loading of the matching binaries "
-+			    "for core files is %s.\n"), value);
-+}
 +
 +static void 
 +build_id_locate_exec (int from_tty)
@@ -70,9 +80,8 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
 +  if (exec_filename != NULL)
 +    exec_file_attach (exec_filename, from_tty);
 +  else
-+    fprintf_unfiltered (gdb_stdlog,
-+		     _("\nwarning: Missing the matching executable file: %s\n"),
-+			build_id_filename);
++    build_id_print_missing (_("the main executable file"), build_id_filename,
++			    1);
 +  xfree (build_id_filename);
 +
 +  /* `.note.gnu.build-id' section exists even for files without a separate
@@ -87,10 +96,9 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
 +    {
 +      if (exec_filename != NULL)
 +	symbol_file_add_main (exec_filename, from_tty);
-+      if (symfile_objfile == NULL)
-+	fprintf_unfiltered (gdb_stdlog,
-+	_("\nwarning: Missing the matching executable's debug info file: %s\n"),
-+			    build_id_filename);
++      /* For EXEC_FILENAME NULL we were already complaining above.  */
++      if (symfile_objfile == NULL && exec_filename != NULL)
++	build_id_print_missing (exec_filename, build_id_filename, 1);
 +    }
 +  xfree (build_id_filename);
 +
@@ -102,7 +110,7 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
  /* This routine opens and sets up the core file bfd.  */
  
  static void
-@@ -417,6 +420,15 @@ core_open (char *filename, int from_tty)
+@@ -349,6 +404,15 @@ core_open (char *filename, int from_tty)
    ontop = !push_target (&core_ops);
    discard_cleanups (old_chain);
  
@@ -118,23 +126,21 @@ diff -u -rup gdb-6.6-orig/gdb/corelow.c gdb-6.6/gdb/corelow.c
    /* This is done first, before anything has a chance to query the
       inferior for information such as symbols.  */
    post_create_inferior (&core_ops, from_tty);
-@@ -662,4 +734,13 @@ _initialize_corelow (void)
+@@ -662,4 +726,11 @@ _initialize_corelow (void)
  
    if (!coreops_suppress_target)
      add_target (&core_ops);
 +
-+  add_setshow_zinteger_cmd ("build-id-core-loads", class_files,
-+			    &build_id_core_loads, _("\
-+Set debugging of the build-id locator."), _("\
-+Show debugging of the build-id locator."), _("\
-+Enables printf debugging output."),
-+			    NULL,
-+			    show_build_id_core_loads,
-+			    &setlist, &showlist);
++  add_setshow_boolean_cmd ("build-id-core-loads", class_files,
++			   &build_id_core_loads, _("\
++Set whether CORE-FILE loads the build-id associated files automatically."), _("\
++Show whether CORE-FILE loads the build-id associated files automatically.."),
++			   NULL, NULL, NULL,
++			   &setlist, &showlist);
  }
-diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
---- gdb-6.6-orig/gdb/solib-svr4.c	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/solib-svr4.c	2007-08-28 15:34:02.000000000 +0200
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
+--- gdb-6.6-unpatched/gdb/solib-svr4.c	2008-01-22 02:21:45.000000000 +0100
++++ gdb-6.6/gdb/solib-svr4.c	2008-01-22 23:39:17.000000000 +0100
 @@ -943,10 +943,35 @@ svr4_current_sos (void)
  		}
                else
@@ -147,6 +153,7 @@ diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
 +
 +		  strncpy (new->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
 +		  new->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
++		  xfree (buffer);
 +		  /* May get overwritten below.  */
 +		  strcpy (new->so_name, new->so_original_name);
 +
@@ -165,9 +172,8 @@ diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
 +			  xfree (name);
 +			}
 +		      else
-+			fprintf_unfiltered (gdb_stdlog,
-+			_("\nwarning: Missing the matching library file: %s\n"),
-+					    build_id_filename);
++			build_id_print_missing (new->so_name, build_id_filename,
++						1);
 +		      xfree (build_id_filename);
 +		      xfree (build_id);
 +		    }
@@ -175,9 +181,9 @@ diff -u -rup gdb-6.6-orig/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
  		  if (debug_solib)
  		    {
  		      fprintf_unfiltered (gdb_stdlog, 
-diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
---- gdb-6.6-orig/gdb/symfile.c	2007-08-28 15:31:19.000000000 +0200
-+++ gdb-6.6/gdb/symfile.c	2007-08-28 15:36:22.000000000 +0200
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6.6/gdb/symfile.c
+--- gdb-6.6-unpatched/gdb/symfile.c	2008-01-22 02:28:03.000000000 +0100
++++ gdb-6.6/gdb/symfile.c	2008-01-22 23:52:12.000000000 +0100
 @@ -54,6 +54,9 @@
  #include "exec.h"
  #include "parser-defs.h"
@@ -196,7 +202,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
  
  int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
-@@ -1120,16 +1124,62 @@ symbol_file_clear (int from_tty)
+@@ -1144,16 +1145,62 @@ symbol_file_clear (int from_tty)
        printf_unfiltered (_("No symbol file now.\n"));
  }
  
@@ -261,7 +267,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  {
    struct build_id *retval;
  
-@@ -1145,6 +1195,348 @@ build_id_bfd_get (bfd *abfd)
+@@ -1169,6 +1216,348 @@ build_id_bfd_get (bfd *abfd)
    return retval;
  }
  
@@ -610,7 +616,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
  
  static int
-@@ -1159,7 +1551,7 @@ build_id_verify (const char *filename, s
+@@ -1183,7 +1572,7 @@ build_id_verify (const char *filename, s
    if (abfd == NULL)
      return 0;
  
@@ -619,7 +625,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"), filename);
-@@ -1177,8 +1569,9 @@ build_id_verify (const char *filename, s
+@@ -1201,8 +1590,9 @@ build_id_verify (const char *filename, s
  
  static char *debug_file_directory = NULL;
  
@@ -631,7 +637,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  {
    char *link, *s, *retval = NULL;
    gdb_byte *data = build_id->data;
-@@ -1186,7 +1579,9 @@ build_id_to_debug_filename (struct build
+@@ -1210,7 +1600,9 @@ build_id_to_debug_filename (struct build
  
    /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
    link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
@@ -642,7 +648,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
    s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
    if (size > 0)
      {
-@@ -1197,12 +1592,14 @@ build_id_to_debug_filename (struct build
+@@ -1221,12 +1613,14 @@ build_id_to_debug_filename (struct build
      *s++ = '/';
    while (size-- > 0)
      s += sprintf (s, "%02x", (unsigned) *data++);
@@ -659,7 +665,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1210,6 +1607,11 @@ build_id_to_debug_filename (struct build
+@@ -1234,9 +1628,203 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -668,10 +674,202 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
 +  else
 +    xfree (link);
 +
++  return retval;
++}
++
++#include <rpm/rpmmessages.h>
++#include <rpm/rpmlib.h>
++#include <rpm/rpmts.h>
++#include <rpm/rpmdb.h>
++#include <rpm/header.h>
++
++static void
++rpm_print_debuginfo (const char *filename)
++{
++  static int rpm_init_done = 0;
++  rpmts ts;
++  rpmdbMatchIterator mi;
++
++  if (!rpm_init_done)
++    {
++      if (rpmReadConfigFiles(NULL, NULL) != 0)
++	{
++	  warning (_("Error reading the rpm configuration files"));
++	  return;
++	}
++      rpm_init_done = 1;
++    }
++
++  ts = rpmtsCreate ();
++  
++  mi = rpmtsInitIterator (ts, RPMTAG_BASENAMES, filename, 0);
++  if (mi != NULL)
++    {
++      int printed = 0;
++
++      for (;;)
++	{
++	  Header h;
++	  char *s;
++	  const char *errmsg;
++
++	  h = rpmdbNextIterator (mi);
++	  if (h == NULL)
++	    break;
++
++	  s = headerSprintf (h, " %{name}", rpmTagTable, rpmHeaderFormats,
++			     &errmsg);
++	  if (s == NULL)
++	    warning (_("Error querying rpm file `%s': %s"), filename, errmsg);
++	  else
++	    {
++	      if (!printed)
++	        {
++		  fprintf_unfiltered (gdb_stdout,
++				      _("Getting all the debuginfos: %s"),
++				      "debuginfo-install");
++		  printed = 1;
++		}
++	      /* Space (' ') delimited was insted by HEADERSPRINTF above.  */
++	      fputs_unfiltered (s, gdb_stdout);
++	    }
++	}
++
++      if (printed)
++	fputs_unfiltered ("\n", gdb_stdout);
++
++      rpmdbFreeIterator (mi);
++    }
++
++  rpmtsFree (ts);
++}
++
++struct missing_debuginfos
++  {
++    char *binary;
++    char *debug;
++    char data[1];
++  };
++
++static struct htab *missing_debuginfos_hash;
++static struct obstack missing_debuginfos_obstack;
++
++static void *
++missing_debuginfos_xcalloc (size_t nmemb, size_t nmemb_size)
++{
++  void *retval;
++  size_t size = nmemb * nmemb_size;
++  
++  retval = obstack_alloc (&missing_debuginfos_obstack, size);
++  memset (retval, 0, size);
    return retval;
  }
  
-@@ -1305,23 +1707,27 @@ find_separate_debug_file (struct objfile
++static hashval_t
++missing_debuginfos_hash_func (const struct missing_debuginfos *elem)
++{
++  return htab_hash_string (elem->binary) ^ htab_hash_string (elem->debug);
++}
++
++static int
++missing_debuginfos_eq (const struct missing_debuginfos *elem1,
++		       const struct missing_debuginfos *elem2)
++{
++  return strcmp (elem1->binary, elem2->binary) == 0
++         && strcmp (elem1->debug, elem2->debug) == 0;
++}
++
++static void
++missing_debuginfos_change (void)
++{
++  if (missing_debuginfos_hash != NULL)
++    {
++      obstack_free (&missing_debuginfos_obstack, NULL);
++      /* All their memory came just from MISSING_DEBUGINFOS_OBSTACK.  */
++      missing_debuginfos_hash = NULL;
++    }
++}
++
++static void
++missing_debuginfos_change_inferior_created (struct target_ops *objfile,
++					    int from_tty)
++{
++  missing_debuginfos_change ();
++}
++
++void
++build_id_print_missing (const char *binary, const char *debug,
++			int print_filename)
++{
++  char *exec_filename = NULL;
++  size_t binary_len0 = strlen (binary) + 1;
++  size_t debug_len0 = strlen (debug) + 1;
++  struct missing_debuginfos *missing_debuginfos;
++  struct missing_debuginfos **slot;
++
++  if (missing_debuginfos_hash == NULL)
++    {
++      obstack_init (&missing_debuginfos_obstack);
++      missing_debuginfos_hash = htab_create_alloc (64,
++	(hashval_t (*) (const void *)) missing_debuginfos_hash_func,
++	(int (*) (const void *, const void *)) missing_debuginfos_eq, NULL,
++	missing_debuginfos_xcalloc, NULL);
++    }
++
++  missing_debuginfos = obstack_alloc (&missing_debuginfos_obstack,
++				      sizeof (*missing_debuginfos) - 1
++				      + binary_len0 + debug_len0);
++  missing_debuginfos->binary = missing_debuginfos->data;
++  memcpy (missing_debuginfos->binary, binary, binary_len0);
++  missing_debuginfos->debug = missing_debuginfos->binary + binary_len0;
++  memcpy (missing_debuginfos->debug, debug, debug_len0);
++
++  slot = (struct missing_debuginfos **) htab_find_slot (missing_debuginfos_hash,
++							missing_debuginfos,
++							INSERT);
++
++  /* While it may be still printed duplicitely with the missing debuginfo file
++   * it is due to once printing about the binary file build-id link and once
++   * about the .debug file build-id link as both the build-id symlinks are
++   * located in the debuginfo package.  */
++
++  if (*slot != NULL)
++    {
++      obstack_free (&missing_debuginfos_obstack, missing_debuginfos);
++      return;
++    }
++  *slot = missing_debuginfos;
++
++  if (print_filename)
++    fprintf_unfiltered (gdb_stdlog, _("Missing separate debuginfo for %s\n"),
++			binary);
++  else
++    fprintf_unfiltered (gdb_stdlog, _("(no separate debuginfo file found)\n"));
++
++  fprintf_unfiltered (gdb_stdlog, _("Try: %s %s\n"),
++		      "yum --enablerepo='*-debuginfo' install", debug);
++
++  if (exec_bfd != NULL)
++    exec_filename = bfd_get_filename (exec_bfd);
++  if (exec_filename != NULL)
++    {
++      static char *last_exec_filename;
++
++      if (last_exec_filename == NULL
++	  || strcmp (exec_filename, last_exec_filename) != 0)
++	{
++	  xfree (last_exec_filename);
++	  last_exec_filename = xstrdup (exec_filename);
++
++	  rpm_print_debuginfo (exec_filename);
++	}
++    }
++}
++
+ static char *
+ get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
+ {
+@@ -1329,23 +1917,27 @@ find_separate_debug_file (struct objfile
    unsigned long crc32;
    int i;
    struct build_id *build_id;
@@ -704,7 +902,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
      }
  
    basename = get_debug_link_info (objfile, &crc32);
-@@ -1329,7 +1735,10 @@ find_separate_debug_file (struct objfile
+@@ -1353,7 +1945,10 @@ find_separate_debug_file (struct objfile
    if (basename == NULL)
      /* There's no separate debug info, hence there's no way we could
         load it => no warning.  */
@@ -716,7 +914,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
    dir = xstrdup (objfile->name);
  
-@@ -1358,6 +1767,7 @@ find_separate_debug_file (struct objfile
+@@ -1382,6 +1977,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -724,7 +922,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1371,6 +1781,7 @@ find_separate_debug_file (struct objfile
+@@ -1395,6 +1991,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -732,7 +930,7 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1384,11 +1795,20 @@ find_separate_debug_file (struct objfile
+@@ -1408,11 +2005,20 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -744,16 +942,16 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
  
 +  if (build_id_filename != NULL)
 +    {
-+      fprintf_unfiltered (gdb_stdlog,
-+		     _("\nwarning: Missing the separate debug info file: %s\n"),
-+			  build_id_filename);
++      /* The filename is already printed for shared libraries.  */
++      build_id_print_missing (objfile->name, build_id_filename,
++			      !(objfile->flags & OBJF_SHARED));
 +      xfree (build_id_filename);
 +    }
 +
    xfree (basename);
    xfree (dir);
    return NULL;
-@@ -4024,4 +4443,12 @@ the global debug-file directory prepende
+@@ -4049,4 +4654,14 @@ the global debug-file directory prepende
  				     NULL,
  				     show_debug_file_directory,
  				     &setlist, &showlist);
@@ -765,11 +963,13 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
 +			    NULL,
 +			    show_build_id_debug,
 +			    &setdebuglist, &showdebuglist);
++
++  observer_attach_inferior_created (missing_debuginfos_change_inferior_created);
  }
-diff -u -rup gdb-6.6-orig/gdb/symfile.h gdb-6.6/gdb/symfile.h
---- gdb-6.6-orig/gdb/symfile.h	2005-12-17 23:34:03.000000000 +0100
-+++ gdb-6.6/gdb/symfile.h	2007-08-28 15:31:56.000000000 +0200
-@@ -322,6 +322,12 @@ extern bfd_byte *symfile_relocate_debug_
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.h gdb-6.6/gdb/symfile.h
+--- gdb-6.6-unpatched/gdb/symfile.h	2008-01-22 02:21:45.000000000 +0100
++++ gdb-6.6/gdb/symfile.h	2008-01-22 23:26:35.000000000 +0100
+@@ -322,6 +322,14 @@ extern bfd_byte *symfile_relocate_debug_
  extern void dwarf_build_psymtabs (struct objfile *, int, file_ptr,
  				  unsigned int, file_ptr, unsigned int);
  
@@ -778,6 +978,8 @@ diff -u -rup gdb-6.6-orig/gdb/symfile.h gdb-6.6/gdb/symfile.h
 +extern struct build_id *build_id_addr_get (CORE_ADDR addr);
 +extern char *build_id_to_filename (struct build_id *build_id,
 +				   char **link_return, int add_debug_suffix);
++extern void build_id_print_missing (const char *binary, const char *debug,
++				    int print_filename);
 +
  /* From dwarf2read.c */
  
