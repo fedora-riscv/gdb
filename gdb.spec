@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -661,6 +661,9 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Feb  7 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-12
+- build-id debug messages print now the library names unconditionally.
+
 * Thu Jan 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-11
 - Improve the text UI messages for the build-id debug files locating.
   - Require now the rpm libraries.
