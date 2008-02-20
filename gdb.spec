@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -28,6 +28,10 @@ URL: http://gnu.org/software/gdb/
 %ifarch ppc64
 Obsoletes: gdb64 < 5.3.91
 %endif
+
+# The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
+Obsoletes: pstack < 1.2-7.2.2.1
+Provides: pstack = 1.2-7.2.2.1
 
 # GDB patches have the format gdb-<version>-bz<red-hat-bz-#>-<desc>.patch;
 # should include the ChangeLog.RedHat change-log entry; and should be
@@ -50,6 +54,8 @@ Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 # Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
 Source2: gdb-orphanripper.c
 
+# Man page for gstack(1).
+Source3: gdb-gstack.man
 
 # ------------------------------------------
 
@@ -349,6 +355,12 @@ Patch298: gdb-6.6-threads-static-test.patch
 # Fix false `(no debugging symbols found)' on `-readnever' runs.
 Patch301: gdb-6.6-buildid-readnever-silent.patch
 
+# ia64 build fixes from Doug Chapman (BZ 428882).
+Patch303: gdb-6.7-bz428882-ia64-fix.patch
+
+# Fix #include <asm/ptrace.h> on kernel-headers-2.6.25-0.40.rc1.git2.fc9.x86_64.
+Patch304: gdb-6.7-kernel-headers-compat.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -386,6 +398,17 @@ Requires(preun): /sbin/install-info
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
+
+%package gdbserver
+Summary: A standalone server for GDB (the GNU source-level debugger)
+Group: Development/Debuggers
+
+%description gdbserver
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+Java, and other languages, by executing them in a controlled fashion
+and printing their data.
+
+This package provides a program that allows you to run GDB on a different machine than the one which is running the program being debugged.
 
 %prep
 
@@ -504,6 +527,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch296 -p1
 %patch298 -p1
 %patch301 -p1
+%patch303 -p1
+%patch304 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -554,6 +579,7 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 	--infodir=%{_infodir}				\
 	$enable_build_warnings				\
 	--with-separate-debug-dir=/usr/lib/debug	\
+	--disable-sim					\
 	--disable-rpath					\
 	--with-system-readline				\
 %ifarch ia64
@@ -628,6 +654,12 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
+# pstack obsoletion
+
+cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
+ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
+ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -651,8 +683,15 @@ fi
 %files
 %defattr(-,root,root)
 %doc COPYING COPYING.LIB README NEWS
-/usr/bin/*
-%{_mandir}/*/*
+%{_bindir}/gcore
+%{_bindir}/gdb
+%{_bindir}/gdbtui
+%{_bindir}/gstack
+%{_bindir}/pstack
+%{_mandir}/*/gdb.1*
+%{_mandir}/*/gdbtui.1*
+%{_mandir}/*/gstack.1*
+%{_mandir}/*/pstack.1*
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
@@ -660,7 +699,18 @@ fi
 
 # don't include the files in include, they are part of binutils
 
+%files gdbserver
+%{_bindir}/gdbserver
+%{_mandir}/*/gdbserver.1*
+
 %changelog
+* Wed Feb 20 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-13
+- ia64 build fixes from Doug Chapman (BZ 428882).
+- gdbserver separated into an extra package (BZ 405791).
+- pstack obsoleted by included gstack (BZ 197020).
+- Fix #include <asm/ptrace.h> on kernel-headers-2.6.25-0.40.rc1.git2.fc9.x86_64.
+- Drop the PowerPC simulator as no longer being compatible with Fedora binaries.
+
 * Thu Feb  7 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-12
 - build-id debug messages print now the library names unconditionally.
 
