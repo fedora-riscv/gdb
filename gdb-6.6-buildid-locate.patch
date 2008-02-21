@@ -9,9 +9,15 @@
 2008-01-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
 	Print the shared libraries names unconditionally.
 
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
---- gdb-6.6-unpatched/gdb/Makefile.in	2008-01-22 02:21:45.000000000 +0100
-+++ gdb-6.6/gdb/Makefile.in	2008-01-22 23:26:35.000000000 +0100
+2008-02-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	Rename `debug build-id' to `build-id-verbose'.
+	Provide its level 0 to disable the build-id messages.
+	New description of `build-id-verbose' in the documentation.
+	Resolve the RH Bug 432164.
+
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/Makefile.in gdb-6.6-patched/gdb/Makefile.in
+--- gdb-6.6-unpatched/gdb/Makefile.in	2008-02-21 04:44:49.000000000 +0100
++++ gdb-6.6-patched/gdb/Makefile.in	2008-02-21 04:10:55.000000000 +0100
 @@ -383,7 +383,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcode
  CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) \
  	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
@@ -41,9 +47,9 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/Makefile.in gdb
  symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
  	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
  	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/corelow.c gdb-6.6/gdb/corelow.c
---- gdb-6.6-unpatched/gdb/corelow.c	2008-01-22 02:21:45.000000000 +0100
-+++ gdb-6.6/gdb/corelow.c	2008-01-22 23:39:09.000000000 +0100
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/corelow.c gdb-6.6-patched/gdb/corelow.c
+--- gdb-6.6-unpatched/gdb/corelow.c	2008-02-21 04:44:49.000000000 +0100
++++ gdb-6.6-patched/gdb/corelow.c	2008-02-21 04:10:55.000000000 +0100
 @@ -46,6 +46,10 @@
  #include "gdb_assert.h"
  #include "exceptions.h"
@@ -141,22 +147,52 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/corelow.c gdb-6
 +			   NULL, NULL, NULL,
 +			   &setlist, &showlist);
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/solib-svr4.c gdb-6.6/gdb/solib-svr4.c
---- gdb-6.6-unpatched/gdb/solib-svr4.c	2008-01-22 02:21:45.000000000 +0100
-+++ gdb-6.6/gdb/solib-svr4.c	2008-01-22 23:39:17.000000000 +0100
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/doc/gdb.texinfo gdb-6.6-patched/gdb/doc/gdb.texinfo
+--- gdb-6.6-unpatched/gdb/doc/gdb.texinfo	2008-02-21 04:44:15.000000000 +0100
++++ gdb-6.6-patched/gdb/doc/gdb.texinfo	2008-02-21 04:43:15.000000000 +0100
+@@ -11940,6 +11940,27 @@ information files.
+ 
+ @end table
+ 
++You can also adjust the current verbosity of the @dfn{build id} locating.
++
++@table @code
++
++@kindex set build-id-verbose 
++@item set build-id-verbose 0
++No additional messages are printed.
++
++@item set build-id-verbose 1
++Missing separate debug filenames are printed.
++
++@item set build-id-verbose 2
++Missing separate debug filenames are printed and also all the parsing of the
++binaries to find their @dfn{build id} content is printed.
++
++@kindex show build-id-verbose
++@item show build-id-verbose
++Show the current verbosity value for the @dfn{build id} content locating.
++
++@end table
++
+ @cindex @code{.gnu_debuglink} sections
+ @cindex debug links
+ A debug link is a special section of the executable file named
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/solib-svr4.c gdb-6.6-patched/gdb/solib-svr4.c
+--- gdb-6.6-unpatched/gdb/solib-svr4.c	2008-02-21 04:44:49.000000000 +0100
++++ gdb-6.6-patched/gdb/solib-svr4.c	2008-02-21 04:10:55.000000000 +0100
 @@ -943,10 +943,35 @@ svr4_current_sos (void)
  		}
                else
                  {
 -		  strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
 -		  new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
--		  xfree (buffer);
--		  strcpy (new->so_original_name, new->so_name);
 +		  struct build_id *build_id;
 +
 +		  strncpy (new->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
 +		  new->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
-+		  xfree (buffer);
+ 		  xfree (buffer);
+-		  strcpy (new->so_original_name, new->so_name);
 +		  /* May get overwritten below.  */
 +		  strcpy (new->so_name, new->so_original_name);
 +
@@ -184,9 +220,9 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/solib-svr4.c gd
  		  if (debug_solib)
  		    {
  		      fprintf_unfiltered (gdb_stdlog, 
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6.6/gdb/symfile.c
---- gdb-6.6-unpatched/gdb/symfile.c	2008-01-22 02:28:03.000000000 +0100
-+++ gdb-6.6/gdb/symfile.c	2008-01-22 23:52:12.000000000 +0100
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6.6-patched/gdb/symfile.c
+--- gdb-6.6-unpatched/gdb/symfile.c	2008-02-21 04:46:25.000000000 +0100
++++ gdb-6.6-patched/gdb/symfile.c	2008-02-21 04:47:36.000000000 +0100
 @@ -54,6 +54,9 @@
  #include "exec.h"
  #include "parser-defs.h"
@@ -205,19 +241,22 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  
  
  int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
-@@ -1144,16 +1145,62 @@ symbol_file_clear (int from_tty)
+@@ -1141,16 +1145,65 @@ symbol_file_clear (int from_tty)
        printf_unfiltered (_("No symbol file now.\n"));
  }
  
 +/* Locate NT_GNU_BUILD_ID and return its matching debug filename.
 +   FIXME: NOTE decoding should be unified with the BFD core notes decoding.  */
 +
-+static int build_id_debug;
++#define BUILD_ID_VERBOSE_NONE 0
++#define BUILD_ID_VERBOSE_FILENAMES 1
++#define BUILD_ID_VERBOSE_BINARY_PARSE 2
++static int build_id_verbose = BUILD_ID_VERBOSE_FILENAMES;
 +static void
-+show_build_id_debug (struct ui_file *file, int from_tty,
-+		     struct cmd_list_element *c, const char *value)
++show_build_id_verbose (struct ui_file *file, int from_tty,
++		       struct cmd_list_element *c, const char *value)
 +{
-+  fprintf_filtered (file, _("Debugging of the build-id locator is %s.\n"),
++  fprintf_filtered (file, _("Verbosity level of the build-id locator is %s.\n"),
 +		    value);
 +}
 +
@@ -270,7 +309,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  {
    struct build_id *retval;
  
-@@ -1169,6 +1216,348 @@ build_id_bfd_get (bfd *abfd)
+@@ -1166,6 +1219,348 @@ build_id_bfd_get (bfd *abfd)
    return retval;
  }
  
@@ -422,7 +461,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +  err = target_read_memory (ehdr_vma, (bfd_byte *) &x_ehdr64, sizeof x_ehdr64);
 +  if (err)
 +    {
-+      if (build_id_debug)
++      if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +        warning (_("build-id: Error reading ELF header at address 0x%lx"),
 +		 (unsigned long) ehdr_vma);
 +      return NULL;
@@ -439,7 +478,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +           || (bfd_get_arch_size (templ) == 32
 +	       && x_ehdr64.e_ident[EI_CLASS] == ELFCLASS32)))
 +    {
-+      if (build_id_debug)
++      if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +        warning (_("build-id: Unrecognized ELF header at address 0x%lx"),
 +		 (unsigned long) ehdr_vma);
 +      return NULL;
@@ -451,7 +490,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +    case ELFDATA2MSB:		/* Big-endian */
 +      if (! bfd_header_big_endian (templ))
 +	{
-+	  if (build_id_debug)
++	  if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +	    warning (_("build-id: Unrecognized "
 +		       "big-endian ELF header at address 0x%lx"),
 +		     (unsigned long) ehdr_vma);
@@ -461,7 +500,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +    case ELFDATA2LSB:		/* Little-endian */
 +      if (! bfd_header_little_endian (templ))
 +	{
-+	  if (build_id_debug)
++	  if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +	    warning (_("build-id: Unrecognized "
 +		       "little-endian ELF header at address 0x%lx"),
 +		     (unsigned long) ehdr_vma);
@@ -470,7 +509,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +      break;
 +    case ELFDATANONE:		/* No data encoding specified */
 +    default:			/* Unknown data encoding specified */
-+      if (build_id_debug)
++      if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +	warning (_("build-id: Unrecognized "
 +		   "ELF header endianity at address 0x%lx"),
 +		 (unsigned long) ehdr_vma);
@@ -487,7 +526,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +			     : sizeof (Elf32_External_Phdr))
 +      || i_ehdr.e_phnum == 0)
 +    {
-+      if (build_id_debug)
++      if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +	warning (_("build-id: Invalid ELF program headers from the ELF header "
 +		   "at address 0x%lx"), (unsigned long) ehdr_vma);
 +      return NULL;
@@ -503,7 +542,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +  if (err)
 +    {
 +      free (i_phdrs);
-+      if (build_id_debug)
++      if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +        warning (_("build-id: Error reading "
 +		   "ELF program headers at address 0x%lx"),
 +		 (unsigned long) (ehdr_vma + i_ehdr.e_phoff));
@@ -533,7 +572,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +	}
 +    }
 +
-+  if (build_id_debug)
++  if (build_id_verbose >= BUILD_ID_VERBOSE_BINARY_PARSE)
 +    warning (_("build-id: Found ELF header at address 0x%lx, loadbase 0x%lx"),
 +	     (unsigned long) ehdr_vma, (unsigned long) loadbase);
 +
@@ -619,7 +658,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
  
  static int
-@@ -1183,7 +1572,7 @@ build_id_verify (const char *filename, s
+@@ -1180,7 +1575,7 @@ build_id_verify (const char *filename, s
    if (abfd == NULL)
      return 0;
  
@@ -628,7 +667,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"), filename);
-@@ -1201,8 +1590,9 @@ build_id_verify (const char *filename, s
+@@ -1198,8 +1593,9 @@ build_id_verify (const char *filename, s
  
  static char *debug_file_directory = NULL;
  
@@ -640,7 +679,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  {
    char *link, *s, *retval = NULL;
    gdb_byte *data = build_id->data;
-@@ -1210,7 +1600,9 @@ build_id_to_debug_filename (struct build
+@@ -1207,7 +1603,9 @@ build_id_to_debug_filename (struct build
  
    /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
    link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
@@ -651,7 +690,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
    s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
    if (size > 0)
      {
-@@ -1221,12 +1613,14 @@ build_id_to_debug_filename (struct build
+@@ -1218,12 +1616,14 @@ build_id_to_debug_filename (struct build
      *s++ = '/';
    while (size-- > 0)
      s += sprintf (s, "%02x", (unsigned) *data++);
@@ -668,7 +707,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1234,9 +1628,203 @@ build_id_to_debug_filename (struct build
+@@ -1231,9 +1631,206 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -677,9 +716,9 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +  else
 +    xfree (link);
 +
-+  return retval;
-+}
-+
+   return retval;
+ }
+ 
 +#include <rpm/rpmmessages.h>
 +#include <rpm/rpmlib.h>
 +#include <rpm/rpmts.h>
@@ -765,9 +804,9 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +  
 +  retval = obstack_alloc (&missing_debuginfos_obstack, size);
 +  memset (retval, 0, size);
-   return retval;
- }
- 
++  return retval;
++}
++
 +static hashval_t
 +missing_debuginfos_hash_func (const struct missing_debuginfos *elem)
 +{
@@ -809,6 +848,9 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
 +  size_t debug_len0 = strlen (debug) + 1;
 +  struct missing_debuginfos *missing_debuginfos;
 +  struct missing_debuginfos **slot;
++
++  if (build_id_verbose < BUILD_ID_VERBOSE_FILENAMES)
++    return;
 +
 +  if (missing_debuginfos_hash == NULL)
 +    {
@@ -872,7 +914,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  static char *
  get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
  {
-@@ -1329,23 +1917,27 @@ find_separate_debug_file (struct objfile
+@@ -1326,23 +1923,27 @@ find_separate_debug_file (struct objfile
    unsigned long crc32;
    int i;
    struct build_id *build_id;
@@ -905,7 +947,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
      }
  
    basename = get_debug_link_info (objfile, &crc32);
-@@ -1353,7 +1945,10 @@ find_separate_debug_file (struct objfile
+@@ -1350,7 +1951,10 @@ find_separate_debug_file (struct objfile
    if (basename == NULL)
      /* There's no separate debug info, hence there's no way we could
         load it => no warning.  */
@@ -917,7 +959,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
  
    dir = xstrdup (objfile->name);
  
-@@ -1382,6 +1977,7 @@ find_separate_debug_file (struct objfile
+@@ -1379,6 +1983,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -925,7 +967,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1395,6 +1991,7 @@ find_separate_debug_file (struct objfile
+@@ -1392,6 +1997,7 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -933,7 +975,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
        xfree (basename);
        xfree (dir);
        return xstrdup (debugfile);
-@@ -1408,11 +2005,20 @@ find_separate_debug_file (struct objfile
+@@ -1405,11 +2011,20 @@ find_separate_debug_file (struct objfile
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
      {
@@ -954,24 +996,26 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.c gdb-6
    xfree (basename);
    xfree (dir);
    return NULL;
-@@ -4049,4 +4654,14 @@ the global debug-file directory prepende
+@@ -4045,4 +4660,16 @@ the global debug-file directory prepende
  				     NULL,
  				     show_debug_file_directory,
  				     &setlist, &showlist);
 +
-+  add_setshow_zinteger_cmd ("build-id", no_class, &build_id_debug, _("\
-+Set debugging of the build-id locator."), _("\
-+Show debugging of the build-id locator."), _("\
-+Enables printf debugging output."),
++  add_setshow_zinteger_cmd ("build-id-verbose", no_class, &build_id_verbose,
++			    _("\
++Set debugging level of the build-id locator."), _("\
++Show debugging level of the build-id locator."), _("\
++Level 1 (default) enables printing the missing debug filenames,\n\
++level 2 also prints the parsing of binaries to find the identificators."),
 +			    NULL,
-+			    show_build_id_debug,
-+			    &setdebuglist, &showdebuglist);
++			    show_build_id_verbose,
++			    &setlist, &showlist);
 +
 +  observer_attach_inferior_created (missing_debuginfos_change_inferior_created);
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.h gdb-6.6/gdb/symfile.h
---- gdb-6.6-unpatched/gdb/symfile.h	2008-01-22 02:21:45.000000000 +0100
-+++ gdb-6.6/gdb/symfile.h	2008-01-22 23:26:35.000000000 +0100
+diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-unpatched/gdb/symfile.h gdb-6.6-patched/gdb/symfile.h
+--- gdb-6.6-unpatched/gdb/symfile.h	2008-02-21 04:44:49.000000000 +0100
++++ gdb-6.6-patched/gdb/symfile.h	2008-02-21 04:10:55.000000000 +0100
 @@ -322,6 +322,14 @@ extern bfd_byte *symfile_relocate_debug_
  extern void dwarf_build_psymtabs (struct objfile *, int, file_ptr,
  				  unsigned int, file_ptr, unsigned int);

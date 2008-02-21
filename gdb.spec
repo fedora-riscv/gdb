@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 42%{?dist}
+Release: 43%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -721,6 +721,11 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Feb 21 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-43
+- Rename `set debug build-id' as `set build-id-verbose', former level 1 moved
+  to level 2, default value is now 1, use `set build-id-verbose 0' now to
+  disable the missing separate debug filenames messages (BZ 432164).
+
 * Thu Jan 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-42
 - build-id debug messages print now the library names unconditionally.
 
