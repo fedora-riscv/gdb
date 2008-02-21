@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -704,6 +704,11 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Thu Feb 21 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-14
+- Rename `set debug build-id' as `set build-id-verbose', former level 1 moved
+  to level 2, default value is now 1, use `set build-id-verbose 0' now to
+  disable the missing separate debug filenames messages (BZ 432164).
+
 * Wed Feb 20 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-13
 - ia64 build fixes from Doug Chapman (BZ 428882).
 - gdbserver separated into an extra package (BZ 405791).
