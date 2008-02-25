@@ -1,9 +1,9 @@
-# Define this if you want to skip the strip step and preserve debug info.
-# Useful for testing.
-#define __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
+# rpmbuild parameters:
+# --with testsuite: Run the testsuite (biarch if possible).  Default is without.
+# --with debug: Build without optimizations and without splitting the debuginfo.
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages
-Name: gdb
+Name: gdb%{?_with_debug:-debug}
 
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -22,6 +22,13 @@ URL: http://gnu.org/software/gdb/
 # For our convenience
 %define gdb_src gdb-%{version}
 %define gdb_build build-%{_target_platform}
+
+%if 0%{?_with_debug:1}
+# Define this if you want to skip the strip step and preserve debug info.
+# Useful for testing.
+%define __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
+%define debug_package %{nil}
+%endif
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -368,9 +375,8 @@ BuildRequires: readline-devel
 Requires: rpm-libs
 BuildRequires: rpm-devel
 
-# BuildRequires are provided here only for the complete testsuite run.
-# Omit them on local user builds. %{_topdir} checks for mock (and so even Koji).
-%if "%{_topdir}" == "/builddir/build"
+# BuildRequires are set here only for the complete testsuite run.
+%if 0%{?_with_testsuite:1}
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
 # Copied from gcc-4.1.2-32
@@ -565,6 +571,9 @@ test -z "$g77" || ln -s "$g77" ./g77
 # line needs to be cleaned up.
 
 export CFLAGS="$RPM_OPT_FLAGS"
+%if 0%{?_with_debug:1}
+CFLAGS="$CFLAGS -O0 -ggdb2"
+%endif
 
 enable_build_warnings="--enable-gdb-build-warnings=,-Wno-unused"
 %ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
@@ -587,6 +596,9 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 %else
 	--without-libunwind				\
 %endif
+%if 0%{?_with_debug:1}
+	--enable-static --disable-shared --enable-debug	\
+%endif
 	%{_target_platform}
 
 make %{?_smp_mflags}
@@ -599,10 +611,11 @@ cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
 # Initially we're in the %{gdb_src} directory.
 cd %{gdb_build}
 
-# For now do testing only on these platforms. 
-%ifarch %{ix86} x86_64 s390x s390 ppc ia64 ppc64
+%if 0%{!?_with_testsuite:1}
+echo ====================TESTSUITE DISABLED=========================
+%else
 echo ====================TESTING=========================
-cd gdb/testsuite
+cd gdb
 gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 # Need to use a single --ignore option, second use overrides first.
 # "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
@@ -614,13 +627,56 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   # ULIMIT required for `gdb.base/auxv.exp'.
   ulimit -H -c
   ulimit -c unlimited || :
-  ./orphanripper make -k check RUNTESTFLAGS='--ignore "bigcore.exp chng-syms.exp checkpoint.exp threadcrash.exp readline-overflow.exp"' || :
+
+  # Setup $CHECK as `check//unix/' or `check//unix/-m64' for explicit bitsize.
+  # Simple `check' is not used for $CHECK as different escaping rules apply
+  # for the --ignore list delimiting spaces.
+  echo 'int main (void) { return 0; }' >biarch.c
+  gcc $RPM_OPT_FLAGS -o biarch biarch.c
+  mv -f biarch biarch-native
+  # Do not try -m64 for biarch as GDB cannot handle inferior larger than itself.
+  for BI in -m32 -m31 ""
+  do
+    if gcc 2>/dev/null $RPM_OPT_FLAGS $BI -o biarch biarch.c
+    then
+      break
+    fi
+  done
+  CHECK="check`echo " $RPM_OPT_FLAGS "|sed -n 's#^.* \(-m[36][241]\) .*$#//unix/\1#p'`"
+  if ! cmp -s biarch-native biarch
+  then
+    CHECK="$CHECK check//unix/$BI"
+  fi
+
+  # Disable some problematic testcases.
+  # RUNTESTFLAGS='--ignore ...' is not used below as it gets separated by the
+  # `check//...' target spawn and too much escaping there would be dense.
+  for test in				\
+    gdb.base/readline-overflow.exp	\
+    gdb.base/chng-syms.exp		\
+    gdb.base/checkpoint.exp		\
+    gdb.base/bigcore.exp		\
+    gdb.threads/threadcrash.exp		\
+  ; do
+    mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
+  done
+
+  for CURRENT in $CHECK
+  do
+    ./orphanripper make -k $CURRENT || :
+  done
 )
-for t in sum log; do
-  ln gdb.$t gdb-%{_target_platform}.$t || :
+for t in sum log
+do
+  for file in testsuite*/gdb.$t
+  do
+    suffix="${file#testsuite.unix.}"
+    suffix="${suffix%/gdb.$t}"
+    ln $file gdb-%{_target_platform}$suffix.$t || :
+  done
 done
 # `tar | bzip2 | uuencode' may have some piping problems in Brew.
-tar cjf gdb-%{_target_platform}.tar.bz2 gdb-%{_target_platform}.{sum,log}
+tar cjf gdb-%{_target_platform}.tar.bz2 gdb-%{_target_platform}*.{sum,log}
 uuencode gdb-%{_target_platform}.tar.bz2 gdb-%{_target_platform}.tar.bz2
 cd ../..
 echo ====================TESTING END=====================
@@ -704,6 +760,11 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Mon Feb 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-15
+- New --with parameters `testsuite' and `debug'.
+  - Testsuite is now run during the build only on explicit `--with testsuite'.
+- Testsuite now possibly produces two outputs for the two GDB target arches.
+
 * Thu Feb 21 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-14
 - Rename `set debug build-id' as `set build-id-verbose', former level 1 moved
   to level 2, default value is now 1, use `set build-id-verbose 0' now to
