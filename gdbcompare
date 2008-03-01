@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: gdbcompare,v 1.3 2007/01/09 11:34:40 jkratoch Exp $
+# $Id: gdbcompare,v 1.4 2007/04/22 08:52:09 jkratoch Exp $
 
 
 use strict;
@@ -14,7 +14,8 @@ local *DIR;
 opendir DIR,"tests" or die "opendir: $!";
 my %arch;
 for my $name (sort readdir(DIR)) {
-	next if $name!~/^gdb-.*[-.]([^-.]+)[.]$suffix$/o;
+	# next if $name!~/^gdb-.*[-.]([^-.]+)[.]$suffix$/o;
+	next if $name!~/^\d+-(.*)[.]$suffix$/o;
 	push @{$arch{$1}},$name;
 }
 closedir DIR or die "closedir: $!";
@@ -29,12 +30,13 @@ system("rm -f tests/gdbcompare-*.diff") and die;
 
 for my $arch (sort keys(%arch)) {
 	next if 2!=@{$arch{$arch}};
-	sub trans { return {"."=>0,"-"=>1}->{($_[0]=~/([-.])[^-.]+[.]\w+$/)[0]}.$_[0]; };
-	my @sorted=sort { my $a1=trans $a; my $b1=trans $b; ($b1 cmp $a1) * ($reverse ? -1 : 1); } @{$arch{$arch}};
-	do { system $_ and die $_; } for "diff -u tests/'".$sorted[1]."' tests/'".$sorted[0]."' >tests/gdbcompare-'$arch'.diff;true";
+	# sub trans { return {"."=>0,"-"=>1}->{($_[0]=~/([-.])[^-.]+[.]\w+$/)[0]}.$_[0]; };
+	sub trans { return $_[0]; };
+	my @sorted=sort { my $a1=trans $a; my $b1=trans $b; ($b1 cmp $a1) * ($reverse ? -1 : +1); } @{$arch{$arch}};
+	do { system $_ and die $_; } for "diff -u tests/'".$sorted[1]."' tests/'".$sorted[0]."' >tests/gdbcompare-'$arch'.'$suffix'.diff;true";
 }
 
-system("vim tests/gdbcompare-*.diff");
+system("vim tests/gdbcompare-*.'$suffix'.diff");
 
 __END__;
 
