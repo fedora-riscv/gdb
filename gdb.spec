@@ -11,7 +11,7 @@ Name: gdb%{?_with_debug:-debug}
 Version: 6.7.1
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -661,6 +661,9 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
 
+  # Run all the scheduled testsuite runs also in the PIE mode.
+  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
+
   for CURRENT in $CHECK
   do
     ./orphanripper make -k $CURRENT || :
@@ -760,6 +763,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Sat Mar  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-16
+- Run the full testsuite also in the `-fPIE -pie' mode.
+
 * Mon Feb 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-15
 - New --with parameters `testsuite' and `debug'.
   - Testsuite is now run during the build only on explicit `--with testsuite'.
