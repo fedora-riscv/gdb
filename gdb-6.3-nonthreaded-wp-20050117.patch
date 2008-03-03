@@ -13,10 +13,14 @@
 
 	Port to GDB-6.7.
 
-Index: gdb-6.7/gdb/doc/observer.texi
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+Index: gdb-6.8cvs20080219/gdb/doc/observer.texi
 ===================================================================
---- gdb-6.7.orig/gdb/doc/observer.texi	2007-10-13 05:09:50.000000000 +0200
-+++ gdb-6.7/gdb/doc/observer.texi	2007-10-14 23:24:52.000000000 +0200
+--- gdb-6.8cvs20080219.orig/gdb/doc/observer.texi	2007-10-09 13:06:07.000000000 +0200
++++ gdb-6.8cvs20080219/gdb/doc/observer.texi	2008-02-21 17:45:46.000000000 +0100
 @@ -119,6 +119,10 @@ when @value{GDBN} calls this observer, t
  haven't been loaded yet.
  @end deftypefun
@@ -28,11 +32,19 @@ Index: gdb-6.7/gdb/doc/observer.texi
  @deftypefun void solib_unloaded (struct so_list *@var{solib})
  The shared library specified by @var{solib} has been unloaded.
  @end deftypefun
-Index: gdb-6.7/gdb/linux-nat.c
+Index: gdb-6.8cvs20080219/gdb/linux-nat.c
 ===================================================================
---- gdb-6.7.orig/gdb/linux-nat.c	2007-10-13 05:09:50.000000000 +0200
-+++ gdb-6.7/gdb/linux-nat.c	2007-10-14 23:24:52.000000000 +0200
-@@ -742,11 +742,26 @@ iterate_over_lwps (int (*callback) (stru
+--- gdb-6.8cvs20080219.orig/gdb/linux-nat.c	2008-02-21 17:45:45.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/linux-nat.c	2008-02-22 08:12:57.000000000 +0100
+@@ -37,6 +37,7 @@
+ #include "regset.h"
+ #include "inf-ptrace.h"
+ #include "auxv.h"
++#include "observer.h"
+ #include <sys/param.h>		/* for MAXPATHLEN */
+ #include <sys/procfs.h>		/* for elf_gregset etc. */
+ #include "elf-bfd.h"		/* for elfcore_write_* */
+@@ -751,11 +752,26 @@ iterate_over_lwps (int (*callback) (stru
  {
    struct lwp_info *lp, *lpnext;
  
@@ -62,8 +74,8 @@ Index: gdb-6.7/gdb/linux-nat.c
      }
  
    return NULL;
-@@ -3272,6 +3284,18 @@ linux_nat_add_target (struct target_ops 
-   thread_db_init (t);
+@@ -3319,6 +3335,18 @@ linux_nat_get_siginfo (ptid_t ptid)
+   return &lp->siginfo;
  }
  
 +/* Observer function for a mourn inferior event.  This is needed
@@ -81,7 +93,7 @@ Index: gdb-6.7/gdb/linux-nat.c
  void
  _initialize_linux_nat (void)
  {
-@@ -3286,6 +3310,8 @@ Specify any of the following keywords fo
+@@ -3333,6 +3361,8 @@ Specify any of the following keywords fo
    status   -- list a different bunch of random process info.\n\
    all      -- list all available /proc info."));
  
@@ -90,10 +102,10 @@ Index: gdb-6.7/gdb/linux-nat.c
    /* Save the original signal mask.  */
    sigprocmask (SIG_SETMASK, NULL, &normal_mask);
  
-Index: gdb-6.7/gdb/target.c
+Index: gdb-6.8cvs20080219/gdb/target.c
 ===================================================================
---- gdb-6.7.orig/gdb/target.c	2007-08-23 20:08:45.000000000 +0200
-+++ gdb-6.7/gdb/target.c	2007-10-14 23:25:13.000000000 +0200
+--- gdb-6.8cvs20080219.orig/gdb/target.c	2008-02-14 23:04:00.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/target.c	2008-02-22 08:10:37.000000000 +0100
 @@ -39,6 +39,7 @@
  #include "gdbcore.h"
  #include "exceptions.h"
@@ -116,11 +128,11 @@ Index: gdb-6.7/gdb/target.c
  static int
  nomemory (CORE_ADDR memaddr, char *myaddr, int len, int write,
  	  struct target_ops *t)
-Index: gdb-6.7/gdb/target.h
+Index: gdb-6.8cvs20080219/gdb/target.h
 ===================================================================
---- gdb-6.7.orig/gdb/target.h	2007-08-23 20:08:46.000000000 +0200
-+++ gdb-6.7/gdb/target.h	2007-10-14 23:24:52.000000000 +0200
-@@ -864,8 +864,7 @@ int target_follow_fork (int follow_child
+--- gdb-6.8cvs20080219.orig/gdb/target.h	2008-01-02 00:04:05.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/target.h	2008-02-22 08:10:37.000000000 +0100
+@@ -861,8 +861,7 @@ int target_follow_fork (int follow_child
  
  /* The inferior process has died.  Do what is right.  */
  
@@ -130,9 +142,10 @@ Index: gdb-6.7/gdb/target.h
  
  /* Does target have enough data to do a run or attach command? */
  
-diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.base/follow-child.c gdb-6.6/gdb/testsuite/gdb.base/follow-child.c
---- gdb-6.6-orig/gdb/testsuite/gdb.base/follow-child.c	2007-10-13 19:24:58.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.base/follow-child.c	2007-10-13 19:11:08.000000000 +0200
+Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.c	2008-02-22 08:14:04.000000000 +0100
 @@ -0,0 +1,29 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -147,7 +160,7 @@ diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.bas
 +   but WITHOUT ANY WARRANTY; without even the implied warranty of
 +   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 +   GNU General Public License for more details.
-+ 
++
 +   You should have received a copy of the GNU General Public License
 +   along with this program; if not, write to the Free Software
 +   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
@@ -163,9 +176,10 @@ diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.bas
 +  sleep (60);
 +  return 0;
 +}
-diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.base/follow-child.exp gdb-6.6/gdb/testsuite/gdb.base/follow-child.exp
---- gdb-6.6-orig/gdb/testsuite/gdb.base/follow-child.exp	2007-10-13 19:24:58.000000000 +0200
-+++ gdb-6.6/gdb/testsuite/gdb.base/follow-child.exp	2007-10-13 19:24:21.000000000 +0200
+Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.exp	2008-02-22 08:14:17.000000000 +0100
 @@ -0,0 +1,55 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -181,7 +195,7 @@ diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.bas
 +# 
 +# You should have received a copy of the GNU General Public License
 +# along with this program; if not, write to the Free Software
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 +
 +if $tracelevel then {
 +    strace $tracelevel
@@ -222,3 +236,16 @@ diff -u -u -X /home/jkratoch/.diffi.list -rup gdb-6.6-orig/gdb/testsuite/gdb.bas
 +	fail $test
 +    }
 +}
+Index: gdb-6.8cvs20080219/gdb/Makefile.in
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/Makefile.in	2008-02-22 08:10:38.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/Makefile.in	2008-02-22 08:13:31.000000000 +0100
+@@ -2377,7 +2377,7 @@ linux-nat.o: linux-nat.c $(defs_h) $(inf
+ 	$(gdb_wait_h) $(gdb_assert_h) $(linux_nat_h) $(gdbthread_h) \
+ 	$(gdbcmd_h) $(regcache_h) $(regset_h) $(inf_ptrace_h) $(auxv_h) \
+ 	$(elf_bfd_h) $(gregset_h) $(gdbcore_h) $(gdbthread_h) $(gdb_stat_h) \
+-	$(linux_fork_h)
++	$(linux_fork_h) $(observer_h)
+ linux-thread-db.o: linux-thread-db.c $(defs_h) $(gdb_assert_h) \
+ 	$(gdb_proc_service_h) $(gdb_thread_db_h) $(bfd_h) $(exceptions_h) \
+ 	$(gdbthread_h) $(inferior_h) $(symfile_h) $(objfiles_h) $(target_h) \

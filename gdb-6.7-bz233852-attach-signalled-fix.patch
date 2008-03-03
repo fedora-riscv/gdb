@@ -18,10 +18,15 @@
 	* gdb.texinfo (Attach): Document the ATTACH and DETACH commands for
 	stopped processes.  Document the messages on the seen pending signals.
 
-diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/NEWS
---- gdb-6.5-unpatched/gdb/NEWS	2008-01-09 18:26:07.000000000 +0100
-+++ gdb-6.5/gdb/NEWS	2008-01-09 15:26:30.000000000 +0100
-@@ -9,6 +9,9 @@ Renesas M32C/M16C		m32c-elf
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+Index: gdb-6.8cvs20080219/gdb/NEWS
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/NEWS	2008-02-24 19:35:37.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/NEWS	2008-02-24 19:36:26.000000000 +0100
+@@ -412,6 +412,9 @@ Renesas M32C/M16C		m32c-elf
  
  Morpho Technologies ms1		ms1-elf
  
@@ -31,30 +36,27 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
  * New commands
  
  init-if-undefined		Initialize a convenience variable, but
---- gdb-6.7.1/gdb/linux-nat.c.orig	2008-01-09 23:54:42.000000000 +0100
-+++ gdb-6.7.1/gdb/linux-nat.c	2008-01-10 00:08:07.000000000 +0100
-@@ -85,11 +85,20 @@
- #define __WALL          0x40000000 /* Wait for any child.  */
+Index: gdb-6.8cvs20080219/gdb/linux-nat.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/linux-nat.c	2008-02-24 19:36:26.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/linux-nat.c	2008-02-24 19:45:01.000000000 +0100
+@@ -89,6 +89,15 @@
+ #define PTRACE_GETSIGINFO    0x4202
  #endif
  
 +#define STRINGIFY_ARG(x) #x
 +#define STRINGIFY(x) STRINGIFY_ARG (x)
 +
-+static int linux_ptrace_post_attach (struct lwp_info *lp);
++static int linux_ptrace_post_attach (ptid_t ptid, int *cloned_return);
 +static int kill_lwp (int lwpid, int signo);
++
++/* PID of the inferior stopped by SIGSTOP before attaching (or zero).  */
++static pid_t pid_was_stopped;
 +
  /* The single-threaded native GNU/Linux target_ops.  We save a pointer for
     the use of the multi-threaded target.  */
  static struct target_ops *linux_ops;
- static struct target_ops linux_ops_saved;
- 
-+/* PID of the inferior stopped by SIGSTOP before attaching (or zero).  */
-+static pid_t pid_was_stopped;
-+
- /* The saved to_xfer_partial method, inherited from inf-ptrace.c.
-    Called by our to_xfer_partial.  */
- static LONGEST (*super_xfer_partial) (struct target_ops *, 
-@@ -540,6 +549,11 @@ linux_child_follow_fork (struct target_o
+@@ -539,6 +548,11 @@ linux_child_follow_fork (struct target_o
  	}
        else
  	{
@@ -66,52 +68,75 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
  	  target_detach (NULL, 0);
  	}
  
-@@ -940,7 +954,6 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
+@@ -942,9 +956,8 @@ lin_lwp_attach_lwp (ptid_t ptid)
       to happen.  */
    if (GET_LWP (ptid) != GET_PID (ptid) && lp == NULL)
      {
 -      pid_t pid;
        int status;
+-      int cloned = 0;
++      int cloned;
  
        if (ptrace (PTRACE_ATTACH, GET_LWP (ptid), 0, 0) < 0)
-@@ -958,10 +971,156 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
-       if (lp == NULL)
- 	lp = add_lwp (ptid);
+ 	{
+@@ -958,37 +971,20 @@ lin_lwp_attach_lwp (ptid_t ptid)
+ 	  return -1;
+ 	}
  
 -      if (debug_linux_nat)
 -	fprintf_unfiltered (gdb_stdlog,
 -			    "LLAL: PTRACE_ATTACH %s, 0, 0 (OK)\n",
 -			    target_pid_to_str (ptid));
-+      status = linux_ptrace_post_attach (lp);
+-
+-      pid = my_waitpid (GET_LWP (ptid), &status, 0);
+-      if (pid == -1 && errno == ECHILD)
+-	{
+-	  /* Try again with __WCLONE to check cloned processes.  */
+-	  pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
+-	  cloned = 1;
++      status = linux_ptrace_post_attach (ptid, &cloned);
 +      if (status != 0)
 +        {
 +	  error (_("Thread %s exited: %s"), target_pid_to_str (ptid),
 +		 status_to_str (status));
-+	}
-+
+ 	}
+ 
+-      gdb_assert (pid == GET_LWP (ptid)
+-		  && WIFSTOPPED (status) && WSTOPSIG (status));
+-
+-      if (lp == NULL)
+-	lp = add_lwp (ptid);
++      /* ADD_LWP with TID only already after the WAITPID.  */
++      lp = add_lwp (ptid);
+       lp->cloned = cloned;
+ 
+-      target_post_attach (pid);
 +      target_post_attach (GET_LWP (ptid));
-+
-+      lp->stopped = 1;
-+    }
-+  else
-+    {
-+      /* We assume that the LWP representing the original process is
-+         already stopped.  Mark it as stopped in the data structure
-+         that the GNU/linux ptrace layer uses to keep track of
-+         threads.  Note that this won't have already been done since
-+         the main thread will have, we assume, been stopped by an
-+         attach from a different layer.  */
-+      if (lp == NULL)
-+	lp = add_lwp (ptid);
-+      lp->stopped = 1;
-+    }
-+
-+  if (verbose)
-+    printf_filtered (_("[New %s]\n"), target_pid_to_str (ptid));
-+
-+  return 0;
-+}
-+
+ 
+       lp->stopped = 1;
+-
+-      if (debug_linux_nat)
+-	{
+-	  fprintf_unfiltered (gdb_stdlog,
+-			      "LLAL: waitpid %s received %s\n",
+-			      target_pid_to_str (ptid),
+-			      status_to_str (status));
+-	}
+     }
+   else
+     {
+@@ -998,44 +994,202 @@ lin_lwp_attach_lwp (ptid_t ptid)
+          threads.  Note that this won't have already been done since
+          the main thread will have, we assume, been stopped by an
+          attach from a different layer.  */
+-      if (lp == NULL)
+-	lp = add_lwp (ptid);
+       lp->stopped = 1;
+     }
+ 
+   return 0;
+ }
+ 
 +/* Detect `T (stopped)' in `/proc/PID/status'.
 +   Other states including `T (tracing stop)' are reported as false.  */
 +
@@ -119,7 +144,7 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 +pid_is_stopped (pid_t pid)
 +{
 +  FILE *status_file;
-+  char buf[100]; 
++  char buf[100];
 +  int retval = 0;
 +
 +  snprintf (buf, sizeof (buf), "/proc/%d/status", (int) pid);
@@ -135,7 +160,7 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 +	      have_state = 1;
 +	      break;
 +	    }
-+	} 
++	}
 +      if (have_state && strstr (buf, "T (stopped)") != NULL)
 +	retval = 1;
 +      fclose (status_file);
@@ -206,11 +231,11 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 +   Similiar processing is being done in this file by WAIT_LWP.  */
 +
 +static int
-+linux_ptrace_post_attach (struct lwp_info *lp)
++linux_ptrace_post_attach (ptid_t ptid, int *cloned_return)
 +{
-+  ptid_t ptid = lp->ptid;
 +  unsigned long sig;
 +  int this_thread_was_stopped;
++  int cloned = 0;
 +
 +  if (debug_linux_nat)
 +    fprintf_unfiltered (gdb_stdlog,
@@ -232,52 +257,33 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 +    {
 +      pid_t pid;
 +      int status;
- 
-       pid = my_waitpid (GET_LWP (ptid), &status, 0);
-       if (pid == -1 && errno == ECHILD)
-@@ -974,13 +1133,7 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
- 		   target_pid_to_str (ptid), safe_strerror (errno));
- 	  lp->cloned = 1;
- 	}
--
--      gdb_assert (pid == GET_LWP (ptid)
--		  && WIFSTOPPED (status) && WSTOPSIG (status));
--
--      target_post_attach (pid);
--
--      lp->stopped = 1;
++
++      pid = my_waitpid (GET_LWP (ptid), &status, 0);
++      if (pid == -1 && errno == ECHILD)
++	{
++	  /* Try again with __WCLONE to check cloned processes.  */
++	  pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
++	  cloned = 1;
++	}
++
 +      gdb_assert (pid == GET_LWP (ptid));
- 
-       if (debug_linux_nat)
- 	{
-@@ -989,22 +1142,32 @@ lin_lwp_attach_lwp (ptid_t ptid, int ver
- 			      target_pid_to_str (ptid),
- 			      status_to_str (status));
- 	}
--    }
--  else
--    {
--      /* We assume that the LWP representing the original process is
--         already stopped.  Mark it as stopped in the data structure
--         that the GNU/linux ptrace layer uses to keep track of
--         threads.  Note that this won't have already been done since
--         the main thread will have, we assume, been stopped by an
--         attach from a different layer.  */
--      if (lp == NULL)
--	lp = add_lwp (ptid);
--      lp->stopped = 1;
--    }
- 
--  if (verbose)
--    printf_filtered (_("[New %s]\n"), target_pid_to_str (ptid));
++
++      if (debug_linux_nat)
++	{
++	  fprintf_unfiltered (gdb_stdlog,
++			      "LLAL: waitpid %s received %s\n",
++			      target_pid_to_str (ptid),
++			      status_to_str (status));
++	}
++
 +      /* Check if the thread has exited.  */
 +      if (WIFEXITED (status) || WIFSIGNALED (status))
-+        return status;
++	return status;
 +      gdb_assert (WIFSTOPPED (status));
 +      sig = WSTOPSIG (status);
 +      gdb_assert (sig != 0);
 +      if (sig == SIGSTOP)
-+        break;
++	break;
 +
 +      /* As the second signal for stopped processes we send SIGSTOP.  */
 +      if (this_thread_was_stopped && sig == SIGCONT)
@@ -295,20 +301,22 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 +      if (ptrace (PTRACE_CONT, GET_LWP (ptid), NULL, (void *) sig) != 0)
 +	perror_with_name (("ptrace"));
 +    }
- 
-   return 0;
- }
-@@ -1013,7 +1176,6 @@ static void
++  *cloned_return = cloned;
++  return 0;
++}
++
+ static void
  linux_nat_attach (char *args, int from_tty)
  {
    struct lwp_info *lp;
 -  pid_t pid;
    int status;
+-  int cloned = 0;
++  int cloned;
  
    /* FIXME: We should probably accept a list of process id's, and
-@@ -1024,21 +1186,12 @@ linux_nat_attach (char *args, int from_t
-   inferior_ptid = BUILD_LWP (GET_PID (inferior_ptid), GET_PID (inferior_ptid));
-   lp = add_lwp (inferior_ptid);
+      attach all of them.  */
+   linux_ops->to_attach (args, from_tty);
  
 -  /* Make sure the initial process is stopped.  The user-level threads
 -     layer might want to poke around in the inferior, and that won't
@@ -320,21 +328,27 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
 -
 -      /* Try again with __WCLONE to check cloned processes.  */
 -      pid = my_waitpid (GET_PID (inferior_ptid), &status, __WCLONE);
--      lp->cloned = 1;
+-      cloned = 1;
 -    }
 -
 -  gdb_assert (pid == GET_PID (inferior_ptid)
 -	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP);
-+  status = linux_ptrace_post_attach (lp);
+-
+   /* Add the initial process as the first LWP to the list.  */
+   inferior_ptid = BUILD_LWP (GET_PID (inferior_ptid), GET_PID (inferior_ptid));
++
++  status = linux_ptrace_post_attach (inferior_ptid, &cloned);
 +  if (status != 0)
 +    error (_("Program %s exited: %s\n"), target_pid_to_str (inferior_ptid),
 +	   status_to_str (status));
-+  if (lp->cloned)
++  if (cloned)
 +    warning (_("%s is a cloned process"), target_pid_to_str (inferior_ptid));
++
++  /* ADD_LWP with TID only already after the WAITPID.  */
+   lp = add_lwp (inferior_ptid);
+   lp->cloned = cloned;
  
-   lp->stopped = 1;
- 
-@@ -1047,8 +1200,8 @@ linux_nat_attach (char *args, int from_t
+@@ -1046,8 +1200,8 @@ linux_nat_attach (char *args, int from_t
    lp->resumed = 1;
    if (debug_linux_nat)
      {
@@ -345,7 +359,7 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
      }
  }
  
-@@ -1093,6 +1246,9 @@ detach_callback (struct lwp_info *lp, vo
+@@ -1092,6 +1246,9 @@ detach_callback (struct lwp_info *lp, vo
       overall process id just yet.  */
    if (GET_LWP (lp->ptid) != GET_PID (lp->ptid))
      {
@@ -355,7 +369,7 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
        errno = 0;
        if (ptrace (PTRACE_DETACH, GET_LWP (lp->ptid), 0,
  		  WSTOPSIG (lp->status)) < 0)
-@@ -1121,6 +1277,9 @@ linux_nat_detach (char *args, int from_t
+@@ -1120,6 +1277,9 @@ linux_nat_detach (char *args, int from_t
  
    trap_ptid = null_ptid;
  
@@ -365,9 +379,9 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
    /* Destroy LWP info; it's no longer valid.  */
    init_lwp_list ();
  
-@@ -1258,6 +1417,14 @@ linux_nat_resume (ptid_t ptid, int step_
-       lp->stopped = 0;
-     }
+@@ -1255,6 +1415,14 @@ linux_nat_resume (ptid_t ptid, int step_
+      resume_callback.  */
+   lp->stopped = 0;
  
 +  /* At this point, we are going to resume the inferior and if we
 +     have attached to a stopped process, we no longer should leave
@@ -380,10 +394,11 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/NEWS gdb-6.5/gdb/
    if (resume_all)
      iterate_over_lwps (resume_callback, NULL);
  
-diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/doc/gdb.texinfo gdb-6.5/gdb/doc/gdb.texinfo
---- gdb-6.5-unpatched/gdb/doc/gdb.texinfo	2008-01-09 18:26:07.000000000 +0100
-+++ gdb-6.5/gdb/doc/gdb.texinfo	2008-01-09 15:26:30.000000000 +0100
-@@ -2190,16 +2190,29 @@ can step and continue; you can modify st
+Index: gdb-6.8cvs20080219/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/doc/gdb.texinfo	2008-02-24 19:36:24.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/doc/gdb.texinfo	2008-02-24 19:36:26.000000000 +0100
+@@ -2176,16 +2176,29 @@ can step and continue; you can modify st
  process continue running, you may use the @code{continue} command after
  attaching @value{GDBN} to the process.
  
@@ -418,4 +433,4 @@ diff -u -X /home/short/.diffi.list -ruNp gdb-6.5-unpatched/gdb/doc/gdb.texinfo g
 +@key{RET} again after executing the command.
  @end table
  
- If you exit @value{GDBN} or use the @code{run} command while you have an
+ If you exit @value{GDBN} while you have an attached process, you detach

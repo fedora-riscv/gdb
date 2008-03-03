@@ -8,14 +8,14 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.7.1
+Version: 6.7.50.20080227
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 16%{?dist}
+Release: 1%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://ftp.gnu.org/gnu/gdb/gdb-6.7.1.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-6.7.50.20080227.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -82,10 +82,6 @@ Patch105: gdb-6.3-ppc64syscall-20040622.patch
 # Stop a backtrace when a zero PC is encountered.
 Patch106: gdb-6.3-framepczero-20040927.patch
 
-# Pass the pc's section into the symbol search code; stops the lookup
-# finding a symbol from the wrong section.
-Patch108: gdb-6.3-ppc64section-20041026.patch
-
 # Include the pc's section when doing a symbol lookup so that the
 # correct symbol is found.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
@@ -94,9 +90,6 @@ Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 # Make upstream `set scheduler-locking step' as default.
 Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
-
-# Threaded watchpoint support
-Patch113: gdb-6.3-threaded-watchpoints-20041213.patch
 
 # Continue removing breakpoints even when failure occurs.
 Patch117: gdb-6.3-removebp-20041130.patch
@@ -112,7 +105,6 @@ Patch119: gdb-6.3-lwp-cache-20041216.patch
 Patch120: gdb-6.3-type-fix-20041213.patch
 
 # VSYSCALL and PIE
-Patch122: gdb-6.3-test-pie-20050107.patch
 Patch124: gdb-6.3-pie-20050110.patch
 
 # Get selftest working with sep-debug-info
@@ -140,9 +132,6 @@ Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 # Prevent gdb from being pushed into background
 Patch142: gdb-6.3-terminal-fix-20050214.patch
 
-# Allow sibling threads to set threaded watchpoints for x86 and x86-64
-Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
-
 # Fix unexpected compiler warning messages.
 Patch147: gdb-6.3-warnings-20050317.patch
 
@@ -161,9 +150,6 @@ Patch157: gdb-6.3-security-errata-20050610.patch
 
 # IA64 sigtramp prev register patch
 Patch158: gdb-6.3-ia64-sigtramp-frame-20050708.patch
-
-# IA64 sigaltstack patch
-Patch159: gdb-6.3-ia64-sigaltstack-20050711.patch
 
 # IA64 gcore speed-up patch
 Patch160: gdb-6.3-ia64-gcore-speedup-20050714.patch
@@ -263,16 +249,13 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.7 release fixups.
-Patch232: gdb-6.7.1-upstream.patch
+#Patch232: gdb-6.7.1-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
 
 # Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
 Patch235: gdb-6.3-bz231832-obstack-2gb.patch
-
-# Suggest SELinux permissions problem; no assertion failure anymore (BZ 232371).
-Patch236: gdb-6.6-bz232371-selinux-thread-error.patch
 
 # Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
 Patch240: gdb-6.6-bz225783-prelink-path.patch
@@ -283,17 +266,11 @@ Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
 # Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
 Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 
-# Fix testcase for watchpoints in threads (for BZ 237096).
-Patch246: gdb-6.6-bz237096-watchthreads-testcasefix.patch
-
 # Notify user of a child forked process being detached (BZ 235197).
 Patch247: gdb-6.6-bz235197-fork-detach-info.patch
 
 # New testcase for gcore of 32bit inferiors on 64bit hosts.
 Patch249: gdb-6.6-gcore32-test.patch
-
-# Enable PowerPC to print 128-bit long double variables (BZ 237872).
-Patch251: gdb-6.5-bz237872-ppc-long-double.patch
 
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
 Patch254: gdb-6.6-testsuite-timeouts.patch
@@ -324,9 +301,6 @@ Patch276: gdb-6.6-bfd-vdso8k.patch
 
 # Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
 Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
-
-# Fix debug load for sparse assembler files (such as vDSO32 for i386-on-x86_64).
-Patch278: gdb-6.6-cu-ranges.patch
 
 # Fix hardware watchpoints after inferior forks-off some process.
 # Threaded `set follow-fork-mode child' still not fixed there, glibc fixes reqd.
@@ -362,11 +336,14 @@ Patch298: gdb-6.6-threads-static-test.patch
 # Fix false `(no debugging symbols found)' on `-readnever' runs.
 Patch301: gdb-6.6-buildid-readnever-silent.patch
 
-# ia64 build fixes from Doug Chapman (BZ 428882).
-Patch303: gdb-6.7-bz428882-ia64-fix.patch
-
 # Fix #include <asm/ptrace.h> on kernel-headers-2.6.25-0.40.rc1.git2.fc9.x86_64.
 Patch304: gdb-6.7-kernel-headers-compat.patch
+
+# Fix/implement the Fortran dynamic arrays support (BZ 377541).
+Patch305: gdb-6.8-bz377541-fortran-dynamic-arrays.patch
+
+# Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
+Patch306: gdb-6.8-watchpoint-inaccessible-memory.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -378,7 +355,7 @@ BuildRequires: rpm-devel
 # BuildRequires are set here only for the complete testsuite run.
 %if 0%{?_with_testsuite:1}
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
+BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc
 # Copied from gcc-4.1.2-32
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
@@ -429,7 +406,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 # Apply patches defined above.
 
-%patch232 -p1
+#%patch232 -p1
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
@@ -440,15 +417,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch104 -p1
 %patch105 -p1
 %patch106 -p1
-%patch108 -p1
 %patch111 -p1
 %patch112 -p1
-%patch113 -p1
 %patch117 -p1
 %patch118 -p1
 %patch119 -p1
 %patch120 -p1
-%patch122 -p1
 %patch124 -p1
 %patch125 -p1
 %patch128 -p1
@@ -458,7 +432,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch141 -p1
 %patch259 -p1
 %patch142 -p1
-%patch145 -p1
 %patch147 -p1
 %patch148 -p1
 %patch150 -p1
@@ -466,7 +439,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch153 -p1
 %patch157 -p1
 %patch158 -p1
-%patch159 -p1
 %patch160 -p1
 %patch161 -p1
 %patch162 -p1
@@ -501,14 +473,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch231 -p1
 %patch234 -p1
 %patch235 -p1
-%patch236 -p1
 %patch240 -p1
 %patch241 -p1
 %patch245 -p1
-%patch246 -p1
 %patch247 -p1
 %patch249 -p1
-%patch251 -p1
 %patch254 -p1
 %patch256 -p1
 %patch258 -p1
@@ -521,7 +490,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch275 -p1
 %patch276 -p1
 %patch277 -p1
-%patch278 -p1
 %patch280 -p1
 %patch282 -p1
 %patch283 -p1
@@ -533,17 +501,22 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch296 -p1
 %patch298 -p1
 %patch301 -p1
-%patch303 -p1
 %patch304 -p1
+%patch305 -p1
+%patch306 -p1
 
-# Change the version that gets printed at GDB startup, so it is RedHat
+find -name "*.orig" | xargs rm -f
+! find -name "*.rej"	# Should not happen.
+
+# Change the version that gets printed at GDB startup, so it is Fedora
 # specific.
 cat > gdb/version.in << _FOO
-Red Hat Linux (%{version}-%{release}rh)
+Fedora (%{version}-%{release})
 _FOO
 
 # Remove the info and other generated files added by the FSF release
 # process.
+rm -f libdecnumber/gstdint.h
 rm -f bfd/doc/*.info
 rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
@@ -591,6 +564,7 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 	--disable-sim					\
 	--disable-rpath					\
 	--with-system-readline				\
+	--with-expat					\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -763,6 +737,14 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Mon Mar  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-1
+- Upgrade to the upstream gdb-6.8 prerelease.
+- Cleanup the leftover `.orig' files during %%prep.
+- Add expat-devel check by the configure script (for the other-arch builds).
+- `--with testsuite' now also BuildRequires: fpc
+- Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
+- Update the printed GDB version string to be Fedora specific.
+
 * Sat Mar  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-16
 - Run the full testsuite also in the `-fPIE -pie' mode.
 

@@ -18,11 +18,16 @@
 	Provide its level 0 to disable the build-id messages.
 	Resolve the RH Bug 432164.
 
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/Makefile.in gdb-6.7.1-patched/gdb/Makefile.in
---- gdb-6.7.1-unpatched/gdb/Makefile.in	2008-02-21 05:01:55.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/Makefile.in	2008-02-21 04:58:13.000000000 +0100
-@@ -387,7 +387,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcode
- CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) \
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+Index: gdb-6.7.50.20080227/gdb/Makefile.in
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/Makefile.in	2008-03-01 10:30:49.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/Makefile.in	2008-03-01 10:38:01.000000000 +0100
+@@ -392,7 +392,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcode
+ CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
  	$(XM_CLIBS) $(TM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
  	$(LIBICONV) $(LIBEXPAT) \
 -	$(LIBIBERTY) $(WIN32LIBS)
@@ -30,33 +35,34 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/Makefile.in g
  CDEPS = $(XM_CDEPS) $(TM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
  	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS)
  
-@@ -1932,7 +1932,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
+@@ -2029,7 +2029,8 @@ corelow.o: corelow.c $(defs_h) $(arch_ut
  	$(inferior_h) $(symtab_h) $(command_h) $(bfd_h) $(target_h) \
  	$(gdbcore_h) $(gdbthread_h) $(regcache_h) $(regset_h) $(symfile_h) \
  	$(exec_h) $(readline_h) $(gdb_assert_h) \
--	$(exceptions_h) $(solib_h)
-+	$(exceptions_h) $(solib_h) $(auxv_h) $(elf_common_h) $(objfiles_h) \
-+	$(gdbcmd_h)
+-	$(exceptions_h) $(solib_h) $(filenames_h)
++	$(exceptions_h) $(solib_h) $(filenames_h) $(auxv_h) $(elf_common_h) \
++	$(objfiles_h) $(gdbcmd_h)
  core-regset.o: core-regset.c $(defs_h) $(command_h) $(gdbcore_h) \
  	$(inferior_h) $(target_h) $(regcache_h) $(gdb_string_h) $(gregset_h)
  cp-abi.o: cp-abi.c $(defs_h) $(value_h) $(cp_abi_h) $(command_h) $(gdbcmd_h) \
-@@ -2768,7 +2769,8 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
+@@ -2884,7 +2885,8 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
  	$(gdb_stabs_h) $(gdb_obstack_h) $(completer_h) $(bcache_h) \
  	$(hashtab_h) $(readline_h) $(gdb_assert_h) $(block_h) \
  	$(gdb_string_h) $(gdb_stat_h) $(observer_h) $(exec_h) \
--	$(parser_defs_h) $(varobj_h) $(elf_bfd_h)
-+	$(parser_defs_h) $(varobj_h) $(elf_bfd_h) $(gdb_stdint_h) $(libbfd_h) \
-+	$(elf_bfd_h) $(elf_external_h)
+-	$(parser_defs_h) $(varobj_h) $(elf_bfd_h) $(solib_h)
++	$(parser_defs_h) $(varobj_h) $(elf_bfd_h) $(solib_h) $(gdb_stdint_h) \
++	$(libbfd_h) $(elf_bfd_h) $(elf_external_h)
  symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
  	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
  	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/corelow.c gdb-6.7.1-patched/gdb/corelow.c
---- gdb-6.7.1-unpatched/gdb/corelow.c	2008-02-21 05:01:55.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/corelow.c	2008-02-21 04:58:13.000000000 +0100
-@@ -44,6 +44,10 @@
- #include "gdb_assert.h"
+Index: gdb-6.7.50.20080227/gdb/corelow.c
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/corelow.c	2008-02-09 14:45:33.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/corelow.c	2008-03-01 10:30:50.000000000 +0100
+@@ -45,6 +45,10 @@
  #include "exceptions.h"
  #include "solib.h"
+ #include "filenames.h"
 +#include "auxv.h"
 +#include "elf/common.h"
 +#include "objfiles.h"
@@ -64,7 +70,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/corelow.c gdb
  
  
  #ifndef O_LARGEFILE
-@@ -251,6 +255,56 @@ add_to_thread_list (bfd *abfd, asection 
+@@ -248,6 +252,56 @@ add_to_thread_list (bfd *abfd, asection 
      inferior_ptid = pid_to_ptid (thread_id);	/* Yes, make it current */
  }
  
@@ -121,7 +127,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/corelow.c gdb
  /* This routine opens and sets up the core file bfd.  */
  
  static void
-@@ -347,6 +401,15 @@ core_open (char *filename, int from_tty)
+@@ -344,6 +398,15 @@ core_open (char *filename, int from_tty)
    ontop = !push_target (&core_ops);
    discard_cleanups (old_chain);
  
@@ -137,7 +143,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/corelow.c gdb
    /* This is done first, before anything has a chance to query the
       inferior for information such as symbols.  */
    post_create_inferior (&core_ops, from_tty);
-@@ -678,4 +741,11 @@ _initialize_corelow (void)
+@@ -692,4 +755,11 @@ _initialize_corelow (void)
  
    if (!coreops_suppress_target)
      add_target (&core_ops);
@@ -149,10 +155,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/corelow.c gdb
 +			   NULL, NULL, NULL,
 +			   &setlist, &showlist);
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/doc/gdb.texinfo gdb-6.7.1-patched/gdb/doc/gdb.texinfo
---- gdb-6.7.1-unpatched/gdb/doc/gdb.texinfo	2008-02-21 05:00:36.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/doc/gdb.texinfo	2008-02-21 04:59:10.000000000 +0100
-@@ -12074,6 +12074,27 @@ information files.
+Index: gdb-6.7.50.20080227/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/doc/gdb.texinfo	2008-03-01 10:30:50.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/doc/gdb.texinfo	2008-03-01 10:38:02.000000000 +0100
+@@ -12208,6 +12208,27 @@ information files.
  
  @end table
  
@@ -180,10 +187,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/doc/gdb.texin
  @cindex @code{.gnu_debuglink} sections
  @cindex debug link sections
  A debug link is a special section of the executable file named
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/solib-svr4.c gdb-6.7.1-patched/gdb/solib-svr4.c
---- gdb-6.7.1-unpatched/gdb/solib-svr4.c	2008-02-21 05:01:55.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/solib-svr4.c	2008-02-21 04:58:13.000000000 +0100
-@@ -960,9 +960,34 @@ svr4_current_sos (void)
+Index: gdb-6.7.50.20080227/gdb/solib-svr4.c
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/solib-svr4.c	2008-03-01 10:30:48.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/solib-svr4.c	2008-03-01 10:30:50.000000000 +0100
+@@ -967,9 +967,34 @@ svr4_current_sos (void)
  		free_so (new);
  	      else
  		{
@@ -221,20 +229,21 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/solib-svr4.c 
  		  if (debug_solib)
  		    {
  		      fprintf_unfiltered (gdb_stdlog, 
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb-6.7.1-patched/gdb/symfile.c
---- gdb-6.7.1-unpatched/gdb/symfile.c	2008-02-21 05:02:16.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/symfile.c	2008-02-21 04:59:10.000000000 +0100
-@@ -53,6 +53,9 @@
- #include "parser-defs.h"
+Index: gdb-6.7.50.20080227/gdb/symfile.c
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/symfile.c	2008-03-01 10:30:48.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/symfile.c	2008-03-01 10:47:02.000000000 +0100
+@@ -54,6 +54,9 @@
  #include "varobj.h"
  #include "elf-bfd.h"
+ #include "solib.h"
 +#include "gdb_stdint.h"
 +#include "libbfd.h"
 +#include "elf/external.h"
  
  #include <sys/types.h>
  #include <fcntl.h>
-@@ -61,6 +64,7 @@
+@@ -62,6 +65,7 @@
  #include <ctype.h>
  #include <time.h>
  #include <sys/time.h>
@@ -242,7 +251,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  
  
  int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
-@@ -1262,16 +1266,65 @@ symbol_file_clear (int from_tty)
+@@ -1235,16 +1239,65 @@ symbol_file_clear (int from_tty)
        printf_unfiltered (_("No symbol file now.\n"));
  }
  
@@ -310,7 +319,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  {
    struct build_id *retval;
  
-@@ -1287,6 +1340,348 @@ build_id_bfd_get (bfd *abfd)
+@@ -1260,6 +1313,348 @@ build_id_bfd_get (bfd *abfd)
    return retval;
  }
  
@@ -659,7 +668,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
  
  static int
-@@ -1301,7 +1696,7 @@ build_id_verify (const char *filename, s
+@@ -1274,7 +1669,7 @@ build_id_verify (const char *filename, s
    if (abfd == NULL)
      return 0;
  
@@ -668,7 +677,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"), filename);
-@@ -1317,8 +1712,9 @@ build_id_verify (const char *filename, s
+@@ -1290,8 +1685,9 @@ build_id_verify (const char *filename, s
    return retval;
  }
  
@@ -680,7 +689,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  {
    char *link, *s, *retval = NULL;
    gdb_byte *data = build_id->data;
-@@ -1326,7 +1722,9 @@ build_id_to_debug_filename (struct build
+@@ -1299,7 +1695,9 @@ build_id_to_debug_filename (struct build
  
    /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
    link = xmalloc (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
@@ -691,7 +700,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
    s = link + sprintf (link, "%s/.build-id/", debug_file_directory);
    if (size > 0)
      {
-@@ -1337,12 +1735,14 @@ build_id_to_debug_filename (struct build
+@@ -1310,12 +1708,14 @@ build_id_to_debug_filename (struct build
      *s++ = '/';
    while (size-- > 0)
      s += sprintf (s, "%02x", (unsigned) *data++);
@@ -708,7 +717,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1350,9 +1750,202 @@ build_id_to_debug_filename (struct build
+@@ -1323,9 +1723,202 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -911,7 +920,20 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
  static char *
  get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
  {
-@@ -1447,23 +2040,27 @@ find_separate_debug_file (struct objfile
+@@ -1411,32 +2004,36 @@ static char *
+ find_separate_debug_file (struct objfile *objfile)
+ {
+   asection *sect;
+-  char *basename;
+-  char *dir;
+-  char *debugfile;
++  char *basename = NULL;
++  char *dir = NULL;
++  char *debugfile = NULL;
+   char *name_copy;
+-  char *canon_name;
++  char *canon_name = NULL;
+   bfd_size_type debuglink_size;
    unsigned long crc32;
    int i;
    struct build_id *build_id;
@@ -944,64 +966,103 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
      }
  
    basename = get_debug_link_info (objfile, &crc32);
-@@ -1471,7 +2068,10 @@ find_separate_debug_file (struct objfile
+@@ -1444,7 +2041,7 @@ find_separate_debug_file (struct objfile
    if (basename == NULL)
      /* There's no separate debug info, hence there's no way we could
         load it => no warning.  */
 -    return NULL;
-+    {
-+      xfree (build_id_filename);
-+      return NULL;
-+    }
++    goto cleanup_return_debugfile;
  
    dir = xstrdup (objfile->name);
  
-@@ -1500,6 +2100,7 @@ find_separate_debug_file (struct objfile
+@@ -1460,23 +2057,19 @@ find_separate_debug_file (struct objfile
+   gdb_assert (i >= 0 && IS_DIR_SEPARATOR (dir[i]));
+   dir[i+1] = '\0';
+ 
+-  debugfile = alloca (strlen (debug_file_directory) + 1
+-                      + strlen (dir)
+-                      + strlen (DEBUG_SUBDIRECTORY)
+-                      + strlen ("/")
+-                      + strlen (basename)
+-                      + 1);
++  debugfile = xmalloc (strlen (debug_file_directory) + 1
++		       + strlen (dir)
++		       + strlen (DEBUG_SUBDIRECTORY)
++		       + strlen ("/")
++		       + strlen (basename)
++		       + 1);
+ 
+   /* First try in the same directory as the original file.  */
+   strcpy (debugfile, dir);
+   strcat (debugfile, basename);
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
-     {
-+      xfree (build_id_filename);
-       xfree (basename);
-       xfree (dir);
-       return xstrdup (debugfile);
-@@ -1513,6 +2114,7 @@ find_separate_debug_file (struct objfile
+-    {
+-      xfree (basename);
+-      xfree (dir);
+-      return xstrdup (debugfile);
+-    }
++    goto cleanup_return_debugfile;
+ 
+   /* Then try in the subdirectory named DEBUG_SUBDIRECTORY.  */
+   strcpy (debugfile, dir);
+@@ -1485,11 +2078,7 @@ find_separate_debug_file (struct objfile
+   strcat (debugfile, basename);
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
-     {
-+      xfree (build_id_filename);
-       xfree (basename);
-       xfree (dir);
-       return xstrdup (debugfile);
-@@ -1526,6 +2128,7 @@ find_separate_debug_file (struct objfile
+-    {
+-      xfree (basename);
+-      xfree (dir);
+-      return xstrdup (debugfile);
+-    }
++    goto cleanup_return_debugfile;
+ 
+   /* Then try in the global debugfile directory.  */
+   strcpy (debugfile, debug_file_directory);
+@@ -1498,11 +2087,7 @@ find_separate_debug_file (struct objfile
+   strcat (debugfile, basename);
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
-     {
-+      xfree (build_id_filename);
-       xfree (basename);
-       xfree (dir);
-       return xstrdup (debugfile);
-@@ -1545,6 +2148,7 @@ find_separate_debug_file (struct objfile
+-    {
+-      xfree (basename);
+-      xfree (dir);
+-      return xstrdup (debugfile);
+-    }
++    goto cleanup_return_debugfile;
+ 
+   /* If the file is in the sysroot, try using its base path in the
+      global debugfile directory.  */
+@@ -1517,20 +2102,19 @@ find_separate_debug_file (struct objfile
+       strcat (debugfile, basename);
  
        if (separate_debug_file_exists (debugfile, crc32, objfile->name))
- 	{
-+	  xfree (build_id_filename);
- 	  xfree (canon_name);
- 	  xfree (basename);
- 	  xfree (dir);
-@@ -1552,6 +2156,12 @@ find_separate_debug_file (struct objfile
- 	}
+-	{
+-	  xfree (canon_name);
+-	  xfree (basename);
+-	  xfree (dir);
+-	  return xstrdup (debugfile);
+-	}
++        goto cleanup_return_debugfile;
      }
-   
-+  if (build_id_filename != NULL)
-+    {
-+      build_id_print_missing (objfile->name, build_id_filename);
-+      xfree (build_id_filename);
-+    }
-+
-   if (canon_name)
-     xfree (canon_name);
+-  
+-  if (canon_name)
+-    xfree (canon_name);
  
-@@ -4275,4 +4885,16 @@ the global debug-file directory prepende
++  debugfile = NULL;
++  if (build_id_filename != NULL)
++    build_id_print_missing (objfile->name, build_id_filename);
++
++cleanup_return_debugfile:
++  xfree (build_id_filename);
++  xfree (canon_name);
+   xfree (basename);
+   xfree (dir);
+-  return NULL;
++  return debugfile;
+ }
+ 
+ 
+@@ -4220,4 +4804,16 @@ the global debug-file directory prepende
  				     NULL,
  				     show_debug_file_directory,
  				     &setlist, &showlist);
@@ -1018,10 +1079,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.c gdb
 +
 +  observer_attach_inferior_created (missing_debuginfos_change_inferior_created);
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1-unpatched/gdb/symfile.h gdb-6.7.1-patched/gdb/symfile.h
---- gdb-6.7.1-unpatched/gdb/symfile.h	2008-02-21 05:01:55.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/symfile.h	2008-02-21 04:58:13.000000000 +0100
-@@ -353,6 +353,13 @@ extern int symfile_map_offsets_to_segmen
+Index: gdb-6.7.50.20080227/gdb/symfile.h
+===================================================================
+--- gdb-6.7.50.20080227.orig/gdb/symfile.h	2008-02-03 23:13:29.000000000 +0100
++++ gdb-6.7.50.20080227/gdb/symfile.h	2008-03-01 10:30:50.000000000 +0100
+@@ -358,6 +358,13 @@ extern int symfile_map_offsets_to_segmen
  struct symfile_segment_data *get_symfile_segment_data (bfd *abfd);
  void free_symfile_segment_data (struct symfile_segment_data *data);
  

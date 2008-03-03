@@ -1,5 +1,8 @@
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=185337
 
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
 
 currently for trivial nonthreaded helloworld with no debug info up to -ggdb2 you
 will get:
@@ -27,9 +30,11 @@ glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
   <81a2>     DW_AT_name        : (indirect string, offset: 0x280e): __errno_location
   <81a8>     DW_AT_MIPS_linkage_name: (indirect string, offset: 0x2808): *__GI___errno_location
 
---- ./gdb/dwarf2read.c	25 Oct 2007 20:54:27 -0000	1.236
-+++ ./gdb/dwarf2read.c	3 Nov 2007 21:03:43 -0000
-@@ -5550,8 +5550,8 @@ read_partial_die (struct partial_die_inf
+Index: gdb-6.8cvs20080219/gdb/dwarf2read.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/dwarf2read.c	2008-02-19 17:27:21.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/dwarf2read.c	2008-02-20 13:35:19.000000000 +0100
+@@ -5679,8 +5679,8 @@ read_partial_die (struct partial_die_inf
  	{
  	case DW_AT_name:
  
@@ -40,7 +45,7 @@ glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
  	    part_die->name = DW_STRING (&attr);
  	  break;
  	case DW_AT_comp_dir:
-@@ -5559,7 +5559,9 @@ read_partial_die (struct partial_die_inf
+@@ -5688,7 +5688,9 @@ read_partial_die (struct partial_die_inf
  	    part_die->dirname = DW_STRING (&attr);
  	  break;
  	case DW_AT_MIPS_linkage_name:
@@ -51,7 +56,7 @@ glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
  	  break;
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
-@@ -7871,9 +7873,13 @@ dwarf2_linkage_name (struct die_info *di
+@@ -7936,9 +7938,13 @@ dwarf2_linkage_name (struct die_info *di
  {
    struct attribute *attr;
  
@@ -68,22 +73,20 @@ glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
    attr = dwarf2_attr (die, DW_AT_name, cu);
    if (attr && DW_STRING (attr))
      return DW_STRING (attr);
-
-
-
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/gdbtypes.c gdb-6.7.1-patched/gdb/gdbtypes.c
---- gdb-6.7.1/gdb/gdbtypes.c	2007-11-04 01:43:03.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/gdbtypes.c	2007-11-04 01:09:31.000000000 +0100
-@@ -3465,6 +3465,8 @@ gdbtypes_post_init (struct gdbarch *gdba
+Index: gdb-6.8cvs20080219/gdb/gdbtypes.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/gdbtypes.c	2008-02-14 23:03:57.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/gdbtypes.c	2008-02-20 13:35:19.000000000 +0100
+@@ -3106,6 +3106,8 @@ gdbtypes_post_init (struct gdbarch *gdba
      init_type (TYPE_CODE_INT, 
- 	       gdbarch_int_bit (current_gdbarch) / TARGET_CHAR_BIT,
+ 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
  	       0, "int", (struct objfile *) NULL);
 +  builtin_type->builtin_int_ptr =
 +    make_pointer_type (builtin_type->builtin_int, NULL);
    builtin_type->builtin_unsigned_int =
      init_type (TYPE_CODE_INT, 
- 	       gdbarch_int_bit (current_gdbarch) / TARGET_CHAR_BIT,
-@@ -3559,6 +3561,11 @@ gdbtypes_post_init (struct gdbarch *gdba
+ 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+@@ -3215,6 +3217,11 @@ gdbtypes_post_init (struct gdbarch *gdba
  	       "<text variable, no debug info>", NULL);
    TYPE_TARGET_TYPE (builtin_type->nodebug_text_symbol) =
      builtin_type->builtin_int;
@@ -95,10 +98,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/gdbtypes.c gdb-6.7.1-pa
    builtin_type->nodebug_data_symbol =
      init_type (TYPE_CODE_INT, 
  	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/gdbtypes.h gdb-6.7.1-patched/gdb/gdbtypes.h
---- gdb-6.7.1/gdb/gdbtypes.h	2007-11-04 01:43:03.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/gdbtypes.h	2007-11-04 01:07:50.000000000 +0100
-@@ -1008,6 +1008,7 @@ struct builtin_type
+Index: gdb-6.8cvs20080219/gdb/gdbtypes.h
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/gdbtypes.h	2008-02-14 23:03:57.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/gdbtypes.h	2008-02-20 13:35:19.000000000 +0100
+@@ -942,6 +942,7 @@ struct builtin_type
  
    /* Types used for symbols with no debug information.  */
    struct type *nodebug_text_symbol;
@@ -106,7 +110,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/gdbtypes.h gdb-6.7.1-pa
    struct type *nodebug_data_symbol;
    struct type *nodebug_unknown_symbol;
    struct type *nodebug_tls_symbol;
-@@ -1026,6 +1027,7 @@ struct builtin_type
+@@ -960,6 +961,7 @@ struct builtin_type
    struct type *builtin_char;
    struct type *builtin_short;
    struct type *builtin_int;
@@ -114,10 +118,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/gdbtypes.h gdb-6.7.1-pa
    struct type *builtin_long;
    struct type *builtin_signed_char;
    struct type *builtin_unsigned_char;
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/parse.c gdb-6.7.1-patched/gdb/parse.c
---- gdb-6.7.1/gdb/parse.c	2007-08-23 20:08:36.000000000 +0200
-+++ gdb-6.7.1-patched/gdb/parse.c	2007-11-04 01:06:59.000000000 +0100
-@@ -424,7 +424,12 @@ write_exp_msymbol (struct minimal_symbol
+Index: gdb-6.8cvs20080219/gdb/parse.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/parse.c	2008-01-02 00:04:03.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/parse.c	2008-02-20 13:35:19.000000000 +0100
+@@ -437,7 +437,12 @@ write_exp_msymbol (struct minimal_symbol
      case mst_text:
      case mst_file_text:
      case mst_solib_trampoline:
@@ -131,10 +136,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/parse.c gdb-6.7.1-patch
        break;
  
      case mst_data:
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/target.c gdb-6.7.1-patched/gdb/target.c
---- gdb-6.7.1/gdb/target.c	2007-11-04 01:43:03.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/target.c	2007-11-04 01:37:45.000000000 +0100
-@@ -819,6 +819,25 @@ pop_target (void)
+Index: gdb-6.8cvs20080219/gdb/target.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/target.c	2008-02-19 17:22:33.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/target.c	2008-02-20 13:36:17.000000000 +0100
+@@ -812,6 +812,25 @@ pop_target (void)
    internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
  }
  
@@ -157,10 +163,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/target.c gdb-6.7.1-patc
 +  return 1;
 +}
 +
- /* Using the objfile specified in BATON, find the address for the
+ /* Using the objfile specified in OBJFILE, find the address for the
     current thread's thread-local storage with offset OFFSET.  */
  CORE_ADDR
-@@ -904,7 +923,28 @@ target_translate_tls_address (struct obj
+@@ -893,7 +912,28 @@ target_translate_tls_address (struct obj
    /* It wouldn't be wrong here to try a gdbarch method, too; finding
       TLS is an ABI-specific thing.  But we don't do that yet.  */
    else
@@ -190,9 +196,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/target.c gdb-6.7.1-patc
  
    return addr;
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.c gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.c
---- gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2007-11-04 01:43:41.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2007-11-03 23:29:02.000000000 +0100
+Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.dwarf2/dw2-errno.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8cvs20080219/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2008-02-20 13:35:19.000000000 +0100
 @@ -0,0 +1,28 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -222,9 +229,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw
 +
 +  return 0;	/* breakpoint */
 +}
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.exp gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
---- gdb-6.7.1/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2007-11-04 01:43:39.000000000 +0100
-+++ gdb-6.7.1-patched/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2007-11-04 01:41:46.000000000 +0100
+Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8cvs20080219/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2008-02-20 13:35:19.000000000 +0100
 @@ -0,0 +1,67 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +

@@ -16,10 +16,14 @@
 
 	Port to GDB-6.7.
 
-Index: gdb-6.7/gdb/libunwind-frame.c
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+Index: gdb-6.8cvs20080219/gdb/libunwind-frame.c
 ===================================================================
---- gdb-6.7.orig/gdb/libunwind-frame.c	2007-10-15 00:08:30.000000000 +0200
-+++ gdb-6.7/gdb/libunwind-frame.c	2007-10-15 00:13:29.000000000 +0200
+--- gdb-6.8cvs20080219.orig/gdb/libunwind-frame.c	2008-01-02 00:04:03.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/libunwind-frame.c	2008-02-24 20:25:56.000000000 +0100
 @@ -61,6 +61,7 @@ static unw_word_t (*unw_find_dyn_list_p)
  struct libunwind_frame_cache
  {
@@ -28,19 +32,19 @@ Index: gdb-6.7/gdb/libunwind-frame.c
    CORE_ADDR func_addr;
    unw_cursor_t cursor;
    unw_addr_space_t as;
-@@ -134,7 +135,7 @@ libunwind_frame_cache (struct frame_info
+@@ -133,6 +134,7 @@ libunwind_frame_cache (struct frame_info
    unw_accessors_t *acc;
    unw_addr_space_t as;
-   unw_cursor_t *cursor_addr;
--  unw_word_t fp;
+   unw_word_t fp;
 +  unw_word_t fp, sp;
    unw_regnum_t uw_sp_regnum;
    struct libunwind_frame_cache *cache;
    struct libunwind_descr *descr;
-@@ -183,14 +184,29 @@ libunwind_frame_cache (struct frame_info
-   else /* make copy */
-     cache->cursor = *cursor_addr;
+@@ -171,14 +173,30 @@ libunwind_frame_cache (struct frame_info
+ 				 : __LITTLE_ENDIAN);
  
+   unw_init_remote_p (&cache->cursor, as, next_frame);
++
 +  /* For the base address, we have a small problem.  The majority
 +     of the time, we can get the stack pointer of the previous
 +     frame to use as a frame pointer.  In the case where we have
@@ -50,7 +54,7 @@ Index: gdb-6.7/gdb/libunwind-frame.c
 +     sigaltstack as we want.  To handle this, we record the stack
 +     address so the caller may calculate a more correct base address
 +     to use.  */
-+  uw_sp_regnum = descr->gdb2uw (gdbarch_sp_regnum (current_gdbarch));
++  uw_sp_regnum = descr->gdb2uw (gdbarch_sp_regnum (gdbarch));
 +  ret = unw_get_reg_p (&cache->cursor, uw_sp_regnum, &sp);
 +  if (ret < 0)
 +    {
@@ -65,11 +69,11 @@ Index: gdb-6.7/gdb/libunwind-frame.c
      }
  
 -  /* To get base address, get sp from previous frame.  */
--  uw_sp_regnum = descr->gdb2uw (gdbarch_sp_regnum (current_gdbarch));
+-  uw_sp_regnum = descr->gdb2uw (gdbarch_sp_regnum (gdbarch));
    ret = unw_get_reg_p (&cache->cursor, uw_sp_regnum, &fp);
    if (ret < 0)
      {
-@@ -198,6 +214,7 @@ libunwind_frame_cache (struct frame_info
+@@ -186,6 +204,7 @@ libunwind_frame_cache (struct frame_info
        error (_("Can't get libunwind sp register."));
      }
  
@@ -77,7 +81,7 @@ Index: gdb-6.7/gdb/libunwind-frame.c
    cache->base = (CORE_ADDR)fp;
    cache->as = as;
  
-@@ -402,6 +419,31 @@ libunwind_search_unwind_table (void *as,
+@@ -381,6 +400,31 @@ libunwind_search_unwind_table (void *as,
  				    di, pi, need_unwind_info, args);
  }
  
@@ -109,7 +113,7 @@ Index: gdb-6.7/gdb/libunwind-frame.c
  /* Verify if we are in a sigtramp frame and we can use libunwind to unwind.  */
  const struct frame_unwind *
  libunwind_sigtramp_frame_sniffer (struct frame_info *next_frame)
-@@ -439,7 +481,7 @@ libunwind_sigtramp_frame_sniffer (struct
+@@ -419,7 +463,7 @@ libunwind_sigtramp_frame_sniffer (struct
    ret = unw_is_signal_frame_p (&cursor);
    unw_destroy_addr_space_p (as);
    if (ret > 0)
@@ -118,11 +122,11 @@ Index: gdb-6.7/gdb/libunwind-frame.c
  
    return NULL;
  }
-Index: gdb-6.7/gdb/libunwind-frame.h
+Index: gdb-6.8cvs20080219/gdb/libunwind-frame.h
 ===================================================================
---- gdb-6.7.orig/gdb/libunwind-frame.h	2007-10-15 00:05:20.000000000 +0200
-+++ gdb-6.7/gdb/libunwind-frame.h	2007-10-15 00:08:36.000000000 +0200
-@@ -48,6 +48,9 @@ void libunwind_frame_set_descr (struct g
+--- gdb-6.8cvs20080219.orig/gdb/libunwind-frame.h	2008-01-02 00:04:03.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/libunwind-frame.h	2008-02-24 20:23:47.000000000 +0100
+@@ -47,6 +47,9 @@ void libunwind_frame_set_descr (struct g
  
  void libunwind_frame_this_id (struct frame_info *next_frame, void **this_cache,
  			      struct frame_id *this_id);
@@ -132,11 +136,11 @@ Index: gdb-6.7/gdb/libunwind-frame.h
  void libunwind_frame_prev_register (struct frame_info *next_frame, void **this_cache,
  				    int regnum, int *optimizedp,
  				    enum lval_type *lvalp, CORE_ADDR *addrp,
-Index: gdb-6.7/gdb/ia64-tdep.c
+Index: gdb-6.8cvs20080219/gdb/ia64-tdep.c
 ===================================================================
---- gdb-6.7.orig/gdb/ia64-tdep.c	2007-10-15 00:05:20.000000000 +0200
-+++ gdb-6.7/gdb/ia64-tdep.c	2007-10-15 00:08:36.000000000 +0200
-@@ -2968,7 +2968,7 @@ ia64_libunwind_sigtramp_frame_this_id (s
+--- gdb-6.8cvs20080219.orig/gdb/ia64-tdep.c	2008-02-24 20:23:40.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/ia64-tdep.c	2008-02-24 20:23:47.000000000 +0100
+@@ -2942,7 +2942,7 @@ ia64_libunwind_sigtramp_frame_this_id (s
    struct frame_id id;
    CORE_ADDR prev_ip;
  
@@ -145,7 +149,7 @@ Index: gdb-6.7/gdb/ia64-tdep.c
    if (frame_id_eq (id, null_frame_id))
      {
        (*this_id) = null_frame_id;
-@@ -2980,8 +2980,14 @@ ia64_libunwind_sigtramp_frame_this_id (s
+@@ -2954,8 +2954,14 @@ ia64_libunwind_sigtramp_frame_this_id (s
    frame_unwind_register (next_frame, IA64_BSP_REGNUM, buf);
    bsp = extract_unsigned_integer (buf, 8);
  

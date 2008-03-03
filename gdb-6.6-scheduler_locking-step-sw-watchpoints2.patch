@@ -17,9 +17,15 @@
 	* infrun.c (proceed): RESUME_STEP initialized for non-stepping.
 	RESUME_STEP set according to STEP only at the end of the function.
 
---- ./gdb/inferior.h	15 Jun 2007 22:44:55 -0000	1.83
-+++ ./gdb/inferior.h	25 Jun 2007 20:33:02 -0000
-@@ -194,7 +194,15 @@ extern void reopen_exec_file (void);
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+Index: gdb-6.8cvs20080219/gdb/inferior.h
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/inferior.h	2008-02-14 23:03:57.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/inferior.h	2008-02-19 14:15:01.000000000 +0100
+@@ -179,7 +179,15 @@ extern void reopen_exec_file (void);
  /* The `resume' routine should only be called in special circumstances.
     Normally, use `proceed', which handles a lot of bookkeeping.  */
  
@@ -36,9 +42,11 @@
  
  /* From misc files */
  
---- ./gdb/infrun.c	22 Jun 2007 12:47:48 -0000	1.243
-+++ ./gdb/infrun.c	25 Jun 2007 20:33:02 -0000
-@@ -76,7 +76,8 @@ static void set_schedlock_func (char *ar
+Index: gdb-6.8cvs20080219/gdb/infrun.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/infrun.c	2008-02-14 23:03:57.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/infrun.c	2008-02-19 14:24:37.000000000 +0100
+@@ -74,7 +74,8 @@ static void set_schedlock_func (char *ar
  
  struct execution_control_state;
  
@@ -48,7 +56,7 @@
  
  static void xdb_handle_command (char *args, int from_tty);
  
-@@ -496,15 +497,18 @@ set_schedlock_func (char *args, int from
+@@ -508,15 +509,18 @@ set_schedlock_func (char *args, int from
     STEP nonzero if we should step (zero to continue instead).
     SIG is the signal to give the inferior (zero for none).  */
  void
@@ -70,7 +78,7 @@
  
    /* FIXME: calling breakpoint_here_p (read_pc ()) three times! */
  
-@@ -593,9 +597,10 @@ a command like `return' or `jump' to con
+@@ -632,9 +636,10 @@ a command like `return' or `jump' to con
  	  resume_ptid = inferior_ptid;
  	}
  
@@ -83,7 +91,7 @@
  	{
  	  /* User-settable 'scheduler' mode requires solo thread resume. */
  	  resume_ptid = inferior_ptid;
-@@ -711,7 +716,7 @@ static CORE_ADDR prev_pc;
+@@ -742,7 +747,7 @@ static CORE_ADDR prev_pc;
  void
  proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
  {
@@ -92,7 +100,7 @@
  
    if (step > 0)
      step_start_function = find_pc_function (read_pc ());
-@@ -725,13 +731,13 @@ proceed (CORE_ADDR addr, enum target_sig
+@@ -756,13 +761,13 @@ proceed (CORE_ADDR addr, enum target_sig
  	   step one instruction before inserting breakpoints so that
  	   we do not stop right away (and report a second hit at this
  	   breakpoint).  */
@@ -108,10 +116,10 @@
      }
    else
      {
-@@ -755,9 +761,9 @@ proceed (CORE_ADDR addr, enum target_sig
+@@ -786,9 +791,9 @@ proceed (CORE_ADDR addr, enum target_sig
       that reported the most recent event.  If a step-over is required
       it returns TRUE and sets the current thread to the old thread. */
-   if (prepare_to_proceed () && breakpoint_here_p (read_pc ()))
+   if (prepare_to_proceed (step))
 -    oneproc = 1;
 +    resume_step = RESUME_STEP_USER;
  
@@ -119,8 +127,8 @@
 +  if (resume_step == RESUME_STEP_USER)
      /* We will get a trace trap after one instruction.
         Continue it automatically and insert breakpoints then.  */
-     trap_expected = 1;
-@@ -806,8 +812,13 @@ proceed (CORE_ADDR addr, enum target_sig
+     stepping_over_breakpoint = 1;
+@@ -832,8 +837,13 @@ proceed (CORE_ADDR addr, enum target_sig
       updated correctly when the inferior is stopped.  */
    prev_pc = read_pc ();
  
@@ -135,7 +143,7 @@
  
    /* Wait for it to stop (if not standalone)
       and in any case decode why it stopped, and act accordingly.  */
-@@ -2681,14 +2690,20 @@ process_event_stop_test:
+@@ -2723,14 +2733,21 @@ process_event_stop_test:
  
  /* Are we in the middle of stepping?  */
  
@@ -145,11 +153,12 @@
  {
 -  return ((!ecs->handling_longjmp
 -	   && ((step_range_end && step_resume_breakpoint == NULL)
--	       || trap_expected))
+-	       || stepping_over_breakpoint))
 -	  || ecs->stepping_through_solib_after_catch
 -	  || bpstat_should_step ());
 +  if (!ecs->handling_longjmp
-+      && ((step_range_end && step_resume_breakpoint == NULL) || trap_expected))
++      && ((step_range_end && step_resume_breakpoint == NULL)
++	  || stepping_over_breakpoint))
 +    return RESUME_STEP_USER;
 +
 +  if (ecs->stepping_through_solib_after_catch)
@@ -162,9 +171,11 @@
  }
  
  /* Subroutine call with source code we should not step over.  Do step
---- ./gdb/linux-nat.c	16 Jun 2007 17:16:25 -0000	1.64
-+++ ./gdb/linux-nat.c	25 Jun 2007 20:33:02 -0000
-@@ -1720,7 +1720,10 @@ count_events_callback (struct lwp_info *
+Index: gdb-6.8cvs20080219/gdb/linux-nat.c
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/linux-nat.c	2008-02-14 23:03:57.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/linux-nat.c	2008-02-19 14:15:01.000000000 +0100
+@@ -1751,7 +1751,10 @@ count_events_callback (struct lwp_info *
  static int
  select_singlestep_lwp_callback (struct lwp_info *lp, void *data)
  {
@@ -176,9 +187,11 @@
      return 1;
    else
      return 0;
---- ./gdb/linux-nat.h	10 May 2007 21:36:00 -0000	1.18
-+++ ./gdb/linux-nat.h	25 Jun 2007 20:33:02 -0000
-@@ -53,8 +53,8 @@ struct lwp_info
+Index: gdb-6.8cvs20080219/gdb/linux-nat.h
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/linux-nat.h	2008-02-14 23:03:58.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/linux-nat.h	2008-02-19 14:15:01.000000000 +0100
+@@ -55,8 +55,8 @@ struct lwp_info
    /* If non-zero, a pending wait status.  */
    int status;
  
@@ -187,5 +200,5 @@
 +  /* The kind of stepping of this LWP.  */
 +  enum resume_step step;
  
-   /* If WAITSTATUS->KIND != TARGET_WAITKIND_SPURIOUS, the waitstatus
-      for this LWP's last event.  This may correspond to STATUS above,
+   /* Non-zero si_signo if this LWP stopped with a trap.  si_addr may
+      be the address of a hardware watchpoint.  */

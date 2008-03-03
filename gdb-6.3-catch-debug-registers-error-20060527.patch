@@ -6,52 +6,153 @@ from  Alexandre Oliva  <aoliva@redhat.com>
 	(i386_linux_set_debug_regs_for_thread): ... this, and
 	add new function to catch exceptions in the old one.
 
-Index: gdb-6.5/gdb/i386-linux-nat.c
+2008-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Port to GDB-6.8pre.
+
+This patch was originally made to workaround a deficiency of ia32el (==ia32
+emulator on ia64) which EIOs on ptrace(2) of the debug registers.
+
+Currently I can no longer run gdb.i386 on RHEL-5.1.ia64 as it fails on
+	$ rpm -qv kernel
+	kernel-2.6.18-53.el5.ia64
+	$ file /emul/ia32-linux/usr/bin/gdb ./print-threads
+	/emul/ia32-linux/usr/bin/gdb: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), for GNU/Linux 2.6.9, dynamically linked (uses shared libs), for GNU/Linux 2.6.9, stripped
+	./print-threads:              ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), for GNU/Linux 2.6.9, dynamically linked (uses shared libs), for GNU/Linux 2.6.9, not stripped
+	$ /emul/ia32-linux/usr/bin/gdb ./print-threads
+	(gdb) r
+	Starting program: /root/jkratoch/redhat/print-threads 
+	Warning:
+	Cannot insert breakpoint -2.
+	Error accessing memory address 0x555766fb: Input/output error.
+	(gdb) maint info breakpoints 
+	Num Type           Disp Enb Address    What
+	-1  longjmp resume keep n   0x00000000 
+	-2  shlib events   keep y   0x555766fb 
+
+ia32-on-ia64 run problem info:
+
+the inconsistency is in function linux_nat_wait - there is a variable called
+block_mask, which is assumed to represent the current signal mask. in the
+following execution path this assumption does not hold:
+
+1) block-mask is filled with SIGCHLD and the signal is masked in
+   lin_lwp_attach_lwp, which is called at the beginning of the procedure
+   that handles a new thread in the debuggee.
+2) further down this procedure gdb tries to set the debug regs of the debuggee.
+   when trying to set debug regs - gdb fails and calls throw_exception. this
+   function finishes with siglongjmp, which clears the sigmask (seq. 1).
+3) further down, linux_nat_wait is called to wait on the new child. in
+   linux_nat_wait there is a sequence :
+
+      if ( ! (block_mask & SIGCHLD) )
+        mask- SIGCHLD
+        while () {
+          wait-no-hang( )
+          if no child found then
+            sigsuspend (SIGCHLD)
+
+4) the signal that notifies the debugger about the child is received after the
+   wait and before the sigsuspend. originally, this was not supposed to happen
+   because SIGCHLD is supposed to be blocked, but because what happens in step
+   2, the signal mask is cleared and the signal is received at this point,
+   which results with a hang
+
+sequence 1:
+
+catch_errors (symbol_add_stubs)
+  symbol_file_add_with_addrs_or_offsets
+    deprecated_target_new_objfile_hook
+      tui_new_objfile_hook
+        attach_thread
+          observer_notify_linux_new_thread
+            generic_observer_notify
+              observer_linux_new_thread_notification_stub
+                i386_linux_new_thread
+                  i386_linux_set_debug_regs_for_thread
+                    i386_linux_dr_set_addr
+                      i386_linux_dr_set
+                        perror_with_name
+                          .
+                          .
+                          .
+                          throw_exception
+                            siglongjmp
+
+RHEL Bug 175270
+
+Index: gdb-6.8cvs20080219/gdb/i386-linux-nat.c
 ===================================================================
---- gdb-6.5.orig/gdb/i386-linux-nat.c	2006-07-11 05:21:58.000000000 -0300
-+++ gdb-6.5/gdb/i386-linux-nat.c	2006-07-11 05:24:29.000000000 -0300
-@@ -27,6 +27,7 @@
- #include "observer.h"
+--- gdb-6.8cvs20080219.orig/gdb/i386-linux-nat.c	2008-01-10 19:19:02.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/i386-linux-nat.c	2008-02-24 09:23:09.000000000 +0100
+@@ -24,6 +24,7 @@
+ #include "regcache.h"
  #include "target.h"
  #include "linux-nat.h"
 +#include "exceptions.h"
  
  #include "gdb_assert.h"
  #include "gdb_string.h"
-@@ -695,14 +696,33 @@ struct i386_debug_register_state
-   unsigned long control;
- };
+@@ -611,20 +612,40 @@ i386_linux_dr_get (ptid_t ptid, int regn
+   return value;
+ }
  
 -static void
--i386_linux_set_debug_regs_for_thread (ptid_t ptid,
--				      struct i386_debug_register_state *dbs)
-+struct i386_debug_register_for_thread
-+{
-+  ptid_t ptid;
-+  struct i386_debug_register_state *dbs;
-+};
-+
+-i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+-{
+-  int tid;
++struct i386_linux_dr_set
++  {
++    int tid;
++    int regnum;
++    unsigned long value;
++  };
+ 
+-  tid = TIDGET (ptid);
+-  if (tid == 0)
+-    tid = PIDGET (ptid);
 +static int
-+i386_linux_set_dr_for_thread (void *drp)
- {
-+  ptid_t ptid = ((struct i386_debug_register_for_thread *)drp)->ptid;
-+  struct i386_debug_register_state *dbs
-+    = ((struct i386_debug_register_for_thread *)drp)->dbs;
-   int i;
-   for (i = 0; i < (DR_LASTADDR - DR_FIRSTADDR) + 1; ++i)
-     i386_linux_dr_set_addr (ptid, i, dbs->addr[i]);
-   i386_linux_dr_set_control (ptid, dbs->control);
++i386_linux_dr_set_core (void *data_pointer)
++{
++  struct i386_linux_dr_set *data = data_pointer;
+ 
+   errno = 0;
+-  ptrace (PTRACE_POKEUSER, tid,
+-	  offsetof (struct user, u_debugreg[regnum]), value);
++  ptrace (PTRACE_POKEUSER, data->tid,
++	  offsetof (struct user, u_debugreg[data->regnum]), data->value);
+   if (errno != 0)
+     perror_with_name (_("Couldn't write debug register"));
 +  return 1;
 +}
 +
 +static int
-+i386_linux_set_debug_regs_for_thread (ptid_t ptid,
-+				      struct i386_debug_register_state *dbs)
++i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
 +{
-+  struct i386_debug_register_for_thread dr;
-+  dr.ptid = ptid;
-+  dr.dbs = dbs;
-+  return catch_errors (i386_linux_set_dr_for_thread, &dr, "", RETURN_MASK_ALL);
++  struct i386_linux_dr_set data;
++  int tid;
++
++  data.tid = TIDGET (ptid);
++  if (data.tid == 0)
++    data.tid = PIDGET (ptid);
++
++  data.regnum = regnum;
++  data.value = value;
++
++  return catch_errors (i386_linux_dr_set_core, &data, "", RETURN_MASK_ALL);
  }
  
- /* Iterator function to support syncing debug registers across all threads.  */
+ void
+Index: gdb-6.8cvs20080219/gdb/Makefile.in
+===================================================================
+--- gdb-6.8cvs20080219.orig/gdb/Makefile.in	2008-02-24 09:13:35.000000000 +0100
++++ gdb-6.8cvs20080219/gdb/Makefile.in	2008-02-24 09:14:26.000000000 +0100
+@@ -2252,7 +2252,7 @@ i386gnu-tdep.o: i386gnu-tdep.c $(defs_h)
+ i386-linux-nat.o: i386-linux-nat.c $(defs_h) $(inferior_h) $(gdbcore_h) \
+ 	$(regcache_h) $(linux_nat_h) $(gdb_assert_h) $(gdb_string_h) \
+ 	$(gregset_h) $(i387_tdep_h) $(i386_tdep_h) $(i386_linux_tdep_h) \
+-	$(gdb_proc_service_h) $(target_h)
++	$(gdb_proc_service_h) $(target_h) $(exceptions_h)
+ i386-linux-tdep.o: i386-linux-tdep.c $(defs_h) $(gdbcore_h) $(frame_h) \
+ 	$(value_h) $(regcache_h) $(inferior_h) $(osabi_h) $(reggroups_h) \
+ 	$(dwarf2_frame_h) $(gdb_string_h) $(i386_tdep_h) \
