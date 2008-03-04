@@ -1,6 +1,7 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
 # --with debug: Build without optimizations and without splitting the debuginfo.
+# --with upstream: No Fedora specific patches get applied.
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages
 Name: gdb%{?_with_debug:-debug}
@@ -11,7 +12,8 @@ Name: gdb%{?_with_debug:-debug}
 Version: 6.7.50.20080227
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 1%{?dist}
+# `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -40,23 +42,8 @@ Obsoletes: gdb64 < 5.3.91
 Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
 
-# GDB patches have the format gdb-<version>-bz<red-hat-bz-#>-<desc>.patch;
-# should include the ChangeLog.RedHat change-log entry; and should be
-# created using diff -u ./gdb (not gdb-6.3/gdb).
-
-# Red Hat local patches
-
-Patch0: gdb-6.3-rh-changelogs-20041202.patch
-
-# Work around out-of-date dejagnu that does not have KFAIL
-Patch1: gdb-6.3-rh-dummykfail-20041202.patch
-
-# Match Red Hat's version info
-Patch2: gdb-6.3-rh-testversion-20041202.patch
-
-# Check that libunwind works - new test then fix
-Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
-Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
+# GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
+# They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
 
 # Cleanup any leftover testsuite processes as it may stuck mock(1) builds.
 Source2: gdb-orphanripper.c
@@ -64,9 +51,15 @@ Source2: gdb-orphanripper.c
 # Man page for gstack(1).
 Source3: gdb-gstack.man
 
-# ------------------------------------------
+# Work around out-of-date dejagnu that does not have KFAIL
+Patch1: gdb-6.3-rh-dummykfail-20041202.patch
 
-# Add fixes starting at 100
+# Match the Fedora's version info.
+Patch2: gdb-6.3-rh-testversion-20041202.patch
+
+# Check that libunwind works - new test then fix
+Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
+Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 # Recognize i386 signal trampolines before CFI.  Ensures that signal
 # frames are identified as signal frames.
@@ -406,10 +399,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 # Apply patches defined above.
 
-#%patch232 -p1
-%patch0 -p1
-%patch1 -p1
+# Match the Fedora's version info.
 %patch2 -p1
+
+%if 0%{!?_with_upstream:1}
+
+#%patch232 -p1
+%patch1 -p1
 %patch3 -p1
 %patch4 -p1
 
@@ -508,6 +504,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
 
+%endif	# 1%{?_with_upstream:0}
+
 # Change the version that gets printed at GDB startup, so it is Fedora
 # specific.
 cat > gdb/version.in << _FOO
@@ -537,20 +535,11 @@ cd %{gdb_build}
 g77="`which gfortran 2>/dev/null || true`"
 test -z "$g77" || ln -s "$g77" ./g77
 
-# FIXME: The configure option --enable-gdb-build-warnings=,-Werror
-# below can conflict with user settings. For instance, passing a
-# combination of -Wall and -O0 from the file rpmrc will always cause
-# at least one warning, and stop the compilation.  The whole configury
-# line needs to be cleaned up.
-
 export CFLAGS="$RPM_OPT_FLAGS"
 %if 0%{?_with_debug:1}
+# --enable-werror could conflict with `-Wall -O0' but this is no longer true
+# for recent GCCs.
 CFLAGS="$CFLAGS -O0 -ggdb2"
-%endif
-
-enable_build_warnings="--enable-gdb-build-warnings=,-Wno-unused"
-%ifarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
-enable_build_warnings="$enable_build_warnings,-Werror"
 %endif
 
 ../configure						\
@@ -559,7 +548,16 @@ enable_build_warnings="$enable_build_warnings,-Werror"
 	--sysconfdir=%{_sysconfdir}			\
 	--mandir=%{_mandir}				\
 	--infodir=%{_infodir}				\
-	$enable_build_warnings				\
+	--enable-gdb-build-warnings=,-Wno-unused	\
+%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
+	--disable-werror				\
+%else 
+%if 0%{?_with_upstream:1}
+	--disable-werror				\
+%else
+	--enable-werror					\
+%endif
+%endif
 	--with-separate-debug-dir=/usr/lib/debug	\
 	--disable-sim					\
 	--disable-rpath					\
@@ -737,6 +735,12 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Tue Mar  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-2
+- Drop the unused `ChangeLog.RedHat' file stubs.
+- New rpm option `--with upstream' to drop the Fedora patches for testing.
+- Drop some no longer valid .spec file comments.
+- Include the Fortran dynamic arrays entry for %%changlog of 6.7.50.20080227-1.
+
 * Mon Mar  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-1
 - Upgrade to the upstream gdb-6.8 prerelease.
 - Cleanup the leftover `.orig' files during %%prep.
@@ -744,6 +748,7 @@ fi
 - `--with testsuite' now also BuildRequires: fpc
 - Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
 - Update the printed GDB version string to be Fedora specific.
+- Fix/implement the Fortran dynamic arrays support (BZ 377541).
 
 * Sat Mar  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.1-16
 - Run the full testsuite also in the `-fPIE -pie' mode.
