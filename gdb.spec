@@ -13,7 +13,7 @@ Version: 6.7.50.20080227
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -38,9 +38,11 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64 < 5.3.91
 %endif
 
+%if 0%{!?_with_upstream:1}
 # The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
 Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
+%endif	# 1%{?_with_upstream:0}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -685,11 +687,13 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
+%if 0%{!?_with_upstream:1}
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
 ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
+%endif	# 1%{?_with_upstream:0}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -717,12 +721,14 @@ fi
 %{_bindir}/gcore
 %{_bindir}/gdb
 %{_bindir}/gdbtui
-%{_bindir}/gstack
-%{_bindir}/pstack
 %{_mandir}/*/gdb.1*
 %{_mandir}/*/gdbtui.1*
+%if 0%{!?_with_upstream:1}
+%{_bindir}/gstack
+%{_bindir}/pstack
 %{_mandir}/*/gstack.1*
 %{_mandir}/*/pstack.1*
+%endif	# 1%{?_with_upstream:0}
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
@@ -735,6 +741,12 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Mon Mar 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-3
+- build-id warnings integrated more with rpm and the lists of the warnings got
+  replaced usually by a single-line `debuginfo-install' advice.
+  - FIXME: Testsuite needs an update for the new pre-prompt messages.
+- Fix the `--with upstream' compilation - gstack/pstack are now omitted.
+
 * Tue Mar  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-2
 - Drop the unused `ChangeLog.RedHat' file stubs.
 - New rpm option `--with upstream' to drop the Fedora patches for testing.
