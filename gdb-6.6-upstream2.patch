@@ -1,0 +1,656 @@
+https://bugzilla.redhat.com/show_bug.cgi?id=435819
+
+http://sourceware.org/ml/gdb-cvs/2008-01/msg00203.html
+
+2008-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* Makefile.in (symfile.o): Update.
+	* NEWS: Mention exec tracing support.
+	* inf-ttrace.c (inf_ttrace_wait): Return TARGET_WAITKIND_EXECD for
+	exec events.
+	* infcmd.c (kill_if_already_running, detach_command)
+	(disconnect_command): Replace SOLIB_RESTART with no_shared_libraries.
+	* infrun.c (MAY_FOLLOW_EXEC, may_follow_exec): Delete.
+	(follow_exec): Do not check may_follow_exec.  Do not mourn and push
+	targets.  Apply the sysroot path to the loaded executable.  Use
+	no_shared_libraries.
+	* linux-nat.c (linux_child_follow_fork): Print fork following
+	messages if verbose.
+	(kill_wait_callback): Kill again before waiting a second time.
+	* symfile.c (symbol_file_clear): Replace SOLIB_RESTART with
+	no_shared_libraries.
+
+2008-01-29  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.base/foll-exec.exp: Update header.  Skip on remote targets.
+	Run on GNU/Linux.
+	(do_exec_tests): Check for systems which do not support catchpoints.
+	Do not match START.
+	* gdb.base/foll-fork.exp: Update header.  Skip on remote targets.
+	Run on GNU/Linux.  Enable verbose output.
+	(check_fork_catchpoints): New.
+	(explicit_fork_child_follow, catch_fork_child_follow)
+	(tcatch_fork_parent_follow): Update expected messages.
+	(do_fork_tests): Use check_fork_catchpoints.
+	* gdb.base/foll-vfork.exp: Update header.  Skip on remote targets.
+	Run on GNU/Linux.  Enable verbose output.
+	(check_vfork_catchpoints): New.
+	(vfork_parent_follow_to_bp, tcatch_vfork_then_child_follow): Update
+	expected messages.
+	(do_vfork_and_exec_tests): Use check_fork_catchpoints.
+
+[ Backport for GDB-6.6.  ]
+
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/Makefile.in gdb-6.6/gdb/Makefile.in
+--- gdb-6.6-orig/gdb/Makefile.in	2008-03-13 21:17:46.000000000 +0100
++++ gdb-6.6/gdb/Makefile.in	2008-03-13 21:20:40.000000000 +0100
+@@ -2788,7 +2788,7 @@ symfile.o: symfile.c $(defs_h) $(bfdlink
+ 	$(hashtab_h) $(readline_h) $(gdb_assert_h) $(block_h) \
+ 	$(gdb_string_h) $(gdb_stat_h) $(observer_h) $(exec_h) \
+ 	$(parser_defs_h) $(elf_bfd_h) $(gdb_stdint_h) $(libbfd_h) $(elf_bfd_h) \
+-	$(elf_external_h)
++	$(elf_external_h) $(solib_h)
+ symfile-mem.o: symfile-mem.c $(defs_h) $(symtab_h) $(gdbcore_h) \
+ 	$(objfiles_h) $(exceptions_h) $(gdbcmd_h) $(target_h) $(value_h) \
+ 	$(symfile_h) $(observer_h) $(auxv_h) $(elf_common_h)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/NEWS gdb-6.6/gdb/NEWS
+--- gdb-6.6-orig/gdb/NEWS	2008-03-13 21:17:46.000000000 +0100
++++ gdb-6.6/gdb/NEWS	2008-03-13 21:21:14.000000000 +0100
+@@ -1,6 +1,11 @@
+ 		What has changed in GDB?
+ 	     (Organized release by release)
+ 
++*** Changes in post-GDB 6.6 (backports)
++
++* GDB on GNU/Linux and HP/UX can now debug through "exec" of a new
++process.
++
+ *** Changes in GDB 6.6
+ 
+ * New targets
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/infcmd.c gdb-6.6/gdb/infcmd.c
+--- gdb-6.6-orig/gdb/infcmd.c	2006-11-20 22:58:51.000000000 +0100
++++ gdb-6.6/gdb/infcmd.c	2008-03-13 21:20:17.000000000 +0100
+@@ -447,9 +447,7 @@ kill_if_already_running (int from_tty)
+ Start it from the beginning? "))
+ 	error (_("Program not restarted."));
+       target_kill ();
+-#if defined(SOLIB_RESTART)
+-      SOLIB_RESTART ();
+-#endif
++      no_shared_libraries (NULL, from_tty);
+       init_wait_for_inferior ();
+     }
+ }
+@@ -1962,9 +1960,7 @@ detach_command (char *args, int from_tty
+ {
+   dont_repeat ();		/* Not for the faint of heart.  */
+   target_detach (args, from_tty);
+-#if defined(SOLIB_RESTART)
+-  SOLIB_RESTART ();
+-#endif
++  no_shared_libraries (NULL, from_tty);
+   if (deprecated_detach_hook)
+     deprecated_detach_hook ();
+ }
+@@ -1982,9 +1978,7 @@ disconnect_command (char *args, int from
+ {
+   dont_repeat ();		/* Not for the faint of heart */
+   target_disconnect (args, from_tty);
+-#if defined(SOLIB_RESTART)
+-  SOLIB_RESTART ();
+-#endif
++  no_shared_libraries (NULL, from_tty);
+   if (deprecated_detach_hook)
+     deprecated_detach_hook ();
+ }
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/infrun.c gdb-6.6/gdb/infrun.c
+--- gdb-6.6-orig/gdb/infrun.c	2008-03-13 21:17:46.000000000 +0100
++++ gdb-6.6/gdb/infrun.c	2008-03-13 21:20:17.000000000 +0100
+@@ -110,15 +110,6 @@ int sync_execution = 0;
+ 
+ static ptid_t previous_inferior_ptid;
+ 
+-/* This is true for configurations that may follow through execl() and
+-   similar functions.  At present this is only true for HP-UX native.  */
+-
+-#ifndef MAY_FOLLOW_EXEC
+-#define MAY_FOLLOW_EXEC (0)
+-#endif
+-
+-static int may_follow_exec = MAY_FOLLOW_EXEC;
+-
+ static int debug_infrun = 0;
+ static void
+ show_debug_infrun (struct ui_file *file, int from_tty,
+@@ -385,9 +376,6 @@ follow_exec (int pid, char *execd_pathna
+   int saved_pid = pid;
+   struct target_ops *tgt;
+ 
+-  if (!may_follow_exec)
+-    return;
+-
+   /* This is an exec event that we actually wish to pay attention to.
+      Refresh our symbol table to the newly exec'd program, remove any
+      momentary bp's, etc.
+@@ -422,17 +410,20 @@ follow_exec (int pid, char *execd_pathna
+   /* We've followed the inferior through an exec.  Therefore, the
+      inferior has essentially been killed & reborn. */
+ 
+-  /* First collect the run target in effect.  */
+-  tgt = find_run_target ();
+-  /* If we can't find one, things are in a very strange state...  */
+-  if (tgt == NULL)
+-    error (_("Could find run target to save before following exec"));
+-
+   gdb_flush (gdb_stdout);
+-  target_mourn_inferior ();
+-  inferior_ptid = pid_to_ptid (saved_pid);
++  generic_mourn_inferior ();
+   /* Because mourn_inferior resets inferior_ptid. */
+-  push_target (tgt);
++  inferior_ptid = pid_to_ptid (saved_pid);
++
++  if (gdb_sysroot && *gdb_sysroot)
++    {
++      char *name = alloca (strlen (gdb_sysroot)
++			    + strlen (execd_pathname)
++			    + 1);
++      strcpy (name, gdb_sysroot);
++      strcat (name, execd_pathname);
++      execd_pathname = name;
++    }
+ 
+   /* That a.out is now the one to use. */
+   exec_file_attach (execd_pathname, 0);
+@@ -443,9 +434,7 @@ follow_exec (int pid, char *execd_pathna
+   /* Reset the shared library package.  This ensures that we get
+      a shlib event when the child reaches "_start", at which point
+      the dld will have had a chance to initialize the child. */
+-#if defined(SOLIB_RESTART)
+-  SOLIB_RESTART ();
+-#endif
++  no_shared_libraries (NULL, 0);
+ #ifdef SOLIB_CREATE_INFERIOR_HOOK
+   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
+ #else
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/linux-nat.c gdb-6.6/gdb/linux-nat.c
+--- gdb-6.6-orig/gdb/linux-nat.c	2008-03-13 21:17:46.000000000 +0100
++++ gdb-6.6/gdb/linux-nat.c	2008-03-13 21:22:47.000000000 +0100
+@@ -416,7 +416,7 @@ child_follow_fork (struct target_ops *op
+ 					_(" (Try `set detach-on-fork off'.)")));
+ 	  advice_printed = 1;
+ 
+-	  if (debug_linux_nat)
++	  if (info_verbose || debug_linux_nat)
+ 	    {
+ 	      fprintf_filtered (gdb_stdlog,
+ 				"Detaching after fork from child process %d.\n",
+@@ -500,7 +500,7 @@ child_follow_fork (struct target_ops *op
+       /* Before detaching from the parent, remove all breakpoints from it. */
+       remove_breakpoints ();
+ 
+-      if (debug_linux_nat)
++      if (info_verbose || debug_linux_nat)
+ 	{
+ 	  target_terminal_ours ();
+ 	  fprintf_filtered (gdb_stdlog,
+@@ -2590,11 +2590,18 @@ kill_wait_callback (struct lwp_info *lp,
+       do
+ 	{
+ 	  pid = my_waitpid (GET_LWP (lp->ptid), NULL, __WCLONE);
+-	  if (pid != (pid_t) -1 && debug_linux_nat)
++	  if (pid != (pid_t) -1)
+ 	    {
+-	      fprintf_unfiltered (gdb_stdlog,
+-				  "KWC: wait %s received unknown.\n",
+-				  target_pid_to_str (lp->ptid));
++	      if (debug_linux_nat)
++		fprintf_unfiltered (gdb_stdlog,
++				    "KWC: wait %s received unknown.\n",
++				    target_pid_to_str (lp->ptid));
++	      /* The Linux kernel sometimes fails to kill a thread
++		 completely after PTRACE_KILL; that goes from the stop
++		 point in do_fork out to the one in
++		 get_signal_to_deliever and waits again.  So kill it
++		 again.  */
++	      kill_callback (lp, NULL);
+ 	    }
+ 	}
+       while (pid == GET_LWP (lp->ptid));
+@@ -2605,11 +2612,14 @@ kill_wait_callback (struct lwp_info *lp,
+   do
+     {
+       pid = my_waitpid (GET_LWP (lp->ptid), NULL, 0);
+-      if (pid != (pid_t) -1 && debug_linux_nat)
++      if (pid != (pid_t) -1)
+ 	{
+-	  fprintf_unfiltered (gdb_stdlog,
+-			      "KWC: wait %s received unk.\n",
+-			      target_pid_to_str (lp->ptid));
++	  if (debug_linux_nat)
++	    fprintf_unfiltered (gdb_stdlog,
++				"KWC: wait %s received unk.\n",
++				target_pid_to_str (lp->ptid));
++	  /* See the call to kill_callback above.  */
++	  kill_callback (lp, NULL);
+ 	}
+     }
+   while (pid == GET_LWP (lp->ptid));
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/symfile.c gdb-6.6/gdb/symfile.c
+--- gdb-6.6-orig/gdb/symfile.c	2008-03-13 21:17:46.000000000 +0100
++++ gdb-6.6/gdb/symfile.c	2008-03-13 21:23:06.000000000 +0100
+@@ -57,6 +57,7 @@
+ #include "gdb_stdint.h"
+ #include "libbfd.h"
+ #include "elf/external.h"
++#include "solib.h"
+ 
+ #include <sys/types.h>
+ #include <fcntl.h>
+@@ -1136,9 +1137,7 @@ symbol_file_clear (int from_tty)
+        storage has just been released, we'd better wipe the solib
+        descriptors as well.
+      */
+-#if defined(SOLIB_RESTART)
+-    SOLIB_RESTART ();
+-#endif
++    no_shared_libraries (NULL, from_tty);
+ 
+     symfile_objfile = NULL;
+     if (from_tty)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/testsuite/gdb.base/foll-exec.exp gdb-6.6/gdb/testsuite/gdb.base/foll-exec.exp
+--- gdb-6.6-orig/gdb/testsuite/gdb.base/foll-exec.exp	2006-08-10 07:27:20.000000000 +0200
++++ gdb-6.6/gdb/testsuite/gdb.base/foll-exec.exp	2008-03-13 21:24:26.000000000 +0100
+@@ -21,7 +21,7 @@ if $tracelevel then {
+ 	strace $tracelevel
+ 	}
+ 
+-if { ![isnative] } then {
++if { [is_remote target] || ![isnative] } then {
+     continue
+ }
+ 
+@@ -49,7 +49,7 @@ if  { [gdb_compile "${srcdir}/${subdir}/
+ 
+ # Until "catch exec" is implemented on other targets...
+ #
+-if ![istarget "hppa*-hp-hpux*"] then {
++if {![istarget "hppa*-hp-hpux*"] && ![istarget "*-linux*"]} then {
+     continue
+ }
+ 
+@@ -94,6 +94,33 @@ proc do_exec_tests {} {
+      return
+    }
+ 
++   # Verify that the system supports "catch exec".
++   gdb_test "catch exec" "Catchpoint \[0-9\]* \\(exec\\)" "insert first exec catchpoint"
++   set has_exec_catchpoints 0
++   gdb_test_multiple "continue" "continue to first exec catchpoint" {
++     -re ".*Your system does not support exec catchpoints.*$gdb_prompt $" {
++       unsupported "continue to first exec catchpoint"
++     }
++     -re ".*Catchpoint.*$gdb_prompt $" {
++       set has_exec_catchpoints 1
++       pass "continue to first exec catchpoint"
++     }
++   }
++
++   if {$has_exec_catchpoints == 0} {
++     unsupported "exec catchpoints"
++     return
++   }
++
++   zap_session
++
++   # Start the program running, and stop at main.
++   #
++   if ![runto_main] then {
++     perror "Couldn't run ${testfile}"
++     return
++   }
++
+    # Verify that we can see various global and local variables
+    # in this program, and that they have expected values.  Some
+    # of these variables are also declared in the program we'll
+@@ -214,7 +241,7 @@ proc do_exec_tests {} {
+    setup_xfail hppa2.0w-hp-hpux* CLLbs16760
+    send_gdb "continue\n"
+    gdb_expect {
+-     -re ".*Executing new program:.*${testfile2}.*Catchpoint .*(exec\'d .*${testfile2}).*in .START..*$gdb_prompt $"\
++     -re ".*Executing new program:.*${testfile2}.*Catchpoint .*(exec\'d .*${testfile2}).*in .*$gdb_prompt $"\
+                      {pass "hit catch exec"}
+      -re "$gdb_prompt $" {fail "hit catch exec"}
+      timeout         {fail "(timeout) hit catch exec"}
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/testsuite/gdb.base/foll-fork.exp gdb-6.6/gdb/testsuite/gdb.base/foll-fork.exp
+--- gdb-6.6-orig/gdb/testsuite/gdb.base/foll-fork.exp	2006-08-10 07:27:20.000000000 +0200
++++ gdb-6.6/gdb/testsuite/gdb.base/foll-fork.exp	2008-03-13 21:24:54.000000000 +0100
+@@ -21,13 +21,14 @@ if $tracelevel then {
+ 	strace $tracelevel
+ 	}
+ 
+-if { ![isnative] } then {
++if { [is_remote target] || ![isnative] } then {
+     continue
+ }
+ 
+ set prms_id 0
+ set bug_id 0
+ 
++global srcfile
+ set testfile "foll-fork"
+ set srcfile ${testfile}.c
+ set binfile ${objdir}/${subdir}/${testfile}
+@@ -42,10 +43,32 @@ if  { [gdb_compile "${srcdir}/${subdir}/
+ # Until "set follow-fork-mode" and "catch fork" are implemented on
+ # other targets...
+ #
+-if ![istarget "hppa*-hp-hpux*"] then {
++if {![istarget "hppa*-hp-hpux*"] && ![istarget "*-linux*"]} then {
+     continue
+ }
+ 
++proc check_fork_catchpoints {} {
++  global gdb_prompt
++
++  # Verify that the system supports "catch fork".
++  gdb_test "catch fork" "Catchpoint \[0-9\]* \\(fork\\)" "insert first fork catchpoint"
++  set has_fork_catchpoints 0
++  gdb_test_multiple "continue" "continue to first fork catchpoint" {
++    -re ".*Your system does not support fork catchpoints.*$gdb_prompt $" {
++      unsupported "continue to first fork catchpoint"
++    }
++    -re ".*Catchpoint.*$gdb_prompt $" {
++      set has_fork_catchpoints 1
++      pass "continue to first fork catchpoint"
++    }
++  }
++
++  if {$has_fork_catchpoints == 0} {
++    unsupported "fork catchpoints"
++    return -code return
++  }
++}
++
+ proc default_fork_parent_follow {} {
+    global gdb_prompt
+ 
+@@ -116,7 +139,7 @@ proc explicit_fork_child_follow {} {
+    }
+    send_gdb "next 2\n"
+    gdb_expect {
+-      -re "Detaching from program:.*Attaching after fork to.*$gdb_prompt $"\
++      -re "Attaching after fork to.*$gdb_prompt $"\
+                       {pass "explicit child follow, no catchpoints"}
+       -re "$gdb_prompt $" {fail "explicit child follow, no catchpoints"}
+       timeout         {fail "(timeout) explicit child follow, no catchpoints"}
+@@ -130,6 +153,7 @@ proc explicit_fork_child_follow {} {
+ 
+ proc catch_fork_child_follow {} {
+    global gdb_prompt
++   global srcfile
+ 
+    send_gdb "catch fork\n"
+    gdb_expect {
+@@ -154,7 +178,7 @@ proc catch_fork_child_follow {} {
+ 
+    send_gdb "continue\n"
+    gdb_expect {
+-      -re "Catchpoint.*(forked process.*),.*in _fork_sys.*$gdb_prompt $"\
++      -re "Catchpoint.*(forked process.*),.*in .*fork.*$gdb_prompt $"\
+                       {pass "explicit child follow, catch fork"}
+       -re "$gdb_prompt $" {fail "explicit child follow, catch fork"}
+       timeout         {fail "(timeout) explicit child follow, catch fork"}
+@@ -176,7 +200,7 @@ proc catch_fork_child_follow {} {
+       -re "$gdb_prompt $" {pass "set follow child"}
+       timeout         {fail "(timeout) set follow child"}
+    }
+-   send_gdb "tbreak 24\n"
++   send_gdb "tbreak ${srcfile}:24\n"
+    gdb_expect {
+       -re "Breakpoint.*, line 24.*$gdb_prompt $"\
+                       {pass "set follow child, tbreak"}
+@@ -185,7 +209,7 @@ proc catch_fork_child_follow {} {
+    }
+    send_gdb "continue\n"
+    gdb_expect {
+-      -re ".*Detaching from program:.*Attaching after fork to.* at .*24.*$gdb_prompt $"\
++      -re "Attaching after fork to.* at .*24.*$gdb_prompt $"\
+                       {pass "set follow child, hit tbreak"}
+       -re "$gdb_prompt $" {fail "set follow child, hit tbreak"}
+       timeout         {fail "(timeout) set follow child, hit tbreak"}
+@@ -212,6 +236,7 @@ proc catch_fork_child_follow {} {
+ 
+ proc tcatch_fork_parent_follow {} {
+    global gdb_prompt
++   global srcfile
+ 
+    send_gdb "catch fork\n"
+    gdb_expect {
+@@ -226,7 +251,7 @@ proc tcatch_fork_parent_follow {} {
+ 
+    send_gdb "continue\n"
+    gdb_expect {
+-      -re ".*in _fork_sys.*$gdb_prompt $"\
++      -re ".*in .*fork.*$gdb_prompt $"\
+                       {pass "explicit parent follow, tcatch fork"}
+       -re "$gdb_prompt $" {fail "explicit parent follow, tcatch fork"}
+       timeout         {fail "(timeout) explicit parent follow, tcatch fork"}
+@@ -236,7 +261,7 @@ proc tcatch_fork_parent_follow {} {
+       -re "$gdb_prompt $" {pass "set follow parent"}
+       timeout         {fail "(timeout) set follow parent"}
+    }
+-   send_gdb "tbreak 24\n"
++   send_gdb "tbreak ${srcfile}:24\n"
+    gdb_expect {
+       -re "Breakpoint.*, line 24.*$gdb_prompt $"\
+                       {pass "set follow parent, tbreak"}
+@@ -314,6 +339,10 @@ By default, the debugger will follow the
+      timeout         {fail "set follow to nonsense is prohibited (reset parent)"}
+    }
+ 
++   # Check that fork catchpoints are supported, as an indicator for whether
++   # fork-following is supported.
++   if [runto_main] then { check_fork_catchpoints }
++
+    # Test the default behaviour, which is to follow the parent of a
+    # fork, and detach from the child.  Do this without catchpoints.
+    #
+@@ -358,6 +387,9 @@ gdb_start
+ gdb_reinitialize_dir $srcdir/$subdir
+ gdb_load ${binfile}
+ 
++# The "Detaching..." and "Attaching..." messages may be hidden by
++# default.
++gdb_test "set verbose" ""
+ 
+ # This is a test of gdb's ability to follow the parent, child or both
+ # parent and child of a Unix fork() system call.
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp gdb-6.6-orig/gdb/testsuite/gdb.base/foll-vfork.exp gdb-6.6/gdb/testsuite/gdb.base/foll-vfork.exp
+--- gdb-6.6-orig/gdb/testsuite/gdb.base/foll-vfork.exp	2006-08-10 07:27:20.000000000 +0200
++++ gdb-6.6/gdb/testsuite/gdb.base/foll-vfork.exp	2008-03-13 21:24:04.000000000 +0100
+@@ -21,7 +21,7 @@ if $tracelevel then {
+ 	strace $tracelevel
+ 	}
+ 
+-if { ![isnative] } then {
++if { [is_remote target] || ![isnative] } then {
+     continue
+ }
+ 
+@@ -36,6 +36,7 @@ set bug_id 0
+ ##  return 0
+ ##}
+ 
++global srcfile
+ set testfile "foll-vfork"
+ set testfile2 "vforked-prog"
+ set srcfile ${testfile}.c
+@@ -57,7 +58,7 @@ if  { [gdb_compile "${srcdir}/${subdir}/
+ # Until "set follow-fork-mode" and "catch vfork" are implemented on
+ # other targets...
+ #
+-if ![istarget "hppa*-hp-hpux*"] then {
++if {![istarget "hppa*-hp-hpux*"] && ![istarget "*-linux*"]} then {
+     continue
+ }
+ 
+@@ -74,6 +75,29 @@ if [istarget "hppa*-hp-hpux10.20"] then 
+ set oldtimeout $timeout
+ set timeout [expr "$timeout + 10"]
+ 
++proc check_vfork_catchpoints {} {
++  global gdb_prompt
++  global has_vfork_catchpoints
++
++  # Verify that the system supports "catch vfork".
++  gdb_test "catch vfork" "Catchpoint \[0-9\]* \\(vfork\\)" "insert first vfork catchpoint"
++  set has_vfork_catchpoints 0
++  gdb_test_multiple "continue" "continue to first vfork catchpoint" {
++    -re ".*Your system does not support vfork catchpoints.*$gdb_prompt $" {
++      unsupported "continue to first vfork catchpoint"
++    }
++    -re ".*Catchpoint.*$gdb_prompt $" {
++      set has_vfork_catchpoints 1
++      pass "continue to first vfork catchpoint"
++    }
++  }
++
++  if {$has_vfork_catchpoints == 0} {
++    unsupported "vfork catchpoints"
++    return -code return
++  }
++}
++
+ proc vfork_parent_follow_through_step {} {
+    global gdb_prompt
+ 
+@@ -98,20 +122,21 @@ proc vfork_parent_follow_through_step {}
+ 
+ proc vfork_parent_follow_to_bp {} {
+    global gdb_prompt
++   global srcfile
+ 
+    send_gdb "set follow parent\n"
+    gdb_expect {
+       -re "$gdb_prompt $" {pass "set follow parent, vfork to bp"}
+       timeout         {fail "set follow parent, vfork to bp"}
+    }
+-   send_gdb "break 18\n"
++   send_gdb "break ${srcfile}:18\n"
+    gdb_expect {
+       -re "$gdb_prompt $" {pass "break, vfork to bp"}
+       timeout         {fail "break, vfork to bp"}
+    }
+    send_gdb "continue\n"
+    gdb_expect {
+-      -re ".*Detaching after fork from process.*Breakpoint.*18.*$gdb_prompt "\
++      -re ".*Detaching after fork from child process.*Breakpoint.*18.*$gdb_prompt "\
+                       {pass "vfork parent follow, to bp"}
+       -re "$gdb_prompt $" {fail "vfork parent follow, to bp"}
+       timeout         {fail "(timeout) vfork parent follow, to bp" }
+@@ -134,7 +159,7 @@ proc vfork_and_exec_child_follow_to_main
+    }
+    send_gdb "continue\n"
+    gdb_expect {
+-      -re "Detaching from program.*Attaching after fork to.*Executing new program.*Breakpoint.*vforked-prog.c:9.*$gdb_prompt "\
++      -re "Attaching after fork to.*Executing new program.*Breakpoint.*vforked-prog.c:9.*$gdb_prompt "\
+                       {pass "vfork and exec child follow, to main bp"}
+       -re "$gdb_prompt $" {fail "vfork and exec child follow, to main bp"}
+       timeout         {fail "(timeout) vfork and exec child follow, to main bp" }
+@@ -192,7 +217,7 @@ proc vfork_and_exec_child_follow_through
+    }
+    send_gdb "next\n"
+    gdb_expect {
+-      -re "Detaching from program.*Attaching after fork to.*Executing new program.*Breakpoint.*vforked-prog.c:9.*$gdb_prompt "\
++      -re "Attaching after fork to.*Executing new program.*Breakpoint.*vforked-prog.c:9.*$gdb_prompt "\
+                       {pass "vfork and exec child follow, through step"}
+       -re "$gdb_prompt $" {fail "vfork and exec child follow, through step"}
+       timeout         {fail "(timeout) vfork and exec child follow, through step" }
+@@ -249,7 +274,7 @@ proc tcatch_vfork_then_parent_follow {} 
+    gdb_expect {
+       -re "0x\[0-9a-fA-F\]*.*vfork.*$gdb_prompt "\
+                       {pass "vfork parent follow, tcatch vfork"}
+-      -re "0x\[0-9a-fA-F\]*.*_vfork.*$gdb_prompt "\
++      -re "vfork \\(\\) at.*$gdb_prompt "\
+                       {pass "vfork parent follow, tcatch vfork"}
+       -re "$gdb_prompt $" {fail "vfork parent follow, tcatch vfork"}
+       timeout         {fail "(timeout) vfork parent follow, tcatch vfork"}
+@@ -270,6 +295,7 @@ proc tcatch_vfork_then_parent_follow {} 
+ 
+ proc tcatch_vfork_then_child_follow {} {
+    global gdb_prompt
++   global srcfile
+    global srcfile2
+ 
+    send_gdb "set follow child\n"
+@@ -288,6 +314,8 @@ proc tcatch_vfork_then_child_follow {} {
+ # HP-UX 10.20 seems to stop you in "vfork", while more recent HP-UXs
+ # stop you in "_vfork".
+    gdb_expect {
++      -re "vfork \\(\\) at .*$gdb_prompt $"\
++                      {pass "vfork child follow, tcatch vfork"}
+       -re "0x\[0-9a-fA-F\]*.*vfork.*$gdb_prompt "\
+                       {pass "vfork child follow, tcatch vfork"}
+       -re "0x\[0-9a-fA-F\]*.*_vfork.*$gdb_prompt "\
+@@ -297,8 +325,10 @@ proc tcatch_vfork_then_child_follow {} {
+    }
+    send_gdb "finish\n"
+    gdb_expect {
+-      -re "Run till exit from.*vfork.*${srcfile2}:9.*$gdb_prompt "\
++      -re "Run till exit from.*vfork.*${srcfile}:12.*$gdb_prompt "\
+                       {pass "vfork child follow, finish after tcatch vfork"}
++      -re "Run till exit from.*vfork.*${srcfile2}:9.*$gdb_prompt "\
++                      {pass "vfork child follow, finish after tcatch vfork (followed exec)"}
+       -re "$gdb_prompt $" {fail "vfork child follow, finish after tcatch vfork"}
+       timeout         {fail "(timeout) vfork child follow, finish after tcatch vfork" }
+    }
+@@ -312,6 +342,10 @@ proc tcatch_vfork_then_child_follow {} {
+ proc do_vfork_and_exec_tests {} {
+    global gdb_prompt
+ 
++   # Check that vfork catchpoints are supported, as an indicator for whether
++   # vfork-following is supported.
++   if [runto_main] then { check_vfork_catchpoints }
++
+    # Try following the parent process by stepping through a call to
+    # vfork.  Do this without catchpoints.
+    if [runto_main] then { vfork_parent_follow_through_step }
+@@ -363,6 +397,9 @@ gdb_start
+ gdb_reinitialize_dir $srcdir/$subdir
+ gdb_load ${binfile}
+ 
++# The "Detaching..." and "Attaching..." messages may be hidden by
++# default.
++gdb_test "set verbose" ""
+ 
+ # This is a test of gdb's ability to follow the parent or child
+ # of a Unix vfork() system call.  (The child will subsequently
+
+
+
+Partial backport of:
+
+2007-09-30  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* linux-nat.c (linux_child_follow_fork): Set inferior_ptid to include
+	LWP ID.  Use linux_nat_switch_fork.
+
+--- gdb-6.6/gdb/linux-nat.c.orig	2008-03-11 21:31:37.000000000 +0100
++++ gdb-6.6/gdb/linux-nat.c	2008-03-11 21:30:25.000000000 +0100
+@@ -550,12 +550,13 @@ child_follow_fork (struct target_ops *op
+ 	  target_detach (NULL, 0);
+ 	}
+ 
+-      inferior_ptid = pid_to_ptid (child_pid);
++      inferior_ptid = ptid_build (child_pid, child_pid, 0);
+ 
+       /* Reinstall ourselves, since we might have been removed in
+ 	 target_detach (which does other necessary cleanup).  */
+ 
+       push_target (ops);
++      linux_nat_switch_fork (inferior_ptid);
+ 
+       /* Reset breakpoints in the child as appropriate.  */
+       follow_inferior_reset_breakpoints ();

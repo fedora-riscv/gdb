@@ -11,7 +11,7 @@ Name: gdb
 Version: 6.6
 
 # The release always contains a leading reserved number, start it at 1.
-Release: 44%{?dist}
+Release: 45%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -298,6 +298,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.6 release fixups.
 Patch232: gdb-6.6-upstream.patch
+Patch307: gdb-6.6-upstream2.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -565,6 +566,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch287 -p1
 %patch291 -p1
 %patch298 -p1
+%patch307 -p1
 
 # Change the version that gets printed at GDB startup, so it is RedHat
 # specific.
@@ -721,9 +723,12 @@ fi
 # don't include the files in include, they are part of binutils
 
 %changelog
+* Thu Mar 13 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-45
+- Backport of follow-fork-mode child fixes (BZ 435819).
+
 * Mon Mar 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-44
 - build-id warnings integrated more with rpm and the lists of the warnings got
-  replaced usually by a single-line `debuginfo-install' advice.
+  replaced usually by a single-line `debuginfo-install' advice (BZ 435581).
   - FIXME: Testsuite needs an update for the new pre-prompt messages.
 
 * Thu Feb 21 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-43
