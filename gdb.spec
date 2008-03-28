@@ -9,15 +9,15 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.7.50.20080227
+Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
-Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-6.7.50.20080227.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -741,6 +741,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Fri Mar 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1
+- Upgrade to the latest upstream final release gdb-6.8.
+
 * Mon Mar 10 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-3
 - build-id warnings integrated more with rpm and the lists of the warnings got
   replaced usually by a single-line `debuginfo-install' advice.
