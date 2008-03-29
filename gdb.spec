@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 1postcvs%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -741,6 +741,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Sat Mar 29 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1postcvs
+- Cosmetic fix of a testcase sanity breakpoint setting (part of BZ 233852).
+
 * Fri Mar 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1
 - Upgrade to the latest upstream final release gdb-6.8.
 
