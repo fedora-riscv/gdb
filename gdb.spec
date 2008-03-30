@@ -758,6 +758,7 @@ fi
 - New test of hiding unexpected breakpoints on intentional step commands.
 - New test of GCORE for shmid 0 shared memory mappings.
 - New test of a crash on `focus cmd', `focus prev' commands.
+- Fix a minor test race of the hardware watchpoints after the fork call.
 
 * Fri Mar 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1
 - Upgrade to the latest upstream final release gdb-6.8.
