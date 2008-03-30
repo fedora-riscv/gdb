@@ -317,6 +317,9 @@ Patch287: gdb-6.7-testsuite-stable-results.patch
 # Test ia64 memory leaks of the code using libunwind.
 Patch289: gdb-6.5-ia64-libunwind-leak-test.patch
 
+# Test hiding unexpected breakpoints on intentional step commands.
+Patch290: gdb-6.5-missed-trap-on-step-test.patch
+
 # Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
 Patch293: gdb-6.7-bz426600-DW_TAG_interface_type-fix.patch
 Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
@@ -339,6 +342,12 @@ Patch305: gdb-6.8-bz377541-fortran-dynamic-arrays.patch
 
 # Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
 Patch306: gdb-6.8-watchpoint-inaccessible-memory.patch
+
+# Test GCORE for shmid 0 shared memory mappings.
+Patch309: gdb-6.3-mapping-zero-inode-test.patch
+
+# Test a crash on `focus cmd', `focus prev' commands.
+Patch311: gdb-6.3-focus-cmd-prev-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -494,6 +503,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch284 -p1
 %patch287 -p1
 %patch289 -p1
+%patch290 -p1
 %patch293 -p1
 %patch294 -p1
 %patch296 -p1
@@ -502,6 +512,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch304 -p1
 %patch305 -p1
 %patch306 -p1
+%patch309 -p1
+%patch311 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -741,8 +753,11 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
-* Sat Mar 29 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1postcvs
+* Sun Mar 30 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1postcvs
 - Cosmetic fix of a testcase sanity breakpoint setting (part of BZ 233852).
+- New test of hiding unexpected breakpoints on intentional step commands.
+- New test of GCORE for shmid 0 shared memory mappings.
+- New test of a crash on `focus cmd', `focus prev' commands.
 
 * Fri Mar 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1
 - Upgrade to the latest upstream final release gdb-6.8.
