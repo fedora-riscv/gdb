@@ -349,6 +349,9 @@ Patch309: gdb-6.3-mapping-zero-inode-test.patch
 # Test a crash on `focus cmd', `focus prev' commands.
 Patch311: gdb-6.3-focus-cmd-prev-test.patch
 
+# Test crash on a sw watchpoint condition getting out of the scope.
+Patch314: gdb-6.3-watchpoint-cond-gone-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -514,6 +517,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch306 -p1
 %patch309 -p1
 %patch311 -p1
+%patch314 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -759,6 +763,7 @@ fi
 - New test of GCORE for shmid 0 shared memory mappings.
 - New test of a crash on `focus cmd', `focus prev' commands.
 - Fix a minor test race of the hardware watchpoints after the fork call.
+- Test crash on a sw watchpoint condition getting out of the scope.
 
 * Fri Mar 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1
 - Upgrade to the latest upstream final release gdb-6.8.
