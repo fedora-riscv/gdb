@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1postcvs%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -243,8 +243,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.7 release fixups.
-#Patch232: gdb-6.7.1-upstream.patch
+# Backported post gdb-6.8 release fixups.
+#Patch232: gdb-6.8-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -371,6 +371,7 @@ BuildRequires: gcc-gnat
 %ifarch %{multilib_64_archs} sparc ppc
 # Ensure glibc{,-devel} is installed for both multilib arches
 BuildRequires: /lib/libc.so.6 %{_exec_prefix}/lib/libc.so /lib64/libc.so.6 %{_exec_prefix}/lib64/libc.so
+BuildRequires: /lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
 %endif
 %endif
 
@@ -757,7 +758,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
-* Sun Mar 30 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-1postcvs
+* Fri Apr 11 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-2
+- Fix a regression due to PIE of reloading a changed exec file (BZ 433410).
+- Include also biarch libgcc on %%{multilib_64_archs} for the testsuite.
 - Cosmetic fix of a testcase sanity breakpoint setting (part of BZ 233852).
 - New test of hiding unexpected breakpoints on intentional step commands.
 - New test of GCORE for shmid 0 shared memory mappings.
