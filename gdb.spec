@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -42,7 +42,7 @@ Obsoletes: gdb64 < 5.3.91
 # The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
 Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
-%endif	# 1%{?_with_upstream:0}
+%endif	# 0%{!?_with_upstream:1}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -244,7 +244,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.8 release fixups.
-#Patch232: gdb-6.8-upstream.patch
+Patch232: gdb-6.8-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -419,7 +419,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#%patch232 -p1
+%patch232 -p1
 %patch1 -p1
 %patch3 -p1
 %patch4 -p1
@@ -523,7 +523,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
 
-%endif	# 1%{?_with_upstream:0}
+%endif	# 0%{!?_with_upstream:1}
 
 # Change the version that gets printed at GDB startup, so it is Fedora
 # specific.
@@ -652,8 +652,11 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
 
+%if 0%{!?_with_upstream:1}
   # Run all the scheduled testsuite runs also in the PIE mode.
+  # Upstream GDB would lock up the testsuite run for too long on its failures.
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
+%endif	# 0%{!?_with_upstream:1}
 
   for CURRENT in $CHECK
   do
@@ -710,7 +713,7 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
 ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
-%endif	# 1%{?_with_upstream:0}
+%endif	# 0%{!?_with_upstream:1}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -745,7 +748,7 @@ fi
 %{_bindir}/pstack
 %{_mandir}/*/gstack.1*
 %{_mandir}/*/pstack.1*
-%endif	# 1%{?_with_upstream:0}
+%endif	# 0%{!?_with_upstream:1}
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
@@ -758,6 +761,12 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Wed Apr 16 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-3
+- Fix ia64 compilation errors (Yi Zhan, BZ 442684).
+- Fix build on non-standard rpm-devel includes (Robert Scheck, BZ 442449).
+- Do not run the PIE mode for the testsuite during `--with upstream'.
+- Fix test of the crash on a sw watchpoint condition getting out of the scope.
+
 * Fri Apr 11 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-2
 - Fix a regression due to PIE of reloading a changed exec file (BZ 433410).
 - Include also biarch libgcc on %%{multilib_64_archs} for the testsuite.
@@ -781,7 +790,7 @@ fi
 - Drop the unused `ChangeLog.RedHat' file stubs.
 - New rpm option `--with upstream' to drop the Fedora patches for testing.
 - Drop some no longer valid .spec file comments.
-- Include the Fortran dynamic arrays entry for %%changlog of 6.7.50.20080227-1.
+- Include the Fortran dynamic arrays entry for changelog of 6.7.50.20080227-1.
 
 * Mon Mar  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.7.50.20080227-1
 - Upgrade to the upstream gdb-6.8 prerelease.
