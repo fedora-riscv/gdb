@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 4%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -92,9 +92,6 @@ Patch117: gdb-6.3-removebp-20041130.patch
 # Add a wrapper script to GDB that implements pstack using the
 # --readnever option.
 Patch118: gdb-6.3-gstack-20050411.patch
-
-# Fix for caching thread lwps for linux
-Patch119: gdb-6.3-lwp-cache-20041216.patch
 
 # Fix to ensure types are visible
 Patch120: gdb-6.3-type-fix-20041213.patch
@@ -352,6 +349,9 @@ Patch311: gdb-6.3-focus-cmd-prev-test.patch
 # Test crash on a sw watchpoint condition getting out of the scope.
 Patch314: gdb-6.3-watchpoint-cond-gone-test.patch
 
+# Test various forms of threads tracking across exec() (BZ 442765).
+Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -363,15 +363,22 @@ BuildRequires: rpm-devel
 %if 0%{?_with_testsuite:1}
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc
+# Ensure the devel libraries are installed for both multilib arches.
+%define multilib_64_archs sparc64 ppc64 s390x x86_64
 # Copied from gcc-4.1.2-32
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
-%endif
-%define multilib_64_archs sparc64 ppc64 s390x x86_64
 %ifarch %{multilib_64_archs} sparc ppc
-# Ensure glibc{,-devel} is installed for both multilib arches
+BuildRequires: %{_exec_prefix}/lib64/libgnat-4.3.so %{_exec_prefix}/lib/libgnat-4.3.so
+%endif
+%endif
+%ifarch %{multilib_64_archs} sparc ppc
 BuildRequires: /lib/libc.so.6 %{_exec_prefix}/lib/libc.so /lib64/libc.so.6 %{_exec_prefix}/lib64/libc.so
 BuildRequires: /lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
+BuildRequires: %{_exec_prefix}/lib/libstdc++.so.6 %{_exec_prefix}/lib64/libstdc++.so.6
+BuildRequires: %{_exec_prefix}/lib64/libgcj.so.9 %{_exec_prefix}/lib/libgcj.so.9
+# for gcc-java:
+BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 %endif
 %endif
 
@@ -432,9 +439,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch112 -p1
 %patch117 -p1
 %patch118 -p1
-%patch119 -p1
 %patch120 -p1
-%patch124 -p1
 %patch125 -p1
 %patch128 -p1
 %patch136 -p1
@@ -519,6 +524,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch309 -p1
 %patch311 -p1
 %patch314 -p1
+%patch315 -p1
+%patch124 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -761,6 +768,14 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Wed Apr 23 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-4
+- Backport fix on various forms of threads tracking across exec() (BZ 442765).
+- Testsuite: Include more biarch libraries on %%{multilib_64_archs}.
+- Disable the build-id warnings for the testsuite run as they cause some FAILs.
+- Fix PIE support for 32bit inferiors on 64bit debugger.
+- Fix trashing memory on one ada/gnat testcase.
+- Make the testsuite results on ada more stable.
+
 * Wed Apr 16 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-3
 - Fix ia64 compilation errors (Yi Zhan, BZ 442684).
 - Fix build on non-standard rpm-devel includes (Robert Scheck, BZ 442449).

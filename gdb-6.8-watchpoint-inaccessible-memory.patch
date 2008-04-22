@@ -31,9 +31,10 @@ It fixes the regression since GDB-6.7.1rh on x86_64 -m64 -fPIE/-pie:
 	-PASS: gdb.base/watchpoint.exp: run to marker1 in test_simple_watchpoint
 	+FAIL: gdb.base/watchpoint.exp: run to marker1 in test_simple_watchpoint
 
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/NEWS gdb-6.7.50.20080227-dynwatch/gdb/NEWS
---- gdb-6.7.50.20080227-orig/gdb/NEWS	2008-03-03 08:42:11.000000000 +0100
-+++ gdb-6.7.50.20080227-dynwatch/gdb/NEWS	2008-03-03 08:38:18.000000000 +0100
+Index: gdb-6.8/gdb/NEWS
+===================================================================
+--- gdb-6.8.orig/gdb/NEWS	2008-04-19 20:48:13.000000000 +0200
++++ gdb-6.8/gdb/NEWS	2008-04-19 20:50:24.000000000 +0200
 @@ -1,6 +1,9 @@
  		What has changed in GDB?
  	     (Organized release by release)
@@ -44,9 +45,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/NEWS gdb
  *** Changes in GDB 6.8
  
  * New native configurations
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoint.c gdb-6.7.50.20080227-dynwatch/gdb/breakpoint.c
---- gdb-6.7.50.20080227-orig/gdb/breakpoint.c	2008-03-03 08:42:10.000000000 +0100
-+++ gdb-6.7.50.20080227-dynwatch/gdb/breakpoint.c	2008-03-03 08:37:33.000000000 +0100
+Index: gdb-6.8/gdb/breakpoint.c
+===================================================================
+--- gdb-6.8.orig/gdb/breakpoint.c	2008-04-19 20:48:11.000000000 +0200
++++ gdb-6.8/gdb/breakpoint.c	2008-04-19 20:51:49.000000000 +0200
 @@ -55,6 +55,7 @@
  #include "memattr.h"
  #include "ada-lang.h"
@@ -177,8 +179,8 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
 +	}
  
        /* Look at each value on the value chain.  */
--      for (; v; v = value_next (v))
-+      for (v = val_chain; v; v = value_next (v))
+-      for (; v; v = next)
++      for (v = val_chain; v; v = next)
  	{
  	  /* If it's a memory location, and GDB actually needed
  	     its contents to evaluate the expression, then we
@@ -332,7 +334,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
  	  /* We will stop here */
  	  return WP_VALUE_CHANGED;
  	}
-@@ -5780,10 +5844,9 @@ watch_command_1 (char *arg, int accessfl
+@@ -5723,10 +5787,9 @@ watch_command_1 (char *arg, int accessfl
    exp_end = arg;
    exp_valid_block = innermost_block;
    mark = value_mark ();
@@ -346,7 +348,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
  
    tok = arg;
    while (*tok == ' ' || *tok == '\t')
-@@ -5872,6 +5935,7 @@ watch_command_1 (char *arg, int accessfl
+@@ -5815,6 +5878,7 @@ watch_command_1 (char *arg, int accessfl
    b->exp_valid_block = exp_valid_block;
    b->exp_string = savestring (exp_start, exp_end - exp_start);
    b->val = val;
@@ -354,7 +356,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
    b->loc->cond = cond;
    if (cond_start)
      b->cond_string = savestring (cond_start, cond_end - cond_start);
-@@ -7755,11 +7819,11 @@ is valid is not currently in scope.\n"),
+@@ -7698,11 +7762,11 @@ is valid is not currently in scope.\n"),
        if (bpt->val)
  	value_free (bpt->val);
        mark = value_mark ();
@@ -371,10 +373,11 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
        if (bpt->type == bp_hardware_watchpoint ||
  	  bpt->type == bp_read_watchpoint ||
  	  bpt->type == bp_access_watchpoint)
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoint.h gdb-6.7.50.20080227-dynwatch/gdb/breakpoint.h
---- gdb-6.7.50.20080227-orig/gdb/breakpoint.h	2008-03-03 08:42:10.000000000 +0100
-+++ gdb-6.7.50.20080227-dynwatch/gdb/breakpoint.h	2008-03-03 08:34:20.000000000 +0100
-@@ -392,8 +392,13 @@ struct breakpoint
+Index: gdb-6.8/gdb/breakpoint.h
+===================================================================
+--- gdb-6.8.orig/gdb/breakpoint.h	2008-04-19 20:47:23.000000000 +0200
++++ gdb-6.8/gdb/breakpoint.h	2008-04-19 20:50:24.000000000 +0200
+@@ -391,8 +391,13 @@ struct breakpoint
      /* The largest block within which it is valid, or NULL if it is
         valid anywhere (e.g. consists just of global symbols).  */
      struct block *exp_valid_block;
@@ -389,9 +392,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/breakpoi
  
      /* Holds the address of the related watchpoint_scope breakpoint
         when using watchpoints on local variables (might the concept
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/testsuite/gdb.base/watchpoint.c gdb-6.7.50.20080227-dynwatch/gdb/testsuite/gdb.base/watchpoint.c
---- gdb-6.7.50.20080227-orig/gdb/testsuite/gdb.base/watchpoint.c	2003-03-17 20:51:58.000000000 +0100
-+++ gdb-6.7.50.20080227-dynwatch/gdb/testsuite/gdb.base/watchpoint.c	2008-03-03 08:34:20.000000000 +0100
+Index: gdb-6.8/gdb/testsuite/gdb.base/watchpoint.c
+===================================================================
+--- gdb-6.8.orig/gdb/testsuite/gdb.base/watchpoint.c	2008-04-19 20:47:16.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.base/watchpoint.c	2008-04-19 20:50:24.000000000 +0200
 @@ -39,6 +39,8 @@ struct foo struct1, struct2, *ptr1, *ptr
  
  int doread = 0;
@@ -424,9 +428,10 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/testsuit
 +
    return 0;
  }
-diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/testsuite/gdb.base/watchpoint.exp gdb-6.7.50.20080227-dynwatch/gdb/testsuite/gdb.base/watchpoint.exp
---- gdb-6.7.50.20080227-orig/gdb/testsuite/gdb.base/watchpoint.exp	2008-01-01 23:53:19.000000000 +0100
-+++ gdb-6.7.50.20080227-dynwatch/gdb/testsuite/gdb.base/watchpoint.exp	2008-03-03 08:34:20.000000000 +0100
+Index: gdb-6.8/gdb/testsuite/gdb.base/watchpoint.exp
+===================================================================
+--- gdb-6.8.orig/gdb/testsuite/gdb.base/watchpoint.exp	2008-04-19 20:47:16.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.base/watchpoint.exp	2008-04-19 20:52:11.000000000 +0200
 @@ -645,6 +645,30 @@ proc test_watchpoint_and_breakpoint {} {
      }
  }
@@ -454,7 +459,7 @@ diff -u -X /home/jkratoch/.diffi.list -rup gdb-6.7.50.20080227-orig/gdb/testsuit
 +	}
 +    }
 +}
-+    
++
  # Start with a fresh gdb.
  
  gdb_exit
