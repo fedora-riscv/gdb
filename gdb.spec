@@ -288,9 +288,6 @@ Patch266: gdb-6.6-bz247354-leader-exit-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 Patch274: gdb-6.6-buildid-locate.patch
 
-# Fixed the kernel 8KB VDSO loading (producing `no loadable sections found').
-Patch276: gdb-6.6-bfd-vdso8k.patch
-
 # Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
 Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
 
@@ -504,7 +501,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch266 -p1
 %patch274 -p1
 %patch275 -p1
-%patch276 -p1
 %patch277 -p1
 %patch280 -p1
 %patch282 -p1
@@ -768,6 +764,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Sun Apr 27 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5
+- Remove the kernel VDSO workaround (`no loadable ...') (kernel BZ 312011).
+
 * Wed Apr 23 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-4
 - Backport fix on various forms of threads tracking across exec() (BZ 442765).
 - Testsuite: Include more biarch libraries on %%{multilib_64_archs}.
