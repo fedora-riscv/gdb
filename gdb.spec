@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 5cvspost%{?_with_upstream:.upstream}%{?dist}
 
 License: GPL
 Group: Development/Debuggers
@@ -764,6 +764,9 @@ fi
 %{_mandir}/*/gdbserver.1*
 
 %changelog
+* Sat May  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5cvspost
+- Fix gdb.base/gcore-shmid0.exp to be unresolved on recent kernels.
+
 * Sun Apr 27 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5
 - Remove the kernel VDSO workaround (`no loadable ...') (kernel BZ 312011).
 
