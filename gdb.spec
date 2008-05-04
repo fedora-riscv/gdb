@@ -766,6 +766,7 @@ fi
 %changelog
 * Sat May  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5cvspost
 - Fix gdb.base/gcore-shmid0.exp to be unresolved on recent kernels.
+- Make the testsuite results of dfp-test.exp more stable.
 
 * Sun Apr 27 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5
 - Remove the kernel VDSO workaround (`no loadable ...') (kernel BZ 312011).
