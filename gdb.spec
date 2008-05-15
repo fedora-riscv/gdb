@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -352,6 +352,9 @@ Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
 # Enable program counter for processing PTID to PC (sparc/sparc64)
 Patch316: gdb-6.8-sparc-fix.patch
 
+# Silence memcpy check which returns false positive (sparc64)
+Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -528,6 +531,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch314 -p1
 %patch315 -p1
 %patch316 -p1
+%patch317 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -777,6 +781,9 @@ fi
 %endif
 
 %changelog
+* Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-8
+- Silence memcpy check which returns false positive (sparc64)
+
 * Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-7
 - patch from DaveM for sparc/sparc64
 - touch up spec to enable sparcv9/sparc64
