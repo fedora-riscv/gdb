@@ -13,9 +13,9 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5cvspost%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
-License: GPL
+License: GPLv3+
 Group: Development/Debuggers
 Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
@@ -349,6 +349,9 @@ Patch314: gdb-6.3-watchpoint-cond-gone-test.patch
 # Test various forms of threads tracking across exec() (BZ 442765).
 Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
 
+# Enable program counter for processing PTID to PC (sparc/sparc64)
+Patch316: gdb-6.8-sparc-fix.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -365,11 +368,11 @@ BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc
 # Copied from gcc-4.1.2-32
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
-%ifarch %{multilib_64_archs} sparc ppc
+%ifarch %{multilib_64_archs} ppc
 BuildRequires: %{_exec_prefix}/lib64/libgnat-4.3.so %{_exec_prefix}/lib/libgnat-4.3.so
 %endif
 %endif
-%ifarch %{multilib_64_archs} sparc ppc
+%ifarch %{multilib_64_archs} sparc sparcv9 ppc
 BuildRequires: /lib/libc.so.6 %{_exec_prefix}/lib/libc.so /lib64/libc.so.6 %{_exec_prefix}/lib64/libc.so
 BuildRequires: /lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
 BuildRequires: %{_exec_prefix}/lib/libstdc++.so.6 %{_exec_prefix}/lib64/libstdc++.so.6
@@ -383,7 +386,10 @@ BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 BuildRequires: libunwind-devel >= 0.99-0.1.frysk20070405cvs
 Requires: libunwind >= 0.99-0.1.frysk20070405cvs
 %else
+# Prelink is broken on sparcv9/sparc64
+%ifnarch sparcv9 sparc64
 BuildRequires: prelink
+%endif
 %endif
  
 Requires(post): /sbin/install-info
@@ -521,6 +527,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch311 -p1
 %patch314 -p1
 %patch315 -p1
+%patch316 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -571,7 +578,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--mandir=%{_mandir}				\
 	--infodir=%{_infodir}				\
 	--enable-gdb-build-warnings=,-Wno-unused	\
-%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64
+%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparcv9 sparc64
 	--disable-werror				\
 %else 
 %if 0%{?_with_upstream:1}
@@ -593,7 +600,11 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 %if 0%{?_with_debug:1}
 	--enable-static --disable-shared --enable-debug	\
 %endif
+%ifarch sparcv9
+	sparc-%{_vendor}-%{_target_os}%{?_gnu}
+%else
 	%{_target_platform}
+%endif
 
 make %{?_smp_mflags}
 make %{?_smp_mflags} info
@@ -759,11 +770,17 @@ fi
 
 # don't include the files in include, they are part of binutils
 
+%ifnarch sparcv9 sparc64
 %files gdbserver
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
+%endif
 
 %changelog
+* Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-6
+- patch from DaveM for sparc/sparc64
+- touch up spec to enable sparcv9/sparc64
+
 * Sat May  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5cvspost
 - Fix gdb.base/gcore-shmid0.exp to be unresolved on recent kernels.
 - Make the testsuite results of dfp-test.exp more stable.

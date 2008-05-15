@@ -1,0 +1,97 @@
+diff -up gdb-6.8/gdb/sparc64-linux-tdep.c.sparc gdb-6.8/gdb/sparc64-linux-tdep.c
+--- gdb-6.8/gdb/sparc64-linux-tdep.c.sparc	2008-01-01 16:53:13.000000000 -0600
++++ gdb-6.8/gdb/sparc64-linux-tdep.c	2008-05-15 14:08:57.000000000 -0500
+@@ -174,6 +174,30 @@ sparc64_linux_collect_core_fpregset (con
+   sparc64_collect_fpregset (regcache, regnum, fpregs);
+ }
+ 
++/* Set the program counter for process PTID to PC.  */
++
++static void
++sparc64_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
++{
++  struct gdbarch_tdep *tdep = gdbarch_tdep (get_regcache_arch (regcache));
++  ULONGEST state;
++
++  regcache_cooked_write_unsigned (regcache, tdep->pc_regnum, pc);
++  regcache_cooked_write_unsigned (regcache, tdep->npc_regnum, pc + 4);
++
++  /* Clear the "in syscall" bit to prevent the kernel from
++     messing with the PCs we just installed, if we happen to be
++     within an interrupted system call that the kernel wants to
++     restart.
++
++     Note that after we return from the dummy call, the TSTATE et al.
++     registers will be automatically restored, and the kernel
++     continues to restart the system call at this point.  */
++  regcache_cooked_read_unsigned (regcache, SPARC64_STATE_REGNUM, &state);
++  state &= ~((ULONGEST)0x20);
++  regcache_cooked_write_unsigned (regcache, SPARC64_STATE_REGNUM, state);
++}
++
+ 
+ 
+ static void
+@@ -211,6 +235,8 @@ sparc64_linux_init_abi (struct gdbarch_i
+ 
+   /* Make sure we can single-step over signal return system calls.  */
+   tdep->step_trap = sparc64_linux_step_trap;
++
++  set_gdbarch_write_pc (gdbarch, sparc64_linux_write_pc);
+ }
+ 
+ 
+diff -up gdb-6.8/gdb/sparc-linux-tdep.c.sparc gdb-6.8/gdb/sparc-linux-tdep.c
+--- gdb-6.8/gdb/sparc-linux-tdep.c.sparc	2008-01-01 16:53:13.000000000 -0600
++++ gdb-6.8/gdb/sparc-linux-tdep.c	2008-05-15 14:08:12.000000000 -0500
+@@ -211,6 +211,30 @@ sparc32_linux_collect_core_fpregset (con
+   sparc32_collect_fpregset (regcache, regnum, fpregs);
+ }
+ 
++/* Set the program counter for process PTID to PC.  */
++
++static void
++sparc_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
++{
++  struct gdbarch_tdep *tdep = gdbarch_tdep (get_regcache_arch (regcache));
++  ULONGEST psr;
++
++  regcache_cooked_write_unsigned (regcache, tdep->pc_regnum, pc);
++  regcache_cooked_write_unsigned (regcache, tdep->npc_regnum, pc + 4);
++
++  /* Clear the "in syscall" bit to prevent the kernel from
++     messing with the PCs we just installed, if we happen to be
++     within an interrupted system call that the kernel wants to
++     restart.
++
++     Note that after we return from the dummy call, the PSR et al.
++     registers will be automatically restored, and the kernel
++     continues to restart the system call at this point.  */
++  regcache_cooked_read_unsigned (regcache, SPARC32_PSR_REGNUM, &psr);
++  psr &= ~0x000004000;
++  regcache_cooked_write_unsigned (regcache, SPARC32_PSR_REGNUM, psr);
++}
++
+ 
+ 
+ static void
+@@ -238,10 +262,6 @@ sparc32_linux_init_abi (struct gdbarch_i
+      prologue analysis.  */
+   tdep->plt_entry_size = 12;
+ 
+-  /* GNU/Linux doesn't support the 128-bit `long double' from the psABI.  */
+-  set_gdbarch_long_double_bit (gdbarch, 64);
+-  set_gdbarch_long_double_format (gdbarch, floatformats_ieee_double);
+-
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
+@@ -251,6 +271,8 @@ sparc32_linux_init_abi (struct gdbarch_i
+ 
+   /* Hook in the DWARF CFI frame unwinder.  */
+   frame_unwind_append_sniffer (gdbarch, dwarf2_frame_sniffer);
++
++  set_gdbarch_write_pc (gdbarch, sparc_linux_write_pc);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
