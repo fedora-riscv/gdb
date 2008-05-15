@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -777,11 +777,11 @@ fi
 %endif
 
 %changelog
-* Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-6
+* Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-7
 - patch from DaveM for sparc/sparc64
 - touch up spec to enable sparcv9/sparc64
 
-* Sat May  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-5cvspost
+* Sat May  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-6
 - Fix gdb.base/gcore-shmid0.exp to be unresolved on recent kernels.
 - Make the testsuite results of dfp-test.exp more stable.
 
