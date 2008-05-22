@@ -1,91 +1,6 @@
---- /dev/null	2007-10-25 16:04:06.860116064 -0400
-+++ gdb-6.3/gdb/testsuite/gdb.base/gcore-shmid0.c	2007-10-27 14:49:59.000000000 -0400
-@@ -0,0 +1,82 @@
-+/* Copyright 2007 Free Software Foundation, Inc.
-+
-+   This file is part of GDB.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 2 of the License, or (at
-+   your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful, but
-+   WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+   General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program; if not, write to the Free Software
-+   Foundation, Inc., 59 Temple Place - Suite 330,
-+   Boston, MA 02111-1307, USA.  */
-+
-+/*
-+ * Test GDB's handling of gcore for mapping with a name but zero inode.
-+ */
-+
-+#include <sys/ipc.h>
-+#include <sys/shm.h>
-+#include <stdio.h>
-+#include <errno.h>
-+#include <stdlib.h>
-+#include <unistd.h>
-+#include <assert.h>
-+
-+/* We need a backtrace through the stack.  */
-+
-+static void
-+initialized (void)
-+{
-+}
-+
-+int
-+main (void)
-+{
-+  int sid;
-+  unsigned int *addr = (void *) -1L;
-+  int try;
-+
-+  /* The generated SID will cycle with an increment of 32768, try until it
-+   * wraps to 0.  */
-+
-+  for (try = 0; addr == (void *) -1L; try++)
-+    {
-+      assert (try < 0x10000);
-+
-+      sid = shmget ((key_t) rand (), 0x1000, IPC_CREAT | IPC_EXCL | 0777);
-+      if (sid == -1)
-+	{
-+	  printf ("shmget (%d, 0x1000, IPC_CREAT): errno %d\n", 0, errno);
-+	  exit (1);
-+	}
-+
-+      /* Use SID only if it is 0, retry it otherwise.  */
-+
-+      if (sid == 0)
-+	{
-+	  addr = shmat (sid, NULL, SHM_RND);
-+	  if (addr == (void *) -1L)
-+	    {
-+	      printf ("shmat (%d, NULL, SHM_RND): errno %d\n", sid,
-+		      errno);
-+	      exit (1);
-+	    }
-+	}
-+      if (shmctl (sid, IPC_RMID, NULL) != 0)
-+	{
-+	  printf ("shmctl (%d, IPC_RMID, NULL): errno %d\n", sid, errno);
-+	  exit (1);
-+	}
-+    }
-+
-+  initialized ();
-+
-+  return 0;
-+}
---- /dev/null	2007-10-25 16:04:06.860116064 -0400
-+++ gdb-6.3/gdb/testsuite/gdb.base/gcore-shmid0.exp	2007-10-27 14:50:40.000000000 -0400
-@@ -0,0 +1,116 @@
+--- /dev/null	2008-05-02 23:36:22.370004160 +0200
++++ gdb-6.8/gdb/testsuite/gdb.base/gcore-shmid0.exp	2008-05-03 22:36:56.000000000 +0200
+@@ -0,0 +1,120 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -106,13 +21,6 @@
 +# bug-gdb@prep.ai.mit.edu
 +
 +# Test GDB's handling of gcore for mapping with a name but zero inode.
-+
-+if $tracelevel then {
-+	strace $tracelevel
-+}
-+
-+set prms_id 0
-+set bug_id 0
 +
 +set testfile "gcore-shmid0"
 +set srcfile  ${testfile}.c
@@ -150,12 +58,23 @@
 +}
 +
 +if { ! [ runto_main ] } then {
-+    untested gcore-buffer-overflow.exp
++    untested gcore-shmid0.exp
 +    return -1
 +}
 +
 +gdb_breakpoint "initialized"
-+gdb_continue_to_breakpoint "initialized"
++gdb_breakpoint "unresolved"
++
++set test "Continue to initialized."
++gdb_test_multiple "continue" $test {
++    -re "Breakpoint .*, initialized .* at .*\r\n$gdb_prompt $" {
++	pass $test
++    }
++    -re "Breakpoint .*, unresolved .* at .*\r\n$gdb_prompt $" {
++	unsupported $test
++	return -1
++    }
++}
 +
 +set escapedfilename [string_to_regexp ${objdir}/${subdir}/gcore-shmid0.test]
 +
@@ -201,4 +120,102 @@
 +    -re "#0 *initialized \\\(\\\) at .*Cannot access memory at address .*$gdb_prompt $" {
 +	fail $test
 +    }
++}
+--- /dev/null	2008-05-02 23:36:22.370004160 +0200
++++ gdb-6.8/gdb/testsuite/gdb.base/gcore-shmid0.c	2008-05-03 22:39:10.000000000 +0200
+@@ -0,0 +1,95 @@
++/* Copyright 2007 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or (at
++   your option) any later version.
++
++   This program is distributed in the hope that it will be useful, but
++   WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++/*
++ * Test GDB's handling of gcore for mapping with a name but zero inode.
++ */
++
++#include <sys/ipc.h>
++#include <sys/shm.h>
++#include <stdio.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <assert.h>
++
++/* We need a backtrace through the stack.  */
++
++static void
++initialized (void)
++{
++}
++
++static void
++unresolved (void)
++{
++}
++
++int
++main (void)
++{
++  int sid;
++  unsigned int *addr = (void *) -1L;
++  int try;
++
++  /* The generated SID will cycle with an increment of 32768, try until it
++   * wraps to 0.  */
++
++  for (try = 0; addr == (void *) -1L; try++)
++    {
++      /* At least kernel-2.6.25-8.fc9.x86_64 just never returns the value 0 by
++         shmget(2).  */
++      if (try > 0x10000)
++        {
++	  printf ("Problem no longer reproducible on this kernel (try %d)\n",
++		  try);
++	  unresolved ();
++	  exit (1);
++	}
++
++      sid = shmget ((key_t) rand (), 0x1000, IPC_CREAT | IPC_EXCL | 0777);
++      if (sid == -1)
++	{
++	  printf ("shmget (%d, 0x1000, IPC_CREAT): errno %d\n", 0, errno);
++	  exit (1);
++	}
++
++      /* Use SID only if it is 0, retry it otherwise.  */
++
++      if (sid == 0)
++	{
++	  addr = shmat (sid, NULL, SHM_RND);
++	  if (addr == (void *) -1L)
++	    {
++	      printf ("shmat (%d, NULL, SHM_RND): errno %d\n", sid,
++		      errno);
++	      exit (1);
++	    }
++	}
++      if (shmctl (sid, IPC_RMID, NULL) != 0)
++	{
++	  printf ("shmctl (%d, IPC_RMID, NULL): errno %d\n", sid, errno);
++	  exit (1);
++	}
++    }
++
++  initialized ();
++
++  return 0;
 +}
