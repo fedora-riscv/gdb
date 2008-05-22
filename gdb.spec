@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 9%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -355,6 +355,9 @@ Patch316: gdb-6.8-sparc-fix.patch
 # Silence memcpy check which returns false positive (sparc64)
 Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 
+# Fix memory trashing on binaries from GCC Ada (workaround GCC PR 35998).
+Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -532,6 +535,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch315 -p1
 %patch316 -p1
 %patch317 -p1
+%patch318 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -781,6 +785,9 @@ fi
 %endif
 
 %changelog
+* Thu May 22 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-9
+- Fix memory trashing on binaries from GNAT/Ada (workaround GCC PR 35998).
+
 * Thu May 15 2008 Tom "spot" Callaway <tcallawa@redhat.com> - 6.8-8
 - Silence memcpy check which returns false positive (sparc64)
 
