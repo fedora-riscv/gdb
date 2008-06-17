@@ -1,0 +1,96 @@
+2008-06-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (watch_command_1): New variable VAL_RESULT.  Fill in
+	VAL_RESULT by the existing FETCH_WATCHPOINT_VALUE call.  Refuse
+	constant VAL_RESULT list watchpoints.
+
+2008-06-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Set Watchpoints): Document constant value watchpoints.
+
+2008-06-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint.exp: New test for constant value watchpoints.
+
+[ Ported for Fedora GDB.  ]
+
+--- ./gdb/breakpoint.c	6 Jun 2008 20:58:08 -0000	1.324
++++ ./gdb/breakpoint.c	9 Jun 2008 06:00:53 -0000
+@@ -5818,7 +5818,7 @@ watch_command_1 (char *arg, int accessfl
+   struct symtab_and_line sal;
+   struct expression *exp;
+   struct block *exp_valid_block;
+-  struct value *val, *mark;
++  struct value *val, *mark, *val_result;
+   struct frame_info *frame;
+   struct frame_info *prev_frame = NULL;
+   char *exp_start = NULL;
+@@ -5903,7 +5903,27 @@ watch_command_1 (char *arg, int accessfl
+   exp_end = arg;
+   exp_valid_block = innermost_block;
+   mark = value_mark ();
+-  fetch_watchpoint_value (exp, &val, NULL, NULL);
++  fetch_watchpoint_value (exp, &val, &val_result, NULL);
++
++  /* VAL may be unset for unreachable final values.  */
++  while (val_result != NULL)
++    {
++      if (VALUE_LVAL (val_result) == lval_memory
++	  || VALUE_LVAL (val_result) == lval_register)
++	break;
++      val_result = value_next (val_result);
++    }
++  if (val_result == NULL)
++    {
++      int len;
++      
++      len = exp_end - exp_start;
++      while (len > 0 && isspace (exp_start[len - 1]))
++	len--;
++      error (_("Cannot watch constant value %.*s."), len, exp_start);
++    }
++
++  /* Break the VAL_RESULT values chain only after its check above.  */
+   if (val != NULL)
+     release_value (val);
+ 
+--- ./gdb/doc/gdb.texinfo	6 Jun 2008 20:58:08 -0000	1.503
++++ ./gdb/doc/gdb.texinfo	9 Jun 2008 06:01:37 -0000
+@@ -3375,6 +3375,17 @@ This command prints a list of watchpoint
+ it is the same as @code{info break} (@pxref{Set Breaks}).
+ @end table
+ 
++If you watch for a change in a numerically entered address you need to
++dereference it as the address itself is just a constant number which will never
++change.  @value{GDBN} refuses to create a never invokable watchpoint:
++
++@smallexample
++(@value{GDBP}) watch 0x600850
++Cannot watch constant value 0x600850.
++(@value{GDBP}) watch *(int *) 0x600850
++Watchpoint 1: *(int *) 6293584
++@end smallexample
++
+ @value{GDBN} sets a @dfn{hardware watchpoint} if possible.  Hardware
+ watchpoints execute very quickly, and the debugger reports a change in
+ value at the exact instruction where the change occurs.  If @value{GDBN}
+--- gdb-6.8/gdb/testsuite/gdb.base/watchpoint.exp.orig	2008-06-17 13:42:35.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.base/watchpoint.exp	2008-06-17 13:43:38.000000000 +0200
+@@ -679,6 +679,17 @@ set prev_timeout $timeout
+ set timeout 600	
+ verbose "Timeout now 600 sec.\n"
+ 
++# Test constant-value watchpoints.
++gdb_test "watch 123" "Cannot watch constant value 123." "constant watchpoint"
++gdb_test "watch 456 if 1 == 2" "Cannot watch constant value 456." \
++	 "constant watchpoint with a condition"
++# For unsupported constant-value watchpoints catching we need to reset the
++# breakpoints counter.
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load $binfile
++
+ gdb_test "set debug solib 1"
+ if [initialize] then {
+ 

@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{?dist}
+Release: 11%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -358,6 +358,21 @@ Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 # Fix memory trashing on binaries from GCC Ada (workaround GCC PR 35998).
 Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 
+# Test a crash on libraries missing the .text section.
+Patch320: gdb-6.5-section-num-fixup-test.patch
+
+# Protect development in the build tree by automatic Makefile dependencies.
+Patch321: gdb-6.8-auto-dependencies.patch
+
+# Refuse creating watchpoints of an address value, suggested by Martin Stransky.
+Patch322: gdb-6.8-constant-watchpoints.patch
+
+# Disable randomization (such as by setarch -R), suggested by Jakub Jelinek.
+Patch323: gdb-6.8-disable-randomization.patch
+
+# Fix compatibility with recent glibc headers.
+Patch324: gdb-6.8-glibc-headers-compat.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -536,6 +551,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch316 -p1
 %patch317 -p1
 %patch318 -p1
+%patch320 -p1
+%patch321 -p1
+%patch322 -p1
+%patch323 -p1
+%patch324 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -655,7 +675,10 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
       break
     fi
   done
-  CHECK="check`echo " $RPM_OPT_FLAGS "|sed -n 's#^.* \(-m[36][241]\) .*$#//unix/\1#p'`"
+  # On ia64 there is no -m64 flag while we must not leave a bare `check' here
+  # as it would switch over some testing scripts to the backward compatibility
+  # mode - when `make check' was executed from inside the testsuite/ directory.
+  CHECK="check//unix$(echo " $RPM_OPT_FLAGS "|sed -n 's#^.* \(-m[36][241]\) .*$#/\1#p')"
   if ! cmp -s biarch-native biarch
   then
     CHECK="$CHECK check//unix/$BI"
@@ -677,7 +700,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 %if 0%{!?_with_upstream:1}
   # Run all the scheduled testsuite runs also in the PIE mode.
   # Upstream GDB would lock up the testsuite run for too long on its failures.
-  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
+  CHECK="$(echo $CHECK|sed 's#check//unix[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
   for CURRENT in $CHECK
@@ -785,6 +808,14 @@ fi
 %endif
 
 %changelog
+* Tue Jun 17 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-11
+- Fix the testsuite run for ia64 (where no -m64 is present).
+- Test a crash on libraries missing the .text section.
+- Protect development in the build tree by automatic Makefile dependencies.
+- Refuse creating watchpoints of an address value, suggested by Martin Stransky.
+- Disable randomization (such as by setarch -R), suggested by Jakub Jelinek.
+- Fix compatibility with recent glibc headers.
+
 * Sun Jun  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-10
 - Fix crash on a watchpoint update on an inferior stop.
 - Fix the s390x part of the hardware watchpoints after a fork.
