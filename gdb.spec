@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -373,6 +373,11 @@ Patch323: gdb-6.8-disable-randomization.patch
 # Fix compatibility with recent glibc headers.
 Patch324: gdb-6.8-glibc-headers-compat.patch
 
+# Force build failure for missing libraries for --enable-tui.
+# Create a single binary `gdb' autodetecting --tui by its argv[0].
+Patch325: gdb-6.8-forced-enable-tui.patch
+Patch326: gdb-6.8-tui-singlebinary.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -556,6 +561,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch322 -p1
 %patch323 -p1
 %patch324 -p1
+%patch325 -p1
+%patch326 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -620,6 +627,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--disable-rpath					\
 	--with-system-readline				\
 	--with-expat					\
+	--enable-tui					\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -735,6 +743,12 @@ make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 chmod 755 $RPM_BUILD_ROOT%{_prefix}/bin/gcore
 
+# Remove the gdb/gdbtui binaries duplicity.
+test -x $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
+ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
+cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
+ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
+
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -808,6 +822,9 @@ fi
 %endif
 
 %changelog
+* Fri Jun 20 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-12
+- Remove the gdb/gdbtui binaries duplicity.
+
 * Tue Jun 17 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-11
 - Fix the testsuite run for ia64 (where no -m64 is present).
 - Test a crash on libraries missing the .text section.
