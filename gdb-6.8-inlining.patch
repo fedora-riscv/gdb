@@ -1,0 +1,3577 @@
+http://sourceware.org/ml/gdb-patches/2008-06/msg00239.html
++
+http://sourceware.org/ml/gdb-patches/2008-06/msg00379.html
+
+[ Backported for gdb-6.8fedora.  ]
+
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/Makefile.in gdb-6.8/gdb/Makefile.in
+--- gdb-6.8-clean/gdb/Makefile.in	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/Makefile.in	2008-06-17 12:30:08.000000000 +0200
+@@ -607,6 +607,7 @@ SFILES = ada-exp.y ada-lang.c ada-typepr
+ 	inf-loop.c \
+ 	infcall.c \
+ 	infcmd.c inflow.c infrun.c \
++	inline-frame.c \
+ 	interps.c \
+ 	jv-exp.y jv-lang.c jv-valprint.c jv-typeprint.c \
+ 	language.c linespec.c \
+@@ -1068,6 +1069,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $
+ 	user-regs.o \
+ 	frame.o frame-unwind.o doublest.o \
+ 	frame-base.o \
++	inline-frame.o \
+ 	gnu-v2-abi.o gnu-v3-abi.o cp-abi.o cp-support.o \
+ 	cp-namespace.o \
+ 	reggroups.o regset.o \
+@@ -2100,13 +2102,13 @@ dwarf2loc.o: dwarf2loc.c $(defs_h) $(ui_
+ 	$(gdbcore_h) $(target_h) $(inferior_h) $(ax_h) $(ax_gdb_h) \
+ 	$(regcache_h) $(objfiles_h) $(exceptions_h) $(elf_dwarf2_h) \
+ 	$(dwarf2expr_h) $(dwarf2loc_h) $(gdb_string_h) $(gdb_assert_h) \
+-	$(dwarf2block_h)
++	$(dwarf2block_h) $(block_h)
+ dwarf2read.o: dwarf2read.c $(defs_h) $(bfd_h) $(symtab_h) $(gdbtypes_h) \
+ 	$(objfiles_h) $(elf_dwarf2_h) $(buildsym_h) $(demangle_h) \
+ 	$(expression_h) $(filenames_h) $(macrotab_h) $(language_h) \
+ 	$(complaints_h) $(bcache_h) $(dwarf2expr_h) $(dwarf2loc_h) \
+ 	$(cp_support_h) $(hashtab_h) $(command_h) $(gdbcmd_h) \
+-	$(gdb_string_h) $(gdb_assert_h) $(dwarf2block_h) $(f_lang_h)
++	$(gdb_string_h) $(gdb_assert_h) $(dwarf2block_h) $(f_lang_h) $(block_h)
+ elfread.o: elfread.c $(defs_h) $(bfd_h) $(gdb_string_h) $(elf_bfd_h) \
+ 	$(elf_mips_h) $(symtab_h) $(symfile_h) $(objfiles_h) $(buildsym_h) \
+ 	$(stabsread_h) $(gdb_stabs_h) $(complaints_h) $(demangle_h) \
+@@ -2155,7 +2157,8 @@ frame.o: frame.c $(defs_h) $(frame_h) $(
+ 	$(regcache_h) $(gdb_assert_h) $(gdb_string_h) $(user_regs_h) \
+ 	$(gdb_obstack_h) $(dummy_frame_h) $(sentinel_frame_h) $(gdbcore_h) \
+ 	$(annotate_h) $(language_h) $(frame_unwind_h) $(frame_base_h) \
+-	$(command_h) $(gdbcmd_h) $(observer_h) $(objfiles_h) $(exceptions_h)
++	$(command_h) $(gdbcmd_h) $(observer_h) $(objfiles_h) $(exceptions_h) \
++	$(block_h)
+ frame-unwind.o: frame-unwind.c $(defs_h) $(frame_h) $(frame_unwind_h) \
+ 	$(gdb_assert_h) $(dummy_frame_h) $(gdb_obstack_h)
+ frv-linux-tdep.o: frv-linux-tdep.c $(defs_h) $(gdbcore_h) $(target_h) \
+@@ -2329,7 +2332,7 @@ infcmd.o: infcmd.c $(defs_h) $(gdb_strin
+ 	$(objfiles_h) $(completer_h) $(ui_out_h) $(event_top_h) \
+ 	$(parser_defs_h) $(regcache_h) $(reggroups_h) $(block_h) \
+ 	$(solib_h) $(gdb_assert_h) $(observer_h) $(target_descriptions_h) \
+-	$(user_regs_h)
++	$(user_regs_h) $(gdbthread_h)
+ inf-loop.o: inf-loop.c $(defs_h) $(inferior_h) $(target_h) $(event_loop_h) \
+ 	$(event_top_h) $(inf_loop_h) $(remote_h) $(exceptions_h)
+ inflow.o: inflow.c $(defs_h) $(frame_h) $(inferior_h) $(command_h) \
+@@ -2347,6 +2350,8 @@ infrun.o: infrun.c $(defs_h) $(gdb_strin
+ inf-ttrace.o: inf-ttrace.c $(defs_h) $(command_h) $(gdbcore_h) \
+ 	$(gdbthread_h) $(inferior_h) $(target_h) \
+ 	$(gdb_assert_h) $(gdb_string_h) $(inf_child_h) $(inf_ttrace_h)
++inline-frame.o: inline-frame.c $(defs_h) $(frame_unwind_h) $(block_h) \
++	$(symtab_h) $(addrmap_h) $(gdb_assert_h)
+ interps.o: interps.c $(defs_h) $(gdbcmd_h) $(ui_out_h) $(event_loop_h) \
+ 	$(event_top_h) $(interps_h) $(completer_h) $(gdb_string_h) \
+ 	$(gdb_events_h) $(gdb_assert_h) $(top_h) $(exceptions_h)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/ada-lang.c gdb-6.8/gdb/ada-lang.c
+--- gdb-6.8-clean/gdb/ada-lang.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/ada-lang.c	2008-06-16 20:11:43.000000000 +0200
+@@ -4624,7 +4624,7 @@ remove_irrelevant_renamings (struct ada_
+   if (current_block == NULL)
+     return nsyms;
+ 
+-  current_function = block_function (current_block);
++  current_function = block_linkage_function (current_block);
+   if (current_function == NULL)
+     return nsyms;
+ 
+@@ -6778,7 +6778,7 @@ ada_find_renaming_symbol (const char *na
+ static struct symbol *
+ find_old_style_renaming_symbol (const char *name, struct block *block)
+ {
+-  const struct symbol *function_sym = block_function (block);
++  const struct symbol *function_sym = block_linkage_function (block);
+   char *rename;
+ 
+   if (function_sym != NULL)
+@@ -9946,7 +9946,7 @@ ada_unhandled_exception_name_addr_from_r
+      the frame corresponding to RAISE_SYM_NAME.  This frame is
+      at least 3 levels up, so we simply skip the first 3 frames
+      without checking the name of their associated function.  */
+-  fi = get_current_frame ();
++  fi = get_current_user_frame ();
+   for (frame_level = 0; frame_level < 3; frame_level += 1)
+     if (fi != NULL)
+       fi = get_prev_frame (fi); 
+@@ -10041,7 +10041,7 @@ print_it_exception (enum exception_catch
+       exception_name [sizeof (exception_name) - 1] = '\0';
+     }
+ 
+-  ada_find_printable_frame (get_current_frame ());
++  ada_find_printable_frame (get_current_user_frame ());
+ 
+   annotate_catchpoint (b->number);
+   switch (ex)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/block.c gdb-6.8/gdb/block.c
+--- gdb-6.8-clean/gdb/block.c	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/block.c	2008-06-16 20:11:43.000000000 +0200
+@@ -47,23 +47,40 @@ contained_in (const struct block *a, con
+ {
+   if (!a || !b)
+     return 0;
+-  return BLOCK_START (a) >= BLOCK_START (b)
+-    && BLOCK_END (a) <= BLOCK_END (b);
+-}
+ 
++  do
++    {
++      if (a == b)
++	return 1;
++      a = BLOCK_SUPERBLOCK (a);
++    }
++  while (a != NULL);
++
++  return 0;
++}
+ 
+ /* Return the symbol for the function which contains a specified
+-   lexical block, described by a struct block BL.  */
++   lexical block, described by a struct block BL.  Inlined functions
++   are never returned.  */
+ 
+ struct symbol *
+-block_function (const struct block *bl)
++block_linkage_function (const struct block *bl)
+ {
+-  while (BLOCK_FUNCTION (bl) == 0 && BLOCK_SUPERBLOCK (bl) != 0)
++  while ((BLOCK_FUNCTION (bl) == NULL || block_inlined_p (bl))
++	 && BLOCK_SUPERBLOCK (bl) != NULL)
+     bl = BLOCK_SUPERBLOCK (bl);
+ 
+   return BLOCK_FUNCTION (bl);
+ }
+ 
++/* Return one if BLOCK represents an inlined function.  */
++
++int
++block_inlined_p (const struct block *block)
++{
++  return BLOCK_INLINED (block);
++}
++
+ /* Return the blockvector immediately containing the innermost lexical
+    block containing the specified pc value and section, or 0 if there
+    is none.  PBLOCK is a pointer to the block.  If PBLOCK is NULL, we
+@@ -304,6 +321,7 @@ allocate_block (struct obstack *obstack)
+   BLOCK_SUPERBLOCK (bl) = NULL;
+   BLOCK_DICT (bl) = NULL;
+   BLOCK_NAMESPACE (bl) = NULL;
++  BLOCK_INLINED (bl) = 0;
+ 
+   return bl;
+ }
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/block.h gdb-6.8/gdb/block.h
+--- gdb-6.8-clean/gdb/block.h	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/block.h	2008-06-16 20:11:43.000000000 +0200
+@@ -65,7 +65,7 @@ struct block
+   CORE_ADDR endaddr;
+ 
+   /* The symbol that names this block, if the block is the body of a
+-     function; otherwise, zero.  */
++     function (real or inlined); otherwise, zero.  */
+ 
+   struct symbol *function;
+ 
+@@ -96,6 +96,9 @@ struct block
+     cplus_specific;
+   }
+   language_specific;
++
++  /* Set if this block corresponds to an inlined function.  */
++  unsigned char inlined;
+ };
+ 
+ #define BLOCK_START(bl)		(bl)->startaddr
+@@ -104,6 +107,7 @@ struct block
+ #define BLOCK_SUPERBLOCK(bl)	(bl)->superblock
+ #define BLOCK_DICT(bl)		(bl)->dict
+ #define BLOCK_NAMESPACE(bl)   (bl)->language_specific.cplus_specific.namespace
++#define BLOCK_INLINED(bl)	(bl)->inlined
+ 
+ /* Macro to loop through all symbols in a block BL, in no particular
+    order.  ITER helps keep track of the iteration, and should be a
+@@ -132,7 +136,9 @@ struct blockvector
+ 
+ enum { GLOBAL_BLOCK = 0, STATIC_BLOCK = 1, FIRST_LOCAL_BLOCK = 2 };
+ 
+-extern struct symbol *block_function (const struct block *);
++extern struct symbol *block_linkage_function (const struct block *);
++
++extern int block_inlined_p (const struct block *block);
+ 
+ extern int contained_in (const struct block *, const struct block *);
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/blockframe.c gdb-6.8/gdb/blockframe.c
+--- gdb-6.8-clean/gdb/blockframe.c	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/blockframe.c	2008-06-24 22:38:08.000000000 +0200
+@@ -61,11 +61,44 @@ struct block *
+ get_frame_block (struct frame_info *frame, CORE_ADDR *addr_in_block)
+ {
+   const CORE_ADDR pc = get_frame_address_in_block (frame);
++  struct frame_info *next_frame;
++  struct block *bl, *cur_bl;
++  int inline_count;
+ 
+   if (addr_in_block)
+     *addr_in_block = pc;
+ 
+-  return block_for_pc (pc);
++  bl = block_for_pc (pc);
++  if (bl == NULL)
++    return NULL;
++
++  inline_count = 0;
++
++  /* Any possibly inlined frames (inlined functions) behind NORMAL_FRAME
++     (non-inlined function) will already be at a different code location and
++     not found by BLOCK_FOR_PC at this PC moment.  */
++  for (next_frame = get_next_frame (frame);
++       next_frame && get_frame_type (next_frame) == INLINE_FRAME;
++       next_frame = get_next_frame (next_frame))
++    inline_count++;
++  
++  /* Simulate some most-inner inlined frames which were suppressed.
++     INLINE_SKIPPED_FRAMES will never exceed the number of the most-inner
++     frames.  But if we are unwinding already outer frames from some
++     non-inlined frame this frames skipping cannot apply.  */
++  if (next_frame == NULL)
++    inline_count += inline_skipped_frames ();
++
++  while (inline_count > 0)
++    {
++      if (block_inlined_p (bl))
++	inline_count--;
++
++      bl = BLOCK_SUPERBLOCK (bl);
++      gdb_assert (bl != NULL);
++    }
++
++  return bl;
+ }
+ 
+ CORE_ADDR
+@@ -77,7 +110,7 @@ get_pc_function_start (CORE_ADDR pc)
+   bl = block_for_pc (pc);
+   if (bl)
+     {
+-      struct symbol *symbol = block_function (bl);
++      struct symbol *symbol = block_linkage_function (bl);
+ 
+       if (symbol)
+ 	{
+@@ -104,9 +137,14 @@ struct symbol *
+ get_frame_function (struct frame_info *frame)
+ {
+   struct block *bl = get_frame_block (frame, 0);
+-  if (bl == 0)
+-    return 0;
+-  return block_function (bl);
++
++  if (bl == NULL)
++    return NULL;
++
++  while (BLOCK_FUNCTION (bl) == NULL && BLOCK_SUPERBLOCK (bl) != NULL)
++    bl = BLOCK_SUPERBLOCK (bl);
++
++  return BLOCK_FUNCTION (bl);
+ }
+ 
+ 
+@@ -119,7 +157,7 @@ find_pc_sect_function (CORE_ADDR pc, str
+   struct block *b = block_for_pc_sect (pc, section);
+   if (b == 0)
+     return 0;
+-  return block_function (b);
++  return block_linkage_function (b);
+ }
+ 
+ /* Return the function containing pc value PC.
+@@ -356,11 +394,11 @@ block_innermost_frame (struct block *blo
+   start = BLOCK_START (block);
+   end = BLOCK_END (block);
+ 
+-  frame = get_current_frame ();
++  frame = get_current_user_frame ();
+   while (frame != NULL)
+     {
+-      calling_pc = get_frame_address_in_block (frame);
+-      if (calling_pc >= start && calling_pc < end)
++      struct block *frame_block = get_frame_block (frame, NULL);
++      if (frame_block != NULL && contained_in (frame_block, block))
+ 	return frame;
+ 
+       frame = get_prev_frame (frame);
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/breakpoint.c gdb-6.8/gdb/breakpoint.c
+--- gdb-6.8-clean/gdb/breakpoint.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/breakpoint.c	2008-06-23 01:24:59.000000000 +0200
+@@ -2591,18 +2591,21 @@ watchpoint_check (void *p)
+     within_current_scope = 1;
+   else
+     {
+-      /* There is no current frame at this moment.  If we're going to have
+-         any chance of handling watchpoints on local variables, we'll need
+-         the frame chain (so we can determine if we're in scope).  */
+-      reinit_frame_cache ();
+       fr = frame_find_by_id (b->watchpoint_frame);
+       within_current_scope = (fr != NULL);
+ 
+       /* If we've gotten confused in the unwinder, we might have
+ 	 returned a frame that can't describe this variable.  */
+-      if (within_current_scope
+-	  && block_function (b->exp_valid_block) != get_frame_function (fr))
+-	within_current_scope = 0;
++      if (within_current_scope)
++	{
++	  struct symbol *function;
++
++	  function = get_frame_function (fr);
++	  if (function == NULL
++	      || !contained_in (b->exp_valid_block,
++				SYMBOL_BLOCK_VALUE (function)))
++	    within_current_scope = 0;
++	}
+ 
+       /* in_function_epilogue_p() returns a non-zero value if we're still
+ 	 in the function but the stack frame has already been invalidated.
+@@ -2614,10 +2617,9 @@ watchpoint_check (void *p)
+ 	 that the watchpoint frame couldn't be found by frame_find_by_id()
+ 	 because the current PC is currently in an epilogue.  Calling
+ 	 gdbarch_in_function_epilogue_p() also when fr == NULL fixes that. */
+-      if ((!within_current_scope || fr == get_current_frame ())
+-          && gdbarch_in_function_epilogue_p (current_gdbarch, read_pc ()))
++      if (gdbarch_in_function_epilogue_p (current_gdbarch, read_pc ()))
+ 	return WP_VALUE_NOT_CHANGED;
+-      if (fr && within_current_scope)
++      if (within_current_scope)
+ 	/* If we end up stopping, the current frame will get selected
+ 	   in normal_stop.  So this call to select_frame won't affect
+ 	   the user.  */
+@@ -2918,7 +2920,7 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+       }
+ 
+     if (frame_id_p (b->frame_id)
+-	&& !frame_id_eq (b->frame_id, get_frame_id (get_current_frame ())))
++	&& !frame_id_stack_eq (b->frame_id, get_frame_id (get_current_frame ())))
+       bs->stop = 0;
+     else
+       {
+@@ -2933,9 +2935,13 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+ 
+ 	if (bl->cond && bl->owner->disposition != disp_del_at_next_stop)
+ 	  {
+-	    /* Need to select the frame, with all that implies
+-	       so that the conditions will have the right context.  */
+-	    select_frame (get_current_frame ());
++	    /* Need to select the frame, with all that implies so that
++	       the conditions will have the right context.  Because we
++	       use the frame, we will not see an inlined function's
++	       variables when we arrive at a breakpoint at the start
++	       of the inlined function; the current frame will be the
++	       call site.  */
++	    select_frame (get_current_user_frame ());
+ 	    value_is_zero
+ 	      = catch_errors (breakpoint_cond_eval, (bl->cond),
+ 			      "Error in testing breakpoint condition:\n",
+@@ -2980,6 +2986,11 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+ 		bs->print = 0;
+ 	      }
+ 	    bs->commands = copy_command_lines (bs->commands);
++
++	    /* We display the innermost inlined frame at a breakpont as it gives to
++	       most of the available information.  */
++	    if (b->type != bp_until && b->type != bp_finish)
++	      set_skipped_inline_frames (0);
+ 	  }
+       }
+     /* Print nothing for this entry if we dont stop or if we dont print.  */
+@@ -5629,7 +5640,7 @@ resolve_sal_pc (struct symtab_and_line *
+       bv = blockvector_for_pc_sect (sal->pc, 0, &b, sal->symtab);
+       if (bv != NULL)
+ 	{
+-	  sym = block_function (b);
++	  sym = block_linkage_function (b);
+ 	  if (sym != NULL)
+ 	    {
+ 	      fixup_symbol_section (sym, sal->symtab->objfile);
+@@ -5761,7 +5772,6 @@ watch_command_1 (char *arg, int accessfl
+   struct block *exp_valid_block;
+   struct value *val, *mark;
+   struct frame_info *frame;
+-  struct frame_info *prev_frame = NULL;
+   char *exp_start = NULL;
+   char *exp_end = NULL;
+   char *tok, *id_tok_start, *end_tok;
+@@ -5895,34 +5905,36 @@ watch_command_1 (char *arg, int accessfl
+     bp_type = bp_watchpoint;
+ 
+   frame = block_innermost_frame (exp_valid_block);
+-  if (frame)
+-    prev_frame = get_prev_frame (frame);
+-  else
+-    prev_frame = NULL;
+ 
+   /* If the expression is "local", then set up a "watchpoint scope"
+      breakpoint at the point where we've left the scope of the watchpoint
+      expression.  Create the scope breakpoint before the watchpoint, so
+      that we will encounter it first in bpstat_stop_status.  */
+-  if (innermost_block && prev_frame)
++  if (innermost_block && frame)
+     {
+-      scope_breakpoint = create_internal_breakpoint (get_frame_pc (prev_frame),
+-						     bp_watchpoint_scope);
++      while (get_frame_type (frame) == INLINE_FRAME)
++ 	frame = get_prev_frame (frame);
++
++      if (frame_id_p (frame_unwind_id (frame)))
++	{
++ 	  scope_breakpoint = create_internal_breakpoint (frame_pc_unwind (frame),
++							 bp_watchpoint_scope);
+ 
+-      scope_breakpoint->enable_state = bp_enabled;
++	  scope_breakpoint->enable_state = bp_enabled;
+ 
+-      /* Automatically delete the breakpoint when it hits.  */
+-      scope_breakpoint->disposition = disp_del;
++	  /* Automatically delete the breakpoint when it hits.  */
++	  scope_breakpoint->disposition = disp_del;
+ 
+-      /* Only break in the proper frame (help with recursion).  */
+-      scope_breakpoint->frame_id = get_frame_id (prev_frame);
++	  /* Only break in the proper frame (help with recursion).  */
++	  scope_breakpoint->frame_id = frame_unwind_id (frame);
+ 
+-      /* Set the address at which we will stop.  */
+-      scope_breakpoint->loc->requested_address
+-	= get_frame_pc (prev_frame);
+-      scope_breakpoint->loc->address
+-	= adjust_breakpoint_address (scope_breakpoint->loc->requested_address,
+-				     scope_breakpoint->type);
++	  /* Set the address at which we will stop.  */
++	  scope_breakpoint->loc->requested_address
++	    = frame_pc_unwind (frame);
++	  scope_breakpoint->loc->address
++	    = adjust_breakpoint_address (scope_breakpoint->loc->requested_address,
++					 scope_breakpoint->type);
++	}
+     }
+ 
+   /* Now set up the breakpoint.  */
+@@ -6095,7 +6107,6 @@ until_break_command (char *arg, int from
+   struct symtabs_and_lines sals;
+   struct symtab_and_line sal;
+   struct frame_info *frame = get_selected_frame (NULL);
+-  struct frame_info *prev_frame = get_prev_frame (frame);
+   struct breakpoint *breakpoint;
+   struct cleanup *old_chain;
+   struct continuation_arg *arg1;
+@@ -6162,11 +6173,14 @@ until_break_command (char *arg, int from
+ 
+   /* Keep within the current frame, or in frames called by the current
+      one.  */
+-  if (prev_frame)
++  while (get_frame_type (frame) == INLINE_FRAME)
++    frame = get_prev_frame (frame);
++
++  if (frame_id_p (frame_unwind_id (frame)))
+     {
+-      sal = find_pc_line (get_frame_pc (prev_frame), 0);
+-      sal.pc = get_frame_pc (prev_frame);
+-      breakpoint = set_momentary_breakpoint (sal, get_frame_id (prev_frame),
++      sal = find_pc_line (frame_pc_unwind (frame), 0);
++      sal.pc = frame_pc_unwind (frame);
++      breakpoint = set_momentary_breakpoint (sal, frame_unwind_id (frame),
+ 					     bp_until);
+       if (!target_can_async_p ())
+ 	make_cleanup_delete_breakpoint (breakpoint);
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/buildsym.c gdb-6.8/gdb/buildsym.c
+--- gdb-6.8-clean/gdb/buildsym.c	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/buildsym.c	2008-06-16 20:11:43.000000000 +0200
+@@ -1141,6 +1141,12 @@ end_symtab (CORE_ADDR end_addr, struct o
+ 	  struct symbol *sym;
+ 	  struct dict_iterator iter;
+ 
++	  /* Inlined functions may have symbols not in the global or static
++	     symbol lists.  */
++	  if (BLOCK_FUNCTION (block) != NULL)
++	    if (SYMBOL_SYMTAB (BLOCK_FUNCTION (block)) == NULL)
++	      SYMBOL_SYMTAB (BLOCK_FUNCTION (block)) = symtab;
++
+ 	  for (sym = dict_iterator_first (BLOCK_DICT (block), &iter);
+ 	       sym != NULL;
+ 	       sym = dict_iterator_next (&iter))
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/doc/gdb.texinfo gdb-6.8/gdb/doc/gdb.texinfo
+--- gdb-6.8-clean/gdb/doc/gdb.texinfo	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/doc/gdb.texinfo	2008-06-16 20:11:43.000000000 +0200
+@@ -136,6 +136,7 @@ software in general.  We will miss him.
+ * Stack::                       Examining the stack
+ * Source::                      Examining source files
+ * Data::                        Examining data
++* Optimized Code::              Debugging optimized code
+ * Macros::                      Preprocessor Macros
+ * Tracepoints::                 Debugging remote targets non-intrusively
+ * Overlays::                    Debugging programs that use overlays
+@@ -1761,7 +1762,7 @@ To request debugging information, specif
+ the compiler.
+ 
+ Programs that are to be shipped to your customers are compiled with
+-optimizations, using the @samp{-O} compiler option.  However, many
++optimizations, using the @samp{-O} compiler option.  However, some
+ compilers are unable to handle the @samp{-g} and @samp{-O} options
+ together.  Using those compilers, you cannot generate optimized
+ executables containing debugging information.
+@@ -1770,22 +1771,7 @@ executables containing debugging informa
+ without @samp{-O}, making it possible to debug optimized code.  We
+ recommend that you @emph{always} use @samp{-g} whenever you compile a
+ program.  You may think your program is correct, but there is no sense
+-in pushing your luck.
+-
+-@cindex optimized code, debugging
+-@cindex debugging optimized code
+-When you debug a program compiled with @samp{-g -O}, remember that the
+-optimizer is rearranging your code; the debugger shows you what is
+-really there.  Do not be too surprised when the execution path does not
+-exactly match your source file!  An extreme example: if you define a
+-variable, but never use it, @value{GDBN} never sees that
+-variable---because the compiler optimizes it out of existence.
+-
+-Some things do not work as well with @samp{-g -O} as with just
+-@samp{-g}, particularly on machines with instruction scheduling.  If in
+-doubt, recompile with @samp{-g} alone, and if this fixes the problem,
+-please report it to us as a bug (including a test case!).
+-@xref{Variables}, for more information about debugging optimized code.
++in pushing your luck.  For more information, see @ref{Optimized Code}.
+ 
+ Older versions of the @sc{gnu} C compiler permitted a variant option
+ @w{@samp{-gg}} for debugging information.  @value{GDBN} no longer supports this
+@@ -7546,6 +7532,100 @@ the data cache operation.
+ @end table
+ 
+ 
++@node Optimized Code
++@chapter Debugging Optimized Code
++@cindex optimized code, debugging
++@cindex debugging optimized code
++
++Almost all compilers support optimization.  With optimization
++disabled, the compiler generates assembly code that corresponds
++directly to your source code, in a simplistic way.  As the compiler
++applies more powerful optimizations, the generated assembly code
++diverges from your original source code.  With help from debugging
++information generated by the compiler, @value{GDBN} can map from
++the running program back to constructs from your original source.
++
++@value{GDBN} is more accurate with optimization disabled.  If you
++can recompile without optimization, it is easier to follow the
++progress of your program during debugging.  But, there are many cases
++where you may need to debug an optimized version.
++
++When you debug a program compiled with @samp{-g -O}, remember that the
++optimizer has rearranged your code; the debugger shows you what is
++really there.  Do not be too surprised when the execution path does not
++exactly match your source file!  An extreme example: if you define a
++variable, but never use it, @value{GDBN} never sees that
++variable---because the compiler optimizes it out of existence.
++
++Some things do not work as well with @samp{-g -O} as with just
++@samp{-g}, particularly on machines with instruction scheduling.  If in
++doubt, recompile with @samp{-g} alone, and if this fixes the problem,
++please report it to us as a bug (including a test case!).
++@xref{Variables}, for more information about debugging optimized code.
++
++@menu
++* Inline Functions::            How @value{GDBN} presents inlining
++@end menu
++
++@node Inline Functions
++@section Inline Functions
++@cindex inline functions, debugging
++
++@dfn{Inlining} is an optimization that inserts a copy of the function
++body directly at each call site, instead of jumping to a shared
++routine.  @value{GDBN} displays inlined functions just like
++non-inlined functions.  They appear in backtraces.  You can view their
++arguments and local variables, step into them with @code{step}, skip
++them with @code{next}, and escape from them with @code{finish}.
++You can check whether a function was inlined by using the
++@code{info frame} command.
++
++For @value{GDBN} to support inlined functions, the compiler must
++record information about inlining in the debug information ---
++@value{NGCC} using the @sc{dwarf 2} format does this, and several
++other compilers do also.  @value{GDBN} only supports inlined functions
++when using @sc{dwarf 2}.  Versions of @value{NGCC} before 4.1
++do not emit two required attributes (@samp{DW_AT_call_file} and
++@samp{DW_AT_call_line}); @value{GDBN} does not display inlined
++function calls with earlier versions of @value{NGCC}.  It instead
++displays the arguments and local variables of inlined functions as
++local variables in the caller.
++
++The body of an inlined function is directly included at its call site;
++unlike a non-inlined function, there are no instructions devoted to
++the call.  @value{GDBN} still pretends that the call site and the
++start of the inlined function are different instructions.  Stepping to
++the call site shows the call site, and then stepping again shows
++the first line of the inlined function, even though no additional
++instructions are executed.
++
++This makes source-level debugging much clearer; you can see both the
++context of the call and then the effect of the call.  Only stepping by
++a single instruction using @code{stepi} or @code{nexti} does not do
++this; single instruction steps always show the inlined body.
++
++There are some ways that @value{GDBN} cannot pretend that inlined
++function calls are the same as normal calls:
++
++@itemize @bullet
++@item
++You cannot set breakpoints on inlined functions.  @value{GDBN}
++either reports that there is no symbol with that name, or else sets the
++breakpoint on the non-inlined copy of the function.
++
++@item
++Setting breakpoints at the call site of an inlined function may not
++work, because the call site does not contain any code.  @value{GDBN}
++may incorrectly move the breakpoint to the next line of the enclosing
++function, after the call.
++
++@item
++@value{GDBN} cannot locate the return value of inlined calls after
++using the @code{finish} command.
++
++@end itemize
++
++
+ @node Macros
+ @chapter C Preprocessor Macros
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/dwarf2loc.c gdb-6.8/gdb/dwarf2loc.c
+--- gdb-6.8-clean/gdb/dwarf2loc.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/dwarf2loc.c	2008-06-16 20:11:43.000000000 +0200
+@@ -31,6 +31,7 @@
+ #include "regcache.h"
+ #include "objfiles.h"
+ #include "exceptions.h"
++#include "block.h"
+ 
+ #include "elf/dwarf2.h"
+ #include "dwarf2expr.h"
+@@ -145,14 +146,19 @@ dwarf_expr_frame_base (void *baton, gdb_
+   struct symbol *framefunc;
+   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+ 
+-  framefunc = get_frame_function (debaton->frame);
++  /* Use block_linkage_function, which returns a real (not inlined)
++     function, instead of get_frame_function, which may return an
++     inlined function.  */
++  framefunc = block_linkage_function (get_frame_block (debaton->frame, NULL));
+ 
+   /* If we found a frame-relative symbol then it was certainly within
+      some function associated with a frame. If we can't find the frame,
+      something has gone wrong.  */
+   gdb_assert (framefunc != NULL);
+ 
+-  if (SYMBOL_OPS (framefunc) == &dwarf2_loclist_funcs)
++  if (SYMBOL_LOCATION_BATON (framefunc) == NULL)
++    *start = NULL;
++  else if (SYMBOL_OPS (framefunc) == &dwarf2_loclist_funcs)
+     {
+       struct dwarf2_loclist_baton *symbaton;
+       struct frame_info *frame = debaton->frame;
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/dwarf2read.c gdb-6.8/gdb/dwarf2read.c
+--- gdb-6.8-clean/gdb/dwarf2read.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/dwarf2read.c	2008-06-16 20:41:01.000000000 +0200
+@@ -48,6 +48,7 @@
+ #include "gdbcmd.h"
+ #include "dwarf2block.h"
+ #include "f-lang.h"
++#include "block.h"
+ 
+ #include <fcntl.h>
+ #include "gdb_string.h"
+@@ -2674,14 +2675,10 @@ process_die (struct die_info *die, struc
+       read_file_scope (die, cu);
+       break;
+     case DW_TAG_subprogram:
++    case DW_TAG_inlined_subroutine:
+       read_subroutine_type (die, cu);
+       read_func_scope (die, cu);
+       break;
+-    case DW_TAG_inlined_subroutine:
+-      /* FIXME:  These are ignored for now.
+-         They could be used to set breakpoints on all inlined instances
+-         of a function and make GDB `next' properly over inlined functions.  */
+-      break;
+     case DW_TAG_lexical_block:
+     case DW_TAG_try_block:
+     case DW_TAG_catch_block:
+@@ -2925,12 +2922,27 @@ read_func_scope (struct die_info *die, s
+   CORE_ADDR lowpc;
+   CORE_ADDR highpc;
+   struct die_info *child_die;
+-  struct attribute *attr;
++  struct attribute *attr, *call_line, *call_file;
+   char *name;
+   const char *previous_prefix = processing_current_prefix;
+   struct cleanup *back_to = NULL;
+   CORE_ADDR baseaddr;
+   struct block *block;
++  int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
++
++  if (inlined_func)
++    {
++      /* If we do not have call site information, we can't show the
++	 caller of this inlined function.  That's too confusing, so
++	 only use the scope for local variables.  */
++      call_line = dwarf2_attr (die, DW_AT_call_line, cu);
++      call_file = dwarf2_attr (die, DW_AT_call_file, cu);
++      if (call_line == NULL || call_file == NULL)
++	{
++	  read_lexical_block_scope (die, cu);
++	  return;
++	}
++    }
+ 
+   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+ 
+@@ -3017,6 +3029,9 @@ read_func_scope (struct die_info *die, s
+   block = finish_block (new->name, &local_symbols, new->old_blocks,
+                         lowpc, highpc, objfile);
+ 
++  if (inlined_func)
++    BLOCK_INLINED (block) = 1;
++
+   /* If we have address ranges, record them.  */
+   dwarf2_record_block_ranges (die, block, baseaddr, cu);
+   
+@@ -6717,8 +6732,9 @@ die_is_declaration (struct die_info *die
+ 	  && dwarf2_attr (die, DW_AT_specification, cu) == NULL);
+ }
+ 
+-/* Return the die giving the specification for DIE, if there is
+-   one.  */
++/* Return the die giving the specification for DIE, if there is one.
++   If there is no specification, but there is an abstract origin, that
++   is returned.  */
+ 
+ static struct die_info *
+ die_specification (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6726,6 +6742,9 @@ die_specification (struct die_info *die,
+   struct attribute *spec_attr = dwarf2_attr (die, DW_AT_specification, cu);
+ 
+   if (spec_attr == NULL)
++    spec_attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
++
++  if (spec_attr == NULL)
+     return NULL;
+   else
+     return follow_die_ref (die, spec_attr, cu);
+@@ -7401,6 +7420,7 @@ new_symbol (struct die_info *die, struct
+   struct attribute *attr = NULL;
+   struct attribute *attr2 = NULL;
+   CORE_ADDR baseaddr;
++  int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
+ 
+   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+ 
+@@ -7428,13 +7448,17 @@ new_symbol (struct die_info *die, struct
+ 	SYMBOL_TYPE (sym) = type;
+       else
+ 	SYMBOL_TYPE (sym) = die_type (die, cu);
+-      attr = dwarf2_attr (die, DW_AT_decl_line, cu);
++      attr = dwarf2_attr (die,
++			  inlined_func ? DW_AT_call_line : DW_AT_decl_line,
++			  cu);
+       if (attr)
+ 	{
+ 	  SYMBOL_LINE (sym) = DW_UNSND (attr);
+ 	}
+ 
+-      attr = dwarf2_attr (die, DW_AT_decl_file, cu);
++      attr = dwarf2_attr (die,
++			  inlined_func ? DW_AT_call_file : DW_AT_decl_file,
++			  cu);
+       if (attr)
+ 	{
+ 	  int file_index = DW_UNSND (attr);
+@@ -7481,6 +7505,13 @@ new_symbol (struct die_info *die, struct
+ 	      add_symbol_to_list (sym, cu->list_in_scope);
+ 	    }
+ 	  break;
++	case DW_TAG_inlined_subroutine:
++	  /* SYMBOL_BLOCK_VALUE (sym) will be filled in later by
++	     finish_block.  */
++	  SYMBOL_CLASS (sym) = LOC_BLOCK;
++	  /* Do not add the symbol to any lists.  It will be found via
++	     BLOCK_FUNCTION from the blockvector.  */
++	  break;
+ 	case DW_TAG_variable:
+ 	  /* Compilation with minimal debug info may result in variables
+ 	     with missing type entries. Change the misleading `void' type
+@@ -7532,9 +7563,19 @@ new_symbol (struct die_info *die, struct
+ 	  if (attr)
+ 	    {
+ 	      var_decode_location (attr, sym, cu);
+-	      /* FIXME drow/2003-07-31: Is LOC_COMPUTED_ARG necessary?  */
+-	      if (SYMBOL_CLASS (sym) == LOC_COMPUTED)
+-		SYMBOL_CLASS (sym) = LOC_COMPUTED_ARG;
++
++	      /* If we are inside a function, mark this as an argument.  If
++		 not, we might be looking at an argument to an inlined function
++		 when we do not have enough information to show inlined frames;
++		 pretend it's a local variable in that case so that the user can
++		 still see it.  */
++	      if (context_stack_depth > 0
++		  && context_stack[context_stack_depth - 1].name != NULL)
++		{
++		  /* FIXME drow/2003-07-31: Is LOC_COMPUTED_ARG necessary?  */
++		  if (SYMBOL_CLASS (sym) == LOC_COMPUTED)
++		    SYMBOL_CLASS (sym) = LOC_COMPUTED_ARG;
++		}
+ 	    }
+ 	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
+ 	  if (attr)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/findvar.c gdb-6.8/gdb/findvar.c
+--- gdb-6.8-clean/gdb/findvar.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/findvar.c	2008-06-16 20:11:43.000000000 +0200
+@@ -518,13 +518,11 @@ addresses have not been bound by the dyn
+     case LOC_REGPARM:
+     case LOC_REGPARM_ADDR:
+       {
+-	struct block *b;
+ 	int regno = SYMBOL_VALUE (var);
+ 	struct value *regval;
+ 
+ 	if (frame == NULL)
+ 	  return 0;
+-	b = get_frame_block (frame, 0);
+ 
+ 	if (SYMBOL_CLASS (var) == LOC_REGPARM_ADDR)
+ 	  {
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/frame-unwind.c gdb-6.8/gdb/frame-unwind.c
+--- gdb-6.8-clean/gdb/frame-unwind.c	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/frame-unwind.c	2008-06-23 01:46:54.000000000 +0200
+@@ -49,8 +49,10 @@ frame_unwind_init (struct obstack *obsta
+      can't override this.  */
+   table->list = OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
+   table->list->unwinder = dummy_frame_unwind;
++  table->list->next = OBSTACK_ZALLOC (obstack, struct frame_unwind_table_entry);
++  table->list->next->unwinder = inline_frame_unwind;
+   /* The insertion point for OSABI sniffers.  */
+-  table->osabi_head = &table->list->next;
++  table->osabi_head = &table->list->next->next;
+   return table;
+ }
+ 
+@@ -88,20 +90,55 @@ frame_unwind_find_by_frame (struct frame
+   struct gdbarch *gdbarch = get_frame_arch (next_frame);
+   struct frame_unwind_table *table = gdbarch_data (gdbarch, frame_unwind_data);
+   struct frame_unwind_table_entry *entry;
++  const struct frame_unwind *inline_unwinder = NULL;
++
+   for (entry = table->list; entry != NULL; entry = entry->next)
+     {
++      /* We delay the INLINE_FRAME unwinders as last as they need to base their
++         decisions on their outer frames.  The inline unwinding sniffer cannot
++         access its outer frames as any frame must be free to fully access its
++         inner frames which leads to deadlocks.  Therefore we first do
++         a regular unwind first and then override (nullify the unwinding
++         operations) by setting it to the inlining unwinder (if it was detected
++         for such frame).  */
++      if (entry->unwinder && entry->unwinder->type == INLINE_FRAME)
++	{
++	  gdb_assert (inline_unwinder == NULL);
++	  gdb_assert (entry->sniffer == NULL);
++	  inline_unwinder = entry->unwinder;
++	  continue;
++	}
+       if (entry->sniffer != NULL)
+ 	{
+ 	  const struct frame_unwind *desc = NULL;
+ 	  desc = entry->sniffer (next_frame);
+ 	  if (desc != NULL)
+-	    return desc;
++	    {
++	      if (inline_unwinder)
++		{
++		  /* Pass the complete information about the regular unwinder.  */
++		  if (inline_unwinder->sniffer (desc, next_frame, this_cache))
++				      
++		    return inline_unwinder;
++		}
++	      return desc;
++	    }
+ 	}
+       if (entry->unwinder != NULL)
+ 	{
+ 	  if (entry->unwinder->sniffer (entry->unwinder, next_frame,
+ 					this_cache))
+-	    return entry->unwinder;
++	    {
++	      if (inline_unwinder)
++		{
++		  /* Pass the complete information about the regular unwinder.  */
++		  if (inline_unwinder->sniffer (entry->unwinder, next_frame,
++						this_cache))
++				      
++		    return inline_unwinder;
++		}
++	      return entry->unwinder;
++	    }
+ 	}
+     }
+   internal_error (__FILE__, __LINE__, _("frame_unwind_find_by_frame failed"));
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/frame-unwind.h gdb-6.8/gdb/frame-unwind.h
+--- gdb-6.8-clean/gdb/frame-unwind.h	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/frame-unwind.h	2008-06-16 20:11:43.000000000 +0200
+@@ -143,6 +143,8 @@ struct frame_unwind
+   frame_dealloc_cache_ftype *dealloc_cache;
+ };
+ 
++extern const struct frame_unwind *const inline_frame_unwind;
++
+ /* Register a frame unwinder, _prepending_ it to the front of the
+    search list (so it is sniffed before previously registered
+    unwinders).  By using a prepend, later calls can install unwinders
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/frame.c gdb-6.8/gdb/frame.c
+--- gdb-6.8-clean/gdb/frame.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/frame.c	2008-06-23 01:20:22.000000000 +0200
+@@ -40,8 +40,13 @@
+ #include "observer.h"
+ #include "objfiles.h"
+ #include "exceptions.h"
++#include "block.h"
+ 
+ static struct frame_info *get_prev_frame_1 (struct frame_info *this_frame);
++static struct frame_info *get_prev_frame_raw (struct frame_info *this_frame);
++
++static void deprecated_update_frame_pc_hack (struct frame_info *frame,
++					     CORE_ADDR pc);
+ 
+ /* We keep a cache of stack frames, each of which is a "struct
+    frame_info".  The innermost one gets allocated (in
+@@ -182,6 +187,11 @@ fprint_frame_id (struct ui_file *file, s
+   fprint_field (file, "code", id.code_addr_p, id.code_addr);
+   fprintf_unfiltered (file, ",");
+   fprint_field (file, "special", id.special_addr_p, id.special_addr);
++  if (id.inline_depth)
++    {
++      fprintf_unfiltered (file, ",inlined=%d", id.inline_depth);
++      fprintf_unfiltered (file, ",block=0x%s", paddr_nz (id.block_addr));
++    }
+   fprintf_unfiltered (file, "}");
+ }
+ 
+@@ -196,6 +206,12 @@ fprint_frame_type (struct ui_file *file,
+     case DUMMY_FRAME:
+       fprintf_unfiltered (file, "DUMMY_FRAME");
+       return;
++    case INLINE_FRAME:
++      fprintf_unfiltered (file, "INLINE_FRAME");
++      return;
++    case SENTINEL_FRAME:
++      fprintf_unfiltered (file, "SENTINEL_FRAME");
++      return;
+     case SIGTRAMP_FRAME:
+       fprintf_unfiltered (file, "SIGTRAMP_FRAME");
+       return;
+@@ -341,8 +357,8 @@ frame_id_p (struct frame_id l)
+   return p;
+ }
+ 
+-int
+-frame_id_eq (struct frame_id l, struct frame_id r)
++static int
++frame_id_eq_1 (struct frame_id l, struct frame_id r)
+ {
+   int eq;
+   if (!l.stack_addr_p || !r.stack_addr_p)
+@@ -352,21 +368,52 @@ frame_id_eq (struct frame_id l, struct f
+   else if (l.stack_addr != r.stack_addr)
+     /* If .stack addresses are different, the frames are different.  */
+     eq = 0;
+-  else if (!l.code_addr_p || !r.code_addr_p)
+-    /* An invalid code addr is a wild card, always succeed.  */
+-    eq = 1;
+-  else if (l.code_addr != r.code_addr)
+-    /* If .code addresses are different, the frames are different.  */
++  else if (l.code_addr_p && r.code_addr_p && l.code_addr != r.code_addr)
++    /* An invalid code addr is a wild card.  If .code addresses are
++       different, the frames are different.  */
+     eq = 0;
+-  else if (!l.special_addr_p || !r.special_addr_p)
+-    /* An invalid special addr is a wild card (or unused), always succeed.  */
+-    eq = 1;
+-  else if (l.special_addr == r.special_addr)
++  else if (l.special_addr_p && r.special_addr_p
++	   && l.special_addr != r.special_addr)
++    /* An invalid special addr is a wild card (or unused).  Otherwise
++       if special addresses are different, the frames are different.  */
++    eq = 0;
++  else
+     /* Frames are equal.  */
+     eq = 1;
+-  else
+-    /* No luck.  */
++
++  return eq;
++}
++
++int
++frame_id_stack_eq (struct frame_id l, struct frame_id r)
++{
++  int eq = frame_id_eq_1 (l, r);
++
++  if (frame_debug)
++    {
++      fprintf_unfiltered (gdb_stdlog, "{ frame_id_stack_eq (l=");
++      fprint_frame_id (gdb_stdlog, l);
++      fprintf_unfiltered (gdb_stdlog, ",r=");
++      fprint_frame_id (gdb_stdlog, r);
++      fprintf_unfiltered (gdb_stdlog, ") -> %d }\n", eq);
++    }
++
++  return eq;
++}
++
++int
++frame_id_eq (struct frame_id l, struct frame_id r)
++{
++  int eq = frame_id_eq_1 (l, r);
++
++  if (l.inline_depth != r.inline_depth)
++    /* If inline depths are different, the frames must be different.  */
+     eq = 0;
++  else if (l.block_addr != r.block_addr)
++    /* If the inlined block has a different start address, the frames
++       must be different.  */
++    eq = 0;
++
+   if (frame_debug)
+     {
+       fprintf_unfiltered (gdb_stdlog, "{ frame_id_eq (l=");
+@@ -375,6 +422,7 @@ frame_id_eq (struct frame_id l, struct f
+       fprint_frame_id (gdb_stdlog, r);
+       fprintf_unfiltered (gdb_stdlog, ") -> %d }\n", eq);
+     }
++
+   return eq;
+ }
+ 
+@@ -385,6 +433,28 @@ frame_id_inner (struct gdbarch *gdbarch,
+   if (!l.stack_addr_p || !r.stack_addr_p)
+     /* Like NaN, any operation involving an invalid ID always fails.  */
+     inner = 0;
++  else if (l.inline_depth < r.inline_depth
++	   && l.stack_addr == r.stack_addr
++	   && l.code_addr_p == r.code_addr_p
++	   && (!l.code_addr_p || l.code_addr == r.code_addr)
++	   && l.special_addr_p == r.special_addr_p
++	   && (!l.special_addr_p || l.special_addr == r.special_addr))
++    {
++      /* Same function, different inlined functions.  */
++      struct block *lb, *rb;
++
++      lb = block_for_pc (l.block_addr);
++      rb = block_for_pc (r.block_addr);
++
++      if (lb == NULL || rb == NULL)
++	/* Something's gone wrong.  */
++	inner = 0;
++      else
++	/* This will return true if LB and RB are the same block, or
++	   if the block with the smaller depth lexically encloses the
++	   block with the greater depth.  */
++	inner = contained_in (lb, rb);
++    }
+   else
+     /* Only return non-zero when strictly inner than.  Note that, per
+        comment in "frame.h", there is some fuzz here.  Frameless
+@@ -412,7 +482,7 @@ frame_find_by_id (struct frame_id id)
+   if (!frame_id_p (id))
+     return NULL;
+ 
+-  for (frame = get_current_frame ();
++  for (frame = get_current_user_frame ();
+        frame != NULL;
+        frame = get_prev_frame (frame))
+     {
+@@ -900,7 +970,7 @@ unwind_to_current_frame (struct ui_out *
+ }
+ 
+ struct frame_info *
+-get_current_frame (void)
++get_current_user_frame (void)
+ {
+   /* First check, and report, the lack of registers.  Having GDB
+      report "No stack!" or "No memory" when the target doesn't even
+@@ -928,6 +998,24 @@ get_current_frame (void)
+   return current_frame;
+ }
+ 
++/* Given FRAME, return the enclosing normal frame for inlined
++   function frames.  Otherwise return the original frame.  */
++
++static struct frame_info *
++get_real_frame (struct frame_info *frame)
++{
++  while (get_frame_type (frame) == INLINE_FRAME)
++    frame = get_prev_frame (frame);
++
++  return frame;
++}
++
++struct frame_info *
++get_current_frame (void)
++{
++  return get_real_frame (get_current_user_frame ());
++}
++
+ /* The "selected" stack frame is used by default for local and arg
+    access.  May be zero, for no selected frame.  */
+ 
+@@ -949,7 +1037,7 @@ get_selected_frame (const char *message)
+       /* Hey!  Don't trust this.  It should really be re-finding the
+ 	 last selected frame of the currently selected thread.  This,
+ 	 though, is better than nothing.  */
+-      select_frame (get_current_frame ());
++      select_frame (get_current_user_frame ());
+     }
+   /* There is always a frame.  */
+   gdb_assert (selected_frame != NULL);
+@@ -1134,7 +1222,6 @@ frame_register_unwind_location (struct f
+ static struct frame_info *
+ get_prev_frame_1 (struct frame_info *this_frame)
+ {
+-  struct frame_info *prev_frame;
+   struct frame_id this_id;
+   struct gdbarch *gdbarch;
+ 
+@@ -1165,6 +1252,14 @@ get_prev_frame_1 (struct frame_info *thi
+   this_frame->prev_p = 1;
+   this_frame->stop_reason = UNWIND_NO_REASON;
+ 
++  /* If we are unwinding from an inline frame, all of the below tests
++     were already performed when we unwound from the next non-inline
++     frame.  We must skip them, since we can not get THIS_FRAME's ID
++     until we have unwound all the way down to the previous non-inline
++     frame.  */
++  if (get_frame_type (this_frame) == INLINE_FRAME)
++    return get_prev_frame_raw (this_frame);
++
+   /* Check that this frame's ID was valid.  If it wasn't, don't try to
+      unwind to the prev frame.  Be careful to not apply this test to
+      the sentinel frame.  */
+@@ -1233,7 +1328,8 @@ get_prev_frame_1 (struct frame_info *thi
+   if (this_frame->level > 0
+       && gdbarch_pc_regnum (gdbarch) >= 0
+       && get_frame_type (this_frame) == NORMAL_FRAME
+-      && get_frame_type (this_frame->next) == NORMAL_FRAME)
++      && (get_frame_type (this_frame->next) == NORMAL_FRAME
++	  || get_frame_type (this_frame->next) == INLINE_FRAME))
+     {
+       int optimized, realnum, nrealnum;
+       enum lval_type lval, nlval;
+@@ -1262,6 +1358,17 @@ get_prev_frame_1 (struct frame_info *thi
+ 	}
+     }
+ 
++  return get_prev_frame_raw (this_frame);
++}
++
++/* Construct a new "struct frame_info" and link it previous to
++   this_frame.  */
++
++static struct frame_info *
++get_prev_frame_raw (struct frame_info *this_frame)
++{
++  struct frame_info *prev_frame;
++
+   /* Allocate the new frame but do not wire it in to the frame chain.
+      Some (bad) code in INIT_FRAME_EXTRA_INFO tries to look along
+      frame->next to pull some fancy tricks (of course such code is, by
+@@ -1421,7 +1528,7 @@ get_prev_frame (struct frame_info *this_
+      the main function when we created the dummy frame, the dummy frame will 
+      point inside the main function.  */
+   if (this_frame->level >= 0
+-      && get_frame_type (this_frame) != DUMMY_FRAME
++      && get_frame_type (this_frame) == NORMAL_FRAME
+       && !backtrace_past_main
+       && inside_main_func (this_frame))
+     /* Don't unwind past main().  Note, this is done _before_ the
+@@ -1467,8 +1574,9 @@ get_prev_frame (struct frame_info *this_
+      from main returns directly to the caller of main.  Since we don't
+      stop at main, we should at least stop at the entry point of the
+      application.  */
+-  if (!backtrace_past_entry
+-      && get_frame_type (this_frame) != DUMMY_FRAME && this_frame->level >= 0
++  if (this_frame->level >= 0
++      && get_frame_type (this_frame) == NORMAL_FRAME
++      && !backtrace_past_entry
+       && inside_entry_func (this_frame))
+     {
+       frame_debug_got_null_frame (gdb_stdlog, this_frame, "inside entry func");
+@@ -1479,7 +1587,8 @@ get_prev_frame (struct frame_info *this_
+      like a SIGSEGV or a dummy frame, and hence that NORMAL frames
+      will never unwind a zero PC.  */
+   if (this_frame->level > 0
+-      && get_frame_type (this_frame) == NORMAL_FRAME
++      && (get_frame_type (this_frame) == NORMAL_FRAME
++	  || get_frame_type (this_frame) == INLINE_FRAME)
+       && get_frame_type (get_next_frame (this_frame)) == NORMAL_FRAME
+       && get_frame_pc (this_frame) == 0)
+     {
+@@ -1518,21 +1627,31 @@ frame_unwind_address_in_block (struct fr
+   CORE_ADDR pc = frame_pc_unwind (next_frame);
+ 
+   /* If NEXT_FRAME was called by a signal frame or dummy frame, then
+-     we shold not adjust the unwound PC.  These frames may not call
++     we should not adjust the unwound PC.  These frames may not call
+      their next frame in the normal way; the operating system or GDB
+      may have pushed their resume address manually onto the stack, so
+      it may be the very first instruction.  Even if the resume address
+      was not manually pushed, they expect to be returned to.  */
+-  if (this_type != NORMAL_FRAME)
++  if (this_type != NORMAL_FRAME && this_type != INLINE_FRAME)
+     return pc;
+ 
++  /* If NEXT_FRAME was inlined into the current frame, we are really
++     interested in an even younger (newer) frame - the point where
++     execution left THIS function.  */
++  while (get_frame_type (next_frame) == INLINE_FRAME)
++    next_frame = next_frame->next;
++
+   /* If THIS frame is not inner most (i.e., NEXT isn't the sentinel),
+      and NEXT is `normal' (i.e., not a sigtramp, dummy, ....) THIS
+      frame's PC ends up pointing at the instruction fallowing the
+      "call".  Adjust that PC value so that it falls on the call
+      instruction (which, hopefully, falls within THIS frame's code
+      block).  So far it's proved to be a very good approximation.  See
+-     get_frame_type() for why ->type can't be used.  */
++     get_frame_type() for why ->type can't be used.
++
++     This is correct even if NEXT_FRAME describes an inlined function.
++     Inlined functions always live between two normal frames, and are
++     themselves normal.  */
+   if (next_frame->level >= 0
+       && get_frame_type (next_frame) == NORMAL_FRAME)
+     --pc;
+@@ -1546,9 +1665,41 @@ get_frame_address_in_block (struct frame
+ 					get_frame_type (this_frame));
+ }
+ 
+-static int
+-pc_notcurrent (struct frame_info *frame)
++void
++find_frame_sal (struct frame_info *frame, struct symtab_and_line *sal)
+ {
++  struct frame_info *next_frame;
++  int notcurrent;
++
++  /* If the next frame represents an inlined function call, this frame's
++     sal is the "call site" of that inlined function, which can not
++     be inferred from get_frame_pc.  */
++  next_frame = get_next_frame (frame);
++  if ((next_frame != NULL && get_frame_type (next_frame) == INLINE_FRAME)
++      || (next_frame == NULL && inline_skipped_frames () > 0))
++    {
++      struct symbol *sym;
++
++      if (next_frame)
++	sym = get_frame_function (next_frame);
++      else
++	sym = inline_skipped_symbol ();
++
++      init_sal (sal);
++      if (sym && SYMBOL_LINE (sym) != 0)
++	{
++	  sal->symtab = SYMBOL_SYMTAB (sym);
++	  sal->line = SYMBOL_LINE (sym);
++	}
++      else
++	/* If the symbol does not have a location, we don't know where
++	   the call site is.  Do not pretend to.  This is jarring, but
++	   we can't do much better.  */
++	sal->pc = get_frame_pc (frame);
++
++      return;
++    }
++
+   /* If FRAME is not the innermost frame, that normally means that
+      FRAME->pc points at the return instruction (which is *after* the
+      call instruction), and we want to get the line containing the
+@@ -1558,15 +1709,8 @@ pc_notcurrent (struct frame_info *frame)
+      PC and such a PC indicates the current (rather than next)
+      instruction/line, consequently, for such cases, want to get the
+      line containing fi->pc.  */
+-  struct frame_info *next = get_next_frame (frame);
+-  int notcurrent = (next != NULL && get_frame_type (next) == NORMAL_FRAME);
+-  return notcurrent;
+-}
+-
+-void
+-find_frame_sal (struct frame_info *frame, struct symtab_and_line *sal)
+-{
+-  (*sal) = find_pc_line (get_frame_pc (frame), pc_notcurrent (frame));
++  notcurrent = (get_frame_pc (frame) != get_frame_address_in_block (frame));
++  (*sal) = find_pc_line (get_frame_pc (frame), notcurrent);
+ }
+ 
+ /* Per "frame.h", return the ``address'' of the frame.  Code should
+@@ -1652,7 +1796,7 @@ get_frame_type (struct frame_info *frame
+   return frame->unwind->type;
+ }
+ 
+-void
++static void
+ deprecated_update_frame_pc_hack (struct frame_info *frame, CORE_ADDR pc)
+ {
+   if (frame_debug)
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/frame.h gdb-6.8/gdb/frame.h
+--- gdb-6.8-clean/gdb/frame.h	2008-01-01 23:53:09.000000000 +0100
++++ gdb-6.8/gdb/frame.h	2008-06-23 01:20:22.000000000 +0200
+@@ -122,6 +122,17 @@ struct frame_id
+   unsigned int stack_addr_p : 1;
+   unsigned int code_addr_p : 1;
+   unsigned int special_addr_p : 1;
++
++  /* The inline depth of this frame.  A frame representing a "called"
++     inlined function will have this set to a nonzero value.  */
++  int inline_depth;
++
++  /* A second code address, considered only if inline_depth != 0.  The
++     block address lets GDB distinguish multiple functions inlined
++     into the same caller.  This should be the first executed
++     instruction in the block corresponding to the inlined
++     function.  */
++  CORE_ADDR block_addr;
+ };
+ 
+ /* Methods for constructing and comparing Frame IDs.
+@@ -168,6 +179,11 @@ extern struct frame_id frame_id_build_wi
+    non-zero .base).  */
+ extern int frame_id_p (struct frame_id l);
+ 
++/* Returns non-zero when L and R identify frames associated with
++   the same underlying stack frame, although they may refer to
++   different inlined functions within the stack frame.  */
++extern int frame_id_stack_eq (struct frame_id l, struct frame_id r);
++
+ /* Returns non-zero when L and R identify the same frame, or, if
+    either L or R have a zero .func, then the same frame base.  */
+ extern int frame_id_eq (struct frame_id l, struct frame_id r);
+@@ -194,6 +210,12 @@ enum frame_type
+   /* A fake frame, created by GDB when performing an inferior function
+      call.  */
+   DUMMY_FRAME,
++  /* A frame representing an inlined function, associated with an upcoming
++     (next, inner, younger) NORMAL_FRAME.  Its unwinder execution is delayed
++     behind the other unwinders (see FRAME_UNWIND_FIND_BY_FRAME).  This
++     unwinder expects the regular unwinder and its existing cache to be passed
++     as the parameters.  */
++  INLINE_FRAME,
+   /* In a signal handler, various OSs handle this in various ways.
+      The main thing is that the frame may be far from normal.  */
+   SIGTRAMP_FRAME,
+@@ -218,7 +240,10 @@ enum frame_type
+ 
+ /* On demand, create the inner most frame using information found in
+    the inferior.  If the inner most frame can't be created, throw an
+-   error.  */
++   error.  get_current_user_frame returns the frame we should display
++   to the user, which may be an inlined function; get_current_frame
++   returns the innermost non-inlined frame.  */
++extern struct frame_info *get_current_user_frame (void);
+ extern struct frame_info *get_current_frame (void);
+ 
+ /* Invalidates the frame cache (this function should have been called
+@@ -703,14 +728,6 @@ extern struct frame_info *deprecated_saf
+ 
+ extern struct frame_info *create_new_frame (CORE_ADDR base, CORE_ADDR pc);
+ 
+-/* FIXME: cagney/2002-12-06: Has the PC in the current frame changed?
+-   "infrun.c", Thanks to gdbarch_decr_pc_after_break, can change the PC after
+-   the initial frame create.  This puts things back in sync.
+-
+-   This replaced: frame->pc = ....; */
+-extern void deprecated_update_frame_pc_hack (struct frame_info *frame,
+-					     CORE_ADDR pc);
+-
+ /* FIXME: cagney/2002-12-18: Has the frame's base changed?  Or to be
+    more exact, was that initial guess at the frame's base as returned
+    by the deleted read_fp() wrong?  If it was, fix it.  This shouldn't
+@@ -721,4 +738,9 @@ extern void deprecated_update_frame_pc_h
+ extern void deprecated_update_frame_base_hack (struct frame_info *frame,
+ 					       CORE_ADDR base);
+ 
++extern void set_skipped_inline_frames (int skip_ok);
++extern void step_into_inline_frame (void);
++extern int inline_skipped_frames (void);
++extern struct symbol *inline_skipped_symbol (void);
++
+ #endif /* !defined (FRAME_H)  */
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/infcall.c gdb-6.8/gdb/infcall.c
+--- gdb-6.8-clean/gdb/infcall.c	2008-01-08 20:28:08.000000000 +0100
++++ gdb-6.8/gdb/infcall.c	2008-06-16 20:11:43.000000000 +0200
+@@ -757,11 +757,8 @@ call_function_by_hand (struct value *fun
+ 
+ 	  if (unwind_on_signal_p)
+ 	    {
+-	      /* The user wants the context restored. */
+-
+-	      /* We must get back to the frame we were before the
+-		 dummy call. */
+-	      frame_pop (get_current_frame ());
++	      /* The user wants the context restored.  Calling error will
++	         run inf_status_cleanup, which does all the work.  */
+ 
+ 	      /* FIXME: Insert a bunch of wrap_here; name can be very
+ 		 long if it's a C++ name with arguments and stuff.  */
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/infcmd.c gdb-6.8/gdb/infcmd.c
+--- gdb-6.8-clean/gdb/infcmd.c	2008-01-31 14:37:21.000000000 +0100
++++ gdb-6.8/gdb/infcmd.c	2008-06-23 01:23:52.000000000 +0200
+@@ -48,6 +48,7 @@
+ #include "observer.h"
+ #include "target-descriptions.h"
+ #include "user-regs.h"
++#include "gdbthread.h"
+ 
+ /* Functions exported for general use, in inferior.h: */
+ 
+@@ -653,6 +654,17 @@ continue_command (char *proc_count_exp, 
+   proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
+ }
+ 
++/* Record the starting point of a "step" or "next" command.  */
++
++static void
++set_step_frame (void)
++{
++  struct symtab_and_line sal;
++
++  find_frame_sal (get_current_user_frame (), &sal);
++  set_step_info (get_frame_id (get_current_user_frame ()), sal);
++}
++
+ /* Step until outside of current statement.  */
+ 
+ static void
+@@ -726,51 +738,14 @@ step_1 (int skip_subroutines, int single
+         make_exec_cleanup (disable_longjmp_breakpoint_cleanup, 0 /*ignore*/);
+     }
+ 
+-  /* In synchronous case, all is well, just use the regular for loop. */
++  /* In synchronous case, all is well, just use the regular for loop.  */
+   if (!target_can_async_p ())
+     {
+       for (; count > 0; count--)
+ 	{
+-	  clear_proceed_status ();
+-
+-	  frame = get_current_frame ();
+-	  if (!frame)		/* Avoid coredump here.  Why tho? */
+-	    error (_("No current frame"));
+-	  step_frame_id = get_frame_id (frame);
+-
+-	  if (!single_inst)
+-	    {
+-	      find_pc_line_pc_range (stop_pc, &step_range_start, &step_range_end);
+-	      if (step_range_end == 0)
+-		{
+-		  char *name;
+-		  if (find_pc_partial_function (stop_pc, &name, &step_range_start,
+-						&step_range_end) == 0)
+-		    error (_("Cannot find bounds of current function"));
+-
+-		  target_terminal_ours ();
+-		  printf_filtered (_("\
+-Single stepping until exit from function %s, \n\
+-which has no line number information.\n"), name);
+-		}
+-	    }
+-	  else
+-	    {
+-	      /* Say we are stepping, but stop after one insn whatever it does.  */
+-	      step_range_start = step_range_end = 1;
+-	      if (!skip_subroutines)
+-		/* It is stepi.
+-		   Don't step over function calls, not even to functions lacking
+-		   line numbers.  */
+-		step_over_calls = STEP_OVER_NONE;
+-	    }
+-
+-	  if (skip_subroutines)
+-	    step_over_calls = STEP_OVER_ALL;
+-
+-	  step_multi = (count > 1);
+-	  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
++	  step_once (skip_subroutines, single_inst, count);
+ 
++	  /* Unexpected breakpoint terminates our multistepping.  */
+ 	  if (!stop_step)
+ 	    break;
+ 	}
+@@ -779,12 +754,12 @@ which has no line number information.\n"
+ 	do_cleanups (cleanups);
+       return;
+     }
+-  /* In case of asynchronous target things get complicated, do only
+-     one step for now, before returning control to the event loop. Let
+-     the continuation figure out how many other steps we need to do,
+-     and handle them one at the time, through step_once(). */
+   else
+     {
++      /* In case of asynchronous target things get complicated, do only
++	 one step for now, before returning control to the event loop. Let
++	 the continuation figure out how many other steps we need to do,
++	 and handle them one at the time, through step_once(). */
+       if (target_can_async_p ())
+ 	step_once (skip_subroutines, single_inst, count);
+     }
+@@ -831,22 +806,25 @@ step_once (int skip_subroutines, int sin
+   if (count > 0)
+     {
+       clear_proceed_status ();
+-
+-      frame = get_current_frame ();
+-      if (!frame)		/* Avoid coredump here.  Why tho? */
+-	error (_("No current frame"));
+-      step_frame_id = get_frame_id (frame);
++      set_step_frame ();
+ 
+       if (!single_inst)
+ 	{
+-	  find_pc_line_pc_range (stop_pc, &step_range_start, &step_range_end);
+-
+-	  /* If we have no line info, switch to stepi mode.  */
+-	  if (step_range_end == 0 && step_stop_if_no_debug)
++	  /* Step at an inlined function behaves like "down".  */
++	  if (!skip_subroutines && !single_inst && inline_skipped_frames ())
+ 	    {
+-	      step_range_start = step_range_end = 1;
++	      step_into_inline_frame ();
++	      if (count > 1)
++		step_once (skip_subroutines, single_inst, count - 1);
++	      else
++		/* Pretend that we've stopped.  */
++		normal_stop ();
++	      return;
+ 	    }
+-	  else if (step_range_end == 0)
++	    
++	  find_pc_line_pc_range (stop_pc, &step_range_start, &step_range_end);
++
++	  if (step_range_end == 0)
+ 	    {
+ 	      char *name;
+ 	      if (find_pc_partial_function (stop_pc, &name, &step_range_start,
+@@ -1052,14 +1030,12 @@ signal_command (char *signum_exp, int fr
+ static void
+ until_next_command (int from_tty)
+ {
+-  struct frame_info *frame;
+   CORE_ADDR pc;
+   struct symbol *func;
+   struct symtab_and_line sal;
+ 
+   clear_proceed_status ();
+-
+-  frame = get_current_frame ();
++  set_step_frame ();
+ 
+   /* Step until either exited from this function or greater
+      than the current line (if in symbolic section) or pc (if
+@@ -1087,7 +1063,6 @@ until_next_command (int from_tty)
+     }
+ 
+   step_over_calls = STEP_OVER_ALL;
+-  step_frame_id = get_frame_id (frame);
+ 
+   step_multi = 0;		/* Only one call to proceed */
+ 
+@@ -1295,6 +1270,35 @@ finish_command (char *arg, int from_tty)
+ 
+   clear_proceed_status ();
+ 
++  /* Finishing from an inline frame is completely different.  We don't
++     try to show the "return value" - no way to locate it.  So we do
++     not need a completion.  */
++  if (get_frame_type (get_selected_frame (_("No selected frame.")))
++      == INLINE_FRAME)
++    {
++      /* Claim we are stepping in the calling frame.  An empty step
++	 range means that we will stop once we aren't in a function
++	 called by that frame.  We don't use the magic "1" value for
++	 step_range_end, because then infrun will think this is nexti,
++	 and not step over the rest of this inlined function call.  */
++      struct symtab_and_line empty_sal;
++      init_sal (&empty_sal);
++      set_step_info (get_frame_id (frame), empty_sal);
++      step_range_start = step_range_end = get_frame_pc (frame);
++      step_over_calls = STEP_OVER_ALL;
++
++      /* Print info on the selected frame, including level number but not
++	 source.  */
++      if (from_tty)
++	{
++	  printf_filtered (_("Run till exit from "));
++	  print_stack_frame (get_selected_frame (NULL), 1, LOCATION);
++	}
++
++      proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
++      return;
++    }
++
+   sal = find_pc_line (get_frame_pc (frame), 0);
+   sal.pc = get_frame_pc (frame);
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/inferior.h gdb-6.8/gdb/inferior.h
+--- gdb-6.8-clean/gdb/inferior.h	2008-06-24 22:58:30.000000000 +0200
++++ gdb-6.8/gdb/inferior.h	2008-06-16 20:11:43.000000000 +0200
+@@ -254,6 +254,8 @@ extern void get_last_target_status(ptid_
+ 
+ extern void follow_inferior_reset_breakpoints (void);
+ 
++void set_step_info (struct frame_id id, struct symtab_and_line sal);
++
+ /* From infcmd.c */
+ 
+ extern void tty_command (char *, int);
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/infrun.c gdb-6.8/gdb/infrun.c
+--- gdb-6.8-clean/gdb/infrun.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/infrun.c	2008-06-17 11:35:38.000000000 +0200
+@@ -276,6 +276,11 @@ static int stop_print_frame;
+ 
+ static struct breakpoint *step_resume_breakpoint = NULL;
+ 
++/* The source file and line at the beginning of the current step
++   operation.  Only valid when step_frame_id is set.  */
++static struct symtab *step_current_symtab;
++static int step_current_line;
++
+ /* This is a cached copy of the pid/waitstatus of the last event
+    returned by target_wait()/deprecated_target_wait_hook().  This
+    information is returned by get_last_target_status().  */
+@@ -972,7 +977,7 @@ struct execution_control_state
+   int wait_some_more;
+ };
+ 
+-void init_execution_control_state (struct execution_control_state *ecs);
++static void init_execution_control_state (struct execution_control_state *ecs);
+ 
+ void handle_inferior_event (struct execution_control_state *ecs);
+ 
+@@ -1121,10 +1126,19 @@ fetch_inferior_event (void *client_data)
+     }
+ }
+ 
++/* Record the frame and location we're currently stepping through.  */
++void
++set_step_info (struct frame_id id, struct symtab_and_line sal)
++{
++  step_frame_id = id;
++  step_current_symtab = sal.symtab;
++  step_current_line = sal.line;
++}
++
+ /* Prepare an execution control state for looping through a
+    wait_for_inferior-type loop.  */
+ 
+-void
++static void
+ init_execution_control_state (struct execution_control_state *ecs)
+ {
+   ecs->stepping_over_breakpoint = 0;
+@@ -1134,8 +1148,6 @@ init_execution_control_state (struct exe
+   ecs->stepping_through_solib_after_catch = 0;
+   ecs->stepping_through_solib_catchpoints = NULL;
+   ecs->sal = find_pc_line (prev_pc, 0);
+-  ecs->current_line = ecs->sal.line;
+-  ecs->current_symtab = ecs->sal.symtab;
+   ecs->infwait_state = infwait_normal_state;
+   ecs->waiton_ptid = pid_to_ptid (-1);
+   ecs->wp = &(ecs->ws);
+@@ -1188,7 +1200,7 @@ context_switch (struct execution_control
+ 			 ecs->handling_longjmp, ecs->stepping_over_breakpoint,
+ 			 ecs->stepping_through_solib_after_catch,
+ 			 ecs->stepping_through_solib_catchpoints,
+-			 ecs->current_line, ecs->current_symtab);
++			 step_current_line, step_current_symtab);
+ 
+       /* Load infrun state for the new thread.  */
+       load_infrun_state (ecs->ptid, &prev_pc,
+@@ -1198,7 +1210,7 @@ context_switch (struct execution_control
+ 			 &ecs->handling_longjmp, &ecs->stepping_over_breakpoint,
+ 			 &ecs->stepping_through_solib_after_catch,
+ 			 &ecs->stepping_through_solib_catchpoints,
+-			 &ecs->current_line, &ecs->current_symtab);
++			 &step_current_line, &step_current_symtab);
+     }
+ 
+   switch_to_thread (ecs->ptid);
+@@ -1276,6 +1288,22 @@ adjust_pc_after_break (struct execution_
+     }
+ }
+ 
++static int
++stepped_in_from (struct frame_info *frame, struct frame_id step_frame_id)
++{
++  for (frame = get_prev_frame (frame);
++       frame != NULL;
++       frame = get_prev_frame (frame))
++    {
++      if (frame_id_eq (get_frame_id (frame), step_frame_id))
++	return 1;
++      if (get_frame_type (frame) != INLINE_FRAME)
++	break;
++    }
++
++  return 0;
++}
++
+ /* Given an execution control state that has been freshly filled in
+    by an event from the inferior, figure out what it means and take
+    appropriate action.  */
+@@ -1336,6 +1364,7 @@ handle_inferior_event (struct execution_
+   ecs->infwait_state = infwait_normal_state;
+ 
+   reinit_frame_cache ();
++  set_skipped_inline_frames (0);
+ 
+   /* If it's a new process, add it to the thread database */
+ 
+@@ -1893,6 +1922,12 @@ handle_inferior_event (struct execution_
+   ecs->random_signal = 0;
+   stopped_by_random_signal = 0;
+ 
++  /* Hide inlined functions starting here, unless we just performed stepi or
++     nexti.  After stepi and nexti, always show the innermost frame (not any
++     inline function call sites).  */
++  if (step_range_end != 1)
++    set_skipped_inline_frames (1);
++
+   if (stop_signal == TARGET_SIGNAL_TRAP
+       && stepping_over_breakpoint
+       && gdbarch_single_step_through_delay_p (current_gdbarch)
+@@ -2092,8 +2127,8 @@ process_event_stop_test:
+       if (step_range_end != 0
+ 	  && stop_signal != TARGET_SIGNAL_0
+ 	  && stop_pc >= step_range_start && stop_pc < step_range_end
+-	  && frame_id_eq (get_frame_id (get_current_frame ()),
+-			  step_frame_id)
++	  && frame_id_stack_eq (get_frame_id (get_current_frame ()),
++				step_frame_id)
+ 	  && step_resume_breakpoint == NULL)
+ 	{
+ 	  /* The inferior is about to take a signal that will take it
+@@ -2423,12 +2458,7 @@ process_event_stop_test:
+      until we exit the run time loader code and reach the callee's
+      address.  */
+   if (step_over_calls == STEP_OVER_UNDEBUGGABLE
+-#ifdef IN_SOLIB_DYNSYM_RESOLVE_CODE
+-      && IN_SOLIB_DYNSYM_RESOLVE_CODE (stop_pc)
+-#else
+-      && in_solib_dynsym_resolve_code (stop_pc)
+-#endif
+-      )
++      && in_solib_dynsym_resolve_code (stop_pc))
+     {
+       CORE_ADDR pc_after_resolver =
+ 	gdbarch_skip_solib_resolver (current_gdbarch, stop_pc);
+@@ -2472,11 +2502,12 @@ process_event_stop_test:
+      previous frame's ID is sufficient - but it is a common case and
+      cheaper than checking the previous frame's ID.
+ 
+-     NOTE: frame_id_eq will never report two invalid frame IDs as
++     NOTE: frame_id_stack_eq will never report two invalid frame IDs as
+      being equal, so to get into this block, both the current and
+      previous frame must have valid frame IDs.  */
+-  if (!frame_id_eq (get_frame_id (get_current_frame ()), step_frame_id)
+-      && frame_id_eq (frame_unwind_id (get_current_frame ()), step_frame_id))
++  if (!frame_id_stack_eq (get_frame_id (get_current_frame ()), step_frame_id)
++      && frame_id_stack_eq (frame_unwind_id (get_current_frame ()),
++			    step_frame_id))
+     {
+       CORE_ADDR real_stop_pc;
+ 
+@@ -2521,13 +2552,7 @@ process_event_stop_test:
+       if (real_stop_pc != 0)
+ 	ecs->stop_func_start = real_stop_pc;
+ 
+-      if (
+-#ifdef IN_SOLIB_DYNSYM_RESOLVE_CODE
+-	  IN_SOLIB_DYNSYM_RESOLVE_CODE (ecs->stop_func_start)
+-#else
+-	  in_solib_dynsym_resolve_code (ecs->stop_func_start)
+-#endif
+-)
++      if (real_stop_pc != 0 && in_solib_dynsym_resolve_code (real_stop_pc))
+ 	{
+ 	  struct symtab_and_line sr_sal;
+ 	  init_sal (&sr_sal);
+@@ -2675,9 +2700,82 @@ process_event_stop_test:
+       return;
+     }
+ 
++  /* Look for "calls" to inlined functions, part one.  If the inline
++     frame machinery detected some skipped call sites, we have entered
++     a new inline function.  */
++
++  if (frame_id_eq (get_frame_id (get_current_user_frame ()), step_frame_id)
++      && inline_skipped_frames ())
++    {
++      struct symtab_and_line call_sal;
++
++      if (debug_infrun)
++	fprintf_unfiltered (gdb_stdlog,
++			    "infrun: stepped into inlined function\n");
++
++      find_frame_sal (get_current_user_frame (), &call_sal);
++
++      if (step_over_calls != STEP_OVER_ALL)
++	{
++	  /* For "step", we're going to stop.  But if the call site
++	     for this inlined function is on the same source line as
++	     we were previously stepping, go down into the function
++	     first.  Otherwise stop at the call site.  */
++
++	  if (call_sal.line == step_current_line
++	      && call_sal.symtab == step_current_symtab)
++	    step_into_inline_frame ();
++
++	  stop_step = 1;
++	  print_stop_reason (END_STEPPING_RANGE, 0);
++	  stop_stepping (ecs);
++	  return;
++	}
++      else
++	{
++	  /* For "next", we should stop at the call site if it is on a
++	     different source line.  Otherwise continue through the
++	     inlined function.  */
++	  if (call_sal.line == step_current_line
++	      && call_sal.symtab == step_current_symtab)
++	    keep_going (ecs);
++	  else
++	    {
++	      stop_step = 1;
++	      print_stop_reason (END_STEPPING_RANGE, 0);
++	      stop_stepping (ecs);
++	    }
++	  return;
++	}
++    }
++
++  /* Look for "calls" to inlined functions, part two.  If we are still
++     in the same real function we were stepping through, but we have
++     to go further up to find the exact frame ID, we are stepping
++     through a more inlined call beyond its call site.  */
++
++  if (get_frame_type (get_current_user_frame ()) == INLINE_FRAME
++      && !frame_id_eq (get_frame_id (get_current_user_frame ()), step_frame_id)
++      && stepped_in_from (get_current_user_frame (), step_frame_id))
++    {
++      if (debug_infrun)
++	fprintf_unfiltered (gdb_stdlog,
++			    "infrun: stepping through inlined function\n");
++
++      if (step_over_calls == STEP_OVER_ALL)
++	keep_going (ecs);
++      else
++	{
++	  stop_step = 1;
++	  print_stop_reason (END_STEPPING_RANGE, 0);
++	  stop_stepping (ecs);
++	}
++      return;
++    }
++
+   if ((stop_pc == ecs->sal.pc)
+-      && (ecs->current_line != ecs->sal.line
+-	  || ecs->current_symtab != ecs->sal.symtab))
++      && (step_current_line != ecs->sal.line
++	  || step_current_symtab != ecs->sal.symtab))
+     {
+       /* We are at the start of a different line.  So stop.  Note that
+          we don't stop if we step into the middle of a different line.
+@@ -2700,13 +2798,11 @@ process_event_stop_test:
+ 
+   step_range_start = ecs->sal.pc;
+   step_range_end = ecs->sal.end;
+-  step_frame_id = get_frame_id (get_current_frame ());
+-  ecs->current_line = ecs->sal.line;
+-  ecs->current_symtab = ecs->sal.symtab;
++  set_step_info (get_frame_id (get_current_user_frame ()), ecs->sal);
+ 
+   /* In the case where we just stepped out of a function into the
+      middle of a line of the caller, continue stepping, but
+-     step_frame_id must be modified to current frame */
++     step_frame_id must be modified to current frame (above).  */
+ #if 0
+   /* NOTE: cagney/2003-10-16: I think this frame ID inner test is too
+      generous.  It will trigger on things like a step into a frameless
+@@ -2723,13 +2819,6 @@ process_event_stop_test:
+      and we're willing to introduce frame unwind logic into this
+      function.  Fortunately, those days are nearly upon us.  */
+ #endif
+-  {
+-    struct frame_info *frame = get_current_frame ();
+-    struct frame_id current_frame = get_frame_id (frame);
+-    if (!(frame_id_inner (get_frame_arch (frame), current_frame,
+-			  step_frame_id)))
+-      step_frame_id = current_frame;
+-  }
+ 
+   if (debug_infrun)
+      fprintf_unfiltered (gdb_stdlog, "infrun: keep going\n");
+@@ -3150,17 +3239,6 @@ normal_stop (void)
+       previous_inferior_ptid = inferior_ptid;
+     }
+ 
+-  /* NOTE drow/2004-01-17: Is this still necessary?  */
+-  /* Make sure that the current_frame's pc is correct.  This
+-     is a correction for setting up the frame info before doing
+-     gdbarch_decr_pc_after_break */
+-  if (target_has_execution)
+-    /* FIXME: cagney/2002-12-06: Has the PC changed?  Thanks to
+-       gdbarch_decr_pc_after_break, the program counter can change.  Ask the
+-       frame code to check for this and sort out any resultant mess.
+-       gdbarch_decr_pc_after_break needs to just go away.  */
+-    deprecated_update_frame_pc_hack (get_current_frame (), read_pc ());
+-
+   if (target_has_execution)
+     {
+       if (remove_breakpoints ())
+@@ -3195,7 +3273,7 @@ Further execution is probably impossible
+      display the frame below, but the current SAL will be incorrect
+      during a user hook-stop function.  */
+   if (target_has_stack && !stop_stack_dummy)
+-    set_current_sal_from_frame (get_current_frame (), 1);
++    set_current_sal_from_frame (get_current_user_frame (), 1);
+ 
+   /* Look up the hook_stop and run it (CLI internally handles problem
+      of stop_command's pre-hook not existing).  */
+@@ -3205,7 +3283,6 @@ Further execution is probably impossible
+ 
+   if (!target_has_stack)
+     {
+-
+       goto done;
+     }
+ 
+@@ -3216,7 +3293,7 @@ Further execution is probably impossible
+ 
+   if (!stop_stack_dummy)
+     {
+-      select_frame (get_current_frame ());
++      select_frame (get_current_user_frame ());
+ 
+       /* Print current location without a level number, if
+          we have changed functions or hit a breakpoint.
+@@ -3251,7 +3328,7 @@ Further execution is probably impossible
+ 	         should) use that when doing a frame comparison.  */
+ 	      if (stop_step
+ 		  && frame_id_eq (step_frame_id,
+-				  get_frame_id (get_current_frame ()))
++				  get_frame_id (get_selected_frame (NULL)))
+ 		  && step_start_function == find_pc_function (stop_pc))
+ 		source_flag = SRC_LINE;	/* finished step, just print source line */
+ 	      else
+@@ -3310,7 +3387,7 @@ Further execution is probably impossible
+          Can't rely on restore_inferior_status because that only gets
+          called if we don't stop in the called function.  */
+       stop_pc = read_pc ();
+-      select_frame (get_current_frame ());
++      select_frame (get_current_user_frame ());
+     }
+ 
+ done:
+@@ -3824,7 +3901,7 @@ restore_inferior_status (struct inferior
+ 	   RETURN_MASK_ERROR) == 0)
+ 	/* Error in restoring the selected frame.  Select the innermost
+ 	   frame.  */
+-	select_frame (get_current_frame ());
++	select_frame (get_current_user_frame ());
+ 
+     }
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/inline-frame.c gdb-6.8/gdb/inline-frame.c
+--- gdb-6.8-clean/gdb/inline-frame.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/inline-frame.c	2008-06-24 22:59:37.000000000 +0200
+@@ -0,0 +1,353 @@
++/* Inline frame unwinder for GDB.
++
++   Copyright (C) 2007 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include "defs.h"
++#include "addrmap.h"
++#include "block.h"
++#include "frame-unwind.h"
++#include "symtab.h"
++
++#include "gdb_assert.h"
++
++static int inline_skip_frames;
++
++/* Only valid if INLINE_SKIP_FRAMES is non-zero.  This is the PC used
++   when calculating INLINE_SKIP_FRAMES; used to check whether we have
++   moved to a new location by user request.  */
++static CORE_ADDR inline_skip_pc;
++
++/* Only valid if INLINE_SKIP_FRAMES is non-zero.  This is the symbol
++   of the outermost skipped inline function.  It's used to find the
++   call site of the current frame.  */
++static struct symbol *inline_skip_symbol;
++
++/* Transparently wrap the former regular unwinder.  Allocated by
++   FRAME_OBSTACK_ZALLOC.  */
++struct inline_cache
++  {
++    const struct frame_unwind *unwind_regular;
++    void *cache_regular;
++  };
++
++/* We just must remap wrapped THIS_CACHE.  */
++
++static void
++inline_frame_dealloc (struct frame_info *self, void *this_cache)
++{
++  struct inline_cache *inline_cache = this_cache;
++
++  /* The same condition as in REINIT_FRAME_CACHE.  */
++  if (inline_cache->unwind_regular->dealloc_cache
++      && inline_cache->cache_regular)
++    inline_cache->unwind_regular->dealloc_cache (self,
++						 inline_cache->cache_regular);
++}
++
++static CORE_ADDR
++inline_frame_prev_pc (struct frame_info *next_frame, void **this_prologue_cache)
++{
++  struct inline_cache *inline_cache = *this_prologue_cache;
++  struct frame_info *this_frame;
++
++  if (inline_cache->unwind_regular->prev_pc)
++    return inline_cache->unwind_regular->prev_pc (next_frame,
++						  &inline_cache->cache_regular);
++  gdb_assert (gdbarch_unwind_pc_p (get_frame_arch (next_frame)));
++  this_frame = get_prev_frame (next_frame);
++  gdb_assert (this_frame);
++  gdb_assert (get_frame_arch (next_frame) == get_frame_arch (this_frame));
++  return gdbarch_unwind_pc (get_frame_arch (this_frame), this_frame);
++}
++
++static void
++inline_frame_this_id (struct frame_info *this_frame,
++		      void **this_cache,
++		      struct frame_id *this_id)
++{
++  struct symbol *func;
++  struct frame_info *next_frame;
++  struct inline_cache *inline_cache = *this_cache;
++
++  this_frame = get_prev_frame (this_frame);
++  gdb_assert (get_frame_type (this_frame) == INLINE_FRAME);
++
++  /* In order to have a stable frame ID for a given inline function, we must
++     get the stack / special addresses from the underlying real frame's this_id
++     method.  We must not call get_prev_frame as each frame expects its inner
++     frames to be already fully accessible.  This would open a can of worms
++     with unwinding deadlocks.  */
++  inline_cache->unwind_regular->this_id (this_frame,
++					 &inline_cache->cache_regular, this_id);
++
++  /* We need a valid frame ID, so we need to be based on a valid
++     frame.  FSF submission NOTE: this would be a good assertion to
++     apply to all frames, all the time.  That would fix the ambiguity
++     of null_frame_id (between "no/any frame" and "the outermost
++     frame").  This will take work.  */
++  gdb_assert (frame_id_p (*this_id));
++
++  /* Future work NOTE: Alexandre Oliva applied a patch to GCC 4.3
++     which generates DW_AT_entry_pc for inlined functions when
++     possible.  If this attribute is available, we should use it
++     in the frame ID (and eventually, to set breakpoints).  */
++  func = get_frame_function (this_frame);
++  gdb_assert (func != NULL);
++  (*this_id).block_addr = BLOCK_START (SYMBOL_BLOCK_VALUE (func));
++
++  /* The regular unwinder knows no INLINE_DEPTH.  */
++  gdb_assert ((*this_id).inline_depth == 0);
++
++  /* Inlined frames (inlined functions) can never exist behind a normal frame
++     (non-inlined function).  Any possible inlined frames (inlined functions)
++     behind such frame will already be at a different code location and not
++     found by BLOCK_FOR_PC at this PC moment.  */
++  for (next_frame = this_frame;
++       next_frame && get_frame_type (next_frame) == INLINE_FRAME;
++       next_frame = get_next_frame (next_frame))
++    (*this_id).inline_depth++;
++
++  gdb_assert ((*this_id).inline_depth > 0);
++}
++
++static void
++inline_frame_prev_register (struct frame_info *next_frame,
++			    void **this_prologue_cache,
++			    int prev_regnum,
++			    int *optimized,
++			    enum lval_type * lvalp,
++			    CORE_ADDR *addrp,
++			    int *realnump, gdb_byte *valuep)
++{
++  /* Copy all the registers unchanged.  */
++  *optimized = 0;
++  *lvalp = lval_register;
++  *addrp = 0;
++  *realnump = prev_regnum;
++  if (valuep)
++    frame_unwind_register (next_frame, (*realnump), valuep);
++}
++
++/* Check whether we are at an inlining site that does not already
++   have an associated frame.  */
++
++static int
++inline_frame_sniffer (const struct frame_unwind *self,
++		      struct frame_info *this_frame,
++		      void **this_cache)
++{
++  CORE_ADDR this_pc;
++  struct block *frame_block, *cur_block;
++  int depth;
++  struct frame_info *next_frame;
++  struct inline_cache *inline_cache;
++
++  /* INLINE_FRAME unwinder is an exception, it is passed the regular unwinder
++     detected for this frame.  */
++  gdb_assert (self != inline_frame_unwind);
++
++  this_pc = frame_unwind_address_in_block (this_frame,
++					   get_frame_type (this_frame));
++  frame_block = block_for_pc (this_pc);
++  if (frame_block == NULL)
++    return 0;
++
++  /* INLINE_SKIP_SYMBOL does not need to be set for each specific frame.  But
++   * it needs to be recalculated after STEP_INTO_INLINE_FRAME according to new
++   * INLINE_SKIP_FRAMES - therefore SET_SKIPPED_INLINE_FRAMES is too early.  */
++  inline_skip_symbol = NULL;
++
++  /* Calculate DEPTH, the number of inlined functions at this
++     location.  */
++  depth = 0;
++  cur_block = frame_block;
++  while (BLOCK_SUPERBLOCK (cur_block))
++    {
++      if (block_inlined_p (cur_block))
++	depth++;
++      if (depth == inline_skip_frames && inline_skip_symbol == NULL)
++	inline_skip_symbol = BLOCK_FUNCTION (cur_block);
++
++      cur_block = BLOCK_SUPERBLOCK (cur_block);
++    }
++
++  /* There are inlined functions here.  Check how many of them already have
++     frames.  Any possibly inlined frames (inlined functions) behind
++     NORMAL_FRAME (non-inlined function) will already be at a different code
++     location and not found by BLOCK_FOR_PC at this PC moment.  */
++  if (get_frame_type (this_frame) == SENTINEL_FRAME)
++    this_frame = NULL;
++  for (next_frame = this_frame;
++       next_frame && get_frame_type (next_frame) == INLINE_FRAME;
++       next_frame = get_next_frame (next_frame))
++    {
++      gdb_assert (depth > 0);
++      depth--;
++    }
++
++  /* Check whether we were requested to skip some frames, so they
++     can be stepped into later.  */
++  if (inline_skip_frames > 0 && next_frame == NULL)
++    {
++      if (this_pc != inline_skip_pc)
++	inline_skip_frames = 0;
++      else
++	{
++	  gdb_assert (depth >= inline_skip_frames);
++	  depth -= inline_skip_frames;
++	}
++    }
++
++  /* If all the inlined functions already have frames, then pass to the
++     normal unwinder for this PC.  */
++  if (depth == 0)
++    return 0;
++
++  /* Transparently wrap the former regular unwinder.  */
++  inline_cache = frame_obstack_zalloc (sizeof (*inline_cache));
++  inline_cache->unwind_regular = self;
++  inline_cache->cache_regular = *this_cache;
++  *this_cache = inline_cache;
++
++  /* If the next frame is an inlined function, but not the outermost, then
++     we are the next outer.  If it is not an inlined function, then we
++     are the innermost inlined function of a different real frame.  */
++  return 1;
++}
++
++static const struct frame_unwind inline_frame_unwinder = {
++  INLINE_FRAME,
++  inline_frame_this_id,
++  inline_frame_prev_register,
++  NULL,
++  inline_frame_sniffer,
++  inline_frame_prev_pc,
++  inline_frame_dealloc
++};
++
++const struct frame_unwind *const inline_frame_unwind = {
++    &inline_frame_unwinder
++};
++
++/* Return non-zero if BLOCK, an inlined function block containing PC,
++   has a group of contiguous instructions starting at PC (but not
++   before it).  */
++
++static int
++block_starting_point_at (CORE_ADDR pc, struct block *block)
++{
++  struct blockvector *bv;
++  struct block *new_block;
++
++  bv = blockvector_for_pc (pc, NULL);
++  if (BLOCKVECTOR_MAP (bv) == NULL)
++    return 0;
++
++  new_block = addrmap_find (BLOCKVECTOR_MAP (bv), pc - 1);
++  if (new_block == NULL)
++    return 1;
++
++  if (new_block == block || contained_in (new_block, block))
++    return 0;
++
++  /* The immediately preceeding address belongs to a different block,
++     which is not a child of this one.  Treat this as an entrance into
++     BLOCK.  */
++  return 1;
++}
++
++void
++set_skipped_inline_frames (int skip_ok)
++{
++  CORE_ADDR this_pc;
++  struct block *frame_block, *cur_block;
++  int skip_count = 0;
++
++  if (!skip_ok)
++    {
++      if (inline_skip_frames != 0)
++	{
++	  inline_skip_frames = 0;
++	  reinit_frame_cache ();
++	}
++      return;
++    }
++
++  /* This function is called right after reinitializing the frame
++     cache.  We try not to do more unwinding than absolutely
++     necessary, for performance.  */
++  this_pc = get_frame_pc (get_current_user_frame ());
++  frame_block = block_for_pc (this_pc);
++
++  if (frame_block != NULL)
++    {
++      cur_block = frame_block;
++      while (BLOCK_SUPERBLOCK (cur_block))
++	{
++	  if (block_inlined_p (cur_block))
++	    {
++	      /* See comments in inline_frame_this_id about this use
++		 of BLOCK_START.  */
++	      if (BLOCK_START (cur_block) == this_pc
++		  || block_starting_point_at (this_pc, cur_block))
++		skip_count++;
++	      else
++		{
++		  /* Here we will stop at any possible inlining after we
++		     already crossed any first non-inlined function.  We could
++		     possibly detected such functions generating NORMAL_FRAME
++		     by `!block_inlined_p && BLOCK_FUNCTION' (as
++		     `!block_inlined_p && !BLOCK_FUNCTION' are just anonymous
++		     local { ... } blocks).  */
++		  break;
++		}
++	    }
++	  cur_block = BLOCK_SUPERBLOCK (cur_block);
++	}
++    }
++
++  inline_skip_pc = this_pc;
++
++  if (inline_skip_frames != skip_count)
++    {
++      inline_skip_frames = skip_count;
++      reinit_frame_cache ();
++    }
++}
++
++void
++step_into_inline_frame (void)
++{
++  gdb_assert (inline_skip_frames > 0);
++  inline_skip_frames--;
++  reinit_frame_cache ();
++}
++
++int
++inline_skipped_frames (void)
++{
++  return inline_skip_frames;
++}
++
++struct symbol *
++inline_skipped_symbol (void)
++{
++  return inline_skip_symbol;
++}
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/mi/mi-cmd-stack.c gdb-6.8/gdb/mi/mi-cmd-stack.c
+--- gdb-6.8-clean/gdb/mi/mi-cmd-stack.c	2008-01-01 23:53:14.000000000 +0100
++++ gdb-6.8/gdb/mi/mi-cmd-stack.c	2008-06-16 20:11:43.000000000 +0200
+@@ -65,7 +65,7 @@ mi_cmd_stack_list_frames (char *command,
+   /* Let's position fi on the frame at which to start the
+      display. Could be the innermost frame if the whole stack needs
+      displaying, or if frame_low is 0. */
+-  for (i = 0, fi = get_current_frame ();
++  for (i = 0, fi = get_current_user_frame ();
+        fi && i < frame_low;
+        i++, fi = get_prev_frame (fi));
+ 
+@@ -108,7 +108,7 @@ mi_cmd_stack_info_depth (char *command, 
+        the stack. */
+     frame_high = -1;
+ 
+-  for (i = 0, fi = get_current_frame ();
++  for (i = 0, fi = get_current_user_frame ();
+        fi && (i < frame_high || frame_high == -1);
+        i++, fi = get_prev_frame (fi))
+     QUIT;
+@@ -180,7 +180,7 @@ mi_cmd_stack_list_args (char *command, c
+   /* Let's position fi on the frame at which to start the
+      display. Could be the innermost frame if the whole stack needs
+      displaying, or if frame_low is 0. */
+-  for (i = 0, fi = get_current_frame ();
++  for (i = 0, fi = get_current_user_frame ();
+        fi && i < frame_low;
+        i++, fi = get_prev_frame (fi));
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/minsyms.c gdb-6.8/gdb/minsyms.c
+--- gdb-6.8-clean/gdb/minsyms.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/minsyms.c	2008-06-16 20:11:43.000000000 +0200
+@@ -677,7 +677,7 @@ prim_record_minimal_symbol_and_info (con
+ 
+   if (msym_bunch_index == BUNCH_SIZE)
+     {
+-      new = (struct msym_bunch *) xmalloc (sizeof (struct msym_bunch));
++      new = XCALLOC (1, struct msym_bunch);
+       msym_bunch_index = 0;
+       new->next = msym_bunch;
+       msym_bunch = new;
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/s390-tdep.c gdb-6.8/gdb/s390-tdep.c
+--- gdb-6.8-clean/gdb/s390-tdep.c	2008-06-24 22:58:30.000000000 +0200
++++ gdb-6.8/gdb/s390-tdep.c	2008-06-16 20:15:07.000000000 +0200
+@@ -1216,6 +1216,7 @@ s390_prologue_frame_unwind_cache (struct
+ 	 needed, instead the code should simpliy rely on its
+ 	 analysis.  */
+       if (get_frame_type (next_frame) == NORMAL_FRAME)
++	  || get_frame_type (next_frame) == INLINE_FRAME)
+ 	return 0;
+ 
+       /* If we really have a frameless function, %r14 must be valid
+@@ -1261,6 +1262,7 @@ s390_prologue_frame_unwind_cache (struct
+   /* FIXME: cagney/2004-05-01: This sanity check shouldn't be needed,
+      instead the code should simpliy rely on its analysis.  */
+   if (size > 0 && get_frame_type (next_frame) != NORMAL_FRAME)
++      && get_frame_type (next_frame) != INLINE_FRAME)
+     {
+       /* See the comment in s390_in_function_epilogue_p on why this is
+ 	 not completely reliable ...  */
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/stack.c gdb-6.8/gdb/stack.c
+--- gdb-6.8-clean/gdb/stack.c	2008-03-17 16:06:24.000000000 +0100
++++ gdb-6.8/gdb/stack.c	2008-06-16 20:11:43.000000000 +0200
+@@ -96,6 +96,30 @@ print_stack_frame_stub (void *args)
+   return 0;
+ }
+ 
++/* Return 1 if we should display the address in addition to the location,
++   because we are in the middle of a statement.  */
++
++static int
++frame_show_address (struct frame_info *frame,
++		    struct symtab_and_line sal)
++{
++  /* If there is a line number, but no PC, then there is no location
++     information associated with this sal.  The only way that should
++     happen is for the call sites of inlined functions (SAL comes from
++     find_frame_sal).  Otherwise, we would have some PC range if the
++     SAL came from a line table.  */
++  if (sal.line != 0 && sal.pc == 0 && sal.end == 0)
++    {
++      if (get_next_frame (frame) == NULL)
++	gdb_assert (inline_skipped_frames () > 0);
++      else
++	gdb_assert (get_frame_type (get_next_frame (frame)) == INLINE_FRAME);
++      return 0;
++    }
++
++  return get_frame_pc (frame) != sal.pc;
++}
++
+ /* Show or print a stack frame FRAME briefly.  The output is format
+    according to PRINT_LEVEL and PRINT_WHAT printing the frame's
+    relative level, function name, argument list, and file name and
+@@ -522,7 +546,7 @@ print_frame_info (struct frame_info *fra
+     {
+       int done = 0;
+       int mid_statement = ((print_what == SRC_LINE)
+-			   && (get_frame_pc (frame) != sal.pc));
++			   && frame_show_address (frame, sal));
+ 
+       if (annotation_level)
+ 	done = identify_source_line (sal.symtab, sal.line, mid_statement,
+@@ -576,7 +600,7 @@ print_frame (struct frame_info *frame, i
+   stb = ui_out_stream_new (uiout);
+   old_chain = make_cleanup_ui_out_stream_delete (stb);
+ 
+-  func = find_pc_function (get_frame_address_in_block (frame));
++  func = get_frame_function (frame);
+   if (func)
+     {
+       /* In certain pathological cases, the symtabs give the wrong
+@@ -597,8 +621,13 @@ print_frame (struct frame_info *frame, i
+          changed (and we'll create a find_pc_minimal_function or some
+          such).  */
+ 
+-      struct minimal_symbol *msymbol =
+-	lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
++      struct minimal_symbol *msymbol = NULL;
++
++      /* Don't attempt to do this for inlined functions, which do not
++	 have a corresponding minimal symbol.  */
++      if (!block_inlined_p (SYMBOL_BLOCK_VALUE (func)))
++	msymbol
++	  = lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
+ 
+       if (msymbol != NULL
+ 	  && (SYMBOL_VALUE_ADDRESS (msymbol)
+@@ -664,7 +693,7 @@ print_frame (struct frame_info *frame, i
+ 			    frame_relative_level (frame));
+     }
+   if (addressprint)
+-    if (get_frame_pc (frame) != sal.pc || !sal.symtab
++    if (frame_show_address (frame, sal) || !sal.symtab
+ 	|| print_what == LOC_AND_ADDRESS)
+       {
+ 	annotate_frame_address ();
+@@ -821,7 +850,7 @@ parse_frame_specification_1 (const char 
+     {
+       struct frame_info *fid;
+       int level = value_as_long (args[0]);
+-      fid = find_relative_frame (get_current_frame (), &level);
++      fid = find_relative_frame (get_current_user_frame (), &level);
+       if (level == 0)
+ 	/* find_relative_frame was successful */
+ 	return fid;
+@@ -846,7 +875,7 @@ parse_frame_specification_1 (const char 
+ 	 what (s)he gets.  Still, give the highest one that matches.
+ 	 (NOTE: cagney/2004-10-29: Why highest, or outer-most, I don't
+ 	 know).  */
+-      for (fid = get_current_frame ();
++      for (fid = get_current_user_frame ();
+ 	   fid != NULL;
+ 	   fid = get_prev_frame (fid))
+ 	{
+@@ -994,8 +1023,10 @@ frame_info (char *addr_exp, int from_tty
+ 	printf_filtered (_(" Outermost frame: %s\n"),
+ 			 frame_stop_reason_string (reason));
+     }
+-
+-  if (calling_frame_info)
++  else if (get_frame_type (fi) == INLINE_FRAME)
++    printf_filtered (" inlined into frame %d",
++		     frame_relative_level (get_prev_frame (fi)));
++  else
+     {
+       printf_filtered (" called by frame at ");
+       fputs_filtered (paddress (get_frame_base (calling_frame_info)),
+@@ -1172,7 +1203,7 @@ backtrace_command_1 (char *count_exp, in
+      variable TRAILING to the frame from which we should start
+      printing.  Second, it must set the variable count to the number
+      of frames which we should print, or -1 if all of them.  */
+-  trailing = get_current_frame ();
++  trailing = get_current_user_frame ();
+ 
+   /* The target can be in a state where there is no valid frames
+      (e.g., just connected). */
+@@ -1455,7 +1486,9 @@ print_frame_local_vars (struct frame_inf
+       if (print_block_frame_locals (block, frame, num_tabs, stream))
+ 	values_printed = 1;
+       /* After handling the function's top-level block, stop.  Don't
+-         continue to its superblock, the block of per-file symbols.  */
++         continue to its superblock, the block of per-file symbols.
++         Also do not continue to the containing function of an inlined
++         function.  */
+       if (BLOCK_FUNCTION (block))
+ 	break;
+       block = BLOCK_SUPERBLOCK (block);
+@@ -1526,7 +1559,9 @@ print_frame_label_vars (struct frame_inf
+ 	return;
+ 
+       /* After handling the function's top-level block, stop.  Don't
+-         continue to its superblock, the block of per-file symbols.  */
++         continue to its superblock, the block of per-file symbols.
++         Also do not continue to the containing function of an inlined
++         function.  */
+       if (BLOCK_FUNCTION (block))
+ 	break;
+       block = BLOCK_SUPERBLOCK (block);
+@@ -1801,6 +1836,9 @@ return_command (char *retval_exp, int fr
+ 
+   thisfun = get_frame_function (get_selected_frame ("No selected frame."));
+ 
++  if (get_frame_type (get_current_user_frame ()) == INLINE_FRAME)
++    error (_("Can not force return from an inlined function."));
++
+   /* Compute the return value.  If the computation triggers an error,
+      let it bail.  If the return type can't be handled, set
+      RETURN_VALUE to NULL, and QUERY_PREFIX to an informational
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/symtab.c gdb-6.8/gdb/symtab.c
+--- gdb-6.8-clean/gdb/symtab.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/symtab.c	2008-06-16 20:11:43.000000000 +0200
+@@ -1264,10 +1264,13 @@ lookup_symbol_aux_local (const char *nam
+ 				     symtab);
+       if (sym != NULL)
+ 	return sym;
++
++      if (BLOCK_FUNCTION (block) != NULL && block_inlined_p (block))
++	break;
+       block = BLOCK_SUPERBLOCK (block);
+     }
+ 
+-  /* We've reached the static block without finding a result.  */
++  /* We've reached the edge of the function without finding a result.  */
+ 
+   return NULL;
+ }
+@@ -2499,6 +2502,7 @@ find_function_start_sal (struct symbol *
+ {
+   CORE_ADDR pc;
+   struct symtab_and_line sal;
++  struct block *b, *function_block;
+ 
+   pc = BLOCK_START (SYMBOL_BLOCK_VALUE (sym));
+   fixup_symbol_section (sym, NULL);
+@@ -2533,6 +2537,25 @@ find_function_start_sal (struct symbol *
+     }
+   sal.pc = pc;
+ 
++  /* Check if we are now inside an inlined function.  If we can,
++     use the call site of the function instead.  */
++  b = block_for_pc_sect (sal.pc, SYMBOL_BFD_SECTION (sym));
++  function_block = NULL;
++  while (b != NULL)
++    {
++      if (BLOCK_FUNCTION (b) != NULL && block_inlined_p (b))
++	function_block = b;
++      else if (BLOCK_FUNCTION (b) != NULL)
++	break;
++      b = BLOCK_SUPERBLOCK (b);
++    }
++  if (function_block != NULL
++      && SYMBOL_LINE (BLOCK_FUNCTION (function_block)) != 0)
++    {
++      sal.line = SYMBOL_LINE (BLOCK_FUNCTION (function_block));
++      sal.symtab = SYMBOL_SYMTAB (BLOCK_FUNCTION (function_block));
++    }
++
+   return sal;
+ }
+ 
+@@ -3530,6 +3553,24 @@ language_search_unquoted_string (char *t
+   return p;
+ }
+ 
++static void
++completion_list_add_fields (struct symbol *sym, char *sym_text,
++			    int sym_text_len, char *text, char *word)
++{
++  if (SYMBOL_CLASS (sym) == LOC_TYPEDEF)
++    {
++      struct type *t = SYMBOL_TYPE (sym);
++      enum type_code c = TYPE_CODE (t);
++      int j;
++
++      if (c == TYPE_CODE_UNION || c == TYPE_CODE_STRUCT)
++	for (j = TYPE_N_BASECLASSES (t); j < TYPE_NFIELDS (t); j++)
++	  if (TYPE_FIELD_NAME (t, j))
++	    completion_list_add_name (TYPE_FIELD_NAME (t, j),
++				      sym_text, sym_text_len, text, word);
++    }
++}
++
+ char **
+ default_make_symbol_completion_list (char *text, char *word)
+ {
+@@ -3542,9 +3583,9 @@ default_make_symbol_completion_list (cha
+   struct partial_symtab *ps;
+   struct minimal_symbol *msymbol;
+   struct objfile *objfile;
+-  struct block *b, *surrounding_static_block = 0;
++  struct block *b;
++  const struct block *surrounding_static_block, *surrounding_global_block;
+   struct dict_iterator iter;
+-  int j;
+   struct partial_symbol **psym;
+   /* The symbol we are completing on.  Points in same buffer as text.  */
+   char *sym_text;
+@@ -3654,41 +3695,43 @@ default_make_symbol_completion_list (cha
+   }
+ 
+   /* Search upwards from currently selected frame (so that we can
+-     complete on local vars.  */
++     complete on local vars).  Also catch fields of types defined in
++     this places which match our text string.  Only complete on types
++     visible from current context. */
++
++  b = get_selected_block (0);
++  surrounding_static_block = block_static_block (b);
++  surrounding_global_block = block_global_block (b);
++  if (surrounding_static_block != NULL)
++    while (b != surrounding_static_block)
++      {
++	QUIT;
+ 
+-  for (b = get_selected_block (0); b != NULL; b = BLOCK_SUPERBLOCK (b))
+-    {
+-      if (!BLOCK_SUPERBLOCK (b))
+-	{
+-	  surrounding_static_block = b;		/* For elmin of dups */
+-	}
++	ALL_BLOCK_SYMBOLS (b, iter, sym)
++	  {
++	    COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text,
++					word);
++	    completion_list_add_fields (sym, sym_text, sym_text_len, text,
++					word);
++	  }
+ 
+-      /* Also catch fields of types defined in this places which match our
+-         text string.  Only complete on types visible from current context. */
++	/* Stop when we encounter an enclosing function.  Do not stop for
++	   non-inlined functions - the locals of the enclosing function
++	   are in scope for a nested function.  */
++	if (BLOCK_FUNCTION (b) != NULL && block_inlined_p (b))
++	  break;
++	b = BLOCK_SUPERBLOCK (b);
++      }
+ 
+-      ALL_BLOCK_SYMBOLS (b, iter, sym)
+-	{
+-	  QUIT;
+-	  COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
+-	  if (SYMBOL_CLASS (sym) == LOC_TYPEDEF)
+-	    {
+-	      struct type *t = SYMBOL_TYPE (sym);
+-	      enum type_code c = TYPE_CODE (t);
++  /* Add fields from the file's types; symbols will be added below.  */
+ 
+-	      if (c == TYPE_CODE_UNION || c == TYPE_CODE_STRUCT)
+-		{
+-		  for (j = TYPE_N_BASECLASSES (t); j < TYPE_NFIELDS (t); j++)
+-		    {
+-		      if (TYPE_FIELD_NAME (t, j))
+-			{
+-			  completion_list_add_name (TYPE_FIELD_NAME (t, j),
+-					sym_text, sym_text_len, text, word);
+-			}
+-		    }
+-		}
+-	    }
+-	}
+-    }
++  if (surrounding_static_block != NULL)
++    ALL_BLOCK_SYMBOLS (surrounding_static_block, iter, sym)
++      completion_list_add_fields (sym, sym_text, sym_text_len, text, word);
++
++  if (surrounding_global_block != NULL)
++      ALL_BLOCK_SYMBOLS (surrounding_global_block, iter, sym)
++	completion_list_add_fields (sym, sym_text, sym_text_len, text, word);
+ 
+   /* Go through the symtabs and check the externs and statics for
+      symbols which match.  */
+@@ -3707,9 +3750,6 @@ default_make_symbol_completion_list (cha
+   {
+     QUIT;
+     b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);
+-    /* Don't do this block twice.  */
+-    if (b == surrounding_static_block)
+-      continue;
+     ALL_BLOCK_SYMBOLS (b, iter, sym)
+       {
+ 	COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
+@@ -4088,6 +4128,7 @@ skip_prologue_using_sal (CORE_ADDR func_
+   struct symtab_and_line prologue_sal;
+   CORE_ADDR start_pc;
+   CORE_ADDR end_pc;
++  struct block *bl;
+ 
+   /* Get an initial range for the function.  */
+   find_pc_partial_function (func_addr, NULL, &start_pc, &end_pc);
+@@ -4112,6 +4153,25 @@ skip_prologue_using_sal (CORE_ADDR func_
+ 	     line mark the prologue -> body transition.  */
+ 	  if (sal.line >= prologue_sal.line)
+ 	    break;
++
++	  /* The line number is smaller.  Check that it's from the
++	     same function, not something inlined.  If it's inlined,
++	     then there is no point comparing the line numbers.  */
++	  bl = block_for_pc (prologue_sal.end);
++	  while (bl)
++	    {
++	      if (block_inlined_p (bl))
++		break;
++	      if (BLOCK_FUNCTION (bl))
++		{
++		  bl = NULL;
++		  break;
++		}
++	      bl = BLOCK_SUPERBLOCK (bl);
++	    }
++	  if (bl != NULL)
++	    break;
++
+ 	  /* The case in which compiler's optimizer/scheduler has
+ 	     moved instructions into the prologue.  We look ahead in
+ 	     the function looking for address ranges whose
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/symtab.h gdb-6.8/gdb/symtab.h
+--- gdb-6.8-clean/gdb/symtab.h	2008-02-05 23:17:40.000000000 +0100
++++ gdb-6.8/gdb/symtab.h	2008-06-16 20:11:43.000000000 +0200
+@@ -623,9 +623,15 @@ struct symbol
+ 
+   ENUM_BITFIELD(address_class) aclass : 6;
+ 
+-  /* Line number of definition.  FIXME:  Should we really make the assumption
+-     that nobody will try to debug files longer than 64K lines?  What about
+-     machine generated programs? */
++  /* Line number of this symbol's definition, except for inlined
++     functions.  For an inlined function (class LOC_BLOCK and
++     BLOCK_INLINE set) this is the line number of the function's call
++     site.  Inlined function symbols are not definitions, and they are
++     never found by symbol table lookup.
++
++     FIXME: Should we really make the assumption that nobody will try
++     to debug files longer than 64K lines?  What about machine
++     generated programs?  */
+ 
+   unsigned short line;
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.cp/annota2.exp gdb-6.8/gdb/testsuite/gdb.cp/annota2.exp
+--- gdb-6.8-clean/gdb/testsuite/gdb.cp/annota2.exp	2008-03-04 21:06:22.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.cp/annota2.exp	2008-06-23 01:20:22.000000000 +0200
+@@ -119,13 +119,14 @@ gdb_expect {
+ # continue until exit
+ # this will test:
+ # annotate-exited
++# `a.x is 1' is asynchronous regarding to `frames-invalid'.
+ #
+ send_gdb "continue\n"
+ gdb_expect {
+-  -re "\r\n\032\032post-prompt\r\nContinuing.\r\n\r\n\032\032starting\r\n\r\n\032\032frames-invalid\r\na.x is 1\r\n\r\n\032\032exited 0\r\n\r\nProgram exited normally.\r\n\r\n\032\032stopped\r\n$gdb_prompt$" \
++  -re "\r\n\032\032post-prompt\r\nContinuing.\r\n\r\n\032\032starting\r\n(\r\n\032\032frames-invalid\r\n)*a.x is 1\r\n(\r\n\032\032frames-invalid\r\n)*\r\n\032\032exited 0\r\n\r\nProgram exited normally.\r\n\r\n\032\032stopped\r\n$gdb_prompt$" \
+ 	  { pass "continue until exit" }
+-  -re ".*$gdb_prompt$"     { fail "continue to exit" }
+-  timeout	            { fail "continue to exit (timeout)" }
++  -re ".*$gdb_prompt$"     { fail "continue until exit" }
++  timeout	            { fail "continue until exit (timeout)" }
+ }
+ 
+ #
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/Makefile.in gdb-6.8/gdb/testsuite/gdb.opt/Makefile.in
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/Makefile.in	2007-10-25 22:30:26.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.opt/Makefile.in	2008-06-16 20:11:43.000000000 +0200
+@@ -1,7 +1,7 @@
+ VPATH = @srcdir@
+ srcdir = @srcdir@
+ 
+-EXECUTABLES = hello/hello
++EXECUTABLES = hello/hello inline-bt
+ 
+ MISCELLANEOUS =
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-bt.c gdb-6.8/gdb/testsuite/gdb.opt/inline-bt.c
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-bt.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-bt.c	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,54 @@
++/* Copyright (C) 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
++   USA.  */
++
++/* VOLATILE forces all the inlining to happen as otherwise the whole program
++   gets optimized by CSE to just simple assignments of the results.  */
++volatile int x, y;
++volatile int result;
++
++void bar(void)
++{
++  x += y; /* set breakpoint 1 here */
++}
++
++inline int func1(void)
++{
++  bar ();
++  return x * y;
++}
++
++inline int func2(void)
++{
++  return x * func1 ();
++}
++
++int main (void)
++{
++  int val;
++
++  x = 7;
++  y = 8;
++  bar ();
++
++  val = func1 ();
++  result = val;
++
++  val = func2 ();
++  result = val;
++
++  return 0;
++}
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-bt.exp gdb-6.8/gdb/testsuite/gdb.opt/inline-bt.exp
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-bt.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-bt.exp	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,61 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++set testfile "inline-bt"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
++	   executable {debug optimize=-O2}] != "" } {
++    untested inline-bt.exp
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++runto_main
++
++get_compiler_info $binfile
++get_debug_format
++if { [skip_inline_frame_tests] } {
++    untested inline-bt.exp
++    return
++}
++
++set line1 [gdb_get_line_number "set breakpoint 1 here"]
++gdb_breakpoint $line1
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (1)"
++gdb_test "backtrace" "#0  bar.*#1  .*main.*" "backtrace from bar (1)"
++gdb_test "info frame" ".*inlined into frame.*" "bar inlined"
++
++# gcc-4.3.1 omits the line number information for (2).
++#gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (2)"
++#gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*main.*" \
++#    "backtrace from bar (2)"
++#gdb_test "up" "#1  .*func1.*" "up from bar (2)"
++#gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (2)"
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (3)"
++gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*func2.*#3  .*main.*" \
++    "backtrace from bar (3)"
++gdb_test "up" "#1  .*func1.*" "up from bar (3)"
++gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (3)"
++gdb_test "up" "#2  .*func2.*" "up from func1 (3)"
++gdb_test "info frame" ".*inlined into frame.*" "func2 inlined (3)"
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-cmds.c gdb-6.8/gdb/testsuite/gdb.opt/inline-cmds.c
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-cmds.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-cmds.c	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,107 @@
++/* Copyright (C) 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
++   USA.  */
++
++/* VOLATILE forces all the inlining to happen as otherwise the whole program
++   gets optimized by CSE to just simple assignments of the results.  */
++volatile int x, y;
++volatile int result;
++
++void bar(void)
++{
++  x += y; /* set breakpoint 1 here */
++}
++
++#ifdef __GNUC__
++__attribute__((__noinline__))
++#endif
++void marker(void)
++{
++  x += y; /* set breakpoint 2 here */
++}
++
++inline int func1(void)
++{
++  bar ();
++  return x * y;
++}
++
++inline int func2(void)
++{
++  return x * func1 ();
++}
++
++inline void func3(void)
++{
++  bar ();
++}
++
++#ifdef __GNUC__
++__attribute__((__noinline__))
++#endif
++void noinline(void)
++{
++  bar (); /* inlined */
++}
++
++
++inline void outer_inline1(void)
++{
++  noinline ();
++}
++
++inline void outer_inline2(void)
++{
++  outer_inline1 ();
++}
++
++int main (void)
++{ /* start of main */
++  int val;
++
++  x = 7;
++  y = 8;
++
++  result = func1 ();
++  result = func2 ();
++  marker ();
++
++  result = 0;
++  result = 0; /* set breakpoint 3 here */
++
++  func1 (); /* first call */
++  func1 (); /* second call */
++  marker ();
++
++  result = 0;
++  result = 0; /* set breakpoint 4 here */
++
++  func1 ();
++  func3 ();
++  marker ();
++
++  result = 0;
++  result = 0; /* set breakpoint 5 here */
++
++  marker ();
++  func1 ();
++  func3 ();
++  marker ();  /* set breakpoint 6 here */
++
++  outer_inline2 ();
++
++  return 0;
++}
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-cmds.exp gdb-6.8/gdb/testsuite/gdb.opt/inline-cmds.exp
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-cmds.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-cmds.exp	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,261 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++set testfile "inline-cmds"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
++	   executable {debug optimize=-O2}] != "" } {
++    untested inline-cmds.exp
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++gdb_test "set listsize 1" ""
++
++runto_main
++
++get_compiler_info $binfile
++get_debug_format
++if { [skip_inline_frame_tests] } {
++    untested inline-bt.exp
++    return
++}
++
++# First, check that the things we expected to be inlined really were,
++# and those that shouldn't be weren't.
++set line1 [gdb_get_line_number "set breakpoint 1 here"]
++gdb_breakpoint $line1
++set line2 [gdb_get_line_number "set breakpoint 2 here"]
++gdb_breakpoint $line2
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (1)"
++gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*main.*" \
++    "backtrace from bar (1)"
++gdb_test "up" "#1  .*func1.*" "up from bar (1)"
++gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (1)"
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (2)"
++gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*func2.*#3  .*main.*" \
++    "backtrace from bar (2)"
++gdb_test "up" "#1  .*func1.*" "up from bar (2)"
++gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (2)"
++gdb_test "up" "#2  .*func2.*" "up from func1 (2)"
++gdb_test "info frame" ".*inlined into frame.*" "func2 inlined (2)"
++
++gdb_test "continue" ".*set breakpoint 2 here.*" "continue to marker"
++gdb_test "backtrace" "#0  marker.*#1  .*main.*" "backtrace from marker"
++gdb_test "info frame" ".*\n called by frame.*" "marker not inlined"
++
++# Next, check that we can next over inlined functions.  We should not end up
++# inside any of them.
++delete_breakpoints
++runto_main
++
++# The lines before the first inlined call.
++set first "x = 7|y = 8"
++
++# Some extra lines that end up in our stepping due to code motion.
++set opt "start of main|result = 0"
++
++# We start this test with a "list" instead of a "next", in case the
++# first non-prologue instruction in main comes from the inlined function.
++set msg "next over inlined functions"
++gdb_test_multiple "list" $msg {
++    -re "($first|result = func1|result = func2|$opt).*$gdb_prompt $" {
++	send_gdb "next\r"
++	exp_continue
++    }
++    -re "marker \\\(\\\);\r\n$gdb_prompt $" {
++	pass $msg
++    }
++}
++
++# Check that when next shows the call of func1, it has not happened yet.
++runto_main
++
++# Like the return value of gdb_test: -1 something is wrong, 0 passed, 1 failed.
++set bt_test -1
++set x_test -1
++
++set msg "next past inlined func1"
++gdb_test_multiple "list" $msg {
++    -re "($first|$opt).*$gdb_prompt $" {
++	send_gdb "next\r"
++	exp_continue
++    }
++    -re "result = func1 \\\(\\\);\r\n$gdb_prompt $" {
++	# Check whether x has been set.  If 0, we may be doing something
++	# else associated with this line besides the inlined call - e.g.
++	# loading the address of result.  If 7, we may be at the call site.
++	# If 15, though, we are past the call and back at the store to
++	# result - that's bad, we should have stepped out of func1 and
++	# kept stepping until the line changed.
++	set x_val -1
++	gdb_test_multiple "print x" "" {
++	    -re "\\\$$decimal = (\[0-9\]*)\r\n$gdb_prompt $" {
++		set x_val $expect_out(1,string)
++	    }
++	    -re "$gdb_prompt $" { }
++	}
++	if { $x_val == 0 || $x_val == 7 } {
++	    if { $x_test != 1 } {
++		set x_test 0
++	    }
++	} else {
++	    set x_test 1
++	}
++
++	# func1 should not show up on backtraces yet.
++	if { $bt_test != 1 } {
++	    set bt_test [gdb_test "backtrace" "#0  \[^#]*main.*" ""]
++	}
++
++	send_gdb "next\r"
++	exp_continue
++    }
++
++    -re "result = func2 \\\(\\\);\r\n$gdb_prompt $" {
++	pass $msg
++    }
++}
++
++if { $x_test == 0 } {
++    pass "print x before func1"
++} else {
++    fail "print x before func1"
++}
++
++if { $bt_test == 0 } {
++    pass "backtrace does not include func1"
++} else {
++    fail "backtrace does not include func1"
++}
++
++# Next, check that we can single step into inlined functions.  We should always
++# "stop" at the call sites before entering them.
++runto_main
++
++set msg "step into func1"
++set saw_call_site 0
++gdb_test_multiple "list" $msg {
++    -re "($first|$opt).*$gdb_prompt $" {
++	send_gdb "step\r"
++	exp_continue
++    }
++    -re "result = func1.*$gdb_prompt $" {
++	set saw_call_site 1
++	send_gdb "step\r"
++	exp_continue
++    }
++    -re "func1 \\\(\\\) at .*\r\n$decimal.*bar \\\(\\\);\r\n$gdb_prompt $" {
++	if { $saw_call_site } {
++	    pass $msg
++	} else {
++	    fail $msg
++	}
++    }
++}
++
++# Check finish out of an inlined function.
++set msg "finish from func1"
++gdb_test_multiple "finish" $msg {
++    -re "result = func1 \\\(\\\);\r\n$gdb_prompt $" {
++	pass $msg
++    }
++    -re "($first|$opt).*$gdb_prompt $" {
++	# Whoops.  We finished, but ended up back at an earlier line.  Keep
++	# trying.
++	send_gdb "step\r"
++	exp_continue
++    }
++    -re "func1 \\\(\\\) at .*\r\n$decimal.*bar \\\(\\\);\r\n$gdb_prompt $" {
++	send_gdb "finish\r"
++	exp_continue
++    }
++}
++
++# Test some corner cases involving consecutive inlined functions.
++set line3 [gdb_get_line_number "set breakpoint 3 here"]
++gdb_breakpoint $line3
++gdb_continue_to_breakpoint "consecutive func1"
++
++gdb_test "next" ".*func1 .*first call.*" "next to first func1"
++set msg "next to second func1"
++gdb_test_multiple "next" $msg {
++    -re ".*func1 .*second call.*$gdb_prompt $" {
++	pass $msg
++    }
++    -re ".*marker .*$gdb_prompt $" {
++	# This assembles to two consecutive call instructions.
++	# Both appear to be at the same line, because they're
++	# in the body of the same inlined function.  This is
++	# reasonable for the line table.  GDB should take the
++	# containing block and/or function into account when
++	# deciding how far to step.  The single line table entry
++	# is actually two consecutive instances of the same line.
++	kfail gdb/NNNN $msg
++    }
++}
++
++# It is easier when the two inlined functions are not on the same line.
++set line4 [gdb_get_line_number "set breakpoint 4 here"]
++gdb_breakpoint $line4
++gdb_continue_to_breakpoint "func1 then func3"
++
++gdb_test "next" ".*func1 \\\(\\\);" "next to func1 before func3"
++gdb_test "next" ".*func3 \\\(\\\);" "next to func3"
++
++# Test finishing out of one thing and into another.
++set line5 [gdb_get_line_number "set breakpoint 5 here"]
++gdb_breakpoint $line5
++gdb_continue_to_breakpoint "finish into func1"
++
++gdb_test "next" ".*marker \\\(\\\);" "next to finish marker"
++gdb_test "step" ".*set breakpoint 2 here.*" "step into finish marker"
++gdb_test "finish" "func1 \\\(\\\);" "finish from marker to func1"
++
++gdb_test "step" "bar \\\(\\\);" "step into func1 for finish"
++gdb_test "finish" "func3 \\\(\\\);" "finish from func1 to func3"
++
++set line6 [gdb_get_line_number "set breakpoint 6 here"]
++gdb_breakpoint $line6
++gdb_continue_to_breakpoint "before the outer_inline call"
++gdb_test "step" "marker \\\(\\\) at .*" "reach 1 the outer_inline call"
++gdb_test "finish" "main \\\(\\\) at .*outer_inline2 \\\(\\\);" "reach outer_inline2"
++gdb_test "bt" "#0  main.*" "backtrace at main of outer_inline"
++gdb_test "step" "outer_inline2 \\\(\\\) at .*" "enter outer_inline2"
++gdb_test "bt" "#0  outer_inline2.*#1  main.*" "backtrace at outer_inline2"
++gdb_test "step" "outer_inline1 \\\(\\\) at .*" "enter outer_inline1 from outer_inline2"
++gdb_test "bt" "#0  outer_inline1.*#1  outer_inline2.*#2  main.*" "backtrace at outer_inline1"
++gdb_test "step" "noinline \\\(\\\) at .*" "enter noinline from outer_inline1"
++gdb_test "bt" "#0  noinline.*#1  .*outer_inline1.*#2  .*outer_inline2.*#3  main.*" "backtrace at noinline from outer_inline1"
++gdb_test "step" "bar \\\(\\\) at .*" "enter bar from noinline"
++gdb_test "bt" "#0  bar.*#1  noinline.*#2  .*outer_inline1.*#3  .*outer_inline2.*#4  main.*" "backtrace at bar from noinline"
++gdb_test "info frame" ".*inlined into frame.*" "bar from noinline inlined"
++gdb_test "up" "#1  noinline.*" "up to noinline"
++gdb_test "info frame" ".*\n called by frame.*" "noinline from outer_inline1 not inlined"
++gdb_test "up" "#2  .*outer_inline1.*" "up to outer_inline1"
++gdb_test "info frame" ".*inlined into frame.*" "outer_inline1 inlined"
++gdb_test "up" "#3  .*outer_inline2.*" "up to outer_inline2"
++gdb_test "info frame" ".*inlined into frame.*" "outer_inline2 inlined"
++gdb_test "up" "#4  main.*" "up from outer_inline2"
++gdb_test "info frame" ".*\n caller of frame.*" "main not inlined"
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-locals.c gdb-6.8/gdb/testsuite/gdb.opt/inline-locals.c
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-locals.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-locals.c	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,59 @@
++/* Copyright (C) 2007 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
++   USA.  */
++
++/* VOLATILE forces all the inlining to happen as otherwise the whole program
++   gets optimized by CSE to just simple assignments of the results.  */
++volatile int x, y;
++volatile int result;
++volatile int *array_p;
++
++void bar(void)
++{
++  x += y; /* set breakpoint 1 here */
++}
++
++inline int func1(int arg1)
++{
++  int array[64];
++  array_p = array;
++  array[0] = result;
++  array[1] = arg1;
++  bar ();
++  return x * y + array_p[0] * arg1;
++}
++
++inline int func2(int arg2)
++{
++  return x * func1 (arg2);
++}
++
++int main (void)
++{
++  int val;
++
++  x = 7;
++  y = 8;
++  bar ();
++
++  val = func1 (result);
++  result = val;
++
++  val = func2 (result);
++  result = val;
++
++  return 0;
++}
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-locals.exp gdb-6.8/gdb/testsuite/gdb.opt/inline-locals.exp
+--- gdb-6.8-clean/gdb/testsuite/gdb.opt/inline-locals.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.opt/inline-locals.exp	2008-06-23 01:20:22.000000000 +0200
+@@ -0,0 +1,95 @@
++# Copyright 2007 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++set testfile "inline-locals"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
++	   executable {debug optimize=-O2}] != "" } {
++    untested inline-locals.exp
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++runto_main
++
++get_compiler_info $binfile
++get_debug_format
++if { [skip_inline_var_tests] } {
++    untested inline-bt.exp
++    return
++}
++
++set no_frames [skip_inline_frame_tests]
++
++set line1 [gdb_get_line_number "set breakpoint 1 here"]
++gdb_breakpoint $line1
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (1)"
++
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (2)"
++
++if { ! $no_frames } {
++    gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*main.*" \
++	"backtrace from bar (2)"
++    gdb_test "up" "#1  .*func1 .* at .*" "up from bar (2)"
++    gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (2)"
++    gdb_test "info locals" "array = {.*}" "info locals above bar (2)"
++    gdb_test "info args" "arg1 = .*" "info args above bar (2)"
++} else {
++    gdb_test "up" "#1  .*main .* at .*" "up from bar (2)"
++    gdb_test "info locals" ".*arg1 = 0.*" "info locals above bar (2)"
++}
++
++# Make sure that locals on the stack are found.  This is an array to
++# prevent it from living in a register.
++if [test_compiler_info "gcc-4-3-*"] {
++    setup_kfail *-*-* "gcc/debug.optimization"
++}
++gdb_test "print array\[0\]" "\\\$$decimal = 0" "print local (2)"
++
++if { ! $no_frames } {
++    # Verify that we do not print out variables from the inlined
++    # function's caller.
++    gdb_test "print val" "No symbol \"val\" in current context\\." \
++	"print out of scope local"
++}
++
++# Repeat the tests from a depth of two inlined functions, and with a
++# more interesting value in the local array.
++gdb_test "continue" ".*set breakpoint 1 here.*" "continue to bar (3)"
++if { ! $no_frames } {
++    gdb_test "backtrace" "#0  bar.*#1  .*func1.*#2  .*func2.*#3  .*main.*" \
++	"backtrace from bar (3)"
++    gdb_test "up" "#1  .*func1 .* at .*" "up from bar (3)"
++    gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (3)"
++    gdb_test "info locals" "array = {.*}" "info locals above bar (3)"
++    gdb_test "info args" "arg1 = .*" "info args above bar (3)"
++} else {
++    gdb_test "up" "#1  .*main .* at .*" "up from bar (3)"
++    gdb_test "info locals" ".*arg1 = 1.*" "info locals above bar (3a)"
++    gdb_test "info locals" ".*arg2 = 184.*" "info locals above bar (3b)"
++}
++
++if [test_compiler_info "gcc-4-3-*"] {
++    setup_kfail *-*-* "gcc/debug.optimization"
++}
++gdb_test "print array\[0\]" "\\\$$decimal = 184" "print local (3)"
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/testsuite/lib/gdb.exp gdb-6.8/gdb/testsuite/lib/gdb.exp
+--- gdb-6.8-clean/gdb/testsuite/lib/gdb.exp	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/testsuite/lib/gdb.exp	2008-06-16 20:11:43.000000000 +0200
+@@ -1357,6 +1357,37 @@ proc skip_hp_tests {} {
+     return $skip_hp
+ }
+ 
++# Return whether we should skip tests for showing inlined functions in
++# backtraces.  Requires get_compiler_info and get_debug_format.
++
++proc skip_inline_frame_tests {} {
++    # GDB only recognizes inlining information in DWARF 2 (DWARF 3).
++    if { ! [test_debug_format "DWARF 2"] } {
++	return 1
++    }
++
++    # GCC before 4.1 does not emit DW_AT_call_file / DW_AT_call_line.
++    if { ([test_compiler_info "gcc-2-*"]
++	  || [test_compiler_info "gcc-3-*"]
++	  || [test_compiler_info "gcc-4-0"]) } {
++	return 1
++    }
++
++    return 0
++}
++
++# Return whether we should skip tests for showing variables from
++# inlined functions.  Requires get_compiler_info and get_debug_format.
++
++proc skip_inline_var_tests {} {
++    # GDB only recognizes inlining information in DWARF 2 (DWARF 3).
++    if { ! [test_debug_format "DWARF 2"] } {
++	return 1
++    }
++
++    return 0
++}
++
+ set compiler_info		"unknown"
+ set gcc_compiled		0
+ set hp_cc_compiler		0
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/thread.c gdb-6.8/gdb/thread.c
+--- gdb-6.8-clean/gdb/thread.c	2008-06-24 22:58:30.000000000 +0200
++++ gdb-6.8/gdb/thread.c	2008-06-16 20:11:43.000000000 +0200
+@@ -582,7 +582,7 @@ thread_apply_all_command (char *cmd, int
+   do_cleanups (old_chain);
+   /* Print stack frame only if we changed thread.  */
+   if (thread_has_changed)
+-    print_stack_frame (get_current_frame (), 1, SRC_LINE);
++    print_stack_frame (get_selected_frame (NULL), 1, SRC_LINE);
+ 
+ }
+ 
+@@ -667,7 +667,7 @@ thread_apply_command (char *tidlist, int
+   do_cleanups (old_chain);
+   /* Print stack frame only if we changed thread.  */
+   if (thread_has_changed)
+-    print_stack_frame (get_current_frame (), 1, SRC_LINE);
++    print_stack_frame (get_selected_frame (NULL), 1, SRC_LINE);
+ }
+ 
+ /* Switch to the specified thread.  Will dispatch off to thread_apply_command
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/tracepoint.c gdb-6.8/gdb/tracepoint.c
+--- gdb-6.8-clean/gdb/tracepoint.c	2008-02-05 17:05:56.000000000 +0100
++++ gdb-6.8/gdb/tracepoint.c	2008-06-16 20:11:43.000000000 +0200
+@@ -2165,7 +2165,7 @@ trace_find_line_command (char *args, int
+     {
+       if (args == 0 || *args == 0)
+ 	{
+-	  sal = find_pc_line (get_frame_pc (get_current_frame ()), 0);
++	  sal = find_pc_line (get_frame_pc (get_selected_frame (NULL)), 0);
+ 	  sals.nelts = 1;
+ 	  sals.sals = (struct symtab_and_line *)
+ 	    xmalloc (sizeof (struct symtab_and_line));
+diff -up -u -X /home/jkratoch/.diffi.list -ruNp -x Makefile gdb-6.8-clean/gdb/valops.c gdb-6.8/gdb/valops.c
+--- gdb-6.8-clean/gdb/valops.c	2008-06-24 22:58:31.000000000 +0200
++++ gdb-6.8/gdb/valops.c	2008-06-16 20:11:43.000000000 +0200
+@@ -845,7 +845,7 @@ value_of_variable (struct symbol *var, s
+       frame = block_innermost_frame (b);
+       if (!frame)
+ 	{
+-	  if (BLOCK_FUNCTION (b)
++	  if (BLOCK_FUNCTION (b) && !block_inlined_p (b)
+ 	      && SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)))
+ 	    error (_("No frame is currently executing in block %s."),
+ 		   SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)));

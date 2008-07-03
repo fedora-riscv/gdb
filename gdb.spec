@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -378,6 +378,10 @@ Patch324: gdb-6.8-glibc-headers-compat.patch
 Patch325: gdb-6.8-forced-enable-tui.patch
 Patch326: gdb-6.8-tui-singlebinary.patch
 
+# Support transparent debugging of inlined functions for an optimized code.
+Patch327: gdb-6.8-inlining.patch
+Patch328: gdb-6.8-inlining-by-name.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -563,6 +567,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch324 -p1
 %patch325 -p1
 %patch326 -p1
+%patch327 -p1
+%patch328 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -822,6 +828,9 @@ fi
 %endif
 
 %changelog
+* Thu Jul  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-13
+- Support transparent debugging of inlined functions for an optimized code.
+
 * Fri Jun 20 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-12
 - Remove the gdb/gdbtui binaries duplicity.
 

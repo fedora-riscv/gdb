@@ -1,0 +1,98 @@
+Implement `b <funcname>' for <funcname> with concete inlined instances by
+a multiple-PC breakpoint.
+
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/ada-lang.c sources-inline-works3/gdb/ada-lang.c
+--- sources-inline-works3-orig/gdb/ada-lang.c	2008-06-24 20:58:11.000000000 +0200
++++ sources-inline-works3/gdb/ada-lang.c	2008-06-26 15:29:33.000000000 +0200
+@@ -4625,7 +4625,7 @@ remove_irrelevant_renamings (struct ada_
+   if (current_block == NULL)
+     return nsyms;
+ 
+-  current_function = block_linkage_function (current_block);
++  current_function = block_function (current_block);
+   if (current_function == NULL)
+     return nsyms;
+ 
+@@ -6721,7 +6721,7 @@ ada_find_renaming_symbol (const char *na
+ static struct symbol *
+ find_old_style_renaming_symbol (const char *name, struct block *block)
+ {
+-  const struct symbol *function_sym = block_linkage_function (block);
++  const struct symbol *function_sym = block_function (block);
+   char *rename;
+ 
+   if (function_sym != NULL)
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/block.c sources-inline-works3/gdb/block.c
+--- sources-inline-works3-orig/gdb/block.c	2008-06-24 20:58:11.000000000 +0200
++++ sources-inline-works3/gdb/block.c	2008-06-26 15:29:09.000000000 +0200
+@@ -73,6 +73,19 @@ block_linkage_function (const struct blo
+   return BLOCK_FUNCTION (bl);
+ }
+ 
++/* Return the symbol for the function which contains a specified
++   lexical block, described by a struct block BL.  Inlined functions
++   can be returned.  */
++
++struct symbol *
++block_function (const struct block *bl)
++{
++  while (BLOCK_FUNCTION (bl) == NULL && BLOCK_SUPERBLOCK (bl) != NULL)
++    bl = BLOCK_SUPERBLOCK (bl);
++
++  return BLOCK_FUNCTION (bl);
++}
++
+ /* Return one if BLOCK represents an inlined function.  */
+ 
+ int
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/block.h sources-inline-works3/gdb/block.h
+--- sources-inline-works3-orig/gdb/block.h	2008-06-24 20:58:11.000000000 +0200
++++ sources-inline-works3/gdb/block.h	2008-06-26 15:29:20.000000000 +0200
+@@ -137,6 +137,7 @@ struct blockvector
+ enum { GLOBAL_BLOCK = 0, STATIC_BLOCK = 1, FIRST_LOCAL_BLOCK = 2 };
+ 
+ extern struct symbol *block_linkage_function (const struct block *);
++extern struct symbol *block_function (const struct block *bl);
+ 
+ extern int block_inlined_p (const struct block *block);
+ 
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/blockframe.c sources-inline-works3/gdb/blockframe.c
+--- sources-inline-works3-orig/gdb/blockframe.c	2008-06-24 20:58:25.000000000 +0200
++++ sources-inline-works3/gdb/blockframe.c	2008-06-26 15:34:44.000000000 +0200
+@@ -157,7 +157,7 @@ find_pc_sect_function (CORE_ADDR pc, str
+   struct block *b = block_for_pc_sect (pc, section);
+   if (b == 0)
+     return 0;
+-  return block_linkage_function (b);
++  return block_function (b);
+ }
+ 
+ /* Return the function containing pc value PC.
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/breakpoint.c sources-inline-works3/gdb/breakpoint.c
+--- sources-inline-works3-orig/gdb/breakpoint.c	2008-06-24 20:58:25.000000000 +0200
++++ sources-inline-works3/gdb/breakpoint.c	2008-06-26 15:28:35.000000000 +0200
+@@ -5692,7 +5692,7 @@ resolve_sal_pc (struct symtab_and_line *
+       bv = blockvector_for_pc_sect (sal->pc, 0, &b, sal->symtab);
+       if (bv != NULL)
+ 	{
+-	  sym = block_linkage_function (b);
++	  sym = block_function (b);
+ 	  if (sym != NULL)
+ 	    {
+ 	      fixup_symbol_section (sym, sal->symtab->objfile);
+diff -up -u -X /home/jkratoch/.diffi.list -rup sources-inline-works3-orig/gdb/testsuite/gdb.opt/inline-cmds.exp sources-inline-works3/gdb/testsuite/gdb.opt/inline-cmds.exp
+--- sources-inline-works3-orig/gdb/testsuite/gdb.opt/inline-cmds.exp	2008-06-24 20:58:25.000000000 +0200
++++ sources-inline-works3/gdb/testsuite/gdb.opt/inline-cmds.exp	2008-06-26 15:49:12.000000000 +0200
+@@ -42,8 +42,10 @@ if { [skip_inline_frame_tests] } {
+ 
+ # First, check that the things we expected to be inlined really were,
+ # and those that shouldn't be weren't.
+-set line1 [gdb_get_line_number "set breakpoint 1 here"]
+-gdb_breakpoint $line1
++# We test also inlining by the function name, otherwise we would use:
++#   set line1 [gdb_get_line_number "set breakpoint 1 here"]
++#   gdb_breakpoint $line1
++gdb_breakpoint "bar"
+ set line2 [gdb_get_line_number "set breakpoint 2 here"]
+ gdb_breakpoint $line2
+ 
