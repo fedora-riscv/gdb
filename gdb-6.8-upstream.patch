@@ -815,3 +815,119 @@ diff -u -r1.5 -r1.6
  gdb_test "finish" " = 1.2" "Correct _Decimal128 return value from called function."
  
  gdb_test "call decimal_dec128_align (double_val1, dec128_val2, double_val3, double_val4, double_val5, double_val6, double_val7, double_val8, double_val9, double_val10, double_val11, double_val12, double_val13, double_val14)" " = 1" \
+
+
+
+gdb/
+2008-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (bpstat_copy): Call RELEASE_VALUE on the new OLD_VAL.
+
+gdb/testsuite/
+2008-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/value-double-free.exp, gdb.base/value-double-free.c: New.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.c,v
+retrieving revision 1.327
+retrieving revision 1.328
+diff -u -r1.327 -r1.328
+--- src/gdb/breakpoint.c	2008/06/28 09:42:15	1.327
++++ src/gdb/breakpoint.c	2008/07/07 22:39:58	1.328
+@@ -1996,7 +1996,10 @@
+       if (bs->commands != NULL)
+ 	tmp->commands = copy_command_lines (bs->commands);
+       if (bs->old_val != NULL)
+-	tmp->old_val = value_copy (bs->old_val);
++	{
++	  tmp->old_val = value_copy (bs->old_val);
++	  release_value (tmp->old_val);
++	}
+ 
+       if (p == NULL)
+ 	/* This is the first thing in the chain.  */
+/cvs/src/src/gdb/testsuite/gdb.base/value-double-free.c,v  -->  standard output
+revision 1.1
+--- src/gdb/testsuite/gdb.base/value-double-free.c
++++ src/gdb/testsuite/gdb.base/value-double-free.c	2008-07-07 22:40:47.485459000 +0000
+@@ -0,0 +1,36 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++volatile int var;
++
++void
++empty (void)
++{
++}
++
++int
++main (void)
++{
++  var = 1;
++  /* Workaround PR 38: We may miss the first watchpoint hit as we stop on the
++     exact instruction which would cause the watchpoint hit.  */
++  var = 2;
++  return 0;
++}
+/cvs/src/src/gdb/testsuite/gdb.base/value-double-free.exp,v  -->  standard output
+revision 1.1
+--- src/gdb/testsuite/gdb.base/value-double-free.exp
++++ src/gdb/testsuite/gdb.base/value-double-free.exp	2008-07-07 22:40:48.139680000 +0000
+@@ -0,0 +1,38 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++set testfile value-double-free
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++if ![runto_main] {
++    return -1
++}
++gdb_test "watch var" "atchpoint \[0-9\]+: var"
++gdb_test "continue" "atchpoint \[0-9\]+: var.*Old value = 0.*New value = \[12\].*"
++gdb_test "print empty()" " = void"
++# We did segfault here.
++gdb_test "help help"
