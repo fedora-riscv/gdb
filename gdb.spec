@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{?dist}
+Release: 16%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -832,6 +832,9 @@ fi
 %endif
 
 %changelog
+* Mon Jul 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-16
+- Rebuild with the new rpm-4.5.90 in the buildroot.
+
 * Sat Jul 12 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-15
 - Temporary rpm-4.5.90 compatibility workaround by Panu Matilainen.
 - Fix a regression in the constant watchpoints fix, found by Daniel Jacobowitz.
