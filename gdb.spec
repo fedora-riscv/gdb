@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?_with_upstream:.upstream}%{?dist}
+Release: 17%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -832,6 +832,9 @@ fi
 %endif
 
 %changelog
+* Mon Jul 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-17
+- Refresh the patchset with fuzz 0 (for new rpmbuild).
+
 * Mon Jul 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-16
 - Rebuild with the new rpm-4.5.90 in the buildroot.
 
