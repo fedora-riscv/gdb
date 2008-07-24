@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -504,7 +504,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch247 -p1
 %patch249 -p1
 %patch254 -p1
-%patch256 -p1
+###%patch256 -p1
 %patch258 -p1
 %patch260 -p1
 %patch261 -p1
@@ -785,6 +785,10 @@ fi
 %endif
 
 %changelog
+* Thu Jul 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-12
+- Temporarily disable attaching to a stopped process (BZ 453688)
+  - To be reintroduced after a fix of the kernel BZ 454404.
+
 * Tue Jul  8 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-11
 - Fix crash due to calling an inferior function right after a watchpoint stop.
 
