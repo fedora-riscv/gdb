@@ -931,3 +931,710 @@ revision 1.1
 +gdb_test "print empty()" " = void"
 +# We did segfault here.
 +gdb_test "help help"
+
+
+
+https://bugzilla.redhat.com/show_bug.cgi?id=452960
+
+bfd/
+2008-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* elf32-ppc.c (ppc_elf_get_synthetic_symtab): Fix memset calls.
+	* elf64-ppc.c (ppc64_elf_get_synthetic_symtab): Likewise.
+
+bfd/
+2008-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+	    Alan Modra  <amodra@bigpond.net.au>
+
+	* elf32-ppc.c (section_covers_vma): New function.
+	(ppc_elf_get_synthetic_symtab): New function.
+	(bfd_elf32_get_synthetic_symtab): Define.
+	* elf64-ppc.c (section_covers_vma): New function.
+	(ppc64_elf_get_synthetic_symtab): Generate sym@plt on glink branch
+	table entries, and __glink_PLTresolve on resolver stub.
+	(ppc64_elf_build_stubs): Rename __glink sym to __glink_PLTresolve.
+
+gdb/
+2008-05-14  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-linux-tdep.c (ppc_linux_convert_from_func_ptr_addr): Rename ...
+	(ppc64_linux_convert_from_func_ptr_addr): ... to this.  No longer try
+	to handle ppc32 PLT entries.
+	(ppc_linux_init_abi): Install ppc64_linux_convert_from_func_ptr_addr
+	only on ppc64.
+
+gdb/
+2008-05-14  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* elfread.c (elf_symtab_read): Create trampolines for @plt symbols.
+	* minsyms.c (lookup_minimal_symbol_by_pc_section_1): Renamed from
+	lookup_minimal_symbol_by_pc_section.  Prefer trampolines if requested.
+	(lookup_minimal_symbol_by_pc_section): Use
+	lookup_minimal_symbol_by_pc_section_1.
+	(lookup_solib_trampoline_symbol_by_pc): Likewise.
+
+[ Backported for GDB-6.8f.  ]
+
+--- ./bfd/elf32-ppc.c	2008-02-26 09:36:03.000000000 +0100
++++ ./bfd/elf32-ppc.c	2008-07-24 15:42:47.000000000 +0200
+@@ -2291,6 +2291,208 @@ ppc_elf_final_write_processing (bfd *abf
+   apuinfo_list_finish ();
+ }
+ 
++static bfd_boolean
++section_covers_vma (bfd *abfd ATTRIBUTE_UNUSED, asection *section, void *ptr)
++{
++  bfd_vma vma = *(bfd_vma *) ptr;
++  return ((section->flags & SEC_ALLOC) != 0
++	  && section->vma <= vma
++	  && vma < section->vma + section->size);
++}
++
++static long
++ppc_elf_get_synthetic_symtab (bfd *abfd, long symcount, asymbol **syms,
++			      long dynsymcount, asymbol **dynsyms,
++			      asymbol **ret)
++{
++  bfd_boolean (*slurp_relocs) (bfd *, asection *, asymbol **, bfd_boolean);
++  asection *plt, *relplt, *dynamic, *glink;
++  bfd_vma glink_vma = 0;
++  bfd_vma resolv_vma = 0;
++  bfd_vma stub_vma;
++  asymbol *s;
++  arelent *p;
++  long count, i;
++  size_t size;
++  char *names;
++  bfd_byte buf[4];
++
++  *ret = NULL;
++
++  if ((abfd->flags & (DYNAMIC | EXEC_P)) == 0)
++    return 0;
++
++  if (dynsymcount <= 0)
++    return 0;
++
++  relplt = bfd_get_section_by_name (abfd, ".rela.plt");
++  if (relplt == NULL)
++    return 0;
++
++  plt = bfd_get_section_by_name (abfd, ".plt");
++  if (plt == NULL)
++    return 0;
++
++  /* Call common code to handle old-style executable PLTs.  */
++  if (elf_section_flags (plt) & SHF_EXECINSTR)
++    return _bfd_elf_get_synthetic_symtab (abfd, symcount, syms,
++					  dynsymcount, dynsyms, ret);
++
++  /* If this object was prelinked, the prelinker stored the address
++     of .glink at got[1].  If it wasn't prelinked, got[1] will be zero.  */
++  dynamic = bfd_get_section_by_name (abfd, ".dynamic");
++  if (dynamic != NULL)
++    {
++      bfd_byte *dynbuf, *extdyn, *extdynend;
++      size_t extdynsize;
++      void (*swap_dyn_in) (bfd *, const void *, Elf_Internal_Dyn *);
++
++      if (!bfd_malloc_and_get_section (abfd, dynamic, &dynbuf))
++	return -1;
++
++      extdynsize = get_elf_backend_data (abfd)->s->sizeof_dyn;
++      swap_dyn_in = get_elf_backend_data (abfd)->s->swap_dyn_in;
++
++      extdyn = dynbuf;
++      extdynend = extdyn + dynamic->size;
++      for (; extdyn < extdynend; extdyn += extdynsize)
++	{
++	  Elf_Internal_Dyn dyn;
++	  (*swap_dyn_in) (abfd, extdyn, &dyn);
++
++	  if (dyn.d_tag == DT_NULL)
++	    break;
++
++	  if (dyn.d_tag == DT_PPC_GOT)
++	    {
++	      unsigned int g_o_t = dyn.d_un.d_val;
++	      asection *got = bfd_get_section_by_name (abfd, ".got");
++	      if (got != NULL
++		  && bfd_get_section_contents (abfd, got, buf,
++					       g_o_t - got->vma + 4, 4))
++		glink_vma = bfd_get_32 (abfd, buf);
++	      break;
++	    }
++	}
++      free (dynbuf);
++    }
++
++  /* Otherwise we read the first plt entry.  */
++  if (glink_vma == 0)
++    {
++      if (bfd_get_section_contents (abfd, plt, buf, 0, 4))
++	glink_vma = bfd_get_32 (abfd, buf);
++    }
++
++  if (glink_vma == 0)
++    return 0;
++
++  /* The .glink section usually does not survive the final
++     link; search for the section (usually .text) where the
++     glink stubs now reside.  */
++  glink = bfd_sections_find_if (abfd, section_covers_vma, &glink_vma);
++  if (glink == NULL)
++    return 0;
++
++  /* Determine glink PLT resolver by reading the relative branch
++     from the first glink stub.  */
++  if (bfd_get_section_contents (abfd, glink, buf,
++				glink_vma - glink->vma, 4))
++    {
++      unsigned int insn = bfd_get_32 (abfd, buf);
++
++      /* The first glink stub may either branch to the resolver ...  */
++      insn ^= B;
++      if ((insn & ~0x3fffffc) == 0)
++	resolv_vma = glink_vma + (insn ^ 0x2000000) - 0x2000000;
++
++      /* ... or fall through a bunch of NOPs.  */
++      else if ((insn ^ B ^ NOP) == 0)
++	for (i = 4;
++	     bfd_get_section_contents (abfd, glink, buf,
++				       glink_vma - glink->vma + i, 4);
++	     i += 4)
++	  if (bfd_get_32 (abfd, buf) != NOP)
++	    {
++	      resolv_vma = glink_vma + i;
++	      break;
++	    }
++    }
++
++  slurp_relocs = get_elf_backend_data (abfd)->s->slurp_reloc_table;
++  if (! (*slurp_relocs) (abfd, relplt, dynsyms, TRUE))
++    return -1;
++
++  count = relplt->size / sizeof (Elf32_External_Rela);
++  stub_vma = glink_vma - (bfd_vma) count * 16;
++  size = count * sizeof (asymbol);
++  p = relplt->relocation;
++  for (i = 0; i < count; i++, p++)
++    size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
++
++  size += sizeof (asymbol) + sizeof ("__glink");
++
++  if (resolv_vma)
++    size += sizeof (asymbol) + sizeof ("__glink_PLTresolve");
++
++  s = *ret = bfd_malloc (size);
++  if (s == NULL)
++    return -1;
++
++  names = (char *) (s + count + 1 + (resolv_vma != 0));
++  p = relplt->relocation;
++  for (i = 0; i < count; i++, p++)
++    {
++      size_t len;
++
++      *s = **p->sym_ptr_ptr;
++      /* Undefined syms won't have BSF_LOCAL or BSF_GLOBAL set.  Since
++	 we are defining a symbol, ensure one of them is set.  */
++      if ((s->flags & BSF_LOCAL) == 0)
++	s->flags |= BSF_GLOBAL;
++      s->section = glink;
++      s->value = stub_vma - glink->vma;
++      s->name = names;
++      s->udata.p = NULL;
++      len = strlen ((*p->sym_ptr_ptr)->name);
++      memcpy (names, (*p->sym_ptr_ptr)->name, len);
++      names += len;
++      memcpy (names, "@plt", sizeof ("@plt"));
++      names += sizeof ("@plt");
++      ++s;
++      stub_vma += 16;
++    }
++
++  /* Add a symbol at the start of the glink branch table.  */
++  memset (s, 0, sizeof *s);
++  s->the_bfd = abfd;
++  s->flags = BSF_GLOBAL;
++  s->section = glink;
++  s->value = glink_vma - glink->vma;
++  s->name = names;
++  memcpy (names, "__glink", sizeof ("__glink"));
++  names += sizeof ("__glink");
++  s++;
++  count++;
++
++  if (resolv_vma)
++    {
++      /* Add a symbol for the glink PLT resolver.  */
++      memset (s, 0, sizeof *s);
++      s->the_bfd = abfd;
++      s->flags = BSF_GLOBAL;
++      s->section = glink;
++      s->value = resolv_vma - glink->vma;
++      s->name = names;
++      memcpy (names, "__glink_PLTresolve", sizeof ("__glink_PLTresolve"));
++      names += sizeof ("__glink_PLTresolve");
++      s++;
++      count++;
++    }
++
++  return count;
++}
++
+ /* The following functions are specific to the ELF linker, while
+    functions above are used generally.  They appear in this file more
+    or less in the order in which they are called.  eg.
+@@ -7733,6 +7935,7 @@ ppc_elf_finish_dynamic_sections (bfd *ou
+ #define bfd_elf32_bfd_reloc_name_lookup	ppc_elf_reloc_name_lookup
+ #define bfd_elf32_bfd_set_private_flags		ppc_elf_set_private_flags
+ #define bfd_elf32_bfd_link_hash_table_create	ppc_elf_link_hash_table_create
++#define bfd_elf32_get_synthetic_symtab		ppc_elf_get_synthetic_symtab
+ 
+ #define elf_backend_object_p			ppc_elf_object_p
+ #define elf_backend_gc_mark_hook		ppc_elf_gc_mark_hook
+@@ -7847,6 +8050,8 @@ ppc_elf_vxworks_final_write_processing (
+ #undef elf_backend_got_header_size
+ #define elf_backend_got_header_size		12
+ 
++#undef bfd_elf32_get_synthetic_symtab
++
+ #undef bfd_elf32_bfd_link_hash_table_create
+ #define bfd_elf32_bfd_link_hash_table_create \
+   ppc_elf_vxworks_link_hash_table_create
+--- ./bfd/elf64-ppc.c	2008-02-15 09:27:19.000000000 +0100
++++ ./bfd/elf64-ppc.c	2008-07-24 15:42:47.000000000 +0200
+@@ -2771,8 +2771,17 @@ sym_exists_at (asymbol **syms, long lo, 
+   return NULL;
+ }
+ 
++static bfd_boolean
++section_covers_vma (bfd *abfd ATTRIBUTE_UNUSED, asection *section, void *ptr)
++{
++  bfd_vma vma = *(bfd_vma *) ptr;
++  return ((section->flags & SEC_ALLOC) != 0
++	  && section->vma <= vma
++	  && vma < section->vma + section->size);
++}
++
+ /* Create synthetic symbols, effectively restoring "dot-symbol" function
+-   entry syms.  */
++   entry syms.  Also generate @plt symbols for the glink branch table.  */
+ 
+ static long
+ ppc64_elf_get_synthetic_symtab (bfd *abfd,
+@@ -2862,8 +2871,6 @@ ppc64_elf_get_synthetic_symtab (bfd *abf
+   symcount = i;
+ 
+   count = 0;
+-  if (opdsymend == secsymend)
+-    goto done;
+ 
+   if (relocatable)
+     {
+@@ -2872,6 +2879,9 @@ ppc64_elf_get_synthetic_symtab (bfd *abf
+       size_t size;
+       long relcount;
+ 
++      if (opdsymend == secsymend)
++	goto done;
++
+       slurp_relocs = get_elf_backend_data (abfd)->s->slurp_reloc_table;
+       relcount = (opd->flags & SEC_RELOC) ? opd->reloc_count : 0;
+       if (relcount == 0)
+@@ -2960,8 +2970,13 @@ ppc64_elf_get_synthetic_symtab (bfd *abf
+     }
+   else
+     {
++      bfd_boolean (*slurp_relocs) (bfd *, asection *, asymbol **, bfd_boolean);
+       bfd_byte *contents;
+       size_t size;
++      long plt_count = 0;
++      bfd_vma glink_vma = 0, resolv_vma = 0;
++      asection *dynamic, *glink = NULL, *relplt = NULL;
++      arelent *p;
+ 
+       if (!bfd_malloc_and_get_section (abfd, opd, &contents))
+ 	{
+@@ -2988,11 +3003,85 @@ ppc64_elf_get_synthetic_symtab (bfd *abf
+ 	    }
+ 	}
+ 
++      /* Get start of .glink stubs from DT_PPC64_GLINK.  */
++      dynamic = bfd_get_section_by_name (abfd, ".dynamic");
++      if (dynamic != NULL)
++	{
++	  bfd_byte *dynbuf, *extdyn, *extdynend;
++	  size_t extdynsize;
++	  void (*swap_dyn_in) (bfd *, const void *, Elf_Internal_Dyn *);
++
++	  if (!bfd_malloc_and_get_section (abfd, dynamic, &dynbuf))
++	    goto free_contents_and_exit;
++
++	  extdynsize = get_elf_backend_data (abfd)->s->sizeof_dyn;
++	  swap_dyn_in = get_elf_backend_data (abfd)->s->swap_dyn_in;
++
++	  extdyn = dynbuf;
++	  extdynend = extdyn + dynamic->size;
++	  for (; extdyn < extdynend; extdyn += extdynsize)
++	    {
++	      Elf_Internal_Dyn dyn;
++	      (*swap_dyn_in) (abfd, extdyn, &dyn);
++
++	      if (dyn.d_tag == DT_NULL)
++		break;
++
++	      if (dyn.d_tag == DT_PPC64_GLINK)
++		{
++		  /* The first glink stub starts at offset 32; see comment in
++		     ppc64_elf_finish_dynamic_sections. */
++		  glink_vma = dyn.d_un.d_val + 32;
++		  /* The .glink section usually does not survive the final
++		     link; search for the section (usually .text) where the
++		     glink stubs now reside.  */
++		  glink = bfd_sections_find_if (abfd, section_covers_vma,
++						&glink_vma);
++		  break;
++		}
++	    }
++
++	  free (dynbuf);
++	}
++
++      if (glink != NULL)
++	{
++	  /* Determine __glink trampoline by reading the relative branch
++	     from the first glink stub.  */
++	  bfd_byte buf[4];
++	  if (bfd_get_section_contents (abfd, glink, buf,
++					glink_vma + 4 - glink->vma, 4))
++	    {
++	      unsigned int insn = bfd_get_32 (abfd, buf);
++	      insn ^= B_DOT;
++	      if ((insn & ~0x3fffffc) == 0)
++		resolv_vma = glink_vma + 4 + (insn ^ 0x2000000) - 0x2000000;
++	    }
++
++	  if (resolv_vma)
++	    size += sizeof (asymbol) + sizeof ("__glink_PLTresolve");
++	}
++
++      relplt = bfd_get_section_by_name (abfd, ".rela.plt");
++      if (glink != NULL && relplt != NULL)
++	{
++	  slurp_relocs = get_elf_backend_data (abfd)->s->slurp_reloc_table;
++	  if (! (*slurp_relocs) (abfd, relplt, dyn_syms, TRUE))
++	    goto free_contents_and_exit;
++	
++	  plt_count = relplt->size / sizeof (Elf64_External_Rela);
++	  size += plt_count * sizeof (asymbol);
++
++	  p = relplt->relocation;
++	  for (i = 0; i < plt_count; i++, p++)
++	    size += strlen ((*p->sym_ptr_ptr)->name) + sizeof ("@plt");
++	}
++
+       s = *ret = bfd_malloc (size);
+       if (s == NULL)
+ 	goto free_contents_and_exit;
+ 
+-      names = (char *) (s + count);
++      names = (char *) (s + count + plt_count + (resolv_vma != 0));
+ 
+       for (i = secsymend; i < opdsymend; ++i)
+ 	{
+@@ -3048,6 +3137,66 @@ ppc64_elf_get_synthetic_symtab (bfd *abf
+ 	    }
+ 	}
+       free (contents);
++
++      if (glink != NULL && relplt != NULL)
++	{
++	  if (resolv_vma)
++	    {
++	      /* Add a symbol for the main glink trampoline.  */
++	      memset (s, 0, sizeof *s);
++	      s->the_bfd = abfd;
++	      s->flags = BSF_GLOBAL;
++	      s->section = glink;
++	      s->value = resolv_vma - glink->vma;
++	      s->name = names;
++	      memcpy (names, "__glink_PLTresolve", sizeof ("__glink_PLTresolve"));
++	      names += sizeof ("__glink_PLTresolve");
++	      s++;
++	      count++;
++	    }
++
++	  /* FIXME: It would be very much nicer to put sym@plt on the
++	     stub rather than on the glink branch table entry.  The
++	     objdump disassembler would then use a sensible symbol
++	     name on plt calls.  The difficulty in doing so is
++	     a) finding the stubs, and,
++	     b) matching stubs against plt entries, and,
++	     c) there can be multiple stubs for a given plt entry.
++
++	     Solving (a) could be done by code scanning, but older
++	     ppc64 binaries used different stubs to current code.
++	     (b) is the tricky one since you need to known the toc
++	     pointer for at least one function that uses a pic stub to
++	     be able to calculate the plt address referenced.
++	     (c) means gdb would need to set multiple breakpoints (or
++	     find the glink branch itself) when setting breakpoints
++	     for pending shared library loads.  */
++	  p = relplt->relocation;
++	  for (i = 0; i < plt_count; i++, p++)
++	    {
++	      size_t len;
++
++	      *s = **p->sym_ptr_ptr;
++	      /* Undefined syms won't have BSF_LOCAL or BSF_GLOBAL set.  Since
++		 we are defining a symbol, ensure one of them is set.  */
++	      if ((s->flags & BSF_LOCAL) == 0)
++		s->flags |= BSF_GLOBAL;
++	      s->section = glink;
++	      s->value = glink_vma - glink->vma;
++	      s->name = names;
++	      s->udata.p = NULL;
++	      len = strlen ((*p->sym_ptr_ptr)->name);
++	      memcpy (names, (*p->sym_ptr_ptr)->name, len);
++	      names += len;
++	      memcpy (names, "@plt", sizeof ("@plt"));
++	      names += sizeof ("@plt");
++	      s++;
++	      glink_vma += 8;
++	      if (i >= 0x8000)
++		glink_vma += 4;
++	    }
++	  count += plt_count;
++	}
+     }
+ 
+  done:
+@@ -9705,7 +9854,8 @@ ppc64_elf_build_stubs (bfd_boolean emit_
+       if (htab->emit_stub_syms)
+ 	{
+ 	  struct elf_link_hash_entry *h;
+-	  h = elf_link_hash_lookup (&htab->elf, "__glink", TRUE, FALSE, FALSE);
++	  h = elf_link_hash_lookup (&htab->elf, "__glink_PLTresolve",
++				    TRUE, FALSE, FALSE);
+ 	  if (h == NULL)
+ 	    return FALSE;
+ 	  if (h->root.type == bfd_link_hash_new)
+--- ./gdb/elfread.c	2008-07-24 15:41:07.000000000 +0200
++++ ./gdb/elfread.c	2008-07-24 15:42:48.000000000 +0200
+@@ -514,6 +514,34 @@ elf_symtab_read (struct objfile *objfile
+ 	  if (msym != NULL)
+ 	    msym->filename = filesymname;
+ 	  gdbarch_elf_make_msymbol_special (current_gdbarch, sym, msym);
++ 
++ 	  /* For @plt symbols, also record a trampoline to the
++ 	     destination symbol.  The @plt symbol will be used in
++ 	     disassembly, and the trampoline will be used when we are
++ 	     trying to find the target.  */
++ 	  if (msym && ms_type == mst_text && type == ST_SYNTHETIC)
++ 	    {
++ 	      int len = strlen (sym->name);
++ 
++ 	      if (len > 4 && strcmp (sym->name + len - 4, "@plt") == 0)
++ 		{
++ 		  char *base_name = alloca (len - 4 + 1);
++ 		  struct minimal_symbol *mtramp;
++ 
++ 		  memcpy (base_name, sym->name, len - 4);
++ 		  base_name[len - 4] = '\0';
++ 		  mtramp = record_minimal_symbol (base_name, symaddr,
++ 						  mst_solib_trampoline,
++ 						  sym->section, objfile);
++ 		  if (mtramp)
++ 		    {
++ 		      MSYMBOL_SIZE (mtramp) = MSYMBOL_SIZE (msym);
++ 		      mtramp->filename = filesymname;
++ 		      gdbarch_elf_make_msymbol_special (current_gdbarch, sym,
++							mtramp);
++ 		    }
++ 		}
++ 	    }
+ 	}
+     }
+ }
+--- ./gdb/minsyms.c	2008-07-24 15:41:07.000000000 +0200
++++ ./gdb/minsyms.c	2008-07-24 15:42:48.000000000 +0200
+@@ -357,10 +357,15 @@ lookup_minimal_symbol_solib_trampoline (
+    ALL the minimal symbol tables before deciding on the symbol that
+    comes closest to the specified PC.  This is because objfiles can
+    overlap, for example objfile A has .text at 0x100 and .data at
+-   0x40000 and objfile B has .text at 0x234 and .data at 0x40048.  */
++   0x40000 and objfile B has .text at 0x234 and .data at 0x40048.
+ 
+-struct minimal_symbol *
+-lookup_minimal_symbol_by_pc_section (CORE_ADDR pc, asection *section)
++   If WANT_TRAMPOLINE is set, prefer mst_solib_trampoline symbols when
++   there are text and trampoline symbols at the same address.
++   Otherwise prefer mst_text symbols.  */
++
++static struct minimal_symbol *
++lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc, asection *section,
++				       int want_trampoline)
+ {
+   int lo;
+   int hi;
+@@ -369,7 +374,11 @@ lookup_minimal_symbol_by_pc_section (COR
+   struct minimal_symbol *msymbol;
+   struct minimal_symbol *best_symbol = NULL;
+   struct obj_section *pc_section;
++  enum minimal_symbol_type want_type, other_type;
+ 
++  want_type = want_trampoline ? mst_solib_trampoline : mst_text;
++  other_type = want_trampoline ? mst_text : mst_solib_trampoline;
++  
+   /* PC has to be in a known section.  This ensures that anything
+      beyond the end of the last segment doesn't appear to be part of
+      the last function in the last segment.  */
+@@ -491,6 +500,24 @@ lookup_minimal_symbol_by_pc_section (COR
+ 		      continue;
+ 		    }
+ 
++		  /* If we are looking for a trampoline and this is a
++		     text symbol, or the other way around, check the
++		     preceeding symbol too.  If they are otherwise
++		     identical prefer that one.  */
++		  if (hi > 0
++		      && MSYMBOL_TYPE (&msymbol[hi]) == other_type
++		      && MSYMBOL_TYPE (&msymbol[hi - 1]) == want_type
++		      && (MSYMBOL_SIZE (&msymbol[hi])
++			  == MSYMBOL_SIZE (&msymbol[hi - 1]))
++		      && (SYMBOL_VALUE_ADDRESS (&msymbol[hi])
++			  == SYMBOL_VALUE_ADDRESS (&msymbol[hi - 1]))
++		      && (SYMBOL_BFD_SECTION (&msymbol[hi])
++			  == SYMBOL_BFD_SECTION (&msymbol[hi - 1])))
++		    {
++		      hi--;
++		      continue;
++		    }
++
+ 		  /* If the minimal symbol has a zero size, save it
+ 		     but keep scanning backwards looking for one with
+ 		     a non-zero size.  A zero size may mean that the
+@@ -571,6 +598,12 @@ lookup_minimal_symbol_by_pc_section (COR
+   return (best_symbol);
+ }
+ 
++struct minimal_symbol *
++lookup_minimal_symbol_by_pc_section (CORE_ADDR pc, asection *section)
++{
++  return lookup_minimal_symbol_by_pc_section_1 (pc, section, 0);
++}
++
+ /* Backward compatibility: search through the minimal symbol table 
+    for a matching PC (no section given) */
+ 
+@@ -1024,7 +1057,13 @@ msymbols_sort (struct objfile *objfile)
+ struct minimal_symbol *
+ lookup_solib_trampoline_symbol_by_pc (CORE_ADDR pc)
+ {
+-  struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
++  struct obj_section *section = find_pc_section (pc);
++  struct minimal_symbol *msymbol;
++
++  if (section == NULL)
++    return NULL;
++  msymbol = lookup_minimal_symbol_by_pc_section_1 (pc, section->the_bfd_section,
++						   1);
+ 
+   if (msymbol != NULL && MSYMBOL_TYPE (msymbol) == mst_solib_trampoline)
+     return msymbol;
+--- ./gdb/ppc-linux-tdep.c	2008-02-20 15:31:40.000000000 +0100
++++ ./gdb/ppc-linux-tdep.c	2008-07-24 15:43:24.000000000 +0200
+@@ -545,7 +545,7 @@ ppc64_skip_trampoline_code (struct frame
+ }
+ 
+ 
+-/* Support for convert_from_func_ptr_addr (ARCH, ADDR, TARG) on PPC
++/* Support for convert_from_func_ptr_addr (ARCH, ADDR, TARG) on PPC64
+    GNU/Linux.
+ 
+    Usually a function pointer's representation is simply the address
+@@ -557,12 +557,6 @@ ppc64_skip_trampoline_code (struct frame
+    function, the second word is the TOC pointer (r2), and the third word
+    is the static chain value.
+ 
+-   For PPC32, there are two kinds of function pointers: non-secure and
+-   secure.  Non-secure function pointers point directly to the
+-   function in a code section and thus need no translation.  Secure
+-   ones (from GCC's -msecure-plt option) are in a data section and
+-   contain one word: the address of the function.
+-
+    Throughout GDB it is currently assumed that a function pointer contains
+    the address of the function, which is not easy to fix.  In addition, the
+    conversion of a function address to a function pointer would
+@@ -578,40 +572,15 @@ ppc64_skip_trampoline_code (struct frame
+    random addresses such as occur when there is no symbol table.  */
+ 
+ static CORE_ADDR
+-ppc_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
+-				      CORE_ADDR addr,
+-				      struct target_ops *targ)
++ppc64_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					CORE_ADDR addr,
++					struct target_ops *targ)
+ {
+-  struct gdbarch_tdep *tdep;
+   struct section_table *s = target_section_by_addr (targ, addr);
+-  char *sect_name = NULL;
+-
+-  if (!s)
+-    return addr;
+-
+-  tdep = gdbarch_tdep (gdbarch);
+-
+-  switch (tdep->wordsize)
+-    {
+-      case 4:
+-	sect_name = ".plt";
+-	break;
+-      case 8:
+-	sect_name = ".opd";
+-	break;
+-      default:
+-	internal_error (__FILE__, __LINE__,
+-			_("failed internal consistency check"));
+-    }
+ 
+   /* Check if ADDR points to a function descriptor.  */
+-
+-  /* NOTE: this depends on the coincidence that the address of a functions
+-     entry point is contained in the first word of its function descriptor
+-     for both PPC-64 and for PPC-32 with secure PLTs.  */
+-  if ((strcmp (s->the_bfd_section->name, sect_name) == 0)
+-      && s->the_bfd_section->flags & SEC_DATA)
+-    return get_target_memory_unsigned (targ, addr, tdep->wordsize);
++  if (s && strcmp (s->the_bfd_section->name, ".opd") == 0)
++    return get_target_memory_unsigned (targ, addr, 8);
+ 
+   return addr;
+ }
+@@ -905,11 +874,6 @@ ppc_linux_init_abi (struct gdbarch_info 
+   set_gdbarch_long_double_bit (gdbarch, 16 * TARGET_CHAR_BIT);
+   set_gdbarch_long_double_format (gdbarch, floatformats_ibm_long_double);
+ 
+-  /* Handle PPC GNU/Linux 64-bit function pointers (which are really
+-     function descriptors) and 32-bit secure PLT entries.  */
+-  set_gdbarch_convert_from_func_ptr_addr
+-    (gdbarch, ppc_linux_convert_from_func_ptr_addr);
+-
+   if (tdep->wordsize == 4)
+     {
+       /* Until November 2001, gcc did not comply with the 32 bit SysV
+@@ -937,6 +901,11 @@ ppc_linux_init_abi (struct gdbarch_info 
+   
+   if (tdep->wordsize == 8)
+     {
++      /* Handle PPC GNU/Linux 64-bit function pointers (which are really
++	 function descriptors).  */
++      set_gdbarch_convert_from_func_ptr_addr
++	(gdbarch, ppc64_linux_convert_from_func_ptr_addr);
++
+       /* Shared library handling.  */
+       set_gdbarch_skip_trampoline_code (gdbarch, ppc64_skip_trampoline_code);
+       set_solib_svr4_fetch_link_map_offsets

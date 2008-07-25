@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -631,8 +631,6 @@ echo ====================TESTING=========================
 cd gdb
 gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 # Need to use a single --ignore option, second use overrides first.
-# "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
-# "threadcrash.exp" is incompatible on ia64 with old kernels.
 # No `%{?_smp_mflags}' here as it may race.
 # WARNING: can't generate a core file - core tests suppressed - check ulimit
 # "readline-overflow.exp" - Testcase is broken, functionality is OK.
@@ -642,23 +640,31 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   ulimit -c unlimited || :
 
   # Setup $CHECK as `check//unix/' or `check//unix/-m64' for explicit bitsize.
-  # Simple `check' is not used for $CHECK as different escaping rules apply
-  # for the --ignore list delimiting spaces.
+  # Never use two different bitsizes as it fails on ppc64.
   echo 'int main (void) { return 0; }' >biarch.c
-  gcc $RPM_OPT_FLAGS -o biarch biarch.c
-  mv -f biarch biarch-native
-  # Do not try -m64 for biarch as GDB cannot handle inferior larger than itself.
-  for BI in -m32 -m31 ""
+  CHECK=""
+  for BI in -m64 -m32 -m31 ""
   do
-    if gcc 2>/dev/null $RPM_OPT_FLAGS $BI -o biarch biarch.c
-    then
-      break
+    # Do not use size-less options if any of the sizes works.
+    if [ -z "$BI" -a -n "$CHECK" ];then
+      continue
     fi
-  done
-  CHECK="check`echo " $RPM_OPT_FLAGS "|sed -n 's#^.* \(-m[36][241]\) .*$#//unix/\1#p'`"
-  if ! cmp -s biarch-native biarch
-  then
+    # Do not use $RPM_OPT_FLAGS as the other non-size options will not be used
+    # in the real run of the testsuite.
+    if ! gcc $BI -o biarch biarch.c
+    then
+      continue
+    fi
     CHECK="$CHECK check//unix/$BI"
+  done
+  # Do not try -m64 inferiors for -m32 GDB as it cannot handle inferiors larger
+  # than itself.
+  # s390 -m31 still uses the standard ELF32 binary format.
+  gcc $RPM_OPT_FLAGS -o biarch biarch.c
+  RPM_SIZE="$(file ./biarch|sed -n 's/^.*: ELF \(32\|64\)-bit .*$/\1/p')"
+  if [ "$RPM_SIZE" != "64" ]
+  then
+    CHECK="$(echo " $CHECK "|sed 's# check//unix/-m64 # #')"
   fi
 
   # Disable some problematic testcases.
@@ -666,10 +672,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   # `check//...' target spawn and too much escaping there would be dense.
   for test in				\
     gdb.base/readline-overflow.exp	\
-    gdb.base/chng-syms.exp		\
-    gdb.base/checkpoint.exp		\
     gdb.base/bigcore.exp		\
-    gdb.threads/threadcrash.exp		\
   ; do
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
@@ -785,6 +788,11 @@ fi
 %endif
 
 %changelog
+* Fri Jul 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-13
+- Fix powerpc recent secure PLTs handling (shared library calls) (BZ 452960).
+- Fix the testsuite .spec runner to run biarch also on ppc.
+- Reenable testcases threadcrash.exp, chng-syms.exp, checkpoint.exp (BZ 207002).
+
 * Thu Jul 24 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-12
 - Temporarily disable attaching to a stopped process (BZ 453688)
   - To be reintroduced after a fix of the kernel BZ 454404.
