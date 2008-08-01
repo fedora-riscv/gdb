@@ -6,6 +6,9 @@
 Summary: A GNU source-level debugger for C, C++, Java and other languages
 Name: gdb%{?_with_debug:-debug}
 
+# Compatibility with F-10 rpmbuild:
+%define _default_patch_fuzz 2
+
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
@@ -13,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{?dist}
+Release: 15%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -358,6 +361,9 @@ Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 # Fix memory trashing on binaries from GCC Ada (workaround GCC PR 35998).
 Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 
+# Fix register assignments with no GDB stack frames (BZ 436037).
+Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -536,6 +542,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch316 -p1
 %patch317 -p1
 %patch318 -p1
+%patch330 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -788,6 +795,13 @@ fi
 %endif
 
 %changelog
+* Fri Aug  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-15
+- Fix register assignments with no GDB stack frames, Denys Vlasenko (BZ 436037).
+
+* Fri Jul 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-14
+- Backpoint `original-location' for multi-PC breakpoints (for Nemiver).
+- Include _default_patch_fuzz for builds on F-10.
+
 * Fri Jul 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-13
 - Fix powerpc recent secure PLTs handling (shared library calls) (BZ 452960).
 - Fix the testsuite .spec runner to run biarch also on ppc.
