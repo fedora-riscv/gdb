@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?_with_upstream:.upstream}%{?dist}
+Release: 18%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -382,6 +382,12 @@ Patch326: gdb-6.8-tui-singlebinary.patch
 Patch327: gdb-6.8-inlining.patch
 Patch328: gdb-6.8-inlining-by-name.patch
 
+# Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
+Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
+
+# Fix register assignments with no GDB stack frames (BZ 436037).
+Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -569,6 +575,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch326 -p1
 %patch327 -p1
 %patch328 -p1
+%patch329 -p1
+%patch330 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -669,8 +677,6 @@ echo ====================TESTING=========================
 cd gdb
 gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 # Need to use a single --ignore option, second use overrides first.
-# "chng-syms.exp" for possibly avoiding Linux kernel crash - Bug 207002.
-# "threadcrash.exp" is incompatible on ia64 with old kernels.
 # No `%{?_smp_mflags}' here as it may race.
 # WARNING: can't generate a core file - core tests suppressed - check ulimit
 # "readline-overflow.exp" - Testcase is broken, functionality is OK.
@@ -680,26 +686,34 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   ulimit -c unlimited || :
 
   # Setup $CHECK as `check//unix/' or `check//unix/-m64' for explicit bitsize.
-  # Simple `check' is not used for $CHECK as different escaping rules apply
-  # for the --ignore list delimiting spaces.
+  # Never use two different bitsizes as it fails on ppc64.
   echo 'int main (void) { return 0; }' >biarch.c
-  gcc $RPM_OPT_FLAGS -o biarch biarch.c
-  mv -f biarch biarch-native
-  # Do not try -m64 for biarch as GDB cannot handle inferior larger than itself.
-  for BI in -m32 -m31 ""
+  CHECK=""
+  for BI in -m64 -m32 -m31 ""
   do
-    if gcc 2>/dev/null $RPM_OPT_FLAGS $BI -o biarch biarch.c
-    then
-      break
+    # Do not use size-less options if any of the sizes works.
+    # On ia64 there is no -m64 flag while we must not leave a bare `check' here
+    # as it would switch over some testing scripts to the backward compatibility
+    # mode: when `make check' was executed from inside the testsuite/ directory.
+    if [ -z "$BI" -a -n "$CHECK" ];then
+      continue
     fi
-  done
-  # On ia64 there is no -m64 flag while we must not leave a bare `check' here
-  # as it would switch over some testing scripts to the backward compatibility
-  # mode - when `make check' was executed from inside the testsuite/ directory.
-  CHECK="check//unix$(echo " $RPM_OPT_FLAGS "|sed -n 's#^.* \(-m[36][241]\) .*$#/\1#p')"
-  if ! cmp -s biarch-native biarch
-  then
+    # Do not use $RPM_OPT_FLAGS as the other non-size options will not be used
+    # in the real run of the testsuite.
+    if ! gcc $BI -o biarch biarch.c
+    then
+      continue
+    fi
     CHECK="$CHECK check//unix/$BI"
+  done
+  # Do not try -m64 inferiors for -m32 GDB as it cannot handle inferiors larger
+  # than itself.
+  # s390 -m31 still uses the standard ELF32 binary format.
+  gcc $RPM_OPT_FLAGS -o biarch biarch.c
+  RPM_SIZE="$(file ./biarch|sed -n 's/^.*: ELF \(32\|64\)-bit .*$/\1/p')"
+  if [ "$RPM_SIZE" != "64" ]
+  then
+    CHECK="$(echo " $CHECK "|sed 's# check//unix/-m64 # #')"
   fi
 
   # Disable some problematic testcases.
@@ -707,10 +721,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   # `check//...' target spawn and too much escaping there would be dense.
   for test in				\
     gdb.base/readline-overflow.exp	\
-    gdb.base/chng-syms.exp		\
-    gdb.base/checkpoint.exp		\
     gdb.base/bigcore.exp		\
-    gdb.threads/threadcrash.exp		\
   ; do
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
@@ -718,7 +729,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
 %if 0%{!?_with_upstream:1}
   # Run all the scheduled testsuite runs also in the PIE mode.
   # Upstream GDB would lock up the testsuite run for too long on its failures.
-  CHECK="$(echo $CHECK|sed 's#check//unix[^ ]*#& &/-fPIE/-pie#g')"
+  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
   for CURRENT in $CHECK
@@ -832,6 +843,14 @@ fi
 %endif
 
 %changelog
+* Fri Aug  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-18
+- Fix powerpc recent secure PLTs handling (shared library calls) (BZ 452960).
+- Fix the testsuite .spec runner to run biarch also on ppc.
+- Reenable testcases threadcrash.exp, chng-syms.exp, checkpoint.exp (BZ 207002).
+- Fix PRPSINFO in the core files dumped by gcore (BZ 254229), reformatted patch
+  from Denys Vlasenko.
+- Fix register assignments with no GDB stack frames, Denys Vlasenko (BZ 436037).
+
 * Mon Jul 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-17
 - Refresh the patchset with fuzz 0 (for new rpmbuild).
 
