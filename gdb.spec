@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{?dist}
+Release: 19%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -843,6 +843,9 @@ fi
 %endif
 
 %changelog
+* Mon Aug  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-19
+- Fix `errno' printing on nonthreaded non-g3 inferiors (TLS minsym is absolute).
+
 * Fri Aug  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-18
 - Fix powerpc recent secure PLTs handling (shared library calls) (BZ 452960).
 - Fix the testsuite .spec runner to run biarch also on ppc.
