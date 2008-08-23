@@ -16,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?_with_upstream:.upstream}%{?dist}
+Release: 18%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -795,6 +795,9 @@ fi
 %endif
 
 %changelog
+* Sat Aug 23 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-18
+- Fix MI debuginfo print on reloaded exec, found by Denys Vlasenko (BZ 459414).
+
 * Mon Aug  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-17
 - Fix `errno' printing on nonthreaded non-g3 inferiors (TLS minsym is absolute).
 
