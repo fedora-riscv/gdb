@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{?dist}
+Release: 21%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -843,6 +843,10 @@ fi
 %endif
 
 %changelog
+* Sat Aug 23 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-21
+- Fix MI debuginfo print on reloaded exec, found by Denys Vlasenko (BZ 459414).
+- Extend the Fortran dynamic variables patch also for dynamic Fortran strings.
+
 * Wed Aug 13 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-20
 - Temporarily disable attaching to a stopped process (BZ 453688)
   - To be reintroduced after a fix of the kernel BZ 454404.

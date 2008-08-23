@@ -40,10 +40,15 @@
 
 	rpm compatibility patch by Panu Matilainen.
 
-Index: gdb-6.8/gdb/Makefile.in
-===================================================================
---- gdb-6.8.orig/gdb/Makefile.in	2008-04-19 20:48:13.000000000 +0200
-+++ gdb-6.8/gdb/Makefile.in	2008-04-19 20:48:21.000000000 +0200
+2008-08-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Disable MI non-compliant message on the missing debuginfo printed on
+	reloaded exec file.
+	Fix found by Denys Vlasenko <dvlasenk@redhat.com>.
+	Fixes Red Hat Bug 459414.
+
+--- ./gdb/Makefile.in	2008-08-21 00:29:46.000000000 +0200
++++ ./gdb/Makefile.in	2008-08-21 00:28:43.000000000 +0200
 @@ -340,7 +340,7 @@ CONFIG_UNINSTALL = @CONFIG_UNINSTALL@
  # your system doesn't have fcntl.h in /usr/include (which is where it
  # should be according to Posix).
@@ -100,10 +105,8 @@ Index: gdb-6.8/gdb/Makefile.in
  	$(CC) -c $(INTERNAL_CFLAGS) $(srcdir)/tui/tui-interp.c
  tui-io.o: $(srcdir)/tui/tui-io.c $(defs_h) $(target_h) \
  	$(event_loop_h) $(event_top_h) $(command_h) $(top_h) $(tui_h) \
-Index: gdb-6.8/gdb/corelow.c
-===================================================================
---- gdb-6.8.orig/gdb/corelow.c	2008-04-19 20:47:17.000000000 +0200
-+++ gdb-6.8/gdb/corelow.c	2008-04-19 20:48:21.000000000 +0200
+--- ./gdb/corelow.c	2008-02-09 14:45:33.000000000 +0100
++++ ./gdb/corelow.c	2008-08-21 00:28:43.000000000 +0200
 @@ -45,6 +45,10 @@
  #include "exceptions.h"
  #include "solib.h"
@@ -200,11 +203,9 @@ Index: gdb-6.8/gdb/corelow.c
 +			   NULL, NULL, NULL,
 +			   &setlist, &showlist);
  }
-Index: gdb-6.8/gdb/doc/gdb.texinfo
-===================================================================
---- gdb-6.8.orig/gdb/doc/gdb.texinfo	2008-04-19 20:48:13.000000000 +0200
-+++ gdb-6.8/gdb/doc/gdb.texinfo	2008-04-19 20:48:21.000000000 +0200
-@@ -12208,6 +12208,27 @@ information files.
+--- ./gdb/doc/gdb.texinfo	2008-08-21 00:29:46.000000000 +0200
++++ ./gdb/doc/gdb.texinfo	2008-08-21 00:28:43.000000000 +0200
+@@ -12195,6 +12195,27 @@ information files.
  
  @end table
  
@@ -232,10 +233,8 @@ Index: gdb-6.8/gdb/doc/gdb.texinfo
  @cindex @code{.gnu_debuglink} sections
  @cindex debug link sections
  A debug link is a special section of the executable file named
-Index: gdb-6.8/gdb/event-top.c
-===================================================================
---- gdb-6.8.orig/gdb/event-top.c	2008-04-19 20:47:17.000000000 +0200
-+++ gdb-6.8/gdb/event-top.c	2008-04-19 20:48:21.000000000 +0200
+--- ./gdb/event-top.c	2008-01-01 23:53:09.000000000 +0100
++++ ./gdb/event-top.c	2008-08-21 00:28:43.000000000 +0200
 @@ -31,6 +31,7 @@
  #include <signal.h>
  #include "exceptions.h"
@@ -262,10 +261,8 @@ Index: gdb-6.8/gdb/event-top.c
    /* Each interpreter has its own rules on displaying the command
       prompt.  */
    if (!current_interp_display_prompt_p ())
-Index: gdb-6.8/gdb/solib-svr4.c
-===================================================================
---- gdb-6.8.orig/gdb/solib-svr4.c	2008-04-19 20:48:12.000000000 +0200
-+++ gdb-6.8/gdb/solib-svr4.c	2008-04-19 20:49:50.000000000 +0200
+--- ./gdb/solib-svr4.c	2008-08-21 00:29:46.000000000 +0200
++++ ./gdb/solib-svr4.c	2008-08-21 00:28:43.000000000 +0200
 @@ -764,9 +764,33 @@ svr4_current_sos (void)
  		     safe_strerror (errcode));
  	  else
@@ -303,10 +300,8 @@ Index: gdb-6.8/gdb/solib-svr4.c
  	    }
  	  xfree (buffer);
  
-Index: gdb-6.8/gdb/symfile.c
-===================================================================
---- gdb-6.8.orig/gdb/symfile.c	2008-04-19 20:48:12.000000000 +0200
-+++ gdb-6.8/gdb/symfile.c	2008-04-19 20:48:21.000000000 +0200
+--- ./gdb/symfile.c	2008-08-21 00:29:46.000000000 +0200
++++ ./gdb/symfile.c	2008-08-21 00:29:18.000000000 +0200
 @@ -53,6 +53,9 @@
  #include "varobj.h"
  #include "elf-bfd.h"
@@ -791,7 +786,7 @@ Index: gdb-6.8/gdb/symfile.c
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1314,9 +1714,432 @@ build_id_to_debug_filename (struct build
+@@ -1314,9 +1714,437 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -1007,11 +1002,14 @@ Index: gdb-6.8/gdb/symfile.c
 +{
 +  char **array, **array_iter;
 +  struct missing_rpm *list_iter;
++  struct cleanup *cleanups;
 +
 +  if (missing_rpm_list_entries == 0)
 +    return;
 +
 +  array = xmalloc (sizeof (*array) * missing_rpm_list_entries);
++  cleanups = make_cleanup (xfree, array);
++
 +  array_iter = array;
 +  for (list_iter = missing_rpm_list; list_iter != NULL;
 +       list_iter = list_iter->next)
@@ -1023,16 +1021,16 @@ Index: gdb-6.8/gdb/symfile.c
 +  qsort (array, missing_rpm_list_entries, sizeof (*array),
 +	 (int (*) (const void *, const void *)) missing_rpm_list_compar);
 +
-+  printf (_("Missing separate debuginfos, use: %s"), "debuginfo-install");
++  printf_unfiltered (_("Missing separate debuginfos, use: %s"),
++		     "debuginfo-install");
 +  for (array_iter = array; array_iter < array + missing_rpm_list_entries;
 +       array_iter++)
 +    {
-+      putchar (' ');
-+      fputs (*array_iter, stdout);
++      putchar_unfiltered (' ');
++      puts_unfiltered (*array_iter);
 +    }
-+  putchar ('\n');
++  putchar_unfiltered ('\n');
 +
-+  xfree (array);
 +  while (missing_rpm_list != NULL)
 +    {
 +      list_iter = missing_rpm_list;
@@ -1040,6 +1038,8 @@ Index: gdb-6.8/gdb/symfile.c
 +      xfree (list_iter);
 +    }
 +  missing_rpm_list_entries = 0;
++
++  do_cleanups (cleanups);
 +}
 +
 +static void
@@ -1224,7 +1224,7 @@ Index: gdb-6.8/gdb/symfile.c
  static char *
  get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
  {
-@@ -1402,32 +2226,36 @@ static char *
+@@ -1402,32 +2231,36 @@ static char *
  find_separate_debug_file (struct objfile *objfile)
  {
    asection *sect;
@@ -1270,7 +1270,7 @@ Index: gdb-6.8/gdb/symfile.c
      }
  
    basename = get_debug_link_info (objfile, &crc32);
-@@ -1435,7 +2263,7 @@ find_separate_debug_file (struct objfile
+@@ -1435,7 +2268,7 @@ find_separate_debug_file (struct objfile
    if (basename == NULL)
      /* There's no separate debug info, hence there's no way we could
         load it => no warning.  */
@@ -1279,7 +1279,7 @@ Index: gdb-6.8/gdb/symfile.c
  
    dir = xstrdup (objfile->name);
  
-@@ -1451,23 +2279,19 @@ find_separate_debug_file (struct objfile
+@@ -1451,23 +2284,19 @@ find_separate_debug_file (struct objfile
    gdb_assert (i >= 0 && IS_DIR_SEPARATOR (dir[i]));
    dir[i+1] = '\0';
  
@@ -1310,7 +1310,7 @@ Index: gdb-6.8/gdb/symfile.c
  
    /* Then try in the subdirectory named DEBUG_SUBDIRECTORY.  */
    strcpy (debugfile, dir);
-@@ -1476,11 +2300,7 @@ find_separate_debug_file (struct objfile
+@@ -1476,11 +2305,7 @@ find_separate_debug_file (struct objfile
    strcat (debugfile, basename);
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
@@ -1323,7 +1323,7 @@ Index: gdb-6.8/gdb/symfile.c
  
    /* Then try in the global debugfile directory.  */
    strcpy (debugfile, debug_file_directory);
-@@ -1489,11 +2309,7 @@ find_separate_debug_file (struct objfile
+@@ -1489,11 +2314,7 @@ find_separate_debug_file (struct objfile
    strcat (debugfile, basename);
  
    if (separate_debug_file_exists (debugfile, crc32, objfile->name))
@@ -1336,7 +1336,7 @@ Index: gdb-6.8/gdb/symfile.c
  
    /* If the file is in the sysroot, try using its base path in the
       global debugfile directory.  */
-@@ -1508,20 +2324,18 @@ find_separate_debug_file (struct objfile
+@@ -1508,20 +2329,18 @@ find_separate_debug_file (struct objfile
        strcat (debugfile, basename);
  
        if (separate_debug_file_exists (debugfile, crc32, objfile->name))
@@ -1365,7 +1365,7 @@ Index: gdb-6.8/gdb/symfile.c
  }
  
  
-@@ -4208,4 +5022,16 @@ the global debug-file directory prepende
+@@ -4208,4 +5027,16 @@ the global debug-file directory prepende
  				     NULL,
  				     show_debug_file_directory,
  				     &setlist, &showlist);
@@ -1382,10 +1382,8 @@ Index: gdb-6.8/gdb/symfile.c
 +
 +  observer_attach_executable_changed (debug_print_executable_changed);
  }
-Index: gdb-6.8/gdb/symfile.h
-===================================================================
---- gdb-6.8.orig/gdb/symfile.h	2008-04-19 20:47:17.000000000 +0200
-+++ gdb-6.8/gdb/symfile.h	2008-04-19 20:48:21.000000000 +0200
+--- ./gdb/symfile.h	2008-02-03 23:13:29.000000000 +0100
++++ ./gdb/symfile.h	2008-08-21 00:28:43.000000000 +0200
 @@ -358,6 +358,14 @@ extern int symfile_map_offsets_to_segmen
  struct symfile_segment_data *get_symfile_segment_data (bfd *abfd);
  void free_symfile_segment_data (struct symfile_segment_data *data);
@@ -1401,31 +1399,8 @@ Index: gdb-6.8/gdb/symfile.h
  /* From dwarf2read.c */
  
  extern int dwarf2_has_info (struct objfile *);
-Index: gdb-6.8/gdb/tui/tui-interp.c
-===================================================================
---- gdb-6.8.orig/gdb/tui/tui-interp.c	2008-04-19 20:47:17.000000000 +0200
-+++ gdb-6.8/gdb/tui/tui-interp.c	2008-04-19 20:48:21.000000000 +0200
-@@ -30,6 +30,7 @@
- #include "tui/tui.h"
- #include "tui/tui-io.h"
- #include "exceptions.h"
-+#include "symfile.h"
- 
- /* Set to 1 when the TUI mode must be activated when we first start
-    gdb.  */
-@@ -128,6 +129,8 @@ tui_command_loop (void *data)
-       char *a_prompt;
-       char *gdb_prompt = get_prompt ();
- 
-+      debug_flush_missing ();
-+
-       /* Tell readline what the prompt to display is and what function
-          it will need to call after a whole line is read. This also
-          displays the first prompt.  */
-Index: gdb-6.8/gdb/testsuite/lib/gdb.exp
-===================================================================
---- gdb-6.8.orig/gdb/testsuite/lib/gdb.exp	2008-04-19 20:48:11.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/lib/gdb.exp	2008-04-19 20:48:21.000000000 +0200
+--- ./gdb/testsuite/lib/gdb.exp	2008-08-21 00:29:46.000000000 +0200
++++ ./gdb/testsuite/lib/gdb.exp	2008-08-21 00:28:43.000000000 +0200
 @@ -1199,6 +1199,16 @@ proc default_gdb_start { } {
  	    warning "Couldn't set the width to 0."
  	}
@@ -1443,3 +1418,22 @@ Index: gdb-6.8/gdb/testsuite/lib/gdb.exp
      return 0;
  }
  
+--- ./gdb/tui/tui-interp.c	2008-01-01 23:53:22.000000000 +0100
++++ ./gdb/tui/tui-interp.c	2008-08-21 00:28:43.000000000 +0200
+@@ -30,6 +30,7 @@
+ #include "tui/tui.h"
+ #include "tui/tui-io.h"
+ #include "exceptions.h"
++#include "symfile.h"
+ 
+ /* Set to 1 when the TUI mode must be activated when we first start
+    gdb.  */
+@@ -128,6 +129,8 @@ tui_command_loop (void *data)
+       char *a_prompt;
+       char *gdb_prompt = get_prompt ();
+ 
++      debug_flush_missing ();
++
+       /* Tell readline what the prompt to display is and what function
+          it will need to call after a whole line is read. This also
+          displays the first prompt.  */
