@@ -16,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?_with_upstream:.upstream}%{?dist}
+Release: 20%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -89,6 +89,9 @@ Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 # Make upstream `set scheduler-locking step' as default.
 Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
 
+# Fix to display base constructors from list and breakpoint commands
+Patch116: gdb-6.3-linespec-20041213.patch
+
 # Continue removing breakpoints even when failure occurs.
 Patch117: gdb-6.3-removebp-20041130.patch
 
@@ -100,6 +103,7 @@ Patch118: gdb-6.3-gstack-20050411.patch
 Patch120: gdb-6.3-type-fix-20041213.patch
 
 # VSYSCALL and PIE
+Patch122: gdb-6.3-test-pie-20050107.patch
 Patch124: gdb-6.3-pie-20050110.patch
 
 # Get selftest working with sep-debug-info
@@ -107,6 +111,10 @@ Patch125: gdb-6.3-test-self-20050110.patch
 
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
+
+# Fix to support multiple destructors just like multiple constructors
+Patch133: gdb-6.3-test-dtorfix-20050121.patch
+Patch134: gdb-6.3-dtorfix-20050121.patch
 
 # Fix to support executable moving
 Patch136: gdb-6.3-test-movedir-20050125.patch
@@ -126,6 +134,9 @@ Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Prevent gdb from being pushed into background
 Patch142: gdb-6.3-terminal-fix-20050214.patch
+
+# Test sibling threads to set threaded watchpoints for x86 and x86-64
+Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 
 # Fix unexpected compiler warning messages.
 Patch147: gdb-6.3-warnings-20050317.patch
@@ -288,6 +299,9 @@ Patch263: gdb-6.3-attach-see-vdso-test.patch
 Patch265: gdb-6.6-bz247354-leader-exit-fix.patch
 Patch266: gdb-6.6-bz247354-leader-exit-test.patch
 
+# Test leftover zombie process (BZ 243845).
+Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
+
 # New locating of the matching binaries from the pure core file (build-id).
 Patch274: gdb-6.6-buildid-locate.patch
 
@@ -361,8 +375,23 @@ Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 # Fix memory trashing on binaries from GCC Ada (workaround GCC PR 35998).
 Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 
+# Test a crash on libraries missing the .text section.
+Patch320: gdb-6.5-section-num-fixup-test.patch
+
 # Fix register assignments with no GDB stack frames (BZ 436037).
 Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
+
+# Make the GDB quit processing non-abortable to cleanup everything properly.
+Patch331: gdb-6.8-quit-never-aborts.patch
+
+# Support DW_TAG_constant for Fortran in recent Fedora/RH GCCs.
+Patch332: gdb-6.8-fortran-tag-constant.patch
+
+# Fix crash on DW_TAG_module for Fortran in recent Fedora/RH GCCs.
+Patch333: gdb-6.8-fortran-module-ignore.patch
+
+# bare names of constructors and destructors should be unique for GDB-6.8+.
+Patch334: gdb-6.8-ctors-dtors-unique.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -452,17 +481,22 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch106 -p1
 %patch111 -p1
 %patch112 -p1
+%patch116 -p1
 %patch117 -p1
 %patch118 -p1
 %patch120 -p1
+%patch122 -p1
 %patch125 -p1
 %patch128 -p1
+%patch133 -p1
+%patch134 -p1
 %patch136 -p1
 %patch139 -p1
 %patch140 -p1
 %patch141 -p1
 %patch259 -p1
 %patch142 -p1
+%patch145 -p1
 %patch147 -p1
 %patch148 -p1
 %patch150 -p1
@@ -517,6 +551,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch263 -p1
 %patch265 -p1
 %patch266 -p1
+%patch271 -p1
 %patch274 -p1
 %patch275 -p1
 %patch277 -p1
@@ -542,7 +577,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch316 -p1
 %patch317 -p1
 %patch318 -p1
+%patch320 -p1
 %patch330 -p1
+%patch331 -p1
+%patch332 -p1
+%patch333 -p1
+%patch334 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -795,6 +835,19 @@ fi
 %endif
 
 %changelog
+* Wed Aug 27 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-20
+- Remove `gdb-6.3-nonthreaded-wp-20050117.patch' as obsoleted + regressing now.
+- Make the GDB quit processing non-abortable to cleanup everything properly.
+- Support DW_TAG_constant for Fortran in recent Fedora/RH GCCs.
+- Fix crash on DW_TAG_module for Fortran in recent Fedora/RH GCCs.
+- Readd resolving of bare names of constructors and destructors.
+- Include various vendor testcases:
+  - Leftover zombie process (BZ 243845).
+  - Multithreaded watchpoints (`gdb.threads/watchthreads2.exp').
+  - PIE testcases (`gdb.pie/*').
+  - C++ contructors/destructors (`gdb.cp/constructortest.exp').
+  - Test a crash on libraries missing the .text section.
+
 * Mon Aug 25 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-19
 - Extend the Fortran dynamic variables patch also for dynamic Fortran strings.
 
