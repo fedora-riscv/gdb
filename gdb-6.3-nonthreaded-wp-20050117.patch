@@ -17,131 +17,12 @@
 
 	Port to GDB-6.8pre.
 
-Index: gdb-6.8cvs20080219/gdb/doc/observer.texi
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/doc/observer.texi	2007-10-09 13:06:07.000000000 +0200
-+++ gdb-6.8cvs20080219/gdb/doc/observer.texi	2008-02-21 17:45:46.000000000 +0100
-@@ -119,6 +119,10 @@ when @value{GDBN} calls this observer, t
- haven't been loaded yet.
- @end deftypefun
- 
-+@deftypefun void mourn_inferior (struct target_ops *@var{target})
-+@value{GDBN} has just detached from an inferior.
-+@end deftypefun
-+
- @deftypefun void solib_unloaded (struct so_list *@var{solib})
- The shared library specified by @var{solib} has been unloaded.
- @end deftypefun
-Index: gdb-6.8cvs20080219/gdb/linux-nat.c
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/linux-nat.c	2008-02-21 17:45:45.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/linux-nat.c	2008-02-22 08:12:57.000000000 +0100
-@@ -37,6 +37,7 @@
- #include "regset.h"
- #include "inf-ptrace.h"
- #include "auxv.h"
-+#include "observer.h"
- #include <sys/param.h>		/* for MAXPATHLEN */
- #include <sys/procfs.h>		/* for elf_gregset etc. */
- #include "elf-bfd.h"		/* for elfcore_write_* */
-@@ -751,11 +752,26 @@ iterate_over_lwps (int (*callback) (stru
- {
-   struct lwp_info *lp, *lpnext;
- 
--  for (lp = lwp_list; lp; lp = lpnext)
-+  if (lwp_list != NULL)
-     {
--      lpnext = lp->next;
-+      for (lp = lwp_list; lp; lp = lpnext)
-+        {
-+          lpnext = lp->next;
-+          if ((*callback) (lp, data))
-+	    return lp;
-+        }
-+    }
-+  else
-+    {
-+      /* We are calling iterate_over_lwps for a non-threaded program.
-+         Initialize the lwp list to the inferior's ptid.  */
-+      gdb_assert (!is_lwp (inferior_ptid));
-+
-+      inferior_ptid = BUILD_LWP (GET_PID (inferior_ptid),
-+				 GET_PID (inferior_ptid));
-+      lp = add_lwp (inferior_ptid);
-       if ((*callback) (lp, data))
--	return lp;
-+        return lp;
-     }
- 
-   return NULL;
-@@ -3319,6 +3335,18 @@ linux_nat_get_siginfo (ptid_t ptid)
-   return &lp->siginfo;
- }
- 
-+/* Observer function for a mourn inferior event.  This is needed
-+   because if iterate_over_lwps is called for a non-threaded program
-+   to handle watchpoints, the lwp list gets initialized but there is
-+   no corresponding clean-up when the inferior is detached.  In
-+   a threaded program, the observer is simply redundant as the
-+   same clean-up gets done in linux_nat_mourn_inferior.  */
-+static void
-+linux_nat_mourn_inferior_observer (struct target_ops *objfile)
-+{
-+  init_lwp_list ();
-+}
-+
- void
- _initialize_linux_nat (void)
- {
-@@ -3333,6 +3361,8 @@ Specify any of the following keywords fo
-   status   -- list a different bunch of random process info.\n\
-   all      -- list all available /proc info."));
- 
-+  observer_attach_mourn_inferior (linux_nat_mourn_inferior_observer);
-+
-   /* Save the original signal mask.  */
-   sigprocmask (SIG_SETMASK, NULL, &normal_mask);
- 
-Index: gdb-6.8cvs20080219/gdb/target.c
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/target.c	2008-02-14 23:04:00.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/target.c	2008-02-22 08:10:37.000000000 +0100
-@@ -39,6 +39,7 @@
- #include "gdbcore.h"
- #include "exceptions.h"
- #include "target-descriptions.h"
-+#include "observer.h"
- 
- static void target_info (char *, int);
- 
-@@ -275,6 +276,13 @@ target_load (char *arg, int from_tty)
-   (*current_target.to_load) (arg, from_tty);
- }
- 
-+void
-+target_mourn_inferior (void)
-+{
-+  (*current_target.to_mourn_inferior) ();
-+  observer_notify_mourn_inferior (&current_target);
-+}
-+
- static int
- nomemory (CORE_ADDR memaddr, char *myaddr, int len, int write,
- 	  struct target_ops *t)
-Index: gdb-6.8cvs20080219/gdb/target.h
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/target.h	2008-01-02 00:04:05.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/target.h	2008-02-22 08:10:37.000000000 +0100
-@@ -861,8 +861,7 @@ int target_follow_fork (int follow_child
- 
- /* The inferior process has died.  Do what is right.  */
- 
--#define	target_mourn_inferior()	\
--     (*current_target.to_mourn_inferior) ()
-+extern void target_mourn_inferior (void);
- 
- /* Does target have enough data to do a run or attach command? */
- 
+2008-08-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove the fix as causing an assertion failure for
+	gdb.base/checkpoint.exp and it is no longer needed for
+	gdb.base/follow-child.exp .
+
 Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
@@ -236,16 +117,3 @@ Index: gdb-6.8cvs20080219/gdb/testsuite/gdb.base/follow-child.exp
 +	fail $test
 +    }
 +}
-Index: gdb-6.8cvs20080219/gdb/Makefile.in
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/Makefile.in	2008-02-22 08:10:38.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/Makefile.in	2008-02-22 08:13:31.000000000 +0100
-@@ -2377,7 +2377,7 @@ linux-nat.o: linux-nat.c $(defs_h) $(inf
- 	$(gdb_wait_h) $(gdb_assert_h) $(linux_nat_h) $(gdbthread_h) \
- 	$(gdbcmd_h) $(regcache_h) $(regset_h) $(inf_ptrace_h) $(auxv_h) \
- 	$(elf_bfd_h) $(gregset_h) $(gdbcore_h) $(gdbthread_h) $(gdb_stat_h) \
--	$(linux_fork_h)
-+	$(linux_fork_h) $(observer_h)
- linux-thread-db.o: linux-thread-db.c $(defs_h) $(gdb_assert_h) \
- 	$(gdb_proc_service_h) $(gdb_thread_db_h) $(bfd_h) $(exceptions_h) \
- 	$(gdbthread_h) $(inferior_h) $(symfile_h) $(objfiles_h) $(target_h) \
