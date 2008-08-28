@@ -16,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{?dist}
+Release: 21%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -281,11 +281,6 @@ Patch249: gdb-6.6-gcore32-test.patch
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
 Patch254: gdb-6.6-testsuite-timeouts.patch
 
-# Fix attaching to stopped processes (BZ 219118, 233852).
-# Fix attaching during a pending signal being delivered.
-Patch256: gdb-6.7-bz233852-attach-signalled-fix.patch
-Patch275: gdb-6.7-bz233852-attach-signalled-test.patch
-
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
 
@@ -392,6 +387,13 @@ Patch333: gdb-6.8-fortran-module-ignore.patch
 
 # bare names of constructors and destructors should be unique for GDB-6.8+.
 Patch334: gdb-6.8-ctors-dtors-unique.patch
+
+# Fix attaching to stopped processes and/or pending signals.
+Patch336: gdb-6.8-attach-signalled-upstream.patch
+Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
+
+# Fix occasional crash on a removed watchpoint.
+Patch338: gdb-6.8-breakpoint-gone.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -544,7 +546,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch247 -p1
 %patch249 -p1
 %patch254 -p1
-###%patch256 -p1
 %patch258 -p1
 %patch260 -p1
 %patch261 -p1
@@ -553,7 +554,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch266 -p1
 %patch271 -p1
 %patch274 -p1
-%patch275 -p1
 %patch277 -p1
 %patch280 -p1
 %patch282 -p1
@@ -583,6 +583,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch332 -p1
 %patch333 -p1
 %patch334 -p1
+%patch336 -p1
+%patch337 -p1
+%patch338 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -835,6 +838,14 @@ fi
 %endif
 
 %changelog
+* Thu Aug 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-21
+- Fix attaching to stopped processes, based on the upstream version now.
+  - Just kernel-2.6.25 neither upstream nor utrace work with it; 2.6.9 works.
+- Fix occasional crash on a removed watchpoint.
+- Fix false testcase FAILs for `gdb.pie/break.exp'.
+- Fix a false warning (+a testcase FAIL) on s390x watchpoints.
+- Fix a false FAIL on s390x `gdb.base/dump.exp'.
+
 * Wed Aug 27 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-20
 - Remove `gdb-6.3-nonthreaded-wp-20050117.patch' as obsoleted + regressing now.
 - Make the GDB quit processing non-abortable to cleanup everything properly.
