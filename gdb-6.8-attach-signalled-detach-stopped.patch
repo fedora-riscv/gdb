@@ -1,0 +1,482 @@
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb-6.8/gdb/linux-nat.c
+--- gdb-6.8-base/gdb/linux-nat.c	2008-08-27 18:09:35.000000000 +0200
++++ gdb-6.8/gdb/linux-nat.c	2008-08-27 18:48:40.000000000 +0200
+@@ -117,6 +117,9 @@
+ static struct target_ops *linux_ops;
+ static struct target_ops linux_ops_saved;
+ 
++/* PID of the inferior stopped by SIGSTOP before attaching (or zero).  */
++static pid_t pid_was_stopped;
++
+ /* The method to call, if any, when a new thread is attached.  */
+ static void (*linux_nat_new_thread) (ptid_t);
+ 
+@@ -531,6 +534,11 @@ linux_child_follow_fork (struct target_o
+ 	}
+       else
+ 	{
++	 /* We should check PID_WAS_STOPPED and detach it stopped accordingly.
++	    In this point of code it cannot be 1 as we would not get FORK
++	    executed without CONTINUE first which resets PID_WAS_STOPPED.
++	    We would have to first TARGET_STOP and WAITPID it as with running
++	    inferior PTRACE_DETACH, SIGSTOP will ignore the signal.  */
+ 	  target_detach (NULL, 0);
+ 	}
+ 
+@@ -936,6 +944,7 @@ linux_nat_post_attach_wait (ptid_t ptid,
+       if (debug_linux_nat)
+ 	fprintf_unfiltered (gdb_stdlog,
+ 			    "LNPAW: Attaching to a stopped process\n");
++      pid_was_stopped = GET_PID (ptid);
+ 
+       /* The process is definitely stopped.  It is in a job control
+ 	 stop, unless the kernel predates the TASK_STOPPED /
+@@ -1128,6 +1137,9 @@ get_pending_status (struct lwp_info *lp,
+   else
+     *status = lp->status;
+ 
++  if (*status == 0 && GET_PID (lp->ptid) == pid_was_stopped)
++    *status = W_STOPCODE (SIGSTOP);
++
+   return 0;
+ }
+ 
+@@ -1207,6 +1219,8 @@ linux_nat_detach (char *args, int from_t
+ 
+   trap_ptid = null_ptid;
+ 
++  pid_was_stopped = 0;
++
+   /* Destroy LWP info; it's no longer valid.  */
+   init_lwp_list ();
+ 
+@@ -1340,6 +1354,14 @@ linux_nat_resume (ptid_t ptid, int step,
+      resume_callback.  */
+   lp->stopped = 0;
+ 
++  /* At this point, we are going to resume the inferior and if we
++     have attached to a stopped process, we no longer should leave
++     it as stopped if the user detaches.  PTID variable has PID set to LWP
++     while we need to check the real PID here.  */
++
++  if (!step && lp && pid_was_stopped == GET_PID (lp->ptid))
++    pid_was_stopped = 0;
++
+   if (resume_all)
+     iterate_over_lwps (resume_callback, NULL);
+ 
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-08-27 18:13:41.000000000 +0200
+@@ -1,19 +1,20 @@
+ /* This testcase is part of GDB, the GNU debugger.
+ 
+-   Copyright 2008 Free Software Foundation, Inc.
++   Copyright 2007 Free Software Foundation, Inc.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+-   the Free Software Foundation; either version 3 of the License, or
++   the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+ 
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+-
++ 
+    You should have received a copy of the GNU General Public License
+-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+ 
+ #include <signal.h>
+ #include <unistd.h>
+@@ -40,8 +41,10 @@ static void *func (void *arg)
+ 
+   raise (SIGALRM);
+ 
+-  /* We must not get past this point, either in a free standing or debugged
+-     state.  */
++  /* This should be NOTREACHED but sometimes it is reached - Bug 427860.
++     We never get here without ptrace(2).  It may also be a kernel bug.  */
++  for (;;)
++    pause ();
+ 
+   abort ();
+   /* NOTREACHED */
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-08-27 18:13:41.000000000 +0200
+@@ -1,27 +1,29 @@
+-# Copyright 2008
+-# Free Software Foundation, Inc.
++# Copyright 2007
+ 
+ # This program is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 3 of the License, or
++# the Free Software Foundation; either version 2 of the License, or
+ # (at your option) any later version.
+-#
++# 
+ # This program is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+-#
++# 
+ # You should have received a copy of the GNU General Public License
+-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ 
+ # This test was created by modifying attach-stopped.exp.
+ # This file was created by Jan Kratochvil <jan.kratochvil@redhat.com>.
+ 
+-# This test only works on Linux
+-if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
+-    continue
++if $tracelevel then {
++    strace $tracelevel
+ }
+ 
++set prms_id 0
++set bug_id 0
++
+ set testfile "attach-into-signal"
+ set srcfile  ${testfile}.c
+ set binfile  ${objdir}/${subdir}/${testfile}
+@@ -60,6 +62,10 @@ proc corefunc { threadtype } {
+     set attempt 1
+     set passes 1
+     while { $passes < 3 && $attempt <= $attempts } {
++
++	# Start with clean gdb
++	gdb_exit
++
+ 	set stoppedtry 0
+ 	while { $stoppedtry < 10 } {
+ 	    if [catch {open /proc/${testpid}/status r} fileid] {
+@@ -83,10 +89,30 @@ proc corefunc { threadtype } {
+ 	    break
+ 	}
+ 
++	gdb_start
++	gdb_reinitialize_dir $srcdir/$subdir
++	gdb_load ${binfile}
++
++	# No PASS message as we may be looping in multiple attempts.
++	gdb_test "set debug lin-lwp 1" "" ""
++
++	set test "$threadtype: set file (pass $passes), before attach1 to stopped process"
++	if {[gdb_test_multiple "file $binfile" $test {
++	   -re "Load new symbol table from.*y or n. $" {
++		# No PASS message as we may be looping in multiple attempts.
++		gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*done." ""
++	    }
++	    -re "Reading symbols from $escapedbinfile\.\.\.*done.*$gdb_prompt $" {
++		# No PASS message as we may be looping in multiple attempts.
++	    }
++	}] != 0 } {
++	    break
++	}
++
+ 	# Main test:
+ 	set test "$threadtype: attach (pass $passes), pending signal catch"
+ 	if {[gdb_test_multiple "attach $testpid" $test {
+-	    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*Received Alarm clock.*$gdb_prompt $" {
++	    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*Redelivering pending Alarm clock..*$gdb_prompt $" {
+ 		# nonthreaded:
+ 		pass $test
+ 		verbose -log "$test succeeded on the attempt # $attempt of $attempts"
+@@ -97,7 +123,7 @@ proc corefunc { threadtype } {
+ 		# We just lack the luck, we should try it again.
+ 		set attempt [expr $attempt + 1]
+ 	    }
+-	    -re "Attaching to process $testpid.*Received Alarm clock.*$gdb_prompt $" {
++	    -re "Attaching to process $testpid.*Redelivering pending Alarm clock..*$gdb_prompt $" {
+ 		# threaded:
+ 		pass $test
+ 		verbose -log "$test succeeded on the attempt # $attempt of $attempts"
+@@ -111,8 +137,6 @@ proc corefunc { threadtype } {
+ 	}] != 0 } {
+ 	    break
+ 	}
+-
+-	gdb_test "detach" "Detaching from.*" ""
+     }
+     if {$passes < 3} {
+ 	if {$attempt > $attempts} {
+@@ -138,20 +162,12 @@ proc corefunc { threadtype } {
+     remote_exec build "kill -9 ${testpid}"
+ }
+ 
+-# Start with clean gdb
+-gdb_exit
+-
+ # build the test case first without threads
+ #
+ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+     gdb_suppress_entire_file "Testcase nonthraded compile failed, so all tests in this file will automatically fail."
+ }
+ 
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-gdb_load ${binfile}
+-gdb_test "set debug lin-lwp 1" "" ""
+-
+ corefunc nonthreaded
+ 
+ # build the test case also with threads
+@@ -160,9 +176,4 @@ if  { [gdb_compile_pthreads "${srcdir}/$
+     gdb_suppress_entire_file "Testcase threaded compile failed, so all tests in this file will automatically fail."
+ }
+ 
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-gdb_load ${binfile}
+-gdb_test "set debug lin-lwp 1" "" ""
+-
+ corefunc threaded
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.c gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.c	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c	2008-08-27 18:13:41.000000000 +0200
+@@ -1,19 +1,20 @@
+ /* This testcase is part of GDB, the GNU debugger.
+ 
+-   Copyright 2008 Free Software Foundation, Inc.
++   Copyright 2005-2007 Free Software Foundation, Inc.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+-   the Free Software Foundation; either version 3 of the License, or
++   the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+ 
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+-
++ 
+    You should have received a copy of the GNU General Public License
+-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+ 
+ /* This program is intended to be started outside of gdb, then
+    manually stopped via a signal.  */
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-08-27 18:13:41.000000000 +0200
+@@ -1,26 +1,33 @@
+-# Copyright 2008
+-# Free Software Foundation, Inc.
++# Copyright 2005-2007
+ 
+ # This program is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 3 of the License, or
++# the Free Software Foundation; either version 2 of the License, or
+ # (at your option) any later version.
+-#
++# 
+ # This program is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+-#
++# 
+ # You should have received a copy of the GNU General Public License
+-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ 
+ # This test was created by modifying attach.exp.
+ # This file was created by Jeff Johnston <jjohnstn@redhat.com>.
+ # This file was updated by Jan Kratochvil <jan.kratochvil@redhat.com>.
+ 
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
+ # This test only works on Linux
+-if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
+-    continue
++if { ![istarget "*-*-linux-gnu*"] } {
++    return 0
+ }
+ 
+ set testfile "attach-stopped"
+@@ -63,7 +70,65 @@ proc corefunc { threadtype } {
+     gdb_reinitialize_dir $srcdir/$subdir
+     gdb_load ${binfile}
+ 
+-    # Verify that we can attach to the stopped process.
++    # Verify that we can attach to the process by first giving its
++    # executable name via the file command, and using attach with the
++    # process ID.
++
++    set test "$threadtype: set file, before attach1 to stopped process"
++    gdb_test_multiple "file $binfile" "$test" {
++       -re "Load new symbol table from.*y or n. $" {
++	    gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*done." \
++		    "$test (re-read)"
++	}
++	-re "Reading symbols from $escapedbinfile\.\.\.*done.*$gdb_prompt $" {
++	    pass "$test"
++	}
++    }
++
++    set test "$threadtype: attach1 to stopped, after setting file"
++    gdb_test_multiple "attach $testpid" "$test" {
++	-re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++	    pass "$test"
++	}
++    }
++
++    # ".*sleep.*clone.*" would fail on s390x as bt stops at START_THREAD there.
++    if {[string equal $threadtype threaded]} {
++	gdb_test "thread apply all bt" ".*sleep.*start_thread.*" "$threadtype: attach1 to stopped bt"
++    } else {
++	gdb_test "bt" ".*sleep.*main.*" "$threadtype: attach1 to stopped bt"
++    }
++
++    # Exit and detach the process.
++       
++    gdb_exit
++
++    # Avoid some race:
++    sleep 2
++
++    if [catch {open /proc/${testpid}/status r} fileid] {
++	set line2 "NOTFOUND"
++    } else {
++	gets $fileid line1;
++	gets $fileid line2;
++	close $fileid;
++    }
++
++    set test "$threadtype: attach1, exit leaves process stopped"
++    if {[string match "*(stopped)*" $line2]} {
++      pass $test
++    } else {
++      fail $test
++    }
++
++    # At this point, the process should still be stopped
++
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    # Verify that we can attach to the process just by giving the
++    # process ID.
+        
+     set test "$threadtype: attach2 to stopped, after setting file"
+     gdb_test_multiple "attach $testpid" "$test" {
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.c gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-08-27 18:13:41.000000000 +0200
+@@ -1,19 +1,20 @@
+ /* This testcase is part of GDB, the GNU debugger.
+ 
+-   Copyright 2008 Free Software Foundation, Inc.
++   Copyright 2005 Free Software Foundation, Inc.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+-   the Free Software Foundation; either version 3 of the License, or
++   the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+ 
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+-
++ 
+    You should have received a copy of the GNU General Public License
+-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+ 
+ /* This program is intended to be started outside of gdb, then
+    manually stopped via a signal.  */
+diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.exp gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp
+--- gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-08-27 17:44:23.000000000 +0200
++++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-08-27 18:13:41.000000000 +0200
+@@ -1,26 +1,33 @@
+-# Copyright 2008
+-# Free Software Foundation, Inc.
++# Copyright 2006
+ 
+ # This program is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 3 of the License, or
++# the Free Software Foundation; either version 2 of the License, or
+ # (at your option) any later version.
+-#
++# 
+ # This program is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+-#
++# 
+ # You should have received a copy of the GNU General Public License
+-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ 
+ # This test was created by modifying gdb.threads/attachstop.
+ # This file was created by Jan Kratochvil <jan.kratochvil@redhat.com>.
+ # Regression for: https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=197584
+ 
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
+ # This test only works on Linux
+-if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
+-    continue
++if { ![istarget "*-*-linux-gnu*"] } {
++    return 0
+ }
+ 
+ set testfile "attachstop-mt"
+@@ -169,12 +176,23 @@ gdb_test "bt" ".*sleep.*(func|main).*" "
+ # Exit and detach the process.
+ gdb_exit
+ 
+-# Stop the program 
+-remote_exec build "kill -s STOP ${testpid}"
+-
+ # No race
+ sleep 2
+ 
++set fileid3 [open $status2 r];
++gets $fileid3 line1;
++gets $fileid3 line2;
++close $fileid3;
++
++set test "attach3, exit leaves process stopped"
++if {[string match "*(stopped)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# At this point, the process should still be stopped
++
+ # Continue the test as we would hit another expected bug regarding
+ # 	Program received signal SIGSTOP, Stopped (signal).
+ # across NPTL threads.

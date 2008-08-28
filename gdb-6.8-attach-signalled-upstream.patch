@@ -1,0 +1,1260 @@
+diff -up -ruNp gdb-6.8-orig/gdb/NEWS gdb-6.8/gdb/NEWS
+--- gdb-6.8-orig/gdb/NEWS	2008-03-27 19:14:10.000000000 +0100
++++ gdb-6.8/gdb/NEWS	2008-08-27 17:45:03.000000000 +0200
+@@ -1,6 +1,12 @@
+ 		What has changed in GDB?
+ 	     (Organized release by release)
+ 
++*** Changes since GDB 6.8
++
++* On GNU/Linux, GDB can now attach to stopped processes.  Several race
++conditions handling signals delivered during attach or thread creation
++have also been fixed.
++
+ * Watchpoints can now be set on unreadable memory locations, e.g. addresses
+ which will be allocated using malloc later in program execution.
+ 
+diff -up -ruNp gdb-6.8-orig/gdb/infcmd.c gdb-6.8/gdb/infcmd.c
+--- gdb-6.8-orig/gdb/infcmd.c	2008-01-31 14:37:21.000000000 +0100
++++ gdb-6.8/gdb/infcmd.c	2008-08-27 17:45:31.000000000 +0200
+@@ -1972,36 +1971,38 @@ attach_command (char *args, int from_tty
+  * started via the normal ptrace (PTRACE_TRACEME).
+  */
+ 
+ static void
+ detach_command (char *args, int from_tty)
+ {
+   dont_repeat ();		/* Not for the faint of heart.  */
+   target_detach (args, from_tty);
+   no_shared_libraries (NULL, from_tty);
++  init_thread_list ();
+   if (deprecated_detach_hook)
+     deprecated_detach_hook ();
+ }
+ 
+ /* Disconnect from the current target without resuming it (leaving it
+    waiting for a debugger).
+ 
+    We'd better not have left any breakpoints in the program or the
+    next debugger will get confused.  Currently only supported for some
+    remote targets, since the normal attach mechanisms don't work on
+    stopped processes on some native platforms (e.g. GNU/Linux).  */
+ 
+ static void
+ disconnect_command (char *args, int from_tty)
+ {
+   dont_repeat ();		/* Not for the faint of heart */
+   target_disconnect (args, from_tty);
+   no_shared_libraries (NULL, from_tty);
++  init_thread_list ();
+   if (deprecated_detach_hook)
+     deprecated_detach_hook ();
+ }
+ 
+ /* Stop the execution of the target while running in async mode, in
+    the backgound. */
+ void
+ interrupt_target_command (char *args, int from_tty)
+ {
+diff -up -ruNp gdb-6.8-orig/gdb/infrun.c gdb-6.8/gdb/infrun.c
+--- gdb-6.8-orig/gdb/infrun.c	2008-01-29 23:47:19.000000000 +0100
++++ gdb-6.8/gdb/infrun.c	2008-08-27 17:44:23.000000000 +0200
+@@ -1966,13 +1966,15 @@ handle_inferior_event (struct execution_
+ 
+       /* This originates from attach_command().  We need to overwrite
+          the stop_signal here, because some kernels don't ignore a
+-         SIGSTOP in a subsequent ptrace(PTRACE_SONT,SOGSTOP) call.
+-         See more comments in inferior.h.  */
+-      if (stop_soon == STOP_QUIETLY_NO_SIGSTOP)
++         SIGSTOP in a subsequent ptrace(PTRACE_CONT,SIGSTOP) call.
++         See more comments in inferior.h.  On the other hand, if we
++	 get a non-SIGSTOP, report it to the user - assume the backend
++	 will handle the SIGSTOP if it should show up later.  */
++      if (stop_soon == STOP_QUIETLY_NO_SIGSTOP
++	  && stop_signal == TARGET_SIGNAL_STOP)
+ 	{
+ 	  stop_stepping (ecs);
+-	  if (stop_signal == TARGET_SIGNAL_STOP)
+-	    stop_signal = TARGET_SIGNAL_0;
++	  stop_signal = TARGET_SIGNAL_0;
+ 	  return;
+ 	}
+ 
+@@ -2043,7 +2045,7 @@ process_event_stop_test:
+ 	  target_terminal_ours_for_output ();
+ 	  print_stop_reason (SIGNAL_RECEIVED, stop_signal);
+ 	}
+-      if (signal_stop[stop_signal])
++      if (signal_stop_state (stop_signal))
+ 	{
+ 	  stop_stepping (ecs);
+ 	  return;
+@@ -3306,7 +3308,9 @@ hook_stop_stub (void *cmd)
+ int
+ signal_stop_state (int signo)
+ {
+-  return signal_stop[signo];
++  /* Always stop on signals if we're just gaining control of the
++     program.  */
++  return signal_stop[signo] || stop_soon != NO_STOP_QUIETLY;
+ }
+ 
+ int
+diff -up -ruNp gdb-6.8-orig/gdb/linux-nat.c gdb-6.8/gdb/linux-nat.c
+--- gdb-6.8-orig/gdb/linux-nat.c	2008-01-29 23:47:20.000000000 +0100
++++ gdb-6.8/gdb/linux-nat.c	2008-08-27 18:00:22.000000000 +0200
+@@ -48,6 +48,30 @@
+ #include <fcntl.h>		/* for O_RDONLY */
+ #include "gdb_procfs32.h"	/* for struct elf_prpsinfo32 */
+ 
++/* Note on this file's use of signals:
++
++   We stop threads by sending a SIGSTOP.  The use of SIGSTOP instead
++   of another signal is not entirely significant; we just need for a
++   signal to be delivered, so that we can intercept it.  SIGSTOP's
++   advantage is that it can not be blocked.  A disadvantage is that it
++   is not a real-time signal, so it can only be queued once; we do not
++   keep track of other sources of SIGSTOP.
++
++   Two other signals that can't be blocked are SIGCONT and SIGKILL.
++   But we can't use them, because they have special behavior when the
++   signal is generated - not when it is delivered.  SIGCONT resumes
++   the entire thread group and SIGKILL kills the entire thread group.
++
++   A delivered SIGSTOP would stop the entire thread group, not just the
++   thread we tkill'd.  But we never let the SIGSTOP deliver; we always
++   intercept and cancel it (by PTRACE_CONT without passing SIGSTOP).
++
++   We could use a real-time signal instead.  This would solve those
++   problems; we could use PTRACE_GETSIGINFO to locate the specific
++   stop signals sent by GDB.  But we would still have to have some
++   support for SIGSTOP, since PTRACE_ATTACH generates it, and there
++   are races with trying to find a signal that is not blocked.  */
++
+ #ifndef O_LARGEFILE
+ #define O_LARGEFILE 0
+ #endif
+@@ -624,6 +648,7 @@ static sigset_t blocked_mask;
+ static int stop_wait_callback (struct lwp_info *lp, void *data);
+ static int linux_nat_thread_alive (ptid_t ptid);
+ static char *linux_child_pid_to_exec_file (int pid);
++static int kill_lwp (int lwpid, int signo);
+ 
+ /* Convert wait status STATUS to a string.  Used for printing debug
+    messages only.  */
+@@ -865,10 +890,103 @@ exit_lwp (struct lwp_info *lp)
+   delete_lwp (lp->ptid);
+ }
+ 
+-/* Attach to the LWP specified by PID.  If VERBOSE is non-zero, print
+-   a message telling the user that a new LWP has been added to the
+-   process.  Return 0 if successful or -1 if the new LWP could not
+-   be attached.  */
++/* Detect `T (stopped)' in `/proc/PID/status'.
++   Other states including `T (tracing stop)' are reported as false.  */
++
++static int
++pid_is_stopped (pid_t pid)
++{
++  FILE *status_file;
++  char buf[100];
++  int retval = 0;
++
++  snprintf (buf, sizeof (buf), "/proc/%d/status", (int) pid);
++  status_file = fopen (buf, "r");
++  if (status_file != NULL)
++    {
++      int have_state = 0;
++
++      while (fgets (buf, sizeof (buf), status_file))
++	{
++	  if (strncmp (buf, "State:", 6) == 0)
++	    {
++	      have_state = 1;
++	      break;
++	    }
++	}
++      if (have_state && strstr (buf, "T (stopped)") != NULL)
++	retval = 1;
++      fclose (status_file);
++    }
++  return retval;
++}
++
++/* Wait for the LWP specified by LP, which we have just attached to.
++   Returns a wait status for that LWP, to cache.  */
++
++static int
++linux_nat_post_attach_wait (ptid_t ptid, int first, int *cloned,
++			    int *signalled)
++{
++  pid_t new_pid, pid = GET_LWP (ptid);
++  int status;
++
++  if (pid_is_stopped (pid))
++    {
++      if (debug_linux_nat)
++	fprintf_unfiltered (gdb_stdlog,
++			    "LNPAW: Attaching to a stopped process\n");
++
++      /* The process is definitely stopped.  It is in a job control
++	 stop, unless the kernel predates the TASK_STOPPED /
++	 TASK_TRACED distinction, in which case it might be in a
++	 ptrace stop.  Make sure it is in a ptrace stop; from there we
++	 can kill it, signal it, et cetera.
++
++         First make sure there is a pending SIGSTOP.  Since we are
++	 already attached, the process can not transition from stopped
++	 to running without a PTRACE_CONT; so we know this signal will
++	 go into the queue.  The SIGSTOP generated by PTRACE_ATTACH is
++	 probably already in the queue (unless this kernel is old
++	 enough to use TASK_STOPPED for ptrace stops); but since SIGSTOP
++	 is not an RT signal, it can only be queued once.  */
++      kill_lwp (pid, SIGSTOP);
++
++      /* Finally, resume the stopped process.  This will deliver the SIGSTOP
++	 (or a higher priority signal, just like normal PTRACE_ATTACH).  */
++      ptrace (PTRACE_CONT, pid, 0, 0);
++    }
++
++  /* Make sure the initial process is stopped.  The user-level threads
++     layer might want to poke around in the inferior, and that won't
++     work if things haven't stabilized yet.  */
++  new_pid = my_waitpid (pid, &status, 0);
++  if (new_pid == -1 && errno == ECHILD)
++    {
++      if (first)
++	warning (_("%s is a cloned process"), target_pid_to_str (ptid));
++
++      /* Try again with __WCLONE to check cloned processes.  */
++      new_pid = my_waitpid (pid, &status, __WCLONE);
++      *cloned = 1;
++    }
++
++  gdb_assert (pid == new_pid && WIFSTOPPED (status));
++
++  if (WSTOPSIG (status) != SIGSTOP)
++    {
++      *signalled = 1;
++      if (debug_linux_nat)
++	fprintf_unfiltered (gdb_stdlog,
++			    "LNPAW: Received %s after attaching\n",
++			    status_to_str (status));
++    }
++
++  return status;
++}
++
++/* Attach to the LWP specified by PID.  Return 0 if successful or -1
++   if the new LWP could not be attached.  */
+ 
+ int
+ lin_lwp_attach_lwp (ptid_t ptid)
+@@ -895,9 +1013,7 @@ lin_lwp_attach_lwp (ptid_t ptid)
+      to happen.  */
+   if (GET_LWP (ptid) != GET_PID (ptid) && lp == NULL)
+     {
+-      pid_t pid;
+-      int status;
+-      int cloned = 0;
++      int status, cloned = 0, signalled = 0;
+ 
+       if (ptrace (PTRACE_ATTACH, GET_LWP (ptid), 0, 0) < 0)
+ 	{
+@@ -916,24 +1032,18 @@ lin_lwp_attach_lwp (ptid_t ptid)
+ 			    "LLAL: PTRACE_ATTACH %s, 0, 0 (OK)\n",
+ 			    target_pid_to_str (ptid));
+ 
+-      pid = my_waitpid (GET_LWP (ptid), &status, 0);
+-      if (pid == -1 && errno == ECHILD)
++      status = linux_nat_post_attach_wait (ptid, 0, &cloned, &signalled);
++      lp = add_lwp (ptid);
++      lp->stopped = 1;
++      lp->cloned = cloned;
++      lp->signalled = signalled;
++      if (WSTOPSIG (status) != SIGSTOP)
+ 	{
+-	  /* Try again with __WCLONE to check cloned processes.  */
+-	  pid = my_waitpid (GET_LWP (ptid), &status, __WCLONE);
+-	  cloned = 1;
++	  lp->resumed = 1;
++	  lp->status = status;
+ 	}
+ 
+-      gdb_assert (pid == GET_LWP (ptid)
+-		  && WIFSTOPPED (status) && WSTOPSIG (status));
+-
+-      if (lp == NULL)
+-	lp = add_lwp (ptid);
+-      lp->cloned = cloned;
+-
+-      target_post_attach (pid);
+-
+-      lp->stopped = 1;
++      target_post_attach (GET_LWP (lp->ptid));
+ 
+       if (debug_linux_nat)
+ 	{
+@@ -963,45 +1073,62 @@ static void
+ linux_nat_attach (char *args, int from_tty)
+ {
+   struct lwp_info *lp;
+-  pid_t pid;
+   int status;
+-  int cloned = 0;
+ 
+   /* FIXME: We should probably accept a list of process id's, and
+      attach all of them.  */
+   linux_ops->to_attach (args, from_tty);
+ 
+-  /* Make sure the initial process is stopped.  The user-level threads
+-     layer might want to poke around in the inferior, and that won't
+-     work if things haven't stabilized yet.  */
+-  pid = my_waitpid (GET_PID (inferior_ptid), &status, 0);
+-  if (pid == -1 && errno == ECHILD)
+-    {
+-      warning (_("%s is a cloned process"), target_pid_to_str (inferior_ptid));
+-
+-      /* Try again with __WCLONE to check cloned processes.  */
+-      pid = my_waitpid (GET_PID (inferior_ptid), &status, __WCLONE);
+-      cloned = 1;
+-    }
+-
+-  gdb_assert (pid == GET_PID (inferior_ptid)
+-	      && WIFSTOPPED (status) && WSTOPSIG (status) == SIGSTOP);
+-
+   /* Add the initial process as the first LWP to the list.  */
+   inferior_ptid = BUILD_LWP (GET_PID (inferior_ptid), GET_PID (inferior_ptid));
+   lp = add_lwp (inferior_ptid);
+-  lp->cloned = cloned;
+ 
++  status = linux_nat_post_attach_wait (lp->ptid, 1, &lp->cloned,
++				       &lp->signalled);
+   lp->stopped = 1;
+ 
+-  /* Fake the SIGSTOP that core GDB expects.  */
+-  lp->status = W_STOPCODE (SIGSTOP);
++  /* Save the wait status to report later.  */
+   lp->resumed = 1;
+   if (debug_linux_nat)
++    fprintf_unfiltered (gdb_stdlog,
++			"LNA: waitpid %ld, saving status %s\n",
++			(long) GET_PID (lp->ptid), status_to_str (status));
++
++  lp->status = status;
++  if (debug_linux_nat)
+     {
+       fprintf_unfiltered (gdb_stdlog,
+-			  "LLA: waitpid %ld, faking SIGSTOP\n", (long) pid);
++			  "LLA: waitpid %ld, faking SIGSTOP\n",
++			  (long) GET_PID (lp->ptid));
++    }
++}
++
++/* Get pending status of LP.  */
++static int
++get_pending_status (struct lwp_info *lp, int *status)
++{
++  struct target_waitstatus last;
++  ptid_t last_ptid;
++
++  get_last_target_status (&last_ptid, &last);
++
++  /* If this lwp is the ptid that GDB is processing an event from, the
++     signal will be in stop_signal.  Otherwise, in all-stop + sync
++     mode, we may cache pending events in lp->status while trying to
++     stop all threads (see stop_wait_callback).  In async mode, the
++     events are always cached in waitpid_queue.  */
++
++  *status = 0;
++  if (GET_LWP (lp->ptid) == GET_LWP (last_ptid))
++    {
++      if (stop_signal != TARGET_SIGNAL_0
++	  && signal_pass_state (stop_signal))
++	*status = W_STOPCODE (target_signal_to_host (stop_signal));
+     }
++  else
++    *status = lp->status;
++
++  return 0;
+ }
+ 
+ static int
+@@ -1014,40 +1141,30 @@ detach_callback (struct lwp_info *lp, vo
+ 			strsignal (WSTOPSIG (lp->status)),
+ 			target_pid_to_str (lp->ptid));
+ 
+-  while (lp->signalled && lp->stopped)
++  /* If there is a pending SIGSTOP, get rid of it.  */
++  if (lp->signalled)
+     {
+-      errno = 0;
+-      if (ptrace (PTRACE_CONT, GET_LWP (lp->ptid), 0,
+-		  WSTOPSIG (lp->status)) < 0)
+-	error (_("Can't continue %s: %s"), target_pid_to_str (lp->ptid),
+-	       safe_strerror (errno));
+-
+       if (debug_linux_nat)
+ 	fprintf_unfiltered (gdb_stdlog,
+-			    "DC:  PTRACE_CONTINUE (%s, 0, %s) (OK)\n",
+-			    target_pid_to_str (lp->ptid),
+-			    status_to_str (lp->status));
++			    "DC: Sending SIGCONT to %s\n",
++			    target_pid_to_str (lp->ptid));
+ 
+-      lp->stopped = 0;
++      kill_lwp (GET_LWP (lp->ptid), SIGCONT);
+       lp->signalled = 0;
+-      lp->status = 0;
+-      /* FIXME drow/2003-08-26: There was a call to stop_wait_callback
+-	 here.  But since lp->signalled was cleared above,
+-	 stop_wait_callback didn't do anything; the process was left
+-	 running.  Shouldn't we be waiting for it to stop?
+-	 I've removed the call, since stop_wait_callback now does do
+-	 something when called with lp->signalled == 0.  */
+-
+-      gdb_assert (lp->status == 0 || WIFSTOPPED (lp->status));
+     }
+ 
+   /* We don't actually detach from the LWP that has an id equal to the
+      overall process id just yet.  */
+   if (GET_LWP (lp->ptid) != GET_PID (lp->ptid))
+     {
++      int status = 0;
++
++      /* Pass on any pending signal for this LWP.  */
++      get_pending_status (lp, &status);
++
+       errno = 0;
+       if (ptrace (PTRACE_DETACH, GET_LWP (lp->ptid), 0,
+-		  WSTOPSIG (lp->status)) < 0)
++		  WSTOPSIG (status)) < 0)
+ 	error (_("Can't detach %s: %s"), target_pid_to_str (lp->ptid),
+ 	       safe_strerror (errno));
+ 
+@@ -1066,11 +1183,28 @@ detach_callback (struct lwp_info *lp, vo
+ static void
+ linux_nat_detach (char *args, int from_tty)
+ {
++  int status;
++
+   iterate_over_lwps (detach_callback, NULL);
+ 
+   /* Only the initial process should be left right now.  */
+   gdb_assert (num_lwps == 1);
+ 
++  /* Pass on any pending signal for the last LWP.  */
++  if ((args == NULL || *args == '\0')
++      && get_pending_status (lwp_list, &status) != -1
++      && WIFSTOPPED (status))
++    {
++      /* Put the signal number in ARGS so that inf_ptrace_detach will
++	 pass it along with PTRACE_DETACH.  */
++      args = alloca (8);
++      sprintf (args, "%d", (int) WSTOPSIG (status));
++      fprintf_unfiltered (gdb_stdlog,
++			  "LND: Sending signal %s to %s\n",
++			  args,
++			  target_pid_to_str (lwp_list->ptid));
++    }
++
+   trap_ptid = null_ptid;
+ 
+   /* Destroy LWP info; it's no longer valid.  */
+@@ -2490,7 +2624,9 @@ linux_nat_pid_to_str (ptid_t ptid)
+ {
+   static char buf[64];
+ 
+-  if (lwp_list && lwp_list->next && is_lwp (ptid))
++  if (is_lwp (ptid)
++      && ((lwp_list && lwp_list->next)
++	  || GET_PID (ptid) != GET_LWP (ptid)))
+     {
+       snprintf (buf, sizeof (buf), "LWP %ld", GET_LWP (ptid));
+       return buf;
+@@ -3424,4 +3560,3 @@ lin_thread_get_thread_signals (sigset_t 
+   /* ... except during a sigsuspend.  */
+   sigdelset (&suspend_mask, cancel);
+ }
+-
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-into-signal.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,67 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <signal.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#ifdef USE_THREADS
++#include <pthread.h>
++#endif
++
++void action(int sig, siginfo_t * info, void *uc)
++{
++  raise (SIGALRM);
++}
++
++static void *func (void *arg)
++{
++  struct sigaction act;
++
++  memset (&act, 0, sizeof(struct sigaction));
++  act.sa_sigaction = action;
++  act.sa_flags = SA_RESTART;
++  sigaction (SIGALRM, &act, 0);
++
++  raise (SIGALRM);
++
++  /* We must not get past this point, either in a free standing or debugged
++     state.  */
++
++  abort ();
++  /* NOTREACHED */
++  return NULL;
++}
++
++int main ()
++{
++
++#ifndef USE_THREADS
++
++  func (NULL);
++
++#else
++
++  pthread_t th;
++  pthread_create (&th, NULL, func, NULL);
++  pthread_join (th, NULL);
++
++#endif
++
++  return 0;
++}
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-into-signal.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,168 @@
++# Copyright 2008
++# Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This test was created by modifying attach-stopped.exp.
++# This file was created by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++# This test only works on Linux
++if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
++    continue
++}
++
++set testfile "attach-into-signal"
++set srcfile  ${testfile}.c
++set binfile  ${objdir}/${subdir}/${testfile}
++set escapedbinfile  [string_to_regexp ${objdir}/${subdir}/${testfile}]
++
++remote_exec build "rm -f ${binfile}"
++# For debugging this test
++#
++#log_user 1
++
++proc corefunc { threadtype } {
++    global srcfile
++    global binfile
++    global escapedbinfile
++    global srcdir
++    global subdir
++    global gdb_prompt
++
++    if [get_compiler_info ${binfile}] {
++	return -1
++    }
++
++    # Start the program running and then wait for a bit, to be sure
++    # that it can be attached to.
++    # Statistically there is a better chance without giving process a nice.
++
++    set testpid [eval exec $binfile &]
++    exec sleep 2
++
++    # Run 2 passes of the test.
++    # The C file inferior stops pending its signals if a single one is lost,
++    # we test successful redelivery of the caught signal by the 2nd pass.
++
++    # linux-2.6.20.4.x86_64 had maximal attempt # 20 in 4 test runs.
++    set attempts 100
++    set attempt 1
++    set passes 1
++    while { $passes < 3 && $attempt <= $attempts } {
++	set stoppedtry 0
++	while { $stoppedtry < 10 } {
++	    if [catch {open /proc/${testpid}/status r} fileid] {
++		set stoppedtry 10
++		break
++	    }
++	    gets $fileid line1;
++	    gets $fileid line2;
++	    close $fileid;
++
++	    if {![string match "*(stopped)*" $line2]} {
++		# No PASS message as we may be looping in multiple attempts.
++		break
++	    }
++	    sleep 1
++	    set stoppedtry [expr $stoppedtry + 1]
++	}
++	if { $stoppedtry >= 10 } {
++	    verbose -log $line2
++	    set test "$threadtype: process is still running on the attempt # $attempt of $attempts"
++	    break
++	}
++
++	# Main test:
++	set test "$threadtype: attach (pass $passes), pending signal catch"
++	if {[gdb_test_multiple "attach $testpid" $test {
++	    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*Received Alarm clock.*$gdb_prompt $" {
++		# nonthreaded:
++		pass $test
++		verbose -log "$test succeeded on the attempt # $attempt of $attempts"
++		set passes [expr $passes + 1]
++	    }
++	    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++		# nonthreaded:
++		# We just lack the luck, we should try it again.
++		set attempt [expr $attempt + 1]
++	    }
++	    -re "Attaching to process $testpid.*Received Alarm clock.*$gdb_prompt $" {
++		# threaded:
++		pass $test
++		verbose -log "$test succeeded on the attempt # $attempt of $attempts"
++		set passes [expr $passes + 1]
++	    }
++	    -re "Attaching to process $testpid.*$gdb_prompt $" {
++		# threaded:
++		# We just lack the luck, we should try it again.
++		set attempt [expr $attempt - 1]
++	    }
++	}] != 0 } {
++	    break
++	}
++
++	gdb_test "detach" "Detaching from.*" ""
++    }
++    if {$passes < 3} {
++	if {$attempt > $attempts} {
++	    unresolved $test
++	} else {
++	    fail $test
++	}
++    }
++
++    # Exit and detach the process.
++       
++    gdb_exit
++
++    # Make sure we don't leave a process around to confuse
++    # the next test run (and prevent the compile by keeping
++    # the text file busy), in case the "set should_exit" didn't
++    # work.
++
++    # Continue the program - some Linux kernels need it before -9 if the
++    # process is stopped.
++    remote_exec build "kill -s CONT ${testpid}"
++       
++    remote_exec build "kill -9 ${testpid}"
++}
++
++# Start with clean gdb
++gdb_exit
++
++# build the test case first without threads
++#
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    gdb_suppress_entire_file "Testcase nonthraded compile failed, so all tests in this file will automatically fail."
++}
++
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++gdb_test "set debug lin-lwp 1" "" ""
++
++corefunc nonthreaded
++
++# build the test case also with threads
++#
++if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DUSE_THREADS}] != "" } {
++    gdb_suppress_entire_file "Testcase threaded compile failed, so all tests in this file will automatically fail."
++}
++
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++gdb_test "set debug lin-lwp 1" "" ""
++
++corefunc threaded
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-stopped.c gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-stopped.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,50 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* This program is intended to be started outside of gdb, then
++   manually stopped via a signal.  */
++
++#include <stddef.h>
++#include <unistd.h>
++#ifdef USE_THREADS
++#include <pthread.h>
++#endif
++
++static void *func (void *arg)
++{
++  sleep (10000);  /* Ridiculous time, but we will eventually kill it.  */
++  sleep (10000);  /* Second sleep.  */
++  return NULL;
++}
++
++int main ()
++{
++
++#ifndef USE_THREADS
++
++  func (NULL);
++
++#else
++
++  pthread_t th;
++  pthread_create (&th, NULL, func, NULL);
++  pthread_join (th, NULL);
++
++#endif
++
++  return 0;
++}
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attach-stopped.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,157 @@
++# Copyright 2008
++# Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This test was created by modifying attach.exp.
++# This file was created by Jeff Johnston <jjohnstn@redhat.com>.
++# This file was updated by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++# This test only works on Linux
++if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
++    continue
++}
++
++set testfile "attach-stopped"
++set srcfile  ${testfile}.c
++set binfile  ${objdir}/${subdir}/${testfile}
++set escapedbinfile  [string_to_regexp ${objdir}/${subdir}/${testfile}]
++
++#execute_anywhere "rm -f ${binfile}"
++remote_exec build "rm -f ${binfile}"
++# For debugging this test
++#
++#log_user 1
++
++proc corefunc { threadtype } {
++    global srcfile
++    global binfile
++    global escapedbinfile
++    global srcdir
++    global subdir
++    global gdb_prompt
++
++    if [get_compiler_info ${binfile}] {
++	return -1
++    }
++
++    # Start the program running and then wait for a bit, to be sure
++    # that it can be attached to.
++
++    set testpid [eval exec $binfile &]
++
++    # Avoid some race:
++    sleep 2
++
++    # Stop the program 
++    remote_exec build "kill -s STOP ${testpid}"
++
++    # Start with clean gdb
++    gdb_exit
++    gdb_start
++    gdb_reinitialize_dir $srcdir/$subdir
++    gdb_load ${binfile}
++
++    # Verify that we can attach to the stopped process.
++       
++    set test "$threadtype: attach2 to stopped, after setting file"
++    gdb_test_multiple "attach $testpid" "$test" {
++	-re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++	    pass "$test"
++	}
++    }
++
++    # ".*sleep.*clone.*" would fail on s390x as bt stops at START_THREAD there.
++    if {[string equal $threadtype threaded]} {
++	gdb_test "thread apply all bt" ".*sleep.*start_thread.*" "$threadtype: attach2 to stopped bt"
++    } else {
++	gdb_test "bt" ".*sleep.*main.*" "$threadtype: attach2 to stopped bt"
++    }
++    # This breakpoint is there for old/non-x86 kernels not restarting syscalls.
++    gdb_breakpoint [gdb_get_line_number "Second sleep"]
++    set test "$threadtype: attach2 continue"
++    send_gdb "continue\n"
++    gdb_expect {
++      -re "Continuing"
++	{ pass "continue ($test)" }
++      timeout
++	{ fail "continue ($test) (timeout)" }
++    }
++
++    # For this to work we must be sure to consume the "Continuing."
++    # message first, or GDB's signal handler may not be in place.
++    after 1000 {send_gdb "\003"}
++    set test "$threadtype: attach2 stop interrupt"
++    gdb_expect 10 {
++      -re "Program received signal SIGINT.*$gdb_prompt $"
++	{
++	  pass $test
++	}
++      -re "Breakpoint \[0-9\].*$srcfile.*$gdb_prompt $"
++	{
++	  pass $test
++	}
++      timeout
++	{
++	  fail $test
++	}
++    }
++
++    gdb_exit
++
++    # Avoid some race:
++    sleep 2
++
++    # At this point, the process should be sleeping
++
++    if [catch {open /proc/${testpid}/status r} fileid2] {
++	set line2 "NOTFOUND"
++    } else {
++	gets $fileid2 line1;
++	gets $fileid2 line2;
++	close $fileid2;
++    }
++
++    set test "$threadtype: attach2, exit leaves process sleeping"
++    if {[string match "*(sleeping)*" $line2]} {
++      pass $test
++    } else {
++      fail $test
++    }
++
++    # Make sure we don't leave a process around to confuse
++    # the next test run (and prevent the compile by keeping
++    # the text file busy), in case the "set should_exit" didn't
++    # work.
++       
++    remote_exec build "kill -9 ${testpid}"
++}
++
++# build the test case first without threads
++#
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    gdb_suppress_entire_file "Testcase nonthraded compile failed, so all tests in this file will automatically fail."
++}
++
++corefunc nonthreaded
++
++# build the test case first without threads
++#
++if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DUSE_THREADS}] != "" } {
++    gdb_suppress_entire_file "Testcase threaded compile failed, so all tests in this file will automatically fail."
++}
++
++corefunc threaded
++
++return 0
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attachstop-mt.c gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attachstop-mt.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,55 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* This program is intended to be started outside of gdb, then
++   manually stopped via a signal.  */
++
++#include <unistd.h>
++#include <pthread.h>
++#include <stdio.h>
++
++/* Red Hat BZ PR 197584.c */
++
++void *func (void *arg)
++{
++  sleep (10000);  /* Ridiculous time, but we will eventually kill it.  */
++  sleep (10000);	/* RHEL3U8 kernel-2.4.21-47.EL will cut the sleep time.  */
++
++  return NULL;	/* thread-sleep */
++}
++
++int main ()
++{
++  pthread_t t1,t2;
++  int ret;
++
++  ret = pthread_create (&t1, NULL, func, NULL);
++  if (ret)
++    fprintf(stderr, "pthread_create(): %s", strerror (ret));
++  ret = pthread_create (&t2, NULL, func, NULL);
++  if (ret)
++    fprintf(stderr, "pthread_create(): %s", strerror (ret));
++
++  ret = pthread_join (t1, NULL);
++  if (ret)	/* first-join */
++    fprintf(stderr, "pthread_join(): %s", strerror (ret));
++  ret = pthread_join (t2, NULL);
++  if (ret)
++    fprintf(stderr, "pthread_join(): %s", strerror (ret));
++
++  return 0;
++}
+diff -up -ruNp gdb-6.8-orig/gdb/testsuite/gdb.threads/attachstop-mt.exp gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp
+--- gdb-6.8-orig/gdb/testsuite/gdb.threads/attachstop-mt.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-08-27 17:44:23.000000000 +0200
+@@ -0,0 +1,260 @@
++# Copyright 2008
++# Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This test was created by modifying gdb.threads/attachstop.
++# This file was created by Jan Kratochvil <jan.kratochvil@redhat.com>.
++# Regression for: https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=197584
++
++# This test only works on Linux
++if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
++    continue
++}
++
++set testfile "attachstop-mt"
++set srcfile  ${testfile}.c
++set binfile  ${objdir}/${subdir}/${testfile}
++set escapedbinfile  [string_to_regexp ${objdir}/${subdir}/${testfile}]
++
++#execute_anywhere "rm -f ${binfile}"
++remote_exec build "rm -f ${binfile}"
++# For debugging this test
++#
++#log_user 1
++
++# build the test case
++#
++if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    gdb_suppress_entire_file "Testcase compile failed, so all tests in this file will automatically fail."
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1
++}
++
++# Start the program running and then wait for a bit, to be sure
++# that it can be attached to.
++
++set testpid [eval exec $binfile &]
++
++# No race
++sleep 2
++
++# Do not: set testpid2 [expr $testpid + 1]
++# as it will not exist on Red Hat 2.6.9-34.0.2.ELsmp
++set testpid2 [expr $testpid + 2]
++
++set status2 /proc/${testpid}/task/${testpid2}/status
++if {[expr ! [file exists $status2]]} {
++  # kernel-2.4
++  set status2 /proc/${testpid2}/status
++}
++
++# Initial sanity test it is normally sleeping
++set fileid0 [open $status2 r];
++gets $fileid0 line1;
++gets $fileid0 line2;
++close $fileid0;
++
++set test "attach0, initial sanity check of the sleeping state"
++if {[string match "*(sleeping)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# Sttach and detach to test it will not become stopped
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++set test "attach0 to sleeping"
++gdb_test_multiple "attach $testpid" "$test" {
++    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++gdb_test "gcore /dev/null" ".*aved corefile.*" "attach0 to sleeping gcore invocation"
++
++gdb_test "thread 2" ".*witching to thread 2 .*" "attach0 to sleeping switch thread"
++
++gdb_test "bt" ".*sleep.*func.*" "attach0 to sleeping bt"
++
++# Exit and detach the process.
++
++gdb_exit
++
++# No race
++sleep 2
++
++# Check it did not get stopped by our gdb
++set fileid1 [open $status2 r];
++gets $fileid1 line1;
++gets $fileid1 line2;
++close $fileid1;
++
++set test "attach1, post-gdb sanity check of the sleeping state - Red Hat BZ 197584"
++if {[string match "*(sleeping)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# Stop the program 
++remote_exec build "kill -s STOP ${testpid}"
++
++# No race
++sleep 2
++
++# Check it really got stopped by kill(1)
++set fileid2 [open $status2 r];
++gets $fileid2 line1;
++gets $fileid2 line2;
++close $fileid2;
++
++set test "attach2, initial sanity check of the stopped state"
++if {[string match "*(stopped)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# Start with clean gdb
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# Verify that we can attach to the process by first giving its
++# executable name via the file command, and using attach with the
++# process ID.
++
++set test "set file, before attach3 to stopped process"
++gdb_test_multiple "file $binfile" "$test" {
++   -re "Load new symbol table from.*y or n. $" {
++        gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*done." \
++		"$test (re-read)"
++    }
++    -re "Reading symbols from $escapedbinfile\.\.\.*done.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++set test "attach3 to stopped, after setting file"
++gdb_test_multiple "attach $testpid" "$test" {
++    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++# We may be already after the threads phase.
++# `thread 2' command is important for the test to switch the current thread to
++# a non-primary one for the detach process.
++
++gdb_test "thread 2" ".*(witching to thread 2 |hread ID 2 not known).*" "attach3 to stopped switch thread"
++gdb_test "bt" ".*sleep.*(func|main).*" "attach3 to stopped bt"
++
++# Exit and detach the process.
++gdb_exit
++
++# Stop the program 
++remote_exec build "kill -s STOP ${testpid}"
++
++# No race
++sleep 2
++
++# Continue the test as we would hit another expected bug regarding
++# 	Program received signal SIGSTOP, Stopped (signal).
++# across NPTL threads.
++
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# Verify that we can attach to the process just by giving the
++# process ID.
++   
++set test "attach4 to stopped, after setting file"
++gdb_test_multiple "attach $testpid" "$test" {
++    -re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++        pass "$test"
++    }
++}
++
++# We may be already after the threads phase.
++# `thread 2' command is important for the test to switch the current thread to
++# a non-primary one for the detach process.
++
++gdb_test "thread 2" ".*(witching to thread 2 |hread ID 2 not known).*" "attach4 to stopped switch thread"
++gdb_test "bt" ".*sleep.*(func|main).*" "attach4 to stopped bt"
++
++# RHEL3U8 kernel-2.4.21-47.EL will not return SIGINT but only shorten the sleep.
++gdb_breakpoint [gdb_get_line_number "Ridiculous time"]
++gdb_breakpoint [gdb_get_line_number "cut the sleep time"]
++set test "attach4 continue"
++send_gdb "continue\n"
++gdb_expect {
++  -re "Continuing"
++    { pass "continue ($test)" }
++  timeout
++    { fail "continue ($test) (timeout)" }
++}
++
++# For this to work we must be sure to consume the "Continuing."
++# message first, or GDB's signal handler may not be in place.
++after 1000 {send_gdb "\003"}
++set test "attach4 stop by interrupt"
++gdb_expect {
++  -re "Program received signal SIGINT.*$gdb_prompt $"
++    {
++      pass $test
++    }
++  -re "Breakpoint \[0-9\].*$srcfile.*$gdb_prompt $"
++    {
++      pass $test
++    }
++  timeout
++    {
++      fail "$test (timeout)"
++    }
++}
++
++gdb_exit
++
++# No race
++sleep 2
++
++# At this point, the process should be sleeping
++
++set fileid4 [open $status2 r];
++gets $fileid4 line1;
++gets $fileid4 line2;
++close $fileid4;
++
++set test "attach4, exit leaves process sleeping"
++if {[string match "*(sleeping)*" $line2]} {
++  pass $test
++} else {
++  fail $test
++}
++
++# Make sure we don't leave a process around to confuse
++# the next test run (and prevent the compile by keeping
++# the text file busy), in case the "set should_exit" didn't
++# work.
++   
++remote_exec build "kill -9 ${testpid}"
++
++return 0
