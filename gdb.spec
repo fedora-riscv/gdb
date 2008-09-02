@@ -16,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?_with_upstream:.upstream}%{?dist}
+Release: 22%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -838,6 +838,9 @@ fi
 %endif
 
 %changelog
+* Tue Sep  2 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-22
+- Fix PIE patch regression for loading binaries from valgrind (BZ 460319).
+
 * Thu Aug 28 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-21
 - Fix attaching to stopped processes, based on the upstream version now.
   - Just kernel-2.6.25 neither upstream nor utrace work with it; 2.6.9 works.
