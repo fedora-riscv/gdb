@@ -22,23 +22,127 @@
 
 	Fix crash on a watchpoint update on an inferior stop.
 
-Index: gdb-6.8/gdb/dwarf2read.c
-===================================================================
---- gdb-6.8.orig/gdb/dwarf2read.c	2008-04-19 21:38:32.000000000 +0200
-+++ gdb-6.8/gdb/dwarf2read.c	2008-04-19 21:38:33.000000000 +0200
-@@ -1221,7 +1221,7 @@ dwarf2_build_psymtabs (struct objfile *o
-   else
-     dwarf2_per_objfile->loc_buffer = NULL;
+2008-09-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix scan_dyntag() for binaries provided by valgrind (BZ 460319).
+
+--- ./gdb/Makefile.in	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/Makefile.in	2008-08-30 23:40:33.000000000 +0200
+@@ -1928,7 +1928,7 @@ amd64-tdep.o: amd64-tdep.c $(defs_h) $(a
+ 	$(dummy_frame_h) $(frame_h) $(frame_base_h) $(frame_unwind_h) \
+ 	$(inferior_h) $(gdbcmd_h) $(gdbcore_h) $(objfiles_h) $(regcache_h) \
+ 	$(regset_h) $(symfile_h) $(gdb_assert_h) $(amd64_tdep_h) \
+-	$(i387_tdep_h)
++	$(i387_tdep_h) $(exceptions_h)
+ annotate.o: annotate.c $(defs_h) $(annotate_h) $(value_h) $(target_h) \
+ 	$(gdbtypes_h) $(breakpoint_h)
+ arch-utils.o: arch-utils.c $(defs_h) $(arch_utils_h) $(buildsym_h) \
+--- ./gdb/amd64-tdep.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/amd64-tdep.c	2008-08-30 23:40:33.000000000 +0200
+@@ -36,6 +36,7 @@
+ #include "symfile.h"
+ #include "dwarf2-frame.h"
+ #include "gdb_assert.h"
++#include "exceptions.h"
  
--  if (mainline
-+  if ((mainline == 1)
-       || (objfile->global_psymbols.size == 0
- 	  && objfile->static_psymbols.size == 0))
-     {
-Index: gdb-6.8/gdb/auxv.c
-===================================================================
---- gdb-6.8.orig/gdb/auxv.c	2008-01-16 17:27:37.000000000 +0100
-+++ gdb-6.8/gdb/auxv.c	2008-04-19 21:38:33.000000000 +0200
+ #include "amd64-tdep.h"
+ #include "i387-tdep.h"
+@@ -731,16 +732,28 @@ amd64_alloc_frame_cache (void)
+    Any function that doesn't start with this sequence will be assumed
+    to have no prologue and thus no valid frame pointer in %rbp.  */
+ 
+-static CORE_ADDR
+-amd64_analyze_prologue (CORE_ADDR pc, CORE_ADDR current_pc,
+-			struct amd64_frame_cache *cache)
++struct amd64_analyze_prologue_data
++  {
++    CORE_ADDR pc, current_pc;
++    struct amd64_frame_cache *cache;
++    CORE_ADDR retval;
++  };
++
++static int
++amd64_analyze_prologue_1 (void *data_pointer)
+ {
++  struct amd64_analyze_prologue_data *data = data_pointer;
++  CORE_ADDR pc = data->pc, current_pc = data->current_pc;
++  struct amd64_frame_cache *cache = data->cache;
+   static gdb_byte proto[3] = { 0x48, 0x89, 0xe5 }; /* movq %rsp, %rbp */
+   gdb_byte buf[3];
+   gdb_byte op;
+ 
+   if (current_pc <= pc)
+-    return current_pc;
++    {
++      data->retval = current_pc;
++      return 1;
++    }
+ 
+   op = read_memory_unsigned_integer (pc, 1);
+ 
+@@ -753,18 +766,57 @@ amd64_analyze_prologue (CORE_ADDR pc, CO
+ 
+       /* If that's all, return now.  */
+       if (current_pc <= pc + 1)
+-        return current_pc;
++        {
++	  data->retval = current_pc;
++	  return 1;
++        }
+ 
+       /* Check for `movq %rsp, %rbp'.  */
+       read_memory (pc + 1, buf, 3);
+       if (memcmp (buf, proto, 3) != 0)
+-	return pc + 1;
++	{
++	  data->retval = pc + 1;
++	  return 1;
++	}
+ 
+       /* OK, we actually have a frame.  */
+       cache->frameless_p = 0;
+-      return pc + 4;
++      data->retval = pc + 4;
++      return 1;
+     }
+ 
++  data->retval = pc;
++  return 1;
++}
++
++/* Catch memory read errors and return just PC in such case.
++   It occurs very early on enable_break->new_symfile_objfile->
++   ->breakpoint_re_set->decode_line_1->decode_variable_1->
++   ->find_function_start_sal  */
++
++static CORE_ADDR
++amd64_analyze_prologue (CORE_ADDR pc, CORE_ADDR current_pc,
++			struct amd64_frame_cache *cache)
++{
++  int status;
++  struct amd64_analyze_prologue_data data;
++  struct ui_file *saved_gdb_stderr;
++
++  /* Suppress error messages.  */
++  saved_gdb_stderr = gdb_stderr;
++  gdb_stderr = ui_file_new ();
++
++  data.pc = pc;
++  data.current_pc = current_pc;
++  data.cache = cache;
++  status = catch_errors (amd64_analyze_prologue_1, &data, "", RETURN_MASK_ALL);
++
++  /* Stop suppressing error messages.  */
++  ui_file_delete (gdb_stderr);
++  gdb_stderr = saved_gdb_stderr;
++
++  if (status)
++    return data.retval;
+   return pc;
+ }
+ 
+--- ./gdb/auxv.c	2008-01-16 17:27:37.000000000 +0100
++++ ./gdb/auxv.c	2008-08-30 23:40:33.000000000 +0200
 @@ -80,7 +80,7 @@ procfs_xfer_auxv (struct target_ops *ops
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  int
@@ -110,10 +214,8 @@ Index: gdb-6.8/gdb/auxv.c
        switch (flavor)
  	{
  	case dec:
-Index: gdb-6.8/gdb/auxv.h
-===================================================================
---- gdb-6.8.orig/gdb/auxv.h	2008-01-01 23:53:09.000000000 +0100
-+++ gdb-6.8/gdb/auxv.h	2008-04-19 21:38:33.000000000 +0200
+--- ./gdb/auxv.h	2008-01-01 23:53:09.000000000 +0100
++++ ./gdb/auxv.h	2008-08-30 23:40:33.000000000 +0200
 @@ -35,14 +35,14 @@ struct target_ops;		/* Forward declarati
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  extern int target_auxv_parse (struct target_ops *ops,
@@ -131,10 +233,83 @@ Index: gdb-6.8/gdb/auxv.h
  
  /* Print the contents of the target's AUXV on the specified file. */
  extern int fprint_target_auxv (struct ui_file *file, struct target_ops *ops);
-Index: gdb-6.8/gdb/breakpoint.h
-===================================================================
---- gdb-6.8.orig/gdb/breakpoint.h	2008-04-19 21:38:33.000000000 +0200
-+++ gdb-6.8/gdb/breakpoint.h	2008-04-19 21:38:33.000000000 +0200
+--- ./gdb/breakpoint.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/breakpoint.c	2008-08-30 23:40:33.000000000 +0200
+@@ -3971,7 +3971,8 @@ describe_other_breakpoints (CORE_ADDR pc
+ 	      printf_filtered (" (thread %d)", b->thread);
+ 	    printf_filtered ("%s%s ",
+ 			     ((b->enable_state == bp_disabled || 
+-			       b->enable_state == bp_call_disabled) 
++			       b->enable_state == bp_call_disabled ||
++			       b->enable_state == bp_startup_disabled)
+ 			      ? " (disabled)"
+ 			      : b->enable_state == bp_permanent 
+ 			      ? " (permanent)"
+@@ -4623,6 +4624,62 @@ disable_breakpoints_in_unloaded_shlib (s
+   }
+ }
+ 
++void
++disable_breakpoints_at_startup (int silent)
++{
++  struct breakpoint *b;
++  int disabled_startup_breaks = 0;
++
++  if (bfd_get_start_address (exec_bfd) != entry_point_address ())
++    {
++      ALL_BREAKPOINTS (b)
++	{
++	  if (((b->type == bp_breakpoint) ||
++	       (b->type == bp_hardware_breakpoint)) &&
++	      b->enable_state == bp_enabled &&
++	      !b->loc->duplicate)
++	    {
++	      b->enable_state = bp_startup_disabled;
++	      if (!silent)
++		{
++		  if (!disabled_startup_breaks)
++		    {
++		      target_terminal_ours_for_output ();
++		      warning ("Temporarily disabling breakpoints:");
++		    }
++		  disabled_startup_breaks = 1;
++		  warning ("breakpoint #%d addr 0x%s", b->number, paddr_nz(b->loc->address));
++		}
++	    }
++	}
++    }
++}
++
++/* Try to reenable any breakpoints after startup.  */
++void
++re_enable_breakpoints_at_startup (void)
++{
++  struct breakpoint *b;
++
++  if (bfd_get_start_address (exec_bfd) != entry_point_address ())
++    {
++      ALL_BREAKPOINTS (b)
++	if (b->enable_state == bp_startup_disabled)
++	  {
++	    char buf[1];
++
++	    /* Do not reenable the breakpoint if the shared library
++	       is still not mapped in.  */
++	    if (target_read_memory (b->loc->address, buf, 1) == 0)
++	      {
++		/*printf ("enabling breakpoint at 0x%s\n", paddr_nz(b->loc->address));*/
++		b->enable_state = bp_enabled;
++	      }
++	  }
++    }
++}
++
++
+ static void
+ create_fork_vfork_event_catchpoint (int tempflag, char *cond_string,
+ 				    enum bptype bp_kind)
+--- ./gdb/breakpoint.h	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/breakpoint.h	2008-08-30 23:40:33.000000000 +0200
 @@ -144,6 +144,7 @@ enum enable_state
  			   automatically enabled and reset when the call 
  			   "lands" (either completes, or stops at another 
@@ -154,24 +329,31 @@ Index: gdb-6.8/gdb/breakpoint.h
  /* This function returns TRUE if ep is a catchpoint. */
  extern int ep_is_catchpoint (struct breakpoint *);
  
-Index: gdb-6.8/gdb/symfile-mem.c
-===================================================================
---- gdb-6.8.orig/gdb/symfile-mem.c	2008-04-19 21:38:27.000000000 +0200
-+++ gdb-6.8/gdb/symfile-mem.c	2008-04-19 21:38:33.000000000 +0200
-@@ -116,7 +116,7 @@ symbol_file_add_from_memory (struct bfd 
-       }
+--- ./gdb/dwarf2read.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/dwarf2read.c	2008-08-30 23:40:33.000000000 +0200
+@@ -1222,7 +1222,7 @@ dwarf2_build_psymtabs (struct objfile *o
+   else
+     dwarf2_per_objfile->loc_buffer = NULL;
  
-   objf = symbol_file_add_from_bfd (nbfd, from_tty,
--                                   sai, 0, OBJF_SHARED);
-+                                   sai, 2, OBJF_SHARED);
- 
-   /* This might change our ideas about frames already looked at.  */
-   reinit_frame_cache ();
-Index: gdb-6.8/gdb/infrun.c
-===================================================================
---- gdb-6.8.orig/gdb/infrun.c	2008-04-19 21:38:29.000000000 +0200
-+++ gdb-6.8/gdb/infrun.c	2008-04-19 21:38:33.000000000 +0200
-@@ -2277,6 +2277,11 @@ process_event_stop_test:
+-  if (mainline
++  if ((mainline == 1)
+       || (objfile->global_psymbols.size == 0
+ 	  && objfile->static_psymbols.size == 0))
+     {
+--- ./gdb/elfread.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/elfread.c	2008-08-30 23:40:33.000000000 +0200
+@@ -673,7 +673,7 @@ elf_symfile_read (struct objfile *objfil
+   /* If we are reinitializing, or if we have never loaded syms yet,
+      set table to empty.  MAINLINE is cleared so that *_read_psymtab
+      functions do not all also re-initialize the psymbol table. */
+-  if (mainline)
++  if (mainline == 1)
+     {
+       init_psymbol_list (objfile, 0);
+       mainline = 0;
+--- ./gdb/infrun.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/infrun.c	2008-08-30 23:40:33.000000000 +0200
+@@ -2314,6 +2314,11 @@ process_event_stop_test:
  #endif
  	  target_terminal_inferior ();
  
@@ -183,10 +365,8 @@ Index: gdb-6.8/gdb/infrun.c
  	  /* If requested, stop when the dynamic linker notifies
  	     gdb of events.  This allows the user to get control
  	     and place breakpoints in initializer routines for
-Index: gdb-6.8/gdb/objfiles.c
-===================================================================
---- gdb-6.8.orig/gdb/objfiles.c	2008-01-01 23:53:12.000000000 +0100
-+++ gdb-6.8/gdb/objfiles.c	2008-04-19 21:38:33.000000000 +0200
+--- ./gdb/objfiles.c	2008-01-01 23:53:12.000000000 +0100
++++ ./gdb/objfiles.c	2008-08-30 23:40:33.000000000 +0200
 @@ -49,6 +49,9 @@
  #include "source.h"
  #include "addrmap.h"
@@ -218,10 +398,8 @@ Index: gdb-6.8/gdb/objfiles.c
  }
  
  /* Create the terminating entry of OBJFILE's minimal symbol table.
-Index: gdb-6.8/gdb/solib-svr4.c
-===================================================================
---- gdb-6.8.orig/gdb/solib-svr4.c	2008-04-19 21:38:30.000000000 +0200
-+++ gdb-6.8/gdb/solib-svr4.c	2008-04-19 21:34:42.000000000 +0200
+--- ./gdb/solib-svr4.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/solib-svr4.c	2008-09-01 17:12:31.000000000 +0200
 @@ -31,6 +31,8 @@
  #include "gdbcore.h"
  #include "target.h"
@@ -245,7 +423,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
    int arch_size, step, sect_size;
    long dyn_tag;
    CORE_ADDR dyn_ptr, dyn_addr;
-+  CORE_ADDR entry_addr;
++  CORE_ADDR reloc_addr = 0;
    gdb_byte *bufend, *bufstart, *buf;
    Elf32_External_Dyn *x_dynp_32;
    Elf64_External_Dyn *x_dynp_64;
@@ -254,7 +432,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
    if (abfd == NULL)
      return 0;
-@@ -360,19 +366,74 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
+@@ -360,19 +366,81 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
    if (arch_size == -1)
     return 0;
  
@@ -264,6 +442,8 @@ Index: gdb-6.8/gdb/solib-svr4.c
 +
 +  if (ptr != NULL)
 +    {
++      CORE_ADDR entry_addr;
++
 +      /* Find the address of the entry point of the program from the
 +	 auxv vector.  */
 +      ret = target_auxv_search (&current_target, AT_ENTRY, &entry_addr);
@@ -285,6 +465,11 @@ Index: gdb-6.8/gdb/solib-svr4.c
 +				"elf_locate_base: found program entry address 0x%s for %s\n",
 +				paddr_nz (entry_addr), exec_bfd->filename);
 +	}
++      reloc_addr = entry_addr - bfd_get_start_address (exec_bfd);
++      if (debug_solib)
++	fprintf_unfiltered (gdb_stdlog,
++			    "elf_locate_base: expected relocation offset 0x%s for %s\n",
++			    paddr_nz (reloc_addr), exec_bfd->filename);
 +    }
 +
    /* Find the start address of the .dynamic section.  */
@@ -331,53 +516,129 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
    /* Iterate over BUF and scan for DYNTAG.  If found, set PTR and return.  */
    step = (arch_size == 32) ? sizeof (Elf32_External_Dyn)
-@@ -405,9 +466,43 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
- 	     CORE_ADDR ptr_addr;
- 
- 	     ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
-+	     if (ptr != NULL)
-+	       {
-+		 if (debug_solib)
-+		   fprintf_unfiltered (gdb_stdlog,
-+				       "elf_locate_base: unrelocated ptr addr 0x%s\n",
-+				       paddr_nz (ptr_addr));
-+		 ptr_addr += entry_addr - bfd_get_start_address (exec_bfd);
-+		 if (debug_solib) 
-+		   fprintf_unfiltered (gdb_stdlog, 
-+				       "elf_locate_base: relocated ptr addr 0x%s"
-+				       " (auxv entry 0x%s, bfd start address 0x%s)"
-+				       " for %s\n",
-+				       paddr_nz (ptr_addr), paddr_nz (entry_addr),
-+				       paddr_nz (bfd_get_start_address (exec_bfd)),
-+				       exec_bfd->filename);
-+	       }
- 	     if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+@@ -393,25 +461,103 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
+ 	dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
+ 	dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
+       }
+-     if (dyn_tag == DT_NULL)
++
++    /* Verify RELOC_ADDR makes sense - it does not have to for valgrind which
++       supplies us a specially crafted executable in /proc/PID/fd/X while
++       /proc/PID/auxv corresponds to a different executable (.../memcheck).  */
++    if (reloc_addr)
++      {
++	gdb_byte tag_buf[8];
++	CORE_ADDR tag_addr;
++
++	tag_addr = dyn_addr + (buf - bufstart) + reloc_addr;
++	if (target_read_memory (tag_addr, tag_buf, arch_size / 8) == 0)
++	  {
++	    if (memcmp (tag_buf, buf, arch_size / 8) != 0)
++	      {
++		if (debug_solib)
++		  fprintf_unfiltered (gdb_stdlog,
++				      "elf_locate_base: tag at offset 0x%lx does not match,"
++				      " dropping relocation offset %s\n",
++				      (unsigned long) (buf - bufstart), paddr_nz (reloc_addr));
++		reloc_addr = 0;
++	      }
++	  }
++	else
++	  {
++	    if (debug_solib)
++	      fprintf_unfiltered (gdb_stdlog,
++				  "elf_locate_base: tag at offset 0x%lx is not readable,"
++				  " dropping relocation offset %s\n",
++				  (unsigned long) (buf - bufstart), paddr_nz (reloc_addr));
++	    reloc_addr = 0;
++	  }
++      }
++
++    if (dyn_tag == DT_NULL)
+        return 0;
+-     if (dyn_tag == dyntag)
+-       {
+-	 /* If requested, try to read the runtime value of this .dynamic
+-	    entry.  */
+-	 if (ptr)
+-	   {
+-	     gdb_byte ptr_buf[8];
+-	     CORE_ADDR ptr_addr;
+-
+-	     ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
+-	     if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
 -	       dyn_ptr = extract_typed_address (ptr_buf,
 -						builtin_type_void_data_ptr);
-+	       {
-+		 dyn_ptr = extract_typed_address (ptr_buf,
-+						  builtin_type_void_data_ptr);
-+		 if (ptr != NULL)
-+		   {
-+		     if (debug_solib)
-+		       fprintf_unfiltered (gdb_stdlog,
-+					   "elf_locate_base: Tag entry has value 0x%s -- return now\n",
-+					   paddr_nz (dyn_ptr));
-+		   }
-+	       }
-+	     else
-+	       {
-+		 if (ptr != NULL)
-+		   {
-+		     if (debug_solib)
-+		       fprintf_unfiltered (gdb_stdlog,
-+					   "elf_locate_base: Couldn't read tag entry value -- return now\n");
-+		   }
-+	       }
- 	     *ptr = dyn_ptr;
- 	   }
- 	 return 1;
-@@ -544,6 +639,10 @@ solib_svr4_r_map (void)
+-	     *ptr = dyn_ptr;
+-	   }
+-	 return 1;
+-       }
++    if (dyn_tag == dyntag)
++      {
++	/* If requested, try to read the runtime value of this .dynamic
++	   entry.  */
++	if (ptr)
++	  {
++	    gdb_byte ptr_buf[8];
++	    CORE_ADDR ptr_addr;
++	    int got;
++
++	    ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
++	    if (ptr != NULL)
++	      {
++		if (debug_solib)
++		  fprintf_unfiltered (gdb_stdlog,
++				      "elf_locate_base: unrelocated ptr addr 0x%s\n",
++				      paddr_nz (ptr_addr));
++		ptr_addr += reloc_addr;
++		if (debug_solib) 
++		  fprintf_unfiltered (gdb_stdlog, 
++				      "elf_locate_base: relocated ptr addr 0x%s"
++				      " (relocation offset %s) for %s\n",
++				      paddr_nz (ptr_addr), paddr_nz (reloc_addr),
++				      exec_bfd->filename);
++	      }
++	    got = target_read_memory (ptr_addr, ptr_buf, arch_size / 8);
++	    if (got != 0 && reloc_addr)
++	      {
++		ptr_addr -= reloc_addr;
++		if (debug_solib) 
++		  fprintf_unfiltered (gdb_stdlog, 
++				      "elf_locate_base: unrelocated back to ptr addr 0x%s"
++				      " as the memory was unreable for %s\n",
++				      paddr_nz (ptr_addr), exec_bfd->filename);
++		got = target_read_memory (ptr_addr, ptr_buf, arch_size / 8);
++	      }
++
++	    if (got == 0)
++	      {
++		dyn_ptr = extract_typed_address (ptr_buf,
++						 builtin_type_void_data_ptr);
++		if (ptr != NULL)
++		  {
++		    if (debug_solib)
++		      fprintf_unfiltered (gdb_stdlog,
++					  "elf_locate_base: Tag entry has value 0x%s -- return now\n",
++					  paddr_nz (dyn_ptr));
++		  }
++	      }
++	    else
++	      {
++		if (ptr != NULL)
++		  {
++		    if (debug_solib)
++		      fprintf_unfiltered (gdb_stdlog,
++					  "elf_locate_base: Couldn't read tag entry value -- return now\n");
++		  }
++	      }
++	    *ptr = dyn_ptr;
++	  }
++	return 1;
++      }
+   }
+ 
+   return 0;
+@@ -544,6 +690,10 @@ solib_svr4_r_map (void)
  {
    struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
  
@@ -388,7 +649,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
    return read_memory_typed_address (debug_base + lmo->r_map_offset,
  				    builtin_type_void_data_ptr);
  }
-@@ -713,6 +812,11 @@ svr4_current_sos (void)
+@@ -713,6 +863,11 @@ svr4_current_sos (void)
    struct so_list *head = 0;
    struct so_list **link_ptr = &head;
    CORE_ADDR ldsomap = 0;
@@ -400,7 +661,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
    /* Always locate the debug struct, in case it has moved.  */
    debug_base = 0;
-@@ -721,10 +825,19 @@ svr4_current_sos (void)
+@@ -721,10 +876,19 @@ svr4_current_sos (void)
    /* If we can't find the dynamic linker's base structure, this
       must not be a dynamically linked executable.  Hmm.  */
    if (! debug_base)
@@ -421,7 +682,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
    lm = solib_svr4_r_map ();
  
    while (lm)
-@@ -740,23 +853,103 @@ svr4_current_sos (void)
+@@ -740,23 +904,103 @@ svr4_current_sos (void)
        new->lm_info->lm = xzalloc (lmo->link_map_size);
        make_cleanup (xfree, new->lm_info->lm);
  
@@ -527,7 +788,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  	  target_read_string (LM_NAME (new), &buffer,
  			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
  	  if (errcode != 0)
-@@ -764,47 +957,60 @@ svr4_current_sos (void)
+@@ -764,47 +1008,60 @@ svr4_current_sos (void)
  		     safe_strerror (errcode));
  	  else
  	    {
@@ -573,15 +834,15 @@ Index: gdb-6.8/gdb/solib-svr4.c
 +			}
 +		      else
 +			debug_print_missing (new->so_name, build_id_filename);
-+
-+		      xfree (build_id_filename);
-+		      xfree (build_id);
-+		    }
  
 -		  /* Missing the build-id matching separate debug info file
 -		     would be handled while SO_NAME gets loaded.  */
 -		  name = build_id_to_filename (build_id, &build_id_filename, 0);
 -		  if (name != NULL)
++		      xfree (build_id_filename);
++		      xfree (build_id);
++		    }
++
 +		  if (debug_solib)
  		    {
 -		      strncpy (new->so_name, name, SO_NAME_MAX_PATH_SIZE - 1);
@@ -621,7 +882,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  	}
  
        /* On Solaris, the dynamic linker is not in the normal list of
-@@ -820,6 +1026,9 @@ svr4_current_sos (void)
+@@ -820,6 +1077,9 @@ svr4_current_sos (void)
    if (head == NULL)
      return svr4_default_sos ();
  
@@ -631,7 +892,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
    return head;
  }
  
-@@ -921,7 +1130,7 @@ for (resolve = 0; resolve <= 1; resolve+
+@@ -921,7 +1181,7 @@ for (resolve = 0; resolve <= 1; resolve+
  /* On some systems, the only way to recognize the link map entry for
     the main executable file is by looking at its name.  Return
     non-zero iff SONAME matches one of the known main executable names.  */
@@ -640,7 +901,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  static int
  match_main (char *soname)
  {
-@@ -935,6 +1144,7 @@ match_main (char *soname)
+@@ -935,6 +1195,7 @@ match_main (char *soname)
  
    return (0);
  }
@@ -648,7 +909,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
  /* Return 1 if PC lies in the dynamic symbol resolution code of the
     SVR4 run time loader.  */
-@@ -1086,11 +1296,17 @@ enable_break (void)
+@@ -1086,11 +1347,17 @@ enable_break (void)
    /* Find the .interp section; if not found, warn the user and drop
       into the old breakpoint at symbol code.  */
    interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
@@ -666,7 +927,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
        int load_addr_found = 0;
        int loader_found_in_list = 0;
        struct so_list *so;
-@@ -1098,6 +1314,14 @@ enable_break (void)
+@@ -1098,6 +1365,14 @@ enable_break (void)
        struct target_ops *tmp_bfd_target;
        int tmp_fd = -1;
        char *tmp_pathname = NULL;
@@ -681,7 +942,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
        /* Read the contents of the .interp section into a local buffer;
           the contents specify the dynamic linker this program uses.  */
-@@ -1120,6 +1344,9 @@ enable_break (void)
+@@ -1120,6 +1395,9 @@ enable_break (void)
        if (tmp_fd >= 0)
  	tmp_bfd = bfd_fopen (tmp_pathname, gnutarget, FOPEN_RB, tmp_fd);
  
@@ -691,7 +952,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
        if (tmp_bfd == NULL)
  	goto bkpt_at_symbol;
  
-@@ -1181,16 +1408,16 @@ enable_break (void)
+@@ -1181,16 +1459,16 @@ enable_break (void)
        interp_sect = bfd_get_section_by_name (tmp_bfd, ".text");
        if (interp_sect)
  	{
@@ -712,7 +973,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  	  interp_plt_sect_high =
  	    interp_plt_sect_low + bfd_section_size (tmp_bfd, interp_sect);
  	}
-@@ -1225,7 +1452,11 @@ enable_break (void)
+@@ -1225,7 +1503,11 @@ enable_break (void)
  
        if (sym_addr != 0)
  	{
@@ -725,7 +986,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  	  return 1;
  	}
  
-@@ -1486,6 +1717,8 @@ svr4_solib_create_inferior_hook (void)
+@@ -1486,6 +1768,8 @@ svr4_solib_create_inferior_hook (void)
    while (stop_signal != TARGET_SIGNAL_TRAP);
    stop_soon = NO_STOP_QUIETLY;
  #endif /* defined(_SCO_DS) */
@@ -734,7 +995,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  }
  
  static void
-@@ -1666,6 +1899,75 @@ svr4_lp64_fetch_link_map_offsets (void)
+@@ -1666,6 +1950,75 @@ svr4_lp64_fetch_link_map_offsets (void)
  
    return lmp;
  }
@@ -810,7 +1071,7 @@ Index: gdb-6.8/gdb/solib-svr4.c
  
  
  struct target_so_ops svr4_so_ops;
-@@ -1724,4 +2026,7 @@ _initialize_svr4_solib (void)
+@@ -1724,4 +2077,7 @@ _initialize_svr4_solib (void)
    svr4_so_ops.in_dynsym_resolve_code = svr4_in_dynsym_resolve_code;
    svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
    svr4_so_ops.same = svr4_same;
@@ -818,292 +1079,8 @@ Index: gdb-6.8/gdb/solib-svr4.c
 +  add_info ("linkmap", info_linkmap_command,
 +	    "Display the inferior's linkmap.");
  }
-Index: gdb-6.8/gdb/varobj.c
-===================================================================
---- gdb-6.8.orig/gdb/varobj.c	2008-04-19 21:38:27.000000000 +0200
-+++ gdb-6.8/gdb/varobj.c	2008-04-19 21:38:33.000000000 +0200
-@@ -1075,6 +1075,62 @@ install_new_value (struct varobj *var, s
-   return changed;
- }
- 
-+void
-+varobj_refresh (void)
-+{
-+  struct varobj *var;
-+  struct varobj_root *croot;
-+  int mycount = rootcount;
-+  char * name;
-+
-+  croot = rootlist;
-+  while ((croot != NULL) && (mycount > 0))
-+    {
-+      var = croot->rootvar;
-+
-+      /* Get rid of the memory for the old expression.  This also
-+         leaves var->root->exp == NULL, which is ok for the parsing
-+         below.  */
-+      free_current_contents (&var->root->exp);
-+
-+      value_free (var->value);
-+      var->type = NULL;
-+
-+      name = xstrdup (var->name);
-+
-+      /* Reparse the expression.  Wrap the call to parse expression,
-+         so we can return a sensible error. */
-+      if (!gdb_parse_exp_1 (&name, var->root->valid_block, 0, &var->root->exp))
-+        {
-+          return;
-+        }
-+
-+      /* We definitively need to catch errors here.
-+         If evaluate_expression succeeds we got the value we wanted.
-+         But if it fails, we still go on with a call to evaluate_type()  */
-+      if (gdb_evaluate_expression (var->root->exp, &var->value))
-+        {
-+          /* no error */
-+          release_value (var->value);
-+          if (value_lazy (var->value))
-+            gdb_value_fetch_lazy (var->value);
-+        }
-+      else
-+        var->value = evaluate_type (var->root->exp);
-+
-+      var->type = value_type (var->value);
-+
-+      mycount--;
-+      croot = croot->next;
-+    }
-+
-+  if (mycount || (croot != NULL))
-+    warning
-+      ("varobj_refresh: assertion failed - wrong tally of root vars (%d:%d)",
-+       rootcount, mycount);
-+}
-+
-+
- /* Update the values for a variable and its children.  This is a
-    two-pronged attack.  First, re-parse the value for the root's
-    expression to see if it's changed.  Then go all the way
-Index: gdb-6.8/gdb/solist.h
-===================================================================
---- gdb-6.8.orig/gdb/solist.h	2008-01-07 16:19:58.000000000 +0100
-+++ gdb-6.8/gdb/solist.h	2008-04-19 21:38:33.000000000 +0200
-@@ -61,6 +61,8 @@ struct so_list
-     bfd *abfd;
-     char symbols_loaded;	/* flag: symbols read in yet? */
-     char from_tty;		/* flag: print msgs? */
-+    char main;                  /* flag: is this the main executable? */
-+    char main_relocated;        /* flag: has it been relocated yet? */
-     struct objfile *objfile;	/* objfile for loaded lib */
-     struct section_table *sections;
-     struct section_table *sections_end;
-@@ -127,9 +129,15 @@ void free_so (struct so_list *so);
- /* Return address of first so_list entry in master shared object list.  */
- struct so_list *master_so_list (void);
- 
-+/* Return address of first so_list entry in master shared object list.  */
-+struct so_list *master_so_list (void);
-+
- /* Find solib binary file and open it.  */
- extern int solib_open (char *in_pathname, char **found_pathname);
- 
-+/* Add the list of sections in so_list to the target to_sections.  */
-+extern void add_to_target_sections (int, struct target_ops *, struct so_list *);
-+
- /* FIXME: gdbarch needs to control this variable */
- extern struct target_so_ops *current_target_so_ops;
- 
-@@ -140,4 +148,6 @@ struct symbol *solib_global_lookup (cons
- 				    const domain_enum domain,
- 				    struct symtab **symtab);
- 
-+/* Controls the printing of debugging output.  */
-+extern int debug_solib;
- #endif
-Index: gdb-6.8/gdb/varobj.h
-===================================================================
---- gdb-6.8.orig/gdb/varobj.h	2008-01-30 08:17:31.000000000 +0100
-+++ gdb-6.8/gdb/varobj.h	2008-04-19 21:38:33.000000000 +0200
-@@ -122,4 +122,6 @@ extern void varobj_invalidate (void);
- 
- extern int varobj_editable_p (struct varobj *var);
- 
-+extern void varobj_refresh(void);
-+
- #endif /* VAROBJ_H */
-Index: gdb-6.8/gdb/symfile.c
-===================================================================
---- gdb-6.8.orig/gdb/symfile.c	2008-04-19 21:38:32.000000000 +0200
-+++ gdb-6.8/gdb/symfile.c	2008-04-19 21:38:33.000000000 +0200
-@@ -47,6 +47,7 @@
- #include "readline/readline.h"
- #include "gdb_assert.h"
- #include "block.h"
-+#include "varobj.h"
- #include "observer.h"
- #include "exec.h"
- #include "parser-defs.h"
-@@ -815,7 +816,7 @@ syms_from_objfile (struct objfile *objfi
- 
-   /* Now either addrs or offsets is non-zero.  */
- 
--  if (mainline)
-+  if (mainline == 1)
-     {
-       /* We will modify the main symbol table, make sure that all its users
-          will be cleaned up if an error occurs during symbol reading.  */
-@@ -843,7 +844,7 @@ syms_from_objfile (struct objfile *objfi
- 
-      We no longer warn if the lowest section is not a text segment (as
-      happens for the PA64 port.  */
--  if (!mainline && addrs && addrs->other[0].name)
-+  if (/*!mainline &&*/ addrs && addrs->other[0].name)
-     {
-       asection *sect;
-       CORE_ADDR lower_offset = 0;	/* Shut up the GCC warning.  */
-@@ -1002,17 +1003,21 @@ new_symfile_objfile (struct objfile *obj
-   /* If this is the main symbol file we have to clean up all users of the
-      old main symbol file. Otherwise it is sufficient to fixup all the
-      breakpoints that may have been redefined by this symbol file.  */
--  if (mainline)
-+  if (mainline == 1)
-     {
-       /* OK, make it the "real" symbol file.  */
-       symfile_objfile = objfile;
- 
-       clear_symtab_users ();
-     }
--  else
-+  else if (mainline == 0)
-     {
-       breakpoint_re_set ();
-     }
-+  else
-+    {
-+      /* Don't reset breakpoints or it will screw up PIE.  */
-+    }
- 
-   /* We're done reading the symbol file; finish off complaints.  */
-   clear_complaints (&symfile_complaints, 0, verbo);
-@@ -1055,7 +1060,7 @@ symbol_file_add_with_addrs_or_offsets (b
-      interactively wiping out any existing symbols.  */
- 
-   if ((have_full_symbols () || have_partial_symbols ())
--      && mainline
-+      && (mainline == 1)
-       && from_tty
-       && !query ("Load new symbol table from \"%s\"? ", name))
-     error (_("Not confirmed."));
-@@ -1241,6 +1246,10 @@ symbol_file_clear (int from_tty)
- 		    symfile_objfile->name)
- 	  : !query (_("Discard symbol table? "))))
-     error (_("Not confirmed."));
-+#ifdef CLEAR_SOLIB
-+      CLEAR_SOLIB ();
-+#endif
-+
-     free_all_objfiles ();
- 
-     /* solib descriptors may have handles to objfiles.  Since their
-@@ -3330,6 +3339,8 @@ reread_symbols (void)
- 	      /* Discard cleanups as symbol reading was successful.  */
- 	      discard_cleanups (old_cleanups);
- 
-+	      init_entry_point_info (objfile);
-+
- 	      /* If the mtime has changed between the time we set new_modtime
- 	         and now, we *want* this to be out of date, so don't call stat
- 	         again now.  */
-@@ -3698,6 +3709,7 @@ clear_symtab_users (void)
-   breakpoint_re_set ();
-   set_default_breakpoint (0, 0, 0, 0);
-   clear_pc_function_cache ();
-+  varobj_refresh ();
-   observer_notify_new_objfile (NULL);
- 
-   /* Clear globals which might have pointed into a removed objfile.
-Index: gdb-6.8/gdb/breakpoint.c
-===================================================================
---- gdb-6.8.orig/gdb/breakpoint.c	2008-04-19 21:38:33.000000000 +0200
-+++ gdb-6.8/gdb/breakpoint.c	2008-04-19 21:38:33.000000000 +0200
-@@ -3946,7 +3946,8 @@ describe_other_breakpoints (CORE_ADDR pc
- 	      printf_filtered (" (thread %d)", b->thread);
- 	    printf_filtered ("%s%s ",
- 			     ((b->enable_state == bp_disabled || 
--			       b->enable_state == bp_call_disabled) 
-+			       b->enable_state == bp_call_disabled ||
-+			       b->enable_state == bp_startup_disabled)
- 			      ? " (disabled)"
- 			      : b->enable_state == bp_permanent 
- 			      ? " (permanent)"
-@@ -4598,6 +4599,62 @@ disable_breakpoints_in_unloaded_shlib (s
-   }
- }
- 
-+void
-+disable_breakpoints_at_startup (int silent)
-+{
-+  struct breakpoint *b;
-+  int disabled_startup_breaks = 0;
-+
-+  if (bfd_get_start_address (exec_bfd) != entry_point_address ())
-+    {
-+      ALL_BREAKPOINTS (b)
-+	{
-+	  if (((b->type == bp_breakpoint) ||
-+	       (b->type == bp_hardware_breakpoint)) &&
-+	      b->enable_state == bp_enabled &&
-+	      !b->loc->duplicate)
-+	    {
-+	      b->enable_state = bp_startup_disabled;
-+	      if (!silent)
-+		{
-+		  if (!disabled_startup_breaks)
-+		    {
-+		      target_terminal_ours_for_output ();
-+		      warning ("Temporarily disabling breakpoints:");
-+		    }
-+		  disabled_startup_breaks = 1;
-+		  warning ("breakpoint #%d addr 0x%s", b->number, paddr_nz(b->loc->address));
-+		}
-+	    }
-+	}
-+    }
-+}
-+
-+/* Try to reenable any breakpoints after startup.  */
-+void
-+re_enable_breakpoints_at_startup (void)
-+{
-+  struct breakpoint *b;
-+
-+  if (bfd_get_start_address (exec_bfd) != entry_point_address ())
-+    {
-+      ALL_BREAKPOINTS (b)
-+	if (b->enable_state == bp_startup_disabled)
-+	  {
-+	    char buf[1];
-+
-+	    /* Do not reenable the breakpoint if the shared library
-+	       is still not mapped in.  */
-+	    if (target_read_memory (b->loc->address, buf, 1) == 0)
-+	      {
-+		/*printf ("enabling breakpoint at 0x%s\n", paddr_nz(b->loc->address));*/
-+		b->enable_state = bp_enabled;
-+	      }
-+	  }
-+    }
-+}
-+
-+
- static void
- create_fork_vfork_event_catchpoint (int tempflag, char *cond_string,
- 				    enum bptype bp_kind)
-Index: gdb-6.8/gdb/solib.c
-===================================================================
---- gdb-6.8.orig/gdb/solib.c	2008-01-07 16:19:58.000000000 +0100
-+++ gdb-6.8/gdb/solib.c	2008-04-19 21:38:33.000000000 +0200
+--- ./gdb/solib.c	2008-01-07 16:19:58.000000000 +0100
++++ ./gdb/solib.c	2008-09-01 17:16:12.000000000 +0200
 @@ -79,6 +79,8 @@ set_solib_ops (struct gdbarch *gdbarch, 
  
  /* external data declarations */
@@ -1278,135 +1255,211 @@ Index: gdb-6.8/gdb/solib.c
 +			   NULL, NULL,
 +			   &setdebuglist, &showdebuglist);
  }
-Index: gdb-6.8/gdb/elfread.c
-===================================================================
---- gdb-6.8.orig/gdb/elfread.c	2008-01-01 23:53:09.000000000 +0100
-+++ gdb-6.8/gdb/elfread.c	2008-04-19 21:38:33.000000000 +0200
-@@ -644,7 +644,7 @@ elf_symfile_read (struct objfile *objfil
-   /* If we are reinitializing, or if we have never loaded syms yet,
-      set table to empty.  MAINLINE is cleared so that *_read_psymtab
-      functions do not all also re-initialize the psymbol table. */
+--- ./gdb/solist.h	2008-01-07 16:19:58.000000000 +0100
++++ ./gdb/solist.h	2008-08-30 23:40:33.000000000 +0200
+@@ -61,6 +61,8 @@ struct so_list
+     bfd *abfd;
+     char symbols_loaded;	/* flag: symbols read in yet? */
+     char from_tty;		/* flag: print msgs? */
++    char main;                  /* flag: is this the main executable? */
++    char main_relocated;        /* flag: has it been relocated yet? */
+     struct objfile *objfile;	/* objfile for loaded lib */
+     struct section_table *sections;
+     struct section_table *sections_end;
+@@ -127,9 +129,15 @@ void free_so (struct so_list *so);
+ /* Return address of first so_list entry in master shared object list.  */
+ struct so_list *master_so_list (void);
+ 
++/* Return address of first so_list entry in master shared object list.  */
++struct so_list *master_so_list (void);
++
+ /* Find solib binary file and open it.  */
+ extern int solib_open (char *in_pathname, char **found_pathname);
+ 
++/* Add the list of sections in so_list to the target to_sections.  */
++extern void add_to_target_sections (int, struct target_ops *, struct so_list *);
++
+ /* FIXME: gdbarch needs to control this variable */
+ extern struct target_so_ops *current_target_so_ops;
+ 
+@@ -140,4 +148,6 @@ struct symbol *solib_global_lookup (cons
+ 				    const domain_enum domain,
+ 				    struct symtab **symtab);
+ 
++/* Controls the printing of debugging output.  */
++extern int debug_solib;
+ #endif
+--- ./gdb/symfile-mem.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/symfile-mem.c	2008-08-30 23:40:33.000000000 +0200
+@@ -116,7 +116,7 @@ symbol_file_add_from_memory (struct bfd 
+       }
+ 
+   objf = symbol_file_add_from_bfd (nbfd, from_tty,
+-                                   sai, 0, OBJF_SHARED);
++                                   sai, 2, OBJF_SHARED);
+ 
+   /* This might change our ideas about frames already looked at.  */
+   reinit_frame_cache ();
+--- ./gdb/symfile.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/symfile.c	2008-08-30 23:41:48.000000000 +0200
+@@ -47,6 +47,7 @@
+ #include "readline/readline.h"
+ #include "gdb_assert.h"
+ #include "block.h"
++#include "varobj.h"
+ #include "observer.h"
+ #include "exec.h"
+ #include "parser-defs.h"
+@@ -815,7 +816,7 @@ syms_from_objfile (struct objfile *objfi
+ 
+   /* Now either addrs or offsets is non-zero.  */
+ 
 -  if (mainline)
 +  if (mainline == 1)
      {
-       init_psymbol_list (objfile, 0);
-       mainline = 0;
-Index: gdb-6.8/gdb/Makefile.in
-===================================================================
---- gdb-6.8.orig/gdb/Makefile.in	2008-04-19 21:38:32.000000000 +0200
-+++ gdb-6.8/gdb/Makefile.in	2008-04-19 21:38:33.000000000 +0200
-@@ -1920,7 +1920,7 @@ amd64-tdep.o: amd64-tdep.c $(defs_h) $(a
- 	$(dummy_frame_h) $(frame_h) $(frame_base_h) $(frame_unwind_h) \
- 	$(inferior_h) $(gdbcmd_h) $(gdbcore_h) $(objfiles_h) $(regcache_h) \
- 	$(regset_h) $(symfile_h) $(gdb_assert_h) $(amd64_tdep_h) \
--	$(i387_tdep_h)
-+	$(i387_tdep_h) $(exceptions_h)
- annotate.o: annotate.c $(defs_h) $(annotate_h) $(value_h) $(target_h) \
- 	$(gdbtypes_h) $(breakpoint_h)
- arch-utils.o: arch-utils.c $(defs_h) $(arch_utils_h) $(buildsym_h) \
-Index: gdb-6.8/gdb/amd64-tdep.c
-===================================================================
---- gdb-6.8.orig/gdb/amd64-tdep.c	2008-04-19 21:38:28.000000000 +0200
-+++ gdb-6.8/gdb/amd64-tdep.c	2008-04-19 21:38:33.000000000 +0200
-@@ -36,6 +36,7 @@
- #include "symfile.h"
- #include "dwarf2-frame.h"
- #include "gdb_assert.h"
-+#include "exceptions.h"
+       /* We will modify the main symbol table, make sure that all its users
+          will be cleaned up if an error occurs during symbol reading.  */
+@@ -843,7 +844,7 @@ syms_from_objfile (struct objfile *objfi
  
- #include "amd64-tdep.h"
- #include "i387-tdep.h"
-@@ -731,16 +732,28 @@ amd64_alloc_frame_cache (void)
-    Any function that doesn't start with this sequence will be assumed
-    to have no prologue and thus no valid frame pointer in %rbp.  */
+      We no longer warn if the lowest section is not a text segment (as
+      happens for the PA64 port.  */
+-  if (!mainline && addrs && addrs->other[0].name)
++  if (/*!mainline &&*/ addrs && addrs->other[0].name)
+     {
+       asection *sect;
+       CORE_ADDR lower_offset = 0;	/* Shut up the GCC warning.  */
+@@ -1002,17 +1003,21 @@ new_symfile_objfile (struct objfile *obj
+   /* If this is the main symbol file we have to clean up all users of the
+      old main symbol file. Otherwise it is sufficient to fixup all the
+      breakpoints that may have been redefined by this symbol file.  */
+-  if (mainline)
++  if (mainline == 1)
+     {
+       /* OK, make it the "real" symbol file.  */
+       symfile_objfile = objfile;
  
--static CORE_ADDR
--amd64_analyze_prologue (CORE_ADDR pc, CORE_ADDR current_pc,
--			struct amd64_frame_cache *cache)
-+struct amd64_analyze_prologue_data
-+  {
-+    CORE_ADDR pc, current_pc;
-+    struct amd64_frame_cache *cache;
-+    CORE_ADDR retval;
-+  };
-+
-+static int
-+amd64_analyze_prologue_1 (void *data_pointer)
- {
-+  struct amd64_analyze_prologue_data *data = data_pointer;
-+  CORE_ADDR pc = data->pc, current_pc = data->current_pc;
-+  struct amd64_frame_cache *cache = data->cache;
-   static gdb_byte proto[3] = { 0x48, 0x89, 0xe5 }; /* movq %rsp, %rbp */
-   gdb_byte buf[3];
-   gdb_byte op;
- 
-   if (current_pc <= pc)
--    return current_pc;
+       clear_symtab_users ();
+     }
+-  else
++  else if (mainline == 0)
+     {
+       breakpoint_re_set ();
+     }
++  else
 +    {
-+      data->retval = current_pc;
-+      return 1;
++      /* Don't reset breakpoints or it will screw up PIE.  */
 +    }
  
-   op = read_memory_unsigned_integer (pc, 1);
+   /* We're done reading the symbol file; finish off complaints.  */
+   clear_complaints (&symfile_complaints, 0, verbo);
+@@ -1055,7 +1060,7 @@ symbol_file_add_with_addrs_or_offsets (b
+      interactively wiping out any existing symbols.  */
  
-@@ -753,18 +766,57 @@ amd64_analyze_prologue (CORE_ADDR pc, CO
+   if ((have_full_symbols () || have_partial_symbols ())
+-      && mainline
++      && (mainline == 1)
+       && from_tty
+       && !query ("Load new symbol table from \"%s\"? ", name))
+     error (_("Not confirmed."));
+@@ -1242,6 +1247,10 @@ symbol_file_clear (int from_tty)
+ 		    symfile_objfile->name)
+ 	  : !query (_("Discard symbol table? "))))
+     error (_("Not confirmed."));
++#ifdef CLEAR_SOLIB
++      CLEAR_SOLIB ();
++#endif
++
+     free_all_objfiles ();
  
-       /* If that's all, return now.  */
-       if (current_pc <= pc + 1)
--        return current_pc;
-+        {
-+	  data->retval = current_pc;
-+	  return 1;
-+        }
+     /* solib descriptors may have handles to objfiles.  Since their
+@@ -3335,6 +3344,8 @@ reread_symbols (void)
+ 	      /* Discard cleanups as symbol reading was successful.  */
+ 	      discard_cleanups (old_cleanups);
  
-       /* Check for `movq %rsp, %rbp'.  */
-       read_memory (pc + 1, buf, 3);
-       if (memcmp (buf, proto, 3) != 0)
--	return pc + 1;
-+	{
-+	  data->retval = pc + 1;
-+	  return 1;
-+	}
++	      init_entry_point_info (objfile);
++
+ 	      /* If the mtime has changed between the time we set new_modtime
+ 	         and now, we *want* this to be out of date, so don't call stat
+ 	         again now.  */
+@@ -3703,6 +3714,7 @@ clear_symtab_users (void)
+   breakpoint_re_set ();
+   set_default_breakpoint (0, 0, 0, 0);
+   clear_pc_function_cache ();
++  varobj_refresh ();
+   observer_notify_new_objfile (NULL);
  
-       /* OK, we actually have a frame.  */
-       cache->frameless_p = 0;
--      return pc + 4;
-+      data->retval = pc + 4;
-+      return 1;
-     }
- 
-+  data->retval = pc;
-+  return 1;
-+}
-+
-+/* Catch memory read errors and return just PC in such case.
-+   It occurs very early on enable_break->new_symfile_objfile->
-+   ->breakpoint_re_set->decode_line_1->decode_variable_1->
-+   ->find_function_start_sal  */
-+
-+static CORE_ADDR
-+amd64_analyze_prologue (CORE_ADDR pc, CORE_ADDR current_pc,
-+			struct amd64_frame_cache *cache)
-+{
-+  int status;
-+  struct amd64_analyze_prologue_data data;
-+  struct ui_file *saved_gdb_stderr;
-+
-+  /* Suppress error messages.  */
-+  saved_gdb_stderr = gdb_stderr;
-+  gdb_stderr = ui_file_new ();
-+
-+  data.pc = pc;
-+  data.current_pc = current_pc;
-+  data.cache = cache;
-+  status = catch_errors (amd64_analyze_prologue_1, &data, "", RETURN_MASK_ALL);
-+
-+  /* Stop suppressing error messages.  */
-+  ui_file_delete (gdb_stderr);
-+  gdb_stderr = saved_gdb_stderr;
-+
-+  if (status)
-+    return data.retval;
-   return pc;
+   /* Clear globals which might have pointed into a removed objfile.
+--- ./gdb/varobj.c	2008-09-01 17:16:38.000000000 +0200
++++ ./gdb/varobj.c	2008-08-30 23:40:33.000000000 +0200
+@@ -1075,6 +1075,62 @@ install_new_value (struct varobj *var, s
+   return changed;
  }
  
++void
++varobj_refresh (void)
++{
++  struct varobj *var;
++  struct varobj_root *croot;
++  int mycount = rootcount;
++  char * name;
++
++  croot = rootlist;
++  while ((croot != NULL) && (mycount > 0))
++    {
++      var = croot->rootvar;
++
++      /* Get rid of the memory for the old expression.  This also
++         leaves var->root->exp == NULL, which is ok for the parsing
++         below.  */
++      free_current_contents (&var->root->exp);
++
++      value_free (var->value);
++      var->type = NULL;
++
++      name = xstrdup (var->name);
++
++      /* Reparse the expression.  Wrap the call to parse expression,
++         so we can return a sensible error. */
++      if (!gdb_parse_exp_1 (&name, var->root->valid_block, 0, &var->root->exp))
++        {
++          return;
++        }
++
++      /* We definitively need to catch errors here.
++         If evaluate_expression succeeds we got the value we wanted.
++         But if it fails, we still go on with a call to evaluate_type()  */
++      if (gdb_evaluate_expression (var->root->exp, &var->value))
++        {
++          /* no error */
++          release_value (var->value);
++          if (value_lazy (var->value))
++            gdb_value_fetch_lazy (var->value);
++        }
++      else
++        var->value = evaluate_type (var->root->exp);
++
++      var->type = value_type (var->value);
++
++      mycount--;
++      croot = croot->next;
++    }
++
++  if (mycount || (croot != NULL))
++    warning
++      ("varobj_refresh: assertion failed - wrong tally of root vars (%d:%d)",
++       rootcount, mycount);
++}
++
++
+ /* Update the values for a variable and its children.  This is a
+    two-pronged attack.  First, re-parse the value for the root's
+    expression to see if it's changed.  Then go all the way
+--- ./gdb/varobj.h	2008-01-30 08:17:31.000000000 +0100
++++ ./gdb/varobj.h	2008-08-30 23:40:33.000000000 +0200
+@@ -122,4 +122,6 @@ extern void varobj_invalidate (void);
+ 
+ extern int varobj_editable_p (struct varobj *var);
+ 
++extern void varobj_refresh(void);
++
+ #endif /* VAROBJ_H */
