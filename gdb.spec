@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?_with_upstream:.upstream}%{?dist}
+Release: 25%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -341,7 +341,10 @@ Patch301: gdb-6.6-buildid-readnever-silent.patch
 Patch304: gdb-6.7-kernel-headers-compat.patch
 
 # Fix/implement the Fortran dynamic arrays support (BZ 377541).
-Patch305: gdb-6.8-bz377541-fortran-dynamic-arrays.patch
+# Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
+Patch339: gdb-6.8-bz377541-vla-bound-undefined.patch
+Patch340: gdb-6.8-bz377541-vla-loc-kind.patch
+Patch305: gdb-6.8-bz377541-vla.patch
 
 # Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
 Patch306: gdb-6.8-watchpoint-inaccessible-memory.patch
@@ -589,6 +592,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch298 -p1
 %patch301 -p1
 %patch304 -p1
+%patch339 -p1
+%patch340 -p1
 %patch305 -p1
 %patch306 -p1
 %patch309 -p1
@@ -653,9 +658,6 @@ g77="`which gfortran 2>/dev/null || true`"
 test -z "$g77" || ln -s "$g77" ./g77
 
 export CFLAGS="$RPM_OPT_FLAGS"
-
-# FIXME: Temporary rpm compatibility cludge, port: gdb-6.6-buildid-locate.patch
-CFLAGS="$CFLAGS -D_RPM_4_4_COMPAT -Wno-deprecated-declarations"
 
 %if 0%{?_with_debug:1}
 # --enable-werror could conflict with `-Wall -O0' but this is no longer true
@@ -882,6 +884,11 @@ fi
 %endif
 
 %changelog
+* Mon Nov  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-25
+- Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
+- Fix the debuginfo-install suggestions for missing base packages (BZ 467901),
+  also update the rpm/yum code to no longer require _RPM_4_4_COMPAT.
+
 * Tue Sep  2 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-24
 - Fix PIE patch regression for loading binaries from valgrind (BZ 460319).
 

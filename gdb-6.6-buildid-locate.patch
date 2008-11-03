@@ -786,7 +786,7 @@
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1314,9 +1714,437 @@ build_id_to_debug_filename (struct build
+@@ -1314,9 +1714,424 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -852,104 +852,91 @@
 +      for (;;)
 +	{
 +	  Header h;
-+	  char *s, *srcrpm, *verrel, *debuginfo;
-+	  union
-+	    {
-+	      void *voidp;
-+	      char *s;
-+	    }
-+	  sourcerpm, arch;
-+	  char **slot;
++	  char *debuginfo, **slot, *s, *s2;
++	  errmsg_t err;
++	  size_t srcrpmlen = sizeof (".src.rpm") - 1;
++	  size_t debuginfolen = sizeof ("-debuginfo") - 1;
 +	  rpmdbMatchIterator mi_debuginfo;
 +
 +	  h = rpmdbNextIterator (mi);
 +	  if (h == NULL)
 +	    break;
 +
-+	  if (!headerGetEntry (h, RPMTAG_SOURCERPM, NULL, &sourcerpm.voidp,
-+			       NULL))
++	  /* Verify the debuginfo file is not already installed.  */
++ 
++	  debuginfo = headerFormat (h, "%{sourcerpm}-debuginfo.%{arch}", &err);
++	  if (!debuginfo)
 +	    {
-+	      warning (_("Error querying the rpm file `%s' %s"), filename,
-+		       "RPMTAG_SOURCERPM");
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               err);
 +	      continue;
 +	    }
-+	  srcrpm = sourcerpm.s + strlen (sourcerpm.s) - (sizeof ".src.rpm" - 1);
-+	  if (srcrpm < sourcerpm.s || strcmp (srcrpm, ".src.rpm") != 0)
++	  /* s = `.src.rpm-debuginfo.%{arch}' */
++	  s = strrchr (debuginfo, '-') - srcrpmlen;
++	  s2 = NULL;
++	  if (s > debuginfo && memcmp (s, ".src.rpm", srcrpmlen) == 0)
 +	    {
-+error_parsing_sourcerpm:
-+	      warning (_("Error parsing %%{sourcerpm} of the rpm file `%s': %s"),
-+		       filename, sourcerpm.s);
++	      /* s2 = `-%{release}.src.rpm-debuginfo.%{arch}' */
++	      s2 = memrchr (debuginfo, '-', s - debuginfo);
++	    }
++	  if (s2)
++	    {
++	      /* s2 = `-%{version}-%{release}.src.rpm-debuginfo.%{arch}' */
++	      s2 = memrchr (debuginfo, '-', s2 - debuginfo);
++	    }
++	  if (!s2)
++	    {
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               debuginfo);
++	      xfree (debuginfo);
 +	      continue;
 +	    }
-+	  s = srcrpm;
++	  /* s = `.src.rpm-debuginfo.%{arch}' */
++	  /* s2 = `-%{version}-%{release}.src.rpm-debuginfo.%{arch}' */
++	  memmove (s2 + debuginfolen, s2, s - s2);
++	  memcpy (s2, "-debuginfo", debuginfolen);
++	  /* s = `XXXX.%{arch}' */
++	  /* strlen ("XXXX") == srcrpmlen + debuginfolen */
++	  /* s2 = `-debuginfo-%{version}-%{release}XX.%{arch}' */
++	  /* strlen ("XX") == srcrpmlen */
++	  memmove (s + debuginfolen, s + srcrpmlen + debuginfolen,
++		   strlen (s + srcrpmlen + debuginfolen) + 1);
++	  /* s = `-debuginfo-%{version}-%{release}.%{arch}' */
 +
-+	  /* Skip the release.  */
-+
-+	  while (s > sourcerpm.s && s[-1] != '-')
-+	    s--;
-+	  if (s == sourcerpm.s)
-+	    goto error_parsing_sourcerpm;
-+	  s--;
-+
-+	  /* Skip the version.  */
-+
-+	  while (s > sourcerpm.s && s[-1] != '-')
-+	    s--;
-+	  if (s == sourcerpm.s)
-+	    goto error_parsing_sourcerpm;
-+	  s--;
-+	  verrel = s;
-+
-+	  if (!headerGetEntry (h, RPMTAG_ARCH, NULL, &arch.voidp, NULL))
++	  /* RPMDBI_PACKAGES requires keylen == sizeof (int).  */
++	  /* RPMDBI_LABEL is an interface for NVR-based dbiFindByLabel().  */
++	  mi_debuginfo = rpmtsInitIterator (ts, RPMDBI_LABEL, debuginfo, 0);
++	  xfree (debuginfo);
++	  if (mi_debuginfo)
 +	    {
-+	      warning (_("Error querying the rpm file `%s' %s"), filename,
-+		       "RPMTAG_ARCH");
-+	      continue;
++	      rpmdbFreeIterator (mi_debuginfo);
++	      count = 0;
++	      break;
 +	    }
 +
 +	  /* The allocated memory gets utilized below for MISSING_RPM_HASH.  */
-+
-+	  debuginfo = xmalloc (strlen (sourcerpm.s) + strlen (arch.s) + 32);
-+
-+	  /* Verify the debuginfo file is not already installed.  */
-+
-+	  sprintf (debuginfo, "%.*s-debuginfo%.*s.%s",
-+		   (int) (verrel - sourcerpm.s), sourcerpm.s,
-+		   (int) (srcrpm - verrel), verrel, arch.s);
-+	  mi_debuginfo = rpmtsInitIterator (ts, RPMDBI_LABEL, debuginfo, 0);
-+	  if (mi_debuginfo != NULL)
++	  debuginfo = headerFormat (h,
++				    "%{name}-%{version}-%{release}.%{arch}",
++				    &err);
++	  if (!debuginfo)
 +	    {
-+	      Header h_debuginfo;
-+
-+	      h_debuginfo = rpmdbNextIterator (mi_debuginfo);
-+	      rpmdbFreeIterator (mi_debuginfo);
-+	      if (h_debuginfo != NULL)
-+		{
-+		  xfree (debuginfo);
-+
-+		  /* We ignore any != 0 for possibly already enlisted rpms as
-+		     it should not hurt much.  */
-+
-+		  count = 0;
-+		  break;
-+		}
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               err);
++	      continue;
 +	    }
 +
-+	  /* Base package name for `debuginfo-install'.  We do not use `yum'
-+	     as its command
-+		 yum --enablerepo='*-debuginfo' install BASE-debuginfo.ARCH
++	  /* Base package name for `debuginfo-install'.  We do not use the
++	     `yum' command directly as the line
++		 yum --enablerepo='*-debuginfo' install NAME-debuginfo.ARCH
 +	     would be more complicated than just:
-+		 debuginfo-install BASE.ARCH
-+	     We do not need to supply the version-release as
-+	     `debuginfo-install' always installs only the debuginfo matching
-+	     the currently installed rpm.  Still we must supply `.%{arch}' as
-+	     we may have multilib (multiple arch-differing rpm packages)
-+	     installed.
++		 debuginfo-install NAME-VERSION-RELEASE.ARCH
++	     Do not supply the rpm base name (derived from .src.rpm name) as
++	     debuginfo-install is unable to install the debuginfo package if
++	     the base name PKG binary rpm is not installed while for example
++	     PKG-libs would be installed (RH Bug 467901).
 +	     FUTURE: After multiple debuginfo versions simultaneously installed
-+	     get supported we may need to supply the version-release here.  */
-+
-+	  sprintf (debuginfo, "%.*s.%s", (int) (verrel - sourcerpm.s),
-+		   sourcerpm.s, arch.s);
++	     get supported the support for the VERSION-RELEASE tags handling
++	     may need an update.  */
 +
 +	  if (missing_rpm_hash == NULL)
 +	    {
