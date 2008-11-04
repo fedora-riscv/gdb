@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{?dist}
+Release: 26%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -419,6 +419,9 @@ Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
 # Fix occasional crash on a removed watchpoint.
 Patch338: gdb-6.8-breakpoint-gone.patch
 
+# Test the watchpoints conditionals works.
+Patch343: gdb-6.8-watchpoint-cond-test.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -621,6 +624,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch336 -p1
 %patch337 -p1
 %patch338 -p1
+%patch343 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -884,6 +888,9 @@ fi
 %endif
 
 %changelog
+* Tue Nov  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-26
+- Fix the watchpoints conditionals.
+
 * Mon Nov  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-25
 - Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
 - Fix the debuginfo-install suggestions for missing base packages (BZ 467901),
