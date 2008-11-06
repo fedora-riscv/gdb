@@ -1,0 +1,276 @@
+gdb/
+2008-10-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix automatic restoration of breakpoints memory for ia64.
+	* ia64-tdep.c (ia64_memory_insert_breakpoint): New comment part for
+	SHADOW_CONTENTS content.  Remova variable instr.  New variable cleanup.
+	Force automatic breakpoints restoration.  PLACED_SIZE and SHADOW_LEN
+	are now set larger, to BUNDLE_LEN - 2.
+	(ia64_memory_remove_breakpoint): Rename variables bundle to bundle_mem
+	and instr to instr_saved.  New variables bundle_saved and
+	instr_breakpoint.  Comment new reasons why we need to disable automatic
+	restoration of breakpoints.  Assert PLACED_SIZE and SHADOW_LEN.  New
+	check of the original memory content.
+	(ia64_breakpoint_from_pc): Array breakpoint extended to BUNDLE_LEN.
+	Sanity check the PCPTR parameter SLOTNUM value.  New #if check on
+	BREAKPOINT_MAX vs. BUNDLE_LEN.  Increase LENPTR to BUNDLE_LEN - 2.
+
+gdb/testsuite/
+2008-10-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/breakpoint-shadow.exp, gdb.base/breakpoint-shadow.c: New.
+
+[ RHEL-5 disable of `set breakpoint always-inserted'.  ]
+
+--- ./gdb/ia64-tdep.c	11 Sep 2008 14:23:15 -0000	1.184
++++ ./gdb/ia64-tdep.c	28 Oct 2008 10:28:41 -0000
+@@ -545,7 +545,21 @@ fetch_instruction (CORE_ADDR addr, instr
+    simulators.  So I changed the pattern slightly to do "break.i 0x080001"
+    instead.  But that didn't work either (I later found out that this
+    pattern was used by the simulator that I was using.)  So I ended up
+-   using the pattern seen below. */
++   using the pattern seen below.
++
++   SHADOW_CONTENTS has byte-based addressing (PLACED_ADDRESS and SHADOW_LEN)
++   while we need bit-based addressing as the instructions length is 41 bits and
++   we must not modify/corrupt the adjacent ones in the same bundle.
++   Fortunately we may store larger memory incl. the adjacent bits with the
++   original memory content (not the possibly already stored breakpoints there).
++   We need to be careful in ia64_memory_remove_breakpoint to always restore
++   only the specific bits of this instruction ignoring any adjacent stored
++   bits.
++
++   We use the original addressing with the low nibble 0..2 which gets
++   incorrectly interpreted by the generic GDB code as the byte offset of
++   SHADOW_CONTENTS.  We store whole BUNDLE_LEN bytes just without these two
++   possibly skipped bytes.  */
+ 
+ #if 0
+ #define IA64_BREAKPOINT 0x00002000040LL
+@@ -559,15 +573,21 @@ ia64_memory_insert_breakpoint (struct gd
+   CORE_ADDR addr = bp_tgt->placed_address;
+   char bundle[BUNDLE_LEN];
+   int slotnum = (int) (addr & 0x0f) / SLOT_MULTIPLIER;
+-  long long instr;
+   int val;
+   int template;
++  struct cleanup *cleanup;
+ 
+   if (slotnum > 2)
+     error (_("Can't insert breakpoint for slot numbers greater than 2."));
+ 
+   addr &= ~0x0f;
+ 
++  /* Enable the automatic memory restoration from breakpoints while
++     we read our instruction bundle.  Otherwise, we could store into
++     SHADOW_CONTENTS an already stored breakpoint at the same location.
++     In practice it is already being prevented by the DUPLICATE field and
++     update_global_location_list.  */
++  cleanup = make_show_memory_breakpoints_cleanup (0);
+   val = target_read_memory (addr, bundle, BUNDLE_LEN);
+ 
+   /* Check for L type instruction in 2nd slot, if present then
+@@ -578,13 +598,18 @@ ia64_memory_insert_breakpoint (struct gd
+       slotnum = 2;
+     }
+ 
+-  instr = slotN_contents (bundle, slotnum);
+-  memcpy (bp_tgt->shadow_contents, &instr, sizeof (instr));
+-  bp_tgt->placed_size = bp_tgt->shadow_len = sizeof (instr);
++  /* Slot number 2 may skip at most 2 bytes at the beginning.  */
++  bp_tgt->placed_size = bp_tgt->shadow_len = BUNDLE_LEN - 2;
++
++  /* Store the whole bundle, except for the initial skipped bytes by the slot
++     number interpreted as bytes offset in PLACED_ADDRESS.  */
++  memcpy (bp_tgt->shadow_contents, bundle + slotnum, bp_tgt->shadow_len);
++
+   replace_slotN_contents (bundle, IA64_BREAKPOINT, slotnum);
+   if (val == 0)
+-    target_write_memory (addr, bundle, BUNDLE_LEN);
++    target_write_memory (addr + slotnum, bundle + slotnum, bp_tgt->shadow_len);
+ 
++  do_cleanups (cleanup);
+   return val;
+ }
+ 
+@@ -593,9 +618,9 @@ ia64_memory_remove_breakpoint (struct gd
+ 			       struct bp_target_info *bp_tgt)
+ {
+   CORE_ADDR addr = bp_tgt->placed_address;
+-  char bundle[BUNDLE_LEN];
++  char bundle_mem[BUNDLE_LEN], bundle_saved[BUNDLE_LEN];
+   int slotnum = (addr & 0x0f) / SLOT_MULTIPLIER;
+-  long long instr;
++  long long instr_breakpoint, instr_saved;
+   int val;
+   int template;
+   struct cleanup *cleanup;
+@@ -604,23 +629,39 @@ ia64_memory_remove_breakpoint (struct gd
+ 
+   /* Disable the automatic memory restoration from breakpoints while
+      we read our instruction bundle.  Otherwise, the general restoration
+-     mechanism kicks in and ends up corrupting our bundle, because it
+-     is not aware of the concept of instruction bundles.  */
++     mechanism kicks in and we would possibly remove parts of the adjacent
++     placed breakpoints.  It is due to our SHADOW_CONTENTS overlapping the real
++     breakpoint instruction bits region.  */
+   cleanup = make_show_memory_breakpoints_cleanup (1);
+-  val = target_read_memory (addr, bundle, BUNDLE_LEN);
++  val = target_read_memory (addr, bundle_mem, BUNDLE_LEN);
+ 
+   /* Check for L type instruction in 2nd slot, if present then
+      bump up the slot number to the 3rd slot */
+-  template = extract_bit_field (bundle, 0, 5);
++  template = extract_bit_field (bundle_mem, 0, 5);
+   if (slotnum == 1 && template_encoding_table[template][1] == L)
+     {
+       slotnum = 2;
+     }
+ 
+-  memcpy (&instr, bp_tgt->shadow_contents, sizeof instr);
+-  replace_slotN_contents (bundle, instr, slotnum);
++  gdb_assert (bp_tgt->placed_size == BUNDLE_LEN - 2);
++  gdb_assert (bp_tgt->placed_size == bp_tgt->shadow_len);
++
++  instr_breakpoint = slotN_contents (bundle_mem, slotnum);
++  if (instr_breakpoint != IA64_BREAKPOINT)
++    warning (_("Breakpoint removal cannot find the placed breakpoint at %s"),
++             paddr_nz (bp_tgt->placed_address));
++
++  /* Extract the original saved instruction from SLOTNUM normalizing its
++     bit-shift for INSTR_SAVED.  */
++  memcpy (bundle_saved, bundle_mem, BUNDLE_LEN);
++  memcpy (bundle_saved + slotnum, bp_tgt->shadow_contents, bp_tgt->shadow_len);
++  instr_saved = slotN_contents (bundle_saved, slotnum);
++
++  /* In BUNDLE_MEM be careful to modify only the bits belonging to SLOTNUM and
++     never any other possibly also stored in SHADOW_CONTENTS.  */
++  replace_slotN_contents (bundle_mem, instr_saved, slotnum);
+   if (val == 0)
+-    target_write_memory (addr, bundle, BUNDLE_LEN);
++    target_write_memory (addr, bundle_mem, BUNDLE_LEN);
+ 
+   do_cleanups (cleanup);
+   return val;
+@@ -631,12 +672,18 @@ ia64_memory_remove_breakpoint (struct gd
+ const unsigned char *
+ ia64_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *pcptr, int *lenptr)
+ {
+-  static unsigned char breakpoint[] =
+-    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+-  *lenptr = sizeof (breakpoint);
+-#if 0
+-  *pcptr &= ~0x0f;
++  static unsigned char breakpoint[BUNDLE_LEN];
++  int slotnum = (int) (*pcptr & 0x0f) / SLOT_MULTIPLIER;
++
++  if (slotnum > 2)
++    error (_("Can't insert breakpoint for slot numbers greater than 2."));
++
++#if BREAKPOINT_MAX < BUNDLE_LEN
++# error "BREAKPOINT_MAX < BUNDLE_LEN"
+ #endif
++
++  *lenptr = BUNDLE_LEN - 2;
++
+   return breakpoint;
+ }
+ 
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/breakpoint-shadow.c	28 Oct 2008 10:28:41 -0000
+@@ -0,0 +1,27 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int
++main (void)
++{
++  volatile int i;
++  
++  i = 1;	/* break-first */
++  i = 2;	/* break-second */
++
++  return 0;
++}
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/breakpoint-shadow.exp	28 Oct 2008 10:28:41 -0000
+@@ -0,0 +1,65 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++set testfile breakpoint-shadow
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# We need to start the inferior to place the breakpoints in the memory at all.
++if { [gdb_start_cmd] < 0 } {
++    untested start
++    return -1
++}
++gdb_test "" "main \\(\\) at .*" "start"
++
++# The default "auto" mode removes all the breakpoints when we stop (and not
++# running the nonstop mode).  We would not be able to test the shadow.
++#RHEL-5:
++#gdb_test "set breakpoint always-inserted on"
++#gdb_test "show breakpoint always-inserted" "Always inserted breakpoint mode is on."
++
++set match "\nDump of assembler code for function main:\r\n(.*)End of assembler dump.\r\n$gdb_prompt $"
++
++set test "disassembly without breakpoints"
++gdb_test_multiple "disass main" $test {
++    -re $match {
++    	set orig $expect_out(1,string)
++	pass $test
++    }
++}
++
++gdb_test "b [gdb_get_line_number "break-first"]" "Breakpoint \[0-9\] at .*" "First breakpoint placed"
++gdb_test "b [gdb_get_line_number "break-second"]" "Breakpoint \[0-9\] at .*" "Second breakpoint placed"
++
++set test "disassembly with breakpoints"
++gdb_test_multiple "disass main" $test {
++    -re $match {
++    	set got $expect_out(1,string)
++	if [string equal -nocase $orig $got] {
++	    pass $test
++	} else {
++	    fail $test
++	}
++    }
++}

@@ -192,9 +192,6 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 # ia32el.
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
-# Testcase for corrupted or missing location list information (BZ 196439).
-Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
-
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
@@ -342,8 +339,8 @@ Patch304: gdb-6.7-kernel-headers-compat.patch
 
 # Fix/implement the Fortran dynamic arrays support (BZ 377541).
 # Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
-Patch339: gdb-6.8-bz377541-vla-bound-undefined.patch
-Patch340: gdb-6.8-bz377541-vla-loc-kind.patch
+Patch345: gdb-6.8-bz377541-vla-bound-undefined.patch
+Patch346: gdb-6.8-bz377541-vla-loc-kind.patch
 Patch305: gdb-6.8-bz377541-vla.patch
 
 # Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
@@ -419,8 +416,11 @@ Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
 # Fix occasional crash on a removed watchpoint.
 Patch338: gdb-6.8-breakpoint-gone.patch
 
+# Fix occasional stepping lockup on many threads, seen on ia64.
+Patch342: gdb-6.8-ia64-breakpoint-restoration.patch
+
 # Test the watchpoints conditionals works.
-Patch343: gdb-6.8-watchpoint-cond-test.patch
+Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -545,7 +545,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch177 -p1
 %patch178 -p1
 %patch179 -p1
-%patch187 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -595,8 +594,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch298 -p1
 %patch301 -p1
 %patch304 -p1
-%patch339 -p1
-%patch340 -p1
+%patch345 -p1
+%patch346 -p1
 %patch305 -p1
 %patch306 -p1
 %patch309 -p1
@@ -624,6 +623,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch336 -p1
 %patch337 -p1
 %patch338 -p1
+%patch342 -p1
 %patch343 -p1
 %patch124 -p1
 
@@ -889,7 +889,10 @@ fi
 
 %changelog
 * Tue Nov  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-26
+- Fix more the variable-length-arrays support (BZ 468266, feature BZ 377541).
 - Fix the watchpoints conditionals.
+- Fix on PPC spurious SIGTRAPs on active watchpoints.
+- Fix occasional stepping lockup on many threads, seen on ia64.
 
 * Mon Nov  3 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-25
 - Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).

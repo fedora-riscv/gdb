@@ -1,9 +1,9 @@
 Based on:
 http://people.redhat.com/jkratoch/vla/
-fortran-dynamic-arrays-HEAD-i.patch
+fortran-dynamic-arrays-HEAD-j.patch
 
---- ./gdb/c-typeprint.c	2008-10-29 20:56:57.000000000 +0100
-+++ ./gdb/c-typeprint.c	2008-10-29 21:32:13.000000000 +0100
+--- ./gdb/c-typeprint.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/c-typeprint.c	2008-11-06 20:51:03.000000000 +0100
 @@ -541,7 +541,12 @@ c_type_print_varspec_suffix (struct type
  	fprintf_filtered (stream, ")");
  
@@ -18,8 +18,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  	&& !TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
  	fprintf_filtered (stream, "%d",
  			  (TYPE_LENGTH (type)
---- ./gdb/dwarf2expr.c	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/dwarf2expr.c	2008-10-29 21:32:13.000000000 +0100
+--- ./gdb/dwarf2expr.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/dwarf2expr.c	2008-11-06 20:51:03.000000000 +0100
 @@ -750,6 +750,13 @@ execute_stack_op (struct dwarf_expr_cont
  	  ctx->initialized = 0;
  	  goto no_push;
@@ -34,8 +34,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  	default:
  	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
  	}
---- ./gdb/dwarf2expr.h	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/dwarf2expr.h	2008-10-29 21:32:13.000000000 +0100
+--- ./gdb/dwarf2expr.h	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/dwarf2expr.h	2008-11-06 20:51:03.000000000 +0100
 @@ -61,10 +61,10 @@ struct dwarf_expr_context
       The result must be live until the current expression evaluation
       is complete.  */
@@ -48,8 +48,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  
    /* The current depth of dwarf expression recursion, via DW_OP_call*,
       DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
---- ./gdb/dwarf2loc.c	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/dwarf2loc.c	2008-11-01 20:31:51.000000000 +0100
+--- ./gdb/dwarf2loc.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/dwarf2loc.c	2008-11-06 20:51:35.000000000 +0100
 @@ -106,6 +106,9 @@ struct dwarf_expr_baton
  {
    struct frame_info *frame;
@@ -60,7 +60,49 @@ fortran-dynamic-arrays-HEAD-i.patch
  };
  
  /* Helper functions for dwarf2_evaluate_loc_desc.  */
-@@ -189,6 +192,105 @@ dwarf_expr_tls_address (void *baton, COR
+@@ -164,22 +167,32 @@ dwarf_expr_frame_base (void *baton, gdb_
+       *start = find_location_expression (symbaton, length,
+ 					 get_frame_address_in_block (frame));
+     }
+-  else
++  else if (SYMBOL_OPS (framefunc) == &dwarf2_locexpr_funcs)
+     {
+       struct dwarf2_locexpr_baton *symbaton;
++
+       symbaton = SYMBOL_LOCATION_BATON (framefunc);
+-      if (symbaton != NULL)
+-	{
+-	  *length = symbaton->size;
+-	  *start = symbaton->data;
+-	}
+-      else
+-	*start = NULL;
++      gdb_assert (symbaton != NULL);
++      *start = symbaton->data;
++      *length = symbaton->size;
+     }
++  else if (SYMBOL_OPS (framefunc) == &dwarf2_missing_funcs)
++    {
++      struct dwarf2_locexpr_baton *symbaton;
++
++      symbaton = SYMBOL_LOCATION_BATON (framefunc);
++      gdb_assert (symbaton == NULL);
++      *start = NULL;
++      *length = 0;	/* unused */
++    }
++  else
++    internal_error (__FILE__, __LINE__,
++		    _("Unsupported SYMBOL_OPS %p for \"%s\""),
++		    SYMBOL_OPS (framefunc), SYMBOL_PRINT_NAME (framefunc));
+ 
+   if (*start == NULL)
+     error (_("Could not find the frame base for \"%s\"."),
+-	   SYMBOL_NATURAL_NAME (framefunc));
++	   SYMBOL_PRINT_NAME (framefunc));
+ }
+ 
+ /* Using the objfile specified in BATON, find the address for the
+@@ -192,6 +205,117 @@ dwarf_expr_tls_address (void *baton, COR
    return target_translate_tls_address (debaton->objfile, offset);
  }
  
@@ -95,7 +137,10 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  xfree (prev_save);
 +}
 +
-+/* It would be useful to sanity check ADDRESS - such as for some objects with
++/* Set the base address - DW_AT_location - of a variable.  It is being later
++   used to derive other object addresses by DW_OP_push_object_address.
++
++   It would be useful to sanity check ADDRESS - such as for some objects with
 +   unset VALUE_ADDRESS - but some valid addresses may be zero (such as first
 +   objects in relocatable .o files).  */
 +
@@ -113,9 +158,10 @@ fortran-dynamic-arrays-HEAD-i.patch
 +
 +/* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
 +   by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
-+   get_selected_frame to find it.  */
++   get_selected_frame to find it.  Returned dwarf_expr_context freeing is
++   pushed on the cleanup chain.  */
 +
-+struct dwarf_expr_context *
++static struct dwarf_expr_context *
 +dwarf_expr_prep_ctx (struct frame_info *frame, gdb_byte *data,
 +		     unsigned short size, struct objfile *objfile)
 +{
@@ -137,7 +183,12 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  ctx->get_tls_address = dwarf_expr_tls_address;
 +  ctx->get_object_address = dwarf_expr_object_address;
 +
++  make_cleanup ((make_cleanup_ftype *) free_dwarf_expr_context, ctx);
++
 +  dwarf_expr_eval (ctx, data, size);
++
++  /* It was used only during dwarf_expr_eval.  */
++  ctx->baton = NULL;
 +
 +  return ctx;
 +}
@@ -150,6 +201,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +{
 +  struct dwarf_expr_context *ctx;
 +  CORE_ADDR retval;
++  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 +
 +  ctx = dwarf_expr_prep_ctx (NULL, dlbaton->data, dlbaton->size,
 +			     dlbaton->objfile);
@@ -160,40 +212,44 @@ fortran-dynamic-arrays-HEAD-i.patch
 +
 +  retval = dwarf_expr_fetch (ctx, 0);
 +
++  do_cleanups (back_to);
++
 +  return retval;
 +}
 +
  /* Evaluate a location description, starting at DATA and with length
     SIZE, to find the current location of variable VAR in the context
     of FRAME.  */
-@@ -199,7 +301,6 @@ dwarf2_evaluate_loc_desc (struct symbol 
+@@ -202,8 +326,8 @@ dwarf2_evaluate_loc_desc (struct symbol 
  {
    struct gdbarch *arch = get_frame_arch (frame);
    struct value *retval;
 -  struct dwarf_expr_baton baton;
    struct dwarf_expr_context *ctx;
++  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
  
    if (size == 0)
-@@ -210,17 +311,8 @@ dwarf2_evaluate_loc_desc (struct symbol 
+     {
+@@ -213,17 +337,8 @@ dwarf2_evaluate_loc_desc (struct symbol 
        return retval;
      }
  
 -  baton.frame = frame;
 -  baton.objfile = objfile;
--
++  ctx = dwarf_expr_prep_ctx (frame, data, size, objfile);
+ 
 -  ctx = new_dwarf_expr_context ();
 -  ctx->baton = &baton;
 -  ctx->read_reg = dwarf_expr_read_reg;
 -  ctx->read_mem = dwarf_expr_read_mem;
 -  ctx->get_frame_base = dwarf_expr_frame_base;
 -  ctx->get_tls_address = dwarf_expr_tls_address;
-+  ctx = dwarf_expr_prep_ctx (frame, data, size, objfile);
- 
+-
 -  dwarf_expr_eval (ctx, data, size);
    if (ctx->num_pieces > 0)
      {
        int i;
-@@ -258,6 +351,10 @@ dwarf2_evaluate_loc_desc (struct symbol 
+@@ -261,6 +376,10 @@ dwarf2_evaluate_loc_desc (struct symbol 
      {
        CORE_ADDR address = dwarf_expr_fetch (ctx, 0);
  
@@ -204,24 +260,100 @@ fortran-dynamic-arrays-HEAD-i.patch
        retval = allocate_value (SYMBOL_TYPE (var));
        VALUE_LVAL (retval) = lval_memory;
        set_value_lazy (retval, 1);
---- ./gdb/dwarf2loc.h	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/dwarf2loc.h	2008-11-01 20:16:31.000000000 +0100
-@@ -66,4 +66,13 @@ struct dwarf2_loclist_baton
+@@ -269,7 +388,7 @@ dwarf2_evaluate_loc_desc (struct symbol 
+ 
+   set_value_initialized (retval, ctx->initialized);
+ 
+-  free_dwarf_expr_context (ctx);
++  do_cleanups (back_to);
+ 
+   return retval;
+ }
+@@ -578,7 +697,7 @@ static int
+ loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
+ {
+   /* FIXME: Could print the entire list of locations.  */
+-  fprintf_filtered (stream, "a variable with multiple locations");
++  fprintf_filtered (stream, _("a variable with multiple locations"));
+   return 1;
+ }
+ 
+@@ -594,16 +713,56 @@ loclist_tracepoint_var_ref (struct symbo
+ 
+   data = find_location_expression (dlbaton, &size, ax->scope);
+   if (data == NULL)
+-    error (_("Variable \"%s\" is not available."), SYMBOL_NATURAL_NAME (symbol));
++    error (_("Variable \"%s\" is not available."), SYMBOL_PRINT_NAME (symbol));
+ 
+   dwarf2_tracepoint_var_ref (symbol, ax, value, data, size);
+ }
+ 
+-/* The set of location functions used with the DWARF-2 expression
+-   evaluator and location lists.  */
++/* The set of location functions used with the DWARF-2 location lists.  */
+ const struct symbol_ops dwarf2_loclist_funcs = {
+   loclist_read_variable,
+   loclist_read_needs_frame,
+   loclist_describe_location,
+   loclist_tracepoint_var_ref
+ };
++
++static struct value *
++missing_read_variable (struct symbol *symbol, struct frame_info *frame)
++{
++  struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
++
++  gdb_assert (dlbaton == NULL);
++  error (_("Unable to resolve variable \"%s\""), SYMBOL_PRINT_NAME (symbol));
++}
++
++static int
++missing_read_needs_frame (struct symbol *symbol)
++{
++  return 0;
++}
++
++static int
++missing_describe_location (struct symbol *symbol, struct ui_file *stream)
++{
++  fprintf_filtered (stream, _("a variable we are unable to resolve"));
++  return 1;
++}
++
++static void
++missing_tracepoint_var_ref (struct symbol *symbol, struct agent_expr *ax,
++			    struct axs_value *value)
++{
++  struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
++
++  gdb_assert (dlbaton == NULL);
++  error (_("Unable to resolve variable \"%s\""), SYMBOL_PRINT_NAME (symbol));
++}
++
++/* The set of location functions used with the DWARF-2 evaluator when we are
++   unable to resolve the symbols.  */
++const struct symbol_ops dwarf2_missing_funcs = {
++  missing_read_variable,
++  missing_read_needs_frame,
++  missing_describe_location,
++  missing_tracepoint_var_ref
++};
+--- ./gdb/dwarf2loc.h	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/dwarf2loc.h	2008-11-06 20:52:23.000000000 +0100
+@@ -65,5 +65,11 @@ struct dwarf2_loclist_baton
+ 
  extern const struct symbol_ops dwarf2_locexpr_funcs;
  extern const struct symbol_ops dwarf2_loclist_funcs;
- 
-+extern void object_address_set (CORE_ADDR address);
++extern const struct symbol_ops dwarf2_missing_funcs;
 +
-+extern struct dwarf_expr_context *dwarf_expr_prep_ctx
-+  (struct frame_info *frame, gdb_byte *data, unsigned short size,
-+   struct objfile *objfile);
++extern void object_address_set (CORE_ADDR address);
 +
 +extern CORE_ADDR dwarf_locexpr_baton_eval
 +  (struct dwarf2_locexpr_baton *dlbaton);
-+
+ 
  #endif /* dwarf2loc.h */
---- ./gdb/dwarf2read.c	2008-10-29 20:56:57.000000000 +0100
-+++ ./gdb/dwarf2read.c	2008-11-01 20:30:52.000000000 +0100
+--- ./gdb/dwarf2read.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/dwarf2read.c	2008-11-06 20:51:35.000000000 +0100
 @@ -1005,7 +1005,14 @@ static void store_in_ref_table (unsigned
  static unsigned int dwarf2_get_ref_die_offset (struct attribute *,
  					       struct dwarf2_cu *);
@@ -338,12 +470,12 @@ fortran-dynamic-arrays-HEAD-i.patch
 +
    attr = dwarf2_attr (die, DW_AT_string_length, cu);
 -  if (attr)
--    {
++  switch (dwarf2_get_attr_constant_value (attr, &length))
+     {
 -      length = DW_UNSND (attr);
 -    }
 -  else
-+  switch (dwarf2_get_attr_constant_value (attr, &length))
-     {
+-    {
 -      /* check for the DW_AT_byte_size attribute */
 +    case dwarf2_attr_const:
 +      /* We currently do not support a constant address where the location
@@ -616,7 +748,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 -      return default_value;
 +      *val_return = DW_SND (attr);
 +      return dwarf2_attr_const;
-     }
++    }
 +  if (attr->form == DW_FORM_udata
 +      || attr->form == DW_FORM_data1
 +      || attr->form == DW_FORM_data2
@@ -625,7 +757,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +    {
 +      *val_return = DW_UNSND (attr);
 +      return dwarf2_attr_const;
-+    }
+     }
 +  if (attr->form == DW_FORM_block
 +      || attr->form == DW_FORM_block1
 +      || attr->form == DW_FORM_block2
@@ -672,19 +804,28 @@ fortran-dynamic-arrays-HEAD-i.patch
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -9938,34 +10113,18 @@ dwarf2_symbol_mark_computed (struct attr
+@@ -9938,34 +10113,24 @@ dwarf2_symbol_mark_computed (struct attr
        SYMBOL_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
--  else
 +  else if (attr_form_is_block (attr))
++    {
++      SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
++      SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
++    }
+   else
      {
 -      struct dwarf2_locexpr_baton *baton;
--
++      dwarf2_invalid_attrib_class_complaint ("location description",
++					     SYMBOL_NATURAL_NAME (sym));
+ 
 -      baton = obstack_alloc (&cu->objfile->objfile_obstack,
 -			     sizeof (struct dwarf2_locexpr_baton));
 -      baton->objfile = objfile;
--
++      /* Some methods are called without checking SYMBOL_OPS validity.  */
++      SYMBOL_OPS (sym) = &dwarf2_missing_funcs;
++      SYMBOL_LOCATION_BATON (sym) = NULL;
+ 
 -      if (attr_form_is_block (attr))
 -	{
 -	  /* Note that we're just copying the block's data pointer
@@ -703,21 +844,16 @@ fortran-dynamic-arrays-HEAD-i.patch
 -	  baton->data = NULL;
 -	}
 -      
-       SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
+-      SYMBOL_OPS (sym) = &dwarf2_locexpr_funcs;
 -      SYMBOL_LOCATION_BATON (sym) = baton;
-+      SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
-+    }
-+  else
-+    {
-+      dwarf2_invalid_attrib_class_complaint ("location description",
-+					     SYMBOL_NATURAL_NAME (sym));
-+      /* We have no valid SYMBOL_OPS.  */
++      /* For functions a missing DW_AT_frame_base does not optimize out the
++	 whole function definition, only its frame base resolving.  */
 +      if (attr->name == DW_AT_location)
 +	SYMBOL_CLASS (sym) = LOC_OPTIMIZED_OUT;
      }
  }
  
-@@ -10205,6 +10363,27 @@ offset_and_type_eq (const void *item_lhs
+@@ -10205,6 +10370,27 @@ offset_and_type_eq (const void *item_lhs
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -745,7 +881,7 @@ fortran-dynamic-arrays-HEAD-i.patch
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  */
  
-@@ -10215,6 +10394,8 @@ set_die_type (struct die_info *die, stru
+@@ -10215,6 +10401,8 @@ set_die_type (struct die_info *die, stru
  
    die->type = type;
  
@@ -754,8 +890,8 @@ fortran-dynamic-arrays-HEAD-i.patch
    if (cu->per_cu == NULL)
      return;
  
---- ./gdb/eval.c	2008-10-29 20:56:57.000000000 +0100
-+++ ./gdb/eval.c	2008-11-01 19:58:56.000000000 +0100
+--- ./gdb/eval.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/eval.c	2008-11-06 20:51:35.000000000 +0100
 @@ -38,6 +38,7 @@
  #include "ui-out.h"
  #include "exceptions.h"
@@ -764,7 +900,26 @@ fortran-dynamic-arrays-HEAD-i.patch
  
  #include "gdb_assert.h"
  
-@@ -1644,9 +1645,12 @@ evaluate_subexp_standard (struct type *e
+@@ -429,6 +430,7 @@ evaluate_subexp_standard (struct type *e
+   long mem_offset;
+   struct type **arg_types;
+   int save_pos1;
++  struct cleanup *old_chain;
+ 
+   pc = (*pos)++;
+   op = exp->elts[pc].opcode;
+@@ -1280,7 +1282,10 @@ evaluate_subexp_standard (struct type *e
+ 
+       /* First determine the type code we are dealing with.  */
+       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
++      old_chain = make_cleanup (null_cleanup, 0);
++      object_address_set (VALUE_ADDRESS (arg1));
+       type = check_typedef (value_type (arg1));
++      do_cleanups (old_chain);
+       code = TYPE_CODE (type);
+ 
+       if (code == TYPE_CODE_PTR)
+@@ -1644,13 +1649,19 @@ evaluate_subexp_standard (struct type *e
        {
  	int subscript_array[MAX_FORTRAN_DIMS];
  	int array_size_array[MAX_FORTRAN_DIMS];
@@ -777,7 +932,14 @@ fortran-dynamic-arrays-HEAD-i.patch
  
  	if (nargs > MAX_FORTRAN_DIMS)
  	  error (_("Too many subscripts for F77 (%d Max)"), MAX_FORTRAN_DIMS);
-@@ -1678,6 +1682,9 @@ evaluate_subexp_standard (struct type *e
+ 
++	old_chain = make_cleanup (null_cleanup, 0);
++	object_address_set (VALUE_ADDRESS (arg1));
++
+ 	tmp_type = check_typedef (value_type (arg1));
+ 	ndimensions = calc_f77_array_dims (type);
+ 
+@@ -1678,6 +1689,9 @@ evaluate_subexp_standard (struct type *e
  	    upper = f77_get_upperbound (tmp_type);
  	    lower = f77_get_lowerbound (tmp_type);
  
@@ -787,12 +949,17 @@ fortran-dynamic-arrays-HEAD-i.patch
  	    array_size_array[nargs - i - 1] = upper - lower + 1;
  
  	    /* Zero-normalize subscripts so that offsetting will work. */
-@@ -1698,15 +1705,20 @@ evaluate_subexp_standard (struct type *e
+@@ -1696,17 +1710,25 @@ evaluate_subexp_standard (struct type *e
+ 	      tmp_type = check_typedef (TYPE_TARGET_TYPE (tmp_type));
+ 	  }
  
- 	/* Now let us calculate the offset for this item */
+-	/* Now let us calculate the offset for this item */
++	/* Kept for the f77_get_upperbound / f77_get_lowerbound calls above.  */
++	do_cleanups (old_chain);
  
 -	offset_item = subscript_array[ndimensions - 1];
--
++	/* Now let us calculate the offset for this item */
+ 
 -	for (i = ndimensions - 1; i > 0; --i)
 -	  offset_item =
 -	    array_size_array[i - 1] * offset_item + subscript_array[i - 1];
@@ -815,7 +982,7 @@ fortran-dynamic-arrays-HEAD-i.patch
  
  	/* Let us now play a dirty trick: we will take arg1 
  	   which is a value node pointing to the topmost level
-@@ -1716,7 +1728,7 @@ evaluate_subexp_standard (struct type *e
+@@ -1716,7 +1738,7 @@ evaluate_subexp_standard (struct type *e
  	   returns the correct type value */
  
  	deprecated_set_value_type (arg1, tmp_type);
@@ -824,7 +991,7 @@ fortran-dynamic-arrays-HEAD-i.patch
        }
  
      case BINOP_LOGICAL_AND:
-@@ -2300,9 +2312,12 @@ evaluate_subexp_for_sizeof (struct expre
+@@ -2300,9 +2322,12 @@ evaluate_subexp_for_sizeof (struct expre
  
      case OP_VAR_VALUE:
        (*pos) += 4;
@@ -840,8 +1007,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  
      default:
        val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
---- ./gdb/f-lang.h	2008-10-29 10:55:07.000000000 +0100
-+++ ./gdb/f-lang.h	2008-10-29 21:32:13.000000000 +0100
+--- ./gdb/f-lang.h	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/f-lang.h	2008-11-06 20:51:03.000000000 +0100
 @@ -28,6 +28,10 @@ extern void f_error (char *);	/* Defined
  extern void f_print_type (struct type *, char *, struct ui_file *, int,
  			  int);
@@ -853,8 +1020,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  extern int f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
  			struct ui_file *, int, int, int,
  			enum val_prettyprint);
---- ./gdb/f-typeprint.c	2008-10-29 10:55:07.000000000 +0100
-+++ ./gdb/f-typeprint.c	2008-11-01 17:51:42.000000000 +0100
+--- ./gdb/f-typeprint.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/f-typeprint.c	2008-11-06 20:51:03.000000000 +0100
 @@ -31,7 +31,7 @@
  #include "gdbcore.h"
  #include "target.h"
@@ -990,8 +1157,8 @@ fortran-dynamic-arrays-HEAD-i.patch
        if (passed_a_ptr)
  	fprintf_filtered (stream, ")");
  
---- ./gdb/f-valprint.c	2008-10-29 20:48:30.000000000 +0100
-+++ ./gdb/f-valprint.c	2008-11-01 17:55:30.000000000 +0100
+--- ./gdb/f-valprint.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/f-valprint.c	2008-11-06 20:51:03.000000000 +0100
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIM
  /* The following macro gives us the size of the nth dimension, Where 
     n is 1 based. */
@@ -1111,8 +1278,8 @@ fortran-dynamic-arrays-HEAD-i.patch
    CHECK_TYPEDEF (type);
    switch (TYPE_CODE (type))
      {
---- ./gdb/findvar.c	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/findvar.c	2008-11-01 20:13:39.000000000 +0100
+--- ./gdb/findvar.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/findvar.c	2008-11-06 20:51:03.000000000 +0100
 @@ -34,6 +34,7 @@
  #include "regcache.h"
  #include "user-regs.h"
@@ -1315,8 +1482,8 @@ fortran-dynamic-arrays-HEAD-i.patch
      }
    else
      {
---- ./gdb/gdbtypes.c	2008-10-29 21:22:30.000000000 +0100
-+++ ./gdb/gdbtypes.c	2008-11-01 20:20:42.000000000 +0100
+--- ./gdb/gdbtypes.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/gdbtypes.c	2008-11-06 20:51:03.000000000 +0100
 @@ -38,6 +38,8 @@
  #include "cp-abi.h"
  #include "gdb_assert.h"
@@ -1683,8 +1850,8 @@ fortran-dynamic-arrays-HEAD-i.patch
    return type;
  }
  
---- ./gdb/gdbtypes.h	2008-10-29 20:56:57.000000000 +0100
-+++ ./gdb/gdbtypes.h	2008-11-02 11:01:18.000000000 +0100
+--- ./gdb/gdbtypes.h	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/gdbtypes.h	2008-11-06 20:51:03.000000000 +0100
 @@ -310,6 +310,16 @@ enum type_code
  #define TYPE_FLAG_NOTTEXT	(1 << 17)
  #define TYPE_NOTTEXT(t)		(TYPE_FLAGS (t) & TYPE_FLAG_NOTTEXT)
@@ -1817,8 +1984,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  extern struct type *create_string_type (struct type *, struct type *);
  
  extern struct type *create_set_type (struct type *, struct type *);
---- ./gdb/printcmd.c	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/printcmd.c	2008-10-29 21:32:14.000000000 +0100
+--- ./gdb/printcmd.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/printcmd.c	2008-11-06 20:51:03.000000000 +0100
 @@ -888,6 +888,11 @@ print_command_1 (char *exp, int inspect,
    else
      val = access_value_history (0);
@@ -1832,7 +1999,7 @@ fortran-dynamic-arrays-HEAD-i.patch
  		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
      {
 --- ./gdb/testsuite/gdb.base/vla-overflow.c	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.base/vla-overflow.c	2008-11-01 17:18:12.000000000 +0100
++++ ./gdb/testsuite/gdb.base/vla-overflow.c	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,30 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -1865,7 +2032,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  return 0;
 +}
 --- ./gdb/testsuite/gdb.base/vla-overflow.exp	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.base/vla-overflow.exp	2008-11-01 17:42:32.000000000 +0100
++++ ./gdb/testsuite/gdb.base/vla-overflow.exp	2008-11-06 20:51:35.000000000 +0100
 @@ -0,0 +1,108 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -1972,11 +2139,11 @@ fortran-dynamic-arrays-HEAD-i.patch
 +verbose -log "kb_found in abort() = [expr [memory_v_pages_get] * $pagesize / 1024]"
 +
 +# `abort' can get expressed as `*__GI_abort'.
-+gdb_test "bt" "in \[^ \]*abort \\(.* in main \\(.*" "Backter after abort()"
++gdb_test "bt" "in \[^ \]*abort \\(.* in main \\(.*" "Backtrace after abort()"
 +
 +verbose -log "kb_found in bt after abort() = [expr [memory_v_pages_get] * $pagesize / 1024]"
 --- ./gdb/testsuite/gdb.base/vla.c	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.base/vla.c	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.base/vla.c	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,55 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -2034,7 +2201,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  return 0;
 +}
 --- ./gdb/testsuite/gdb.base/vla.exp	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.base/vla.exp	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.base/vla.exp	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,62 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -2098,8 +2265,135 @@ fortran-dynamic-arrays-HEAD-i.patch
 +gdb_test "p temp1" " = '1' <repeats 78 times>" "second: print temp1"
 +gdb_test "p temp2" " = '2' <repeats 78 times>" "second: print temp2"
 +gdb_test "p temp3" " = '3' <repeats 48 times>" "second: print temp3"
+--- ./gdb/testsuite/gdb.dwarf2/dw2-stripped.c	1970-01-01 01:00:00.000000000 +0100
++++ ./gdb/testsuite/gdb.dwarf2/dw2-stripped.c	2008-11-06 20:51:35.000000000 +0100
+@@ -0,0 +1,42 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2004 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
++   USA.  */
++
++
++/* The function `func1' traced into must have debug info on offset > 0;
++   (DW_UNSND (attr)).  This is the reason of `func0' existence.  */
++
++void
++func0(int a, int b)
++{
++}
++
++/* `func1' being traced into must have some arguments to dump.  */
++
++void
++func1(int a, int b)
++{
++  func0 (a,b);
++}
++
++int
++main(void)
++{
++  func1 (1, 2);
++  return 0;
++}
+--- ./gdb/testsuite/gdb.dwarf2/dw2-stripped.exp	1970-01-01 01:00:00.000000000 +0100
++++ ./gdb/testsuite/gdb.dwarf2/dw2-stripped.exp	2008-11-06 20:51:35.000000000 +0100
+@@ -0,0 +1,79 @@
++# Copyright 2006 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++# Minimal DWARF-2 unit test
++
++# This test can only be run on targets which support DWARF-2.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0  
++}
++
++set testfile "dw2-stripped"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}.x
++
++remote_exec build "rm -f ${binfile}"
++
++# get the value of gcc_compiled
++if [get_compiler_info ${binfile}] {
++    return -1
++}
++
++# This test can only be run on gcc as we use additional_flags=FIXME
++if {$gcc_compiled == 0} {
++    return 0
++}
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-ggdb3}] != "" } {
++    return -1
++}
++
++remote_exec build "objcopy -R .debug_loc ${binfile}"
++set strip_output [remote_exec build "objdump -h ${binfile}"]
++
++set test "stripping test file preservation"
++if [ regexp ".debug_info " $strip_output]  {
++    pass "$test (.debug_info preserved)"
++} else {
++    fail "$test (.debug_info got also stripped)"
++}
++
++set test "stripping test file functionality"
++if [ regexp ".debug_loc " $strip_output]  {
++    fail "$test (.debug_loc still present)"
++} else {
++    pass "$test (.debug_loc stripped)"
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# For C programs, "start" should stop in main().
++
++gdb_test "start" \
++         ".*main \\(\\) at .*" \
++         "start"
++gdb_test "step" \
++         "func.* \\(.*\\) at .*" \
++         "step"
 --- ./gdb/testsuite/gdb.fortran/dynamic.exp	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.fortran/dynamic.exp	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/dynamic.exp	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,141 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -2243,7 +2537,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +# maps to foo::vary(1,3)
 +gdb_test "p vart(2,9)" "\\$\[0-9\]* = 10"
 --- ./gdb/testsuite/gdb.fortran/dynamic.f90	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.fortran/dynamic.f90	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/dynamic.f90	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,97 @@
 +! Copyright 2007 Free Software Foundation, Inc.
 +!
@@ -2343,7 +2637,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  if (x (3, 1) .ne. 10) call abort
 +end
 --- ./gdb/testsuite/gdb.fortran/string.exp	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.fortran/string.exp	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/string.exp	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,59 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -2405,7 +2699,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +gdb_test "p e" "\\$\[0-9\]* = 'e   '" "p e re-set"
 +gdb_test "p f" "\\$\[0-9\]* = \\(\\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f2  ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\)" "p *f re-set"
 --- ./gdb/testsuite/gdb.fortran/string.f90	1970-01-01 01:00:00.000000000 +0100
-+++ ./gdb/testsuite/gdb.fortran/string.f90	2008-10-29 21:32:14.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/string.f90	2008-11-06 20:51:03.000000000 +0100
 @@ -0,0 +1,37 @@
 +! Copyright 2008 Free Software Foundation, Inc.
 +!
@@ -2444,8 +2738,8 @@ fortran-dynamic-arrays-HEAD-i.patch
 +  h = 'h'
 +  call foo (g, h)
 +end
---- ./gdb/typeprint.c	2008-10-29 10:50:23.000000000 +0100
-+++ ./gdb/typeprint.c	2008-10-29 21:32:46.000000000 +0100
+--- ./gdb/typeprint.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/typeprint.c	2008-11-06 20:51:35.000000000 +0100
 @@ -33,6 +33,7 @@
  #include "cp-abi.h"
  #include "typeprint.h"
@@ -2464,8 +2758,43 @@ fortran-dynamic-arrays-HEAD-i.patch
    LA_PRINT_TYPE (type, varstring, stream, show, 0);
  }
  
---- ./gdb/valarith.c	2008-02-04 01:23:04.000000000 +0100
-+++ ./gdb/valarith.c	2008-11-01 20:17:00.000000000 +0100
+@@ -113,7 +117,8 @@ whatis_exp (char *exp, int show)
+ {
+   struct expression *expr;
+   struct value *val;
+-  struct cleanup *old_chain = NULL;
++  /* Required at least for the object_address_set call.  */
++  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+   struct type *real_type = NULL;
+   struct type *type;
+   int full = 0;
+@@ -123,12 +128,13 @@ whatis_exp (char *exp, int show)
+   if (exp)
+     {
+       expr = parse_expression (exp);
+-      old_chain = make_cleanup (free_current_contents, &expr);
++      make_cleanup (free_current_contents, &expr);
+       val = evaluate_type (expr);
+     }
+   else
+     val = access_value_history (0);
+ 
++  object_address_set (VALUE_ADDRESS (val));
+   type = value_type (val);
+ 
+   if (objectprint)
+@@ -164,8 +170,7 @@ whatis_exp (char *exp, int show)
+   type_print (type, "", gdb_stdout, show);
+   printf_filtered ("\n");
+ 
+-  if (exp)
+-    do_cleanups (old_chain);
++  do_cleanups (old_chain);
+ }
+ 
+ static void
+--- ./gdb/valarith.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/valarith.c	2008-11-06 20:51:03.000000000 +0100
 @@ -39,7 +39,6 @@
  #define TRUNCATION_TOWARDS_ZERO ((-5 / 2) == -2)
  #endif
@@ -2601,8 +2930,8 @@ fortran-dynamic-arrays-HEAD-i.patch
    return v;
  }
  
---- ./gdb/valops.c	2008-10-29 20:56:57.000000000 +0100
-+++ ./gdb/valops.c	2008-10-29 21:57:54.000000000 +0100
+--- ./gdb/valops.c	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/valops.c	2008-11-06 20:51:35.000000000 +0100
 @@ -37,6 +37,7 @@
  #include "dictionary.h"
  #include "cp-support.h"
@@ -2611,10 +2940,12 @@ fortran-dynamic-arrays-HEAD-i.patch
  
  #include <errno.h>
  #include "gdb_string.h"
-@@ -504,6 +505,46 @@ value_one (struct type *type, enum lval_
+@@ -504,6 +505,49 @@ value_one (struct type *type, enum lval_
    return val;
  }
  
++/* object_address_set must be already called before this function.  */
++
 +const char *
 +object_address_data_not_valid (struct type *type)
 +{
@@ -2632,8 +2963,8 @@ fortran-dynamic-arrays-HEAD-i.patch
 +
 +/* Return non-zero if the variable is valid.  If it is valid the function
 +   may store the data address (DW_AT_DATA_LOCATION) of TYPE at *ADDRESS_RETURN.
-+   You should set *ADDRESS_RETURN as VALUE_ADDRESS (VAL) before calling this
-+   function as if no DW_AT_DATA_LOCATION is present for TYPE the address at
++   You must set *ADDRESS_RETURN as VALUE_ADDRESS (VAL) before calling this
++   function.  If no DW_AT_DATA_LOCATION is present for TYPE the address at
 +   *ADDRESS_RETURN is left unchanged.  ADDRESS_RETURN must not be NULL, use
 +   object_address_data_not_valid () for just the data validity check.  */
 +
@@ -2642,6 +2973,7 @@ fortran-dynamic-arrays-HEAD-i.patch
 +{
 +  gdb_assert (address_return != NULL);
 +
++  object_address_set (*address_return);
 +  if (object_address_data_not_valid (type) != NULL)
 +    {
 +      /* Do not try to evaluate DW_AT_data_location as it may even crash
@@ -2658,7 +2990,7 @@ fortran-dynamic-arrays-HEAD-i.patch
  /* Return a value with type TYPE located at ADDR.
  
     Call value_at only if the data needs to be fetched immediately;
-@@ -570,12 +611,21 @@ value_at_lazy (struct type *type, CORE_A
+@@ -570,12 +614,21 @@ value_at_lazy (struct type *type, CORE_A
  int
  value_fetch_lazy (struct value *val)
  {
@@ -2685,7 +3017,7 @@ fortran-dynamic-arrays-HEAD-i.patch
  
    set_value_lazy (val, 0);
    return 0;
-@@ -887,12 +937,17 @@ struct value *
+@@ -887,12 +940,17 @@ struct value *
  value_coerce_array (struct value *arg1)
  {
    struct type *type = check_typedef (value_type (arg1));
@@ -2704,8 +3036,8 @@ fortran-dynamic-arrays-HEAD-i.patch
  }
  
  /* Given a value which is a function, return a value which is a pointer
---- ./gdb/value.h	2008-02-04 01:23:04.000000000 +0100
-+++ ./gdb/value.h	2008-11-01 20:16:57.000000000 +0100
+--- ./gdb/value.h	2008-11-06 20:50:14.000000000 +0100
++++ ./gdb/value.h	2008-11-06 20:51:03.000000000 +0100
 @@ -284,6 +284,10 @@ extern struct value *value_from_decfloat
  					  const gdb_byte *decbytes);
  extern struct value *value_from_string (char *string);

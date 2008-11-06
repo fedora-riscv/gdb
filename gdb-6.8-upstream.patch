@@ -1716,3 +1716,1128 @@ diff -u -r1.309 -r1.310
  	  b->loc->cond = parse_exp_1 (&s, b->exp_valid_block, 0);
  	}
      }
+
+
+
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=196439
+http://sourceware.org/ml/gdb-patches/2008-04/msg00628.html
+http://sourceware.org/ml/gdb-cvs/2008-05/msg00051.html
+
+Testcase:
+gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
+
+2008-05-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (dwarf_expr_frame_base): Error out on missing
+	SYMBOL_LOCATION_BATON.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/dwarf2loc.c,v
+retrieving revision 1.50
+retrieving revision 1.51
+diff -u -r1.50 -r1.51
+--- src/gdb/dwarf2loc.c	2008/03/26 14:53:28	1.50
++++ src/gdb/dwarf2loc.c	2008/05/04 12:44:16	1.51
+@@ -166,8 +166,13 @@
+     {
+       struct dwarf2_locexpr_baton *symbaton;
+       symbaton = SYMBOL_LOCATION_BATON (framefunc);
+-      *length = symbaton->size;
+-      *start = symbaton->data;
++      if (symbaton != NULL)
++	{
++	  *length = symbaton->size;
++	  *start = symbaton->data;
++	}
++      else
++	*start = NULL;
+     }
+ 
+   if (*start == NULL)
+
+
+
+http://sourceware.org/ml/gdb-patches/2008-04/msg00508.html
+http://sourceware.org/ml/gdb-cvs/2008-05/msg00017.html
+
+Test applicable from:
+gdb-6.8-watchpoint-conditionals-test.patch
+
+gdb/
+2008-05-02  Andreas Schwab  <schwab@suse.de>
+
+	* target.h (struct target_ops): Add
+	to_watchpoint_addr_within_range.
+	(target_watchpoint_addr_within_range): New function.
+	* target.c (update_current_target): Inherit
+	to_watchpoint_addr_within_range, defaulting to
+	default_watchpoint_addr_within_range.
+	(default_watchpoint_addr_within_range): New function.
+	(debug_to_watchpoint_addr_within_range): New function.
+	(setup_target_debug): Set to_watchpoint_addr_within_range.
+	* ppc-linux-nat.c (ppc_linux_watchpoint_addr_within_range):
+	New function.
+	(_initialize_ppc_linux_nat): Set to_watchpoint_addr_within_range.
+	* breakpoint.c (watchpoints_triggered): Use
+	target_watchpoint_addr_within_range.
+
+gdb/doc/
+2008-05-02  Andreas Schwab  <schwab@suse.de>
+
+	* gdbint.texinfo (Algorithms): Describe
+	target_watchpoint_addr_within_range.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/target.h,v
+retrieving revision 1.117
+retrieving revision 1.118
+diff -u -r1.117 -r1.118
+--- src/gdb/target.h	2008/05/01 19:31:51	1.117
++++ src/gdb/target.h	2008/05/02 11:07:25	1.118
+@@ -367,6 +367,8 @@
+     int to_have_steppable_watchpoint;
+     int to_have_continuable_watchpoint;
+     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
++    int (*to_watchpoint_addr_within_range) (struct target_ops *,
++					    CORE_ADDR, CORE_ADDR, int);
+     int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, int);
+     void (*to_terminal_init) (void);
+     void (*to_terminal_inferior) (void);
+@@ -1093,6 +1095,9 @@
+ #define target_stopped_data_address_p(CURRENT_TARGET) (1)
+ #endif
+ 
++#define target_watchpoint_addr_within_range(target, addr, start, length) \
++  (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
++
+ extern const struct target_desc *target_read_description (struct target_ops *);
+ 
+ /* Command logging facility.  */
+===================================================================
+RCS file: /cvs/src/src/gdb/target.c,v
+retrieving revision 1.160
+retrieving revision 1.161
+diff -u -r1.160 -r1.161
+--- src/gdb/target.c	2008/04/24 10:21:44	1.160
++++ src/gdb/target.c	2008/05/02 11:07:25	1.161
+@@ -49,6 +49,9 @@
+ 
+ static void default_terminal_info (char *, int);
+ 
++static int default_watchpoint_addr_within_range (struct target_ops *,
++						 CORE_ADDR, CORE_ADDR, int);
++
+ static int default_region_ok_for_hw_watchpoint (CORE_ADDR, int);
+ 
+ static int nosymbol (char *, CORE_ADDR *);
+@@ -131,6 +134,9 @@
+ 
+ static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
+ 
++static int debug_to_watchpoint_addr_within_range (struct target_ops *,
++						  CORE_ADDR, CORE_ADDR, int);
++
+ static int debug_to_region_ok_for_hw_watchpoint (CORE_ADDR, int);
+ 
+ static void debug_to_terminal_init (void);
+@@ -416,9 +422,10 @@
+       INHERIT (to_insert_watchpoint, t);
+       INHERIT (to_remove_watchpoint, t);
+       INHERIT (to_stopped_data_address, t);
+-      INHERIT (to_stopped_by_watchpoint, t);
+       INHERIT (to_have_steppable_watchpoint, t);
+       INHERIT (to_have_continuable_watchpoint, t);
++      INHERIT (to_stopped_by_watchpoint, t);
++      INHERIT (to_watchpoint_addr_within_range, t);
+       INHERIT (to_region_ok_for_hw_watchpoint, t);
+       INHERIT (to_terminal_init, t);
+       INHERIT (to_terminal_inferior, t);
+@@ -544,6 +551,8 @@
+   de_fault (to_stopped_data_address,
+ 	    (int (*) (struct target_ops *, CORE_ADDR *))
+ 	    return_zero);
++  de_fault (to_watchpoint_addr_within_range,
++	    default_watchpoint_addr_within_range);
+   de_fault (to_region_ok_for_hw_watchpoint,
+ 	    default_region_ok_for_hw_watchpoint);
+   de_fault (to_terminal_init,
+@@ -1881,6 +1890,14 @@
+ }
+ 
+ static int
++default_watchpoint_addr_within_range (struct target_ops *target,
++				      CORE_ADDR addr,
++				      CORE_ADDR start, int length)
++{
++  return addr >= start && addr < start + length;
++}
++
++static int
+ return_zero (void)
+ {
+   return 0;
+@@ -2448,6 +2465,23 @@
+ }
+ 
+ static int
++debug_to_watchpoint_addr_within_range (struct target_ops *target,
++				       CORE_ADDR addr,
++				       CORE_ADDR start, int length)
++{
++  int retval;
++
++  retval = debug_target.to_watchpoint_addr_within_range (target, addr,
++							 start, length);
++
++  fprintf_filtered (gdb_stdlog,
++		    "target_watchpoint_addr_within_range (0x%lx, 0x%lx, %d) = %d\n",
++		    (unsigned long) addr, (unsigned long) start, length,
++		    retval);
++  return retval;
++}
++
++static int
+ debug_to_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
+ {
+   int retval;
+@@ -2790,6 +2824,7 @@
+   current_target.to_remove_watchpoint = debug_to_remove_watchpoint;
+   current_target.to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
+   current_target.to_stopped_data_address = debug_to_stopped_data_address;
++  current_target.to_watchpoint_addr_within_range = debug_to_watchpoint_addr_within_range;
+   current_target.to_region_ok_for_hw_watchpoint = debug_to_region_ok_for_hw_watchpoint;
+   current_target.to_terminal_init = debug_to_terminal_init;
+   current_target.to_terminal_inferior = debug_to_terminal_inferior;
+===================================================================
+RCS file: /cvs/src/src/gdb/ppc-linux-nat.c,v
+retrieving revision 1.78
+retrieving revision 1.79
+diff -u -r1.78 -r1.79
+--- src/gdb/ppc-linux-nat.c	2008/01/16 04:48:55	1.78
++++ src/gdb/ppc-linux-nat.c	2008/05/02 11:07:25	1.79
+@@ -889,6 +889,16 @@
+   return ppc_linux_stopped_data_address (&current_target, &addr);
+ }
+ 
++static int
++ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
++					CORE_ADDR addr,
++					CORE_ADDR start, int length)
++{
++  addr &= ~7;
++  /* Check whether [start, start+length-1] intersects [addr, addr+7]. */
++  return start <= addr + 7 && start + length - 1 >= addr;
++}
++
+ static void
+ ppc_linux_store_inferior_registers (struct regcache *regcache, int regno)
+ {
+@@ -997,6 +1007,7 @@
+   t->to_remove_watchpoint = ppc_linux_remove_watchpoint;
+   t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
+   t->to_stopped_data_address = ppc_linux_stopped_data_address;
++  t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
+ 
+   t->to_read_description = ppc_linux_read_description;
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.c,v
+retrieving revision 1.317
+retrieving revision 1.318
+diff -u -r1.317 -r1.318
+--- src/gdb/breakpoint.c	2008/05/01 20:35:33	1.317
++++ src/gdb/breakpoint.c	2008/05/02 11:07:25	1.318
+@@ -2616,8 +2616,9 @@
+ 	for (loc = b->loc; loc; loc = loc->next)
+ 	  /* Exact match not required.  Within range is
+ 	     sufficient.  */
+-	  if (addr >= loc->address
+-	      && addr < loc->address + loc->length)
++	  if (target_watchpoint_addr_within_range (&current_target,
++						   addr, loc->address,
++						   loc->length))
+ 	    {
+ 	      b->watchpoint_triggered = watch_triggered_yes;
+ 	      break;
+===================================================================
+RCS file: /cvs/src/src/gdb/doc/gdbint.texinfo,v
+retrieving revision 1.282
+retrieving revision 1.283
+diff -u -r1.282 -r1.283
+--- src/gdb/doc/gdbint.texinfo	2008/04/30 21:16:46	1.282
++++ src/gdb/doc/gdbint.texinfo	2008/05/02 11:07:25	1.283
+@@ -9,7 +9,7 @@
+ @ifinfo
+ This file documents the internals of the GNU debugger @value{GDBN}.
+ Copyright (C) 1990, 1991, 1992, 1993, 1994, 1996, 1998, 1999, 2000, 2001,
+-   2002, 2003, 2004, 2005, 2006
++   2002, 2003, 2004, 2005, 2006, 2008
+    Free Software Foundation, Inc.
+ Contributed by Cygnus Solutions.  Written by John Gilmore.
+ Second Edition by Stan Shebs.
+@@ -711,10 +711,19 @@
+ resuming, this method should clear it.  For instance, the x86 debug
+ control register has sticky triggered flags.
+ 
++@findex target_watchpoint_addr_within_range
++@item target_watchpoint_addr_within_range (@var{target}, @var{addr}, @var{start}, @var{length})
++Check whether @var{addr} (as returned by @code{target_stopped_data_address})
++lies within the hardware-defined watchpoint region described by
++@var{start} and @var{length}.  This only needs to be provided if the
++granularity of a watchpoint is greater than one byte, i.e., if the
++watchpoint can also trigger on nearby addresses outside of the watched
++region.
++
+ @findex HAVE_STEPPABLE_WATCHPOINT
+ @item HAVE_STEPPABLE_WATCHPOINT
+ If defined to a non-zero value, it is not necessary to disable a
+-watchpoint to step over it.    Like @code{gdbarch_have_nonsteppable_watchpoint},
++watchpoint to step over it.  Like @code{gdbarch_have_nonsteppable_watchpoint},
+ this is usually set when watchpoints trigger at the instruction
+ which will perform an interesting read or write.  It should be
+ set if there is a temporary disable bit which allows the processor
+
+
+
+[RFA] Try2: Ignore breakpoints when reading memory.
+http://sourceware.org/ml/gdb-patches/2008-03/msg00106.html
+http://sourceware.org/ml/gdb-cvs/2008-03/msg00058.html
+
+2008-03-13  Vladimir Prus  <vladimir@codesourcery.com>
+	    Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* breakpoint.h (breakpoint_restore_shadows): New
+	declaration.
+	* breakpoint.c (breakpoint_restore_shadows): New.
+	(read_memory_nobpt): Delete.
+	* gdbcore.h (read_memory_nobpt): Delete declaration.
+	* target.c (memory_xfer_partial): Call
+	breakpoint_restore_shadows.
+	(restore_show_memory_breakpoints)
+	(make_show_memory_beakpoints_cleanup): New.
+	(show_memory_breakpoints): New.
+	* target.h (make_show_memory_beakpoints_cleanup): Declare.
+	* ppc-linux-tdep.c (ppc_linux_memory_remove_breakpoint):
+	Make sure we see memory breakpoints when checking if
+	breakpoint is still there.
+	* alpha-tdep.c, alphanbsd-tdep.c, frame.c, frv-tdep.c,
+	hppa-linux-tdep.c, hppa-tdep.c, i386-linux-nat.c, i386-tdep.c,
+	m68klinux-tdep.c, mips-tdep.c, mn10300-tdep.c, s390-tdep.c,
+	sparc-tdep.c: Use target_read_memory instead of read_memory_nobpt.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/Makefile.in,v
+retrieving revision 1.988
+retrieving revision 1.989
+diff -u -r1.988 -r1.989
+--- src/gdb/Makefile.in	2008/03/10 23:14:05	1.988
++++ src/gdb/Makefile.in	2008/03/13 12:22:08	1.989
+@@ -2873,7 +2873,7 @@
+ target.o: target.c $(defs_h) $(gdb_string_h) $(target_h) $(gdbcmd_h) \
+ 	$(symtab_h) $(inferior_h) $(bfd_h) $(symfile_h) $(objfiles_h) \
+ 	$(gdb_wait_h) $(dcache_h) $(regcache_h) $(gdb_assert_h) $(gdbcore_h) \
+-	$(exceptions_h) $(target_descriptions_h)
++	$(exceptions_h) $(target_descriptions_h) $(gdb_stdint_h)
+ target-descriptions.o: target-descriptions.c $(defs_h) $(arch_utils_h) \
+ 	$(target_h) $(target_descriptions_h) $(vec_h) $(xml_tdesc_h) \
+ 	$(gdbcmd_h) $(gdb_assert_h) $(gdbtypes_h) $(reggroups_h) \
+===================================================================
+RCS file: /cvs/src/src/gdb/alpha-tdep.c,v
+retrieving revision 1.182
+retrieving revision 1.183
+diff -u -r1.182 -r1.183
+--- src/gdb/alpha-tdep.c	2008/02/20 15:45:20	1.182
++++ src/gdb/alpha-tdep.c	2008/03/13 12:22:11	1.183
+@@ -638,7 +638,7 @@
+   gdb_byte buf[ALPHA_INSN_SIZE];
+   int status;
+ 
+-  status = read_memory_nobpt (pc, buf, sizeof (buf));
++  status = target_read_memory (pc, buf, sizeof (buf));
+   if (status)
+     memory_error (status, pc);
+   return extract_unsigned_integer (buf, sizeof (buf));
+===================================================================
+RCS file: /cvs/src/src/gdb/alphanbsd-tdep.c,v
+retrieving revision 1.36
+retrieving revision 1.37
+diff -u -r1.36 -r1.37
+--- src/gdb/alphanbsd-tdep.c	2008/01/01 22:53:09	1.36
++++ src/gdb/alphanbsd-tdep.c	2008/03/13 12:22:11	1.37
+@@ -216,7 +216,7 @@
+   LONGEST off;
+   int i;
+ 
+-  if (read_memory_nobpt (pc, (char *) w, 4) != 0)
++  if (target_read_memory (pc, (char *) w, 4) != 0)
+     return -1;
+ 
+   for (i = 0; i < RETCODE_NWORDS; i++)
+@@ -230,7 +230,7 @@
+   off = i * 4;
+   pc -= off;
+ 
+-  if (read_memory_nobpt (pc, (char *) ret, sizeof (ret)) != 0)
++  if (target_read_memory (pc, (char *) ret, sizeof (ret)) != 0)
+     return -1;
+ 
+   if (memcmp (ret, sigtramp_retcode, RETCODE_SIZE) == 0)
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.c,v
+retrieving revision 1.305
+retrieving revision 1.306
+diff -u -r1.305 -r1.306
+--- src/gdb/breakpoint.c	2008/03/03 13:24:12	1.305
++++ src/gdb/breakpoint.c	2008/03/13 12:22:11	1.306
+@@ -702,25 +702,16 @@
+   error (_("No breakpoint number %d."), bnum);
+ }
+ 
+-/* Like target_read_memory() but if breakpoints are inserted, return
+-   the shadow contents instead of the breakpoints themselves.
++/* Update BUF, which is LEN bytes read from the target address MEMADDR,
++   by replacing any memory breakpoints with their shadowed contents.  */
+ 
+-   Read "memory data" from whatever target or inferior we have. 
+-   Returns zero if successful, errno value if not.  EIO is used
+-   for address out of bounds.  If breakpoints are inserted, returns
+-   shadow contents, not the breakpoints themselves.  From breakpoint.c.  */
+-
+-int
+-read_memory_nobpt (CORE_ADDR memaddr, gdb_byte *myaddr, unsigned len)
++void
++breakpoint_restore_shadows (gdb_byte *buf, ULONGEST memaddr, LONGEST len)
+ {
+-  int status;
+-  const struct bp_location *b;
++  struct bp_location *b;
+   CORE_ADDR bp_addr = 0;
+   int bp_size = 0;
+-
+-  if (gdbarch_breakpoint_from_pc (current_gdbarch, &bp_addr, &bp_size) == NULL)
+-    /* No breakpoints on this machine. */
+-    return target_read_memory (memaddr, myaddr, len);
++  int bptoffset = 0;
+ 
+   ALL_BP_LOCATIONS (b)
+   {
+@@ -739,59 +730,35 @@
+     if (bp_size == 0)
+       /* bp isn't valid, or doesn't shadow memory.  */
+       continue;
++
+     if (bp_addr + bp_size <= memaddr)
+       /* The breakpoint is entirely before the chunk of memory we
+          are reading.  */
+       continue;
++
+     if (bp_addr >= memaddr + len)
+       /* The breakpoint is entirely after the chunk of memory we are
+          reading. */
+       continue;
+-    /* Copy the breakpoint from the shadow contents, and recurse for
+-       the things before and after.  */
+-    {
+-      /* Offset within shadow_contents.  */
+-      int bptoffset = 0;
+-
+-      if (bp_addr < memaddr)
+-	{
+-	  /* Only copy the second part of the breakpoint.  */
+-	  bp_size -= memaddr - bp_addr;
+-	  bptoffset = memaddr - bp_addr;
+-	  bp_addr = memaddr;
+-	}
+-
+-      if (bp_addr + bp_size > memaddr + len)
+-	{
+-	  /* Only copy the first part of the breakpoint.  */
+-	  bp_size -= (bp_addr + bp_size) - (memaddr + len);
+-	}
+ 
+-      memcpy (myaddr + bp_addr - memaddr,
+-	      b->target_info.shadow_contents + bptoffset, bp_size);
++    /* Offset within shadow_contents.  */
++    if (bp_addr < memaddr)
++      {
++	/* Only copy the second part of the breakpoint.  */
++	bp_size -= memaddr - bp_addr;
++	bptoffset = memaddr - bp_addr;
++	bp_addr = memaddr;
++      }
+ 
+-      if (bp_addr > memaddr)
+-	{
+-	  /* Copy the section of memory before the breakpoint.  */
+-	  status = read_memory_nobpt (memaddr, myaddr, bp_addr - memaddr);
+-	  if (status != 0)
+-	    return status;
+-	}
++    if (bp_addr + bp_size > memaddr + len)
++      {
++	/* Only copy the first part of the breakpoint.  */
++	bp_size -= (bp_addr + bp_size) - (memaddr + len);
++      }
+ 
+-      if (bp_addr + bp_size < memaddr + len)
+-	{
+-	  /* Copy the section of memory after the breakpoint.  */
+-	  status = read_memory_nobpt (bp_addr + bp_size,
+-				      myaddr + bp_addr + bp_size - memaddr,
+-				      memaddr + len - (bp_addr + bp_size));
+-	  if (status != 0)
+-	    return status;
+-	}
+-      return 0;
+-    }
++    memcpy (buf + bp_addr - memaddr,
++	    b->target_info.shadow_contents + bptoffset, bp_size);
+   }
+-  /* Nothing overlaps.  Just call read_memory_noerr.  */
+-  return target_read_memory (memaddr, myaddr, len);
+ }
+ 
+ 
+@@ -4299,7 +4266,7 @@
+   /* Adjust the breakpoint's address prior to allocating a location.
+      Once we call allocate_bp_location(), that mostly uninitialized
+      location will be placed on the location chain.  Adjustment of the
+-     breakpoint may cause read_memory_nobpt() to be called and we do
++     breakpoint may cause target_read_memory() to be called and we do
+      not want its scan of the location chain to find a breakpoint and
+      location that's only been partially initialized.  */
+   adjusted_address = adjust_breakpoint_address (sal.pc, bptype);
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.h,v
+retrieving revision 1.66
+retrieving revision 1.67
+diff -u -r1.66 -r1.67
+--- src/gdb/breakpoint.h	2008/03/03 13:24:12	1.66
++++ src/gdb/breakpoint.h	2008/03/13 12:22:12	1.67
+@@ -859,4 +859,9 @@
+    target.  */
+ int watchpoints_triggered (struct target_waitstatus *);
+ 
++/* Update BUF, which is LEN bytes read from the target address MEMADDR,
++   by replacing any memory breakpoints with their shadowed contents.  */
++void breakpoint_restore_shadows (gdb_byte *buf, ULONGEST memaddr, 
++				 LONGEST len);
++
+ #endif /* !defined (BREAKPOINT_H) */
+===================================================================
+RCS file: /cvs/src/src/gdb/frame.c,v
+retrieving revision 1.237
+retrieving revision 1.238
+diff -u -r1.237 -r1.238
+--- src/gdb/frame.c	2008/02/28 16:24:24	1.237
++++ src/gdb/frame.c	2008/03/13 12:22:12	1.238
+@@ -1691,8 +1691,8 @@
+ safe_frame_unwind_memory (struct frame_info *this_frame,
+ 			  CORE_ADDR addr, gdb_byte *buf, int len)
+ {
+-  /* NOTE: read_memory_nobpt returns zero on success!  */
+-  return !read_memory_nobpt (addr, buf, len);
++  /* NOTE: target_read_memory returns zero on success!  */
++  return !target_read_memory (addr, buf, len);
+ }
+ 
+ /* Architecture method.  */
+===================================================================
+RCS file: /cvs/src/src/gdb/frv-tdep.c,v
+retrieving revision 1.118
+retrieving revision 1.119
+diff -u -r1.118 -r1.119
+--- src/gdb/frv-tdep.c	2008/01/11 13:19:59	1.118
++++ src/gdb/frv-tdep.c	2008/03/13 12:22:12	1.119
+@@ -449,7 +449,7 @@
+       char instr[frv_instr_size];
+       int status;
+ 
+-      status = read_memory_nobpt (addr, instr, sizeof instr);
++      status = target_read_memory (addr, instr, sizeof instr);
+ 
+       if (status != 0)
+ 	break;
+===================================================================
+RCS file: /cvs/src/src/gdb/gdbcore.h,v
+retrieving revision 1.28
+retrieving revision 1.29
+diff -u -r1.28 -r1.29
+--- src/gdb/gdbcore.h	2008/01/01 22:53:10	1.28
++++ src/gdb/gdbcore.h	2008/03/13 12:22:12	1.29
+@@ -39,18 +39,6 @@
+ 
+ extern int have_core_file_p (void);
+ 
+-/* Read "memory data" from whatever target or inferior we have.
+-   Returns zero if successful, errno value if not.  EIO is used for
+-   address out of bounds.  If breakpoints are inserted, returns shadow
+-   contents, not the breakpoints themselves.  From breakpoint.c.  */
+-
+-/* NOTE: cagney/2004-06-10: Code reading from a live inferior can use
+-   the get_frame_memory methods, code reading from an exec can use the
+-   target methods.  */
+-
+-extern int read_memory_nobpt (CORE_ADDR memaddr, gdb_byte *myaddr,
+-			      unsigned len);
+-
+ /* Report a memory error with error().  */
+ 
+ extern void memory_error (int status, CORE_ADDR memaddr);
+===================================================================
+RCS file: /cvs/src/src/gdb/hppa-linux-tdep.c,v
+retrieving revision 1.27
+retrieving revision 1.28
+diff -u -r1.27 -r1.28
+--- src/gdb/hppa-linux-tdep.c	2008/02/18 16:11:21	1.27
++++ src/gdb/hppa-linux-tdep.c	2008/03/13 12:22:12	1.28
+@@ -101,7 +101,7 @@
+     {
+       char buf[4];
+ 
+-      read_memory_nobpt (npc, buf, 4);
++      target_read_memory (npc, buf, 4);
+       insn[i] = extract_unsigned_integer (buf, 4);
+       if ((insn[i] & pattern[i].mask) == pattern[i].data)
+         npc += 4;
+===================================================================
+RCS file: /cvs/src/src/gdb/hppa-tdep.c,v
+retrieving revision 1.247
+retrieving revision 1.248
+diff -u -r1.247 -r1.248
+--- src/gdb/hppa-tdep.c	2008/02/18 16:11:21	1.247
++++ src/gdb/hppa-tdep.c	2008/03/13 12:22:12	1.248
+@@ -545,7 +545,7 @@
+   char buf[4];
+   int off;
+ 
+-  status = read_memory_nobpt (pc, buf, 4);
++  status = target_read_memory (pc, buf, 4);
+   if (status != 0)
+     return 0;
+ 
+@@ -1552,7 +1552,7 @@
+       old_save_sp = save_sp;
+       old_stack_remaining = stack_remaining;
+ 
+-      status = read_memory_nobpt (pc, buf, 4);
++      status = target_read_memory (pc, buf, 4);
+       inst = extract_unsigned_integer (buf, 4);
+ 
+       /* Yow! */
+@@ -1603,7 +1603,7 @@
+ 		 && reg_num <= 26)
+ 	    {
+ 	      pc += 4;
+-	      status = read_memory_nobpt (pc, buf, 4);
++	      status = target_read_memory (pc, buf, 4);
+ 	      inst = extract_unsigned_integer (buf, 4);
+ 	      if (status != 0)
+ 		return pc;
+@@ -1616,7 +1616,7 @@
+       reg_num = inst_saves_fr (inst);
+       save_fr &= ~(1 << reg_num);
+ 
+-      status = read_memory_nobpt (pc + 4, buf, 4);
++      status = target_read_memory (pc + 4, buf, 4);
+       next_inst = extract_unsigned_integer (buf, 4);
+ 
+       /* Yow! */
+@@ -1647,13 +1647,13 @@
+ 		      <= (gdbarch_ptr_bit (gdbarch) == 64 ? 11 : 7))
+ 	    {
+ 	      pc += 8;
+-	      status = read_memory_nobpt (pc, buf, 4);
++	      status = target_read_memory (pc, buf, 4);
+ 	      inst = extract_unsigned_integer (buf, 4);
+ 	      if (status != 0)
+ 		return pc;
+ 	      if ((inst & 0xfc000000) != 0x34000000)
+ 		break;
+-	      status = read_memory_nobpt (pc + 4, buf, 4);
++	      status = target_read_memory (pc + 4, buf, 4);
+ 	      next_inst = extract_unsigned_integer (buf, 4);
+ 	      if (status != 0)
+ 		return pc;
+@@ -2857,7 +2857,7 @@
+     {
+       gdb_byte buf[HPPA_INSN_SIZE];
+ 
+-      read_memory_nobpt (npc, buf, HPPA_INSN_SIZE);
++      target_read_memory (npc, buf, HPPA_INSN_SIZE);
+       insn[i] = extract_unsigned_integer (buf, HPPA_INSN_SIZE);
+       if ((insn[i] & pattern[i].mask) == pattern[i].data)
+         npc += 4;
+===================================================================
+RCS file: /cvs/src/src/gdb/i386-linux-nat.c,v
+retrieving revision 1.86
+retrieving revision 1.87
+diff -u -r1.86 -r1.87
+--- src/gdb/i386-linux-nat.c	2008/03/01 04:39:36	1.86
++++ src/gdb/i386-linux-nat.c	2008/03/13 12:22:13	1.87
+@@ -770,7 +770,7 @@
+          that's about to be restored, and set the trace flag there.  */
+ 
+       /* First check if PC is at a system call.  */
+-      if (read_memory_nobpt (pc, buf, LINUX_SYSCALL_LEN) == 0
++      if (target_read_memory (pc, buf, LINUX_SYSCALL_LEN) == 0
+ 	  && memcmp (buf, linux_syscall, LINUX_SYSCALL_LEN) == 0)
+ 	{
+ 	  ULONGEST syscall;
+===================================================================
+RCS file: /cvs/src/src/gdb/i386-tdep.c,v
+retrieving revision 1.251
+retrieving revision 1.252
+diff -u -r1.251 -r1.252
+--- src/gdb/i386-tdep.c	2008/03/11 05:21:38	1.251
++++ src/gdb/i386-tdep.c	2008/03/13 12:22:13	1.252
+@@ -344,7 +344,7 @@
+   long delta = 0;
+   int data16 = 0;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+   if (op == 0x66)
+     {
+       data16 = 1;
+@@ -410,12 +410,12 @@
+   if (current_pc <= pc)
+     return pc;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+ 
+   if (op != 0x58)		/* popl %eax */
+     return pc;
+ 
+-  read_memory_nobpt (pc + 1, buf, 4);
++  target_read_memory (pc + 1, buf, 4);
+   if (memcmp (buf, proto1, 3) != 0 && memcmp (buf, proto2, 4) != 0)
+     return pc;
+ 
+@@ -454,7 +454,7 @@
+   gdb_byte buf[8];
+   gdb_byte op;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+ 
+   if (op == 0x68 || op == 0x6a)
+     {
+@@ -541,7 +541,7 @@
+   struct i386_insn *insn;
+   gdb_byte op;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+ 
+   for (insn = skip_insns; insn->len > 0; insn++)
+     {
+@@ -554,7 +554,7 @@
+ 	  gdb_assert (insn->len > 1);
+ 	  gdb_assert (insn->len <= I386_MAX_INSN_LEN);
+ 
+-	  read_memory_nobpt (pc + 1, buf, insn->len - 1);
++	  target_read_memory (pc + 1, buf, insn->len - 1);
+ 	  for (i = 1; i < insn->len; i++)
+ 	    {
+ 	      if ((buf[i - 1] & insn->mask[i]) != insn->insn[i])
+@@ -632,7 +632,7 @@
+   gdb_byte op;
+   int check = 1;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+ 
+   while (check) 
+     {
+@@ -641,7 +641,7 @@
+       if (op == 0x90) 
+ 	{
+ 	  pc += 1;
+-	  read_memory_nobpt (pc, &op, 1);
++	  target_read_memory (pc, &op, 1);
+ 	  check = 1;
+ 	}
+       /* Ignore no-op instruction `mov %edi, %edi'.
+@@ -657,11 +657,11 @@
+ 
+       else if (op == 0x8b)
+ 	{
+-	  read_memory_nobpt (pc + 1, &op, 1);
++	  target_read_memory (pc + 1, &op, 1);
+ 	  if (op == 0xff)
+ 	    {
+ 	      pc += 2;
+-	      read_memory_nobpt (pc, &op, 1);
++	      target_read_memory (pc, &op, 1);
+ 	      check = 1;
+ 	    }
+ 	}
+@@ -685,7 +685,7 @@
+   if (limit <= pc)
+     return limit;
+ 
+-  read_memory_nobpt (pc, &op, 1);
++  target_read_memory (pc, &op, 1);
+ 
+   if (op == 0x55)		/* pushl %ebp */
+     {
+@@ -720,7 +720,7 @@
+       if (limit <= pc + skip)
+ 	return limit;
+ 
+-      read_memory_nobpt (pc + skip, &op, 1);
++      target_read_memory (pc + skip, &op, 1);
+ 
+       /* Check for `movl %esp, %ebp' -- can be written in two ways.  */
+       switch (op)
+@@ -754,7 +754,7 @@
+ 
+ 	 NOTE: You can't subtract a 16-bit immediate from a 32-bit
+ 	 reg, so we don't have to worry about a data16 prefix.  */
+-      read_memory_nobpt (pc, &op, 1);
++      target_read_memory (pc, &op, 1);
+       if (op == 0x83)
+ 	{
+ 	  /* `subl' with 8-bit immediate.  */
+@@ -810,7 +810,7 @@
+     offset -= cache->locals;
+   for (i = 0; i < 8 && pc < current_pc; i++)
+     {
+-      read_memory_nobpt (pc, &op, 1);
++      target_read_memory (pc, &op, 1);
+       if (op < 0x50 || op > 0x57)
+ 	break;
+ 
+@@ -900,7 +900,7 @@
+ 
+   for (i = 0; i < 6; i++)
+     {
+-      read_memory_nobpt (pc + i, &op, 1);
++      target_read_memory (pc + i, &op, 1);
+       if (pic_pat[i] != op)
+ 	break;
+     }
+@@ -908,7 +908,7 @@
+     {
+       int delta = 6;
+ 
+-      read_memory_nobpt (pc + delta, &op, 1);
++      target_read_memory (pc + delta, &op, 1);
+ 
+       if (op == 0x89)		/* movl %ebx, x(%ebp) */
+ 	{
+@@ -921,7 +921,7 @@
+ 	  else			/* Unexpected instruction.  */
+ 	    delta = 0;
+ 
+-          read_memory_nobpt (pc + delta, &op, 1);
++          target_read_memory (pc + delta, &op, 1);
+ 	}
+ 
+       /* addl y,%ebx */
+===================================================================
+RCS file: /cvs/src/src/gdb/m68klinux-tdep.c,v
+retrieving revision 1.27
+retrieving revision 1.28
+diff -u -r1.27 -r1.28
+--- src/gdb/m68klinux-tdep.c	2008/01/01 22:53:12	1.27
++++ src/gdb/m68klinux-tdep.c	2008/03/13 12:22:13	1.28
+@@ -69,7 +69,7 @@
+   char buf[12];
+   unsigned long insn0, insn1, insn2;
+ 
+-  if (read_memory_nobpt (pc - 4, buf, sizeof (buf)))
++  if (target_read_memory (pc - 4, buf, sizeof (buf)))
+     return 0;
+   insn1 = extract_unsigned_integer (buf + 4, 4);
+   insn2 = extract_unsigned_integer (buf + 8, 4);
+===================================================================
+RCS file: /cvs/src/src/gdb/mips-tdep.c,v
+retrieving revision 1.469
+retrieving revision 1.470
+diff -u -r1.469 -r1.470
+--- src/gdb/mips-tdep.c	2008/02/20 14:34:43	1.469
++++ src/gdb/mips-tdep.c	2008/03/13 12:22:13	1.470
+@@ -926,7 +926,7 @@
+     }
+   else
+     instlen = MIPS_INSN32_SIZE;
+-  status = read_memory_nobpt (addr, buf, instlen);
++  status = target_read_memory (addr, buf, instlen);
+   if (status)
+     memory_error (status, addr);
+   return extract_unsigned_integer (buf, instlen);
+===================================================================
+RCS file: /cvs/src/src/gdb/mn10300-tdep.c,v
+retrieving revision 1.154
+retrieving revision 1.155
+diff -u -r1.154 -r1.155
+--- src/gdb/mn10300-tdep.c	2008/02/05 16:20:20	1.154
++++ src/gdb/mn10300-tdep.c	2008/03/13 12:22:13	1.155
+@@ -620,7 +620,7 @@
+ 	goto finish_prologue;
+ 
+       /* Get the next two bytes so the prologue scan can continue.  */
+-      status = read_memory_nobpt (addr, buf, 2);
++      status = target_read_memory (addr, buf, 2);
+       if (status != 0)
+ 	goto finish_prologue;
+     }
+@@ -761,7 +761,7 @@
+       if (!fmov_found)
+ 	{
+ 	  addr = restore_addr;
+-	  status = read_memory_nobpt (addr, buf, 2);
++	  status = target_read_memory (addr, buf, 2);
+ 	  if (status != 0)
+ 	    goto finish_prologue;
+ 	  stack_extra_size = 0;
+===================================================================
+RCS file: /cvs/src/src/gdb/ppc-linux-tdep.c,v
+retrieving revision 1.94
+retrieving revision 1.95
+diff -u -r1.94 -r1.95
+--- src/gdb/ppc-linux-tdep.c	2008/02/20 14:31:40	1.94
++++ src/gdb/ppc-linux-tdep.c	2008/03/13 12:22:13	1.95
+@@ -281,12 +281,15 @@
+   int val;
+   int bplen;
+   gdb_byte old_contents[BREAKPOINT_MAX];
++  struct cleanup *cleanup;
+ 
+   /* Determine appropriate breakpoint contents and size for this address.  */
+   bp = gdbarch_breakpoint_from_pc (gdbarch, &addr, &bplen);
+   if (bp == NULL)
+     error (_("Software breakpoints not implemented for this target."));
+ 
++  /* Make sure we see the memory breakpoints.  */
++  cleanup = make_show_memory_breakpoints_cleanup (1);
+   val = target_read_memory (addr, old_contents, bplen);
+ 
+   /* If our breakpoint is no longer at the address, this means that the
+@@ -295,6 +298,7 @@
+   if (val == 0 && memcmp (bp, old_contents, bplen) == 0)
+     val = target_write_memory (addr, bp_tgt->shadow_contents, bplen);
+ 
++  do_cleanups (cleanup);
+   return val;
+ }
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/s390-tdep.c,v
+retrieving revision 1.170
+retrieving revision 1.171
+diff -u -r1.170 -r1.171
+--- src/gdb/s390-tdep.c	2008/01/31 15:43:32	1.170
++++ src/gdb/s390-tdep.c	2008/03/13 12:22:13	1.171
+@@ -503,12 +503,12 @@
+   static int s390_instrlen[] = { 2, 4, 4, 6 };
+   int instrlen;
+ 
+-  if (read_memory_nobpt (at, &instr[0], 2))
++  if (target_read_memory (at, &instr[0], 2))
+     return -1;
+   instrlen = s390_instrlen[instr[0] >> 6];
+   if (instrlen > 2)
+     {
+-      if (read_memory_nobpt (at + 2, &instr[2], instrlen - 2))
++      if (target_read_memory (at + 2, &instr[2], instrlen - 2))
+         return -1;
+     }
+   return instrlen;
+@@ -1132,19 +1132,19 @@
+   int d2;
+ 
+   if (word_size == 4
+-      && !read_memory_nobpt (pc - 4, insn, 4)
++      && !target_read_memory (pc - 4, insn, 4)
+       && is_rs (insn, op_lm, &r1, &r3, &d2, &b2)
+       && r3 == S390_SP_REGNUM - S390_R0_REGNUM)
+     return 1;
+ 
+   if (word_size == 4
+-      && !read_memory_nobpt (pc - 6, insn, 6)
++      && !target_read_memory (pc - 6, insn, 6)
+       && is_rsy (insn, op1_lmy, op2_lmy, &r1, &r3, &d2, &b2)
+       && r3 == S390_SP_REGNUM - S390_R0_REGNUM)
+     return 1;
+ 
+   if (word_size == 8
+-      && !read_memory_nobpt (pc - 6, insn, 6)
++      && !target_read_memory (pc - 6, insn, 6)
+       && is_rsy (insn, op1_lmg, op2_lmg, &r1, &r3, &d2, &b2)
+       && r3 == S390_SP_REGNUM - S390_R0_REGNUM)
+     return 1;
+@@ -1658,7 +1658,7 @@
+   CORE_ADDR pc = frame_pc_unwind (next_frame);
+   bfd_byte sigreturn[2];
+ 
+-  if (read_memory_nobpt (pc, sigreturn, 2))
++  if (target_read_memory (pc, sigreturn, 2))
+     return NULL;
+ 
+   if (sigreturn[0] != 0x0a /* svc */)
+===================================================================
+RCS file: /cvs/src/src/gdb/sparc-tdep.c,v
+retrieving revision 1.193
+retrieving revision 1.194
+diff -u -r1.193 -r1.194
+--- src/gdb/sparc-tdep.c	2008/01/11 14:43:15	1.193
++++ src/gdb/sparc-tdep.c	2008/03/13 12:22:13	1.194
+@@ -99,7 +99,7 @@
+   int i;
+ 
+   /* If we can't read the instruction at PC, return zero.  */
+-  if (read_memory_nobpt (pc, buf, sizeof (buf)))
++  if (target_read_memory (pc, buf, sizeof (buf)))
+     return 0;
+ 
+   insn = 0;
+===================================================================
+RCS file: /cvs/src/src/gdb/target.c,v
+retrieving revision 1.155
+retrieving revision 1.156
+diff -u -r1.155 -r1.156
+--- src/gdb/target.c	2008/02/28 16:26:17	1.155
++++ src/gdb/target.c	2008/03/13 12:22:13	1.156
+@@ -39,6 +39,7 @@
+ #include "gdbcore.h"
+ #include "exceptions.h"
+ #include "target-descriptions.h"
++#include "gdb_stdint.h"
+ 
+ static void target_info (char *, int);
+ 
+@@ -203,6 +204,11 @@
+ 
+ static int trust_readonly = 0;
+ 
++/* Nonzero if we should show true memory content including
++   memory breakpoint inserted by gdb.  */
++
++static int show_memory_breakpoints = 0;
++
+ /* Non-zero if we want to see trace of target level stuff.  */
+ 
+ static int targetdebug = 0;
+@@ -1064,7 +1070,11 @@
+       if (res <= 0)
+ 	return -1;
+       else
+-	return res;
++	{
++	  if (readbuf && !show_memory_breakpoints)
++	    breakpoint_restore_shadows (readbuf, memaddr, reg_len);
++	  return res;
++	}
+     }
+ 
+   /* If none of those methods found the memory we wanted, fall back
+@@ -1082,22 +1092,41 @@
+       res = ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
+ 				  readbuf, writebuf, memaddr, reg_len);
+       if (res > 0)
+-	return res;
++	break;
+ 
+       /* We want to continue past core files to executables, but not
+ 	 past a running target's memory.  */
+       if (ops->to_has_all_memory)
+-	return res;
++	break;
+ 
+       ops = ops->beneath;
+     }
+   while (ops != NULL);
+ 
++  if (readbuf && !show_memory_breakpoints)
++    breakpoint_restore_shadows (readbuf, memaddr, reg_len);
++
+   /* If we still haven't got anything, return the last error.  We
+      give up.  */
+   return res;
+ }
+ 
++static void
++restore_show_memory_breakpoints (void *arg)
++{
++  show_memory_breakpoints = (uintptr_t) arg;
++}
++
++struct cleanup *
++make_show_memory_breakpoints_cleanup (int show)
++{
++  int current = show_memory_breakpoints;
++  show_memory_breakpoints = show;
++
++  return make_cleanup (restore_show_memory_breakpoints,
++		       (void *) (uintptr_t) current);
++}
++
+ static LONGEST
+ target_xfer_partial (struct target_ops *ops,
+ 		     enum target_object object, const char *annex,
+===================================================================
+RCS file: /cvs/src/src/gdb/target.h,v
+retrieving revision 1.111
+retrieving revision 1.112
+diff -u -r1.111 -r1.112
+--- src/gdb/target.h	2008/02/28 16:26:17	1.111
++++ src/gdb/target.h	2008/03/13 12:22:14	1.112
+@@ -1250,6 +1250,11 @@
+ 
+ /* Any target can call this to switch to remote protocol (in remote.c). */
+ extern void push_remote_target (char *name, int from_tty);
++
++/* Set the show memory breakpoints mode to show, and installs a cleanup
++   to restore it back to the current value.  */
++extern struct cleanup *make_show_memory_breakpoints_cleanup (int show);
++
+ 
+ /* Imported from machine dependent code */
+ 
+
+
+
+[commit] SIGILL in ld.so when running program from GDB on ia64-linux
+http://sourceware.org/ml/gdb-patches/2008-04/msg00674.html
+http://sourceware.org/ml/gdb-cvs/2008-04/msg00173.html
+
+2008-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ia64-tdep.c (ia64_memory_remove_breakpoint): Set
+	show_memory_breakpoints to 1 while reading the instruction bundle.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/ia64-tdep.c,v
+retrieving revision 1.174
+retrieving revision 1.175
+diff -u -r1.174 -r1.175
+--- src/gdb/ia64-tdep.c	2008/04/22 11:03:41	1.174
++++ src/gdb/ia64-tdep.c	2008/04/29 21:14:06	1.175
+@@ -598,9 +598,15 @@
+   long long instr;
+   int val;
+   int template;
++  struct cleanup *cleanup;
+ 
+   addr &= ~0x0f;
+ 
++  /* Disable the automatic memory restoration from breakpoints while
++     we read our instruction bundle.  Otherwise, the general restoration
++     mechanism kicks in and ends up corrupting our bundle, because it
++     is not aware of the concept of instruction bundles.  */
++  cleanup = make_show_memory_breakpoints_cleanup (1);
+   val = target_read_memory (addr, bundle, BUNDLE_LEN);
+ 
+   /* Check for L type instruction in 2nd slot, if present then
+@@ -616,6 +622,7 @@
+   if (val == 0)
+     target_write_memory (addr, bundle, BUNDLE_LEN);
+ 
++  do_cleanups (cleanup);
+   return val;
+ }
+ 
