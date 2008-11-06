@@ -1,0 +1,93 @@
+# Never terminate `bt full' on a problem of variable resolving (BZ 466901).
+
+--- ./gdb/f-valprint.c	2008-11-06 22:05:16.000000000 +0100
++++ ./gdb/f-valprint.c	2008-11-06 22:09:10.000000000 +0100
+@@ -611,8 +611,7 @@ info_common_command (char *comname, int 
+       while (entry != NULL)
+ 	{
+ 	  printf_filtered ("%s = ", DEPRECATED_SYMBOL_NAME (entry->symbol));
+-	  print_variable_value (entry->symbol, fi, gdb_stdout);
+-	  printf_filtered ("\n");
++	  print_variable_value_nl (entry->symbol, fi, gdb_stdout);
+ 	  entry = entry->next;
+ 	}
+     }
+--- ./gdb/printcmd.c	2008-11-06 22:05:16.000000000 +0100
++++ ./gdb/printcmd.c	2008-11-06 22:06:55.000000000 +0100
+@@ -42,6 +42,7 @@
+ #include "block.h"
+ #include "disasm.h"
+ #include "dfp.h"
++#include "exceptions.h"
+ 
+ #ifdef TUI
+ #include "tui/tui.h"		/* For tui_active et.al.   */
+@@ -1721,15 +1722,26 @@ disable_display_command (char *args, int
+ 
+ 
+ /* Print the value in stack frame FRAME of a variable specified by a
+-   struct symbol.  */
++   struct symbol.  Printed value gets terminated by a newline.  */
+ 
+ void
+-print_variable_value (struct symbol *var, struct frame_info *frame,
+-		      struct ui_file *stream)
++print_variable_value_nl (struct symbol *var, struct frame_info *frame,
++			 struct ui_file *stream)
+ {
+-  struct value *val = read_var_value (var, frame);
++  struct value *val;
++  struct gdb_exception e;
+ 
+-  value_print (val, stream, 0, Val_pretty_default);
++  TRY_CATCH (e, RETURN_MASK_ERROR)
++    {
++      val = read_var_value (var, frame);
++    }
++  if (e.reason < 0)
++    exception_print (stream, e);
++  else
++    {
++      value_print (val, stream, 0, Val_pretty_default);
++      fprintf_filtered (stream, "\n");
++    }
+ }
+ 
+ static void
+--- ./gdb/stack.c	2008-11-06 22:05:16.000000000 +0100
++++ ./gdb/stack.c	2008-11-06 22:08:45.000000000 +0100
+@@ -1412,8 +1412,7 @@ print_block_frame_locals (struct block *
+ 	    fputs_filtered ("\t", stream);
+ 	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
+ 	  fputs_filtered (" = ", stream);
+-	  print_variable_value (sym, frame, stream);
+-	  fprintf_filtered (stream, "\n");
++	  print_variable_value_nl (sym, frame, stream);
+ 	  break;
+ 
+ 	default:
+@@ -1633,8 +1632,7 @@ print_frame_arg_vars (struct frame_info 
+ 
+ 	  sym2 = lookup_symbol (DEPRECATED_SYMBOL_NAME (sym),
+ 				b, VAR_DOMAIN, NULL, NULL);
+-	  print_variable_value (sym2, frame, stream);
+-	  fprintf_filtered (stream, "\n");
++	  print_variable_value_nl (sym2, frame, stream);
+ 	  break;
+ 
+ 	default:
+--- ./gdb/value.h	2008-11-06 22:05:16.000000000 +0100
++++ ./gdb/value.h	2008-11-06 22:08:07.000000000 +0100
+@@ -526,9 +526,9 @@ extern int common_val_print (struct valu
+ extern int val_print_string (CORE_ADDR addr, int len, int width,
+ 			     struct ui_file *stream);
+ 
+-extern void print_variable_value (struct symbol *var,
+-				  struct frame_info *frame,
+-				  struct ui_file *stream);
++extern void print_variable_value_nl (struct symbol *var,
++				     struct frame_info *frame,
++				     struct ui_file *stream);
+ 
+ extern int check_field (struct value *, const char *);
+ 

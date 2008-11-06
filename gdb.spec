@@ -422,6 +422,12 @@ Patch342: gdb-6.8-ia64-breakpoint-restoration.patch
 # Test the watchpoints conditionals works.
 Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 
+# Never terminate `bt full' on a problem of variable resolving (for BZ 466901).
+Patch347: gdb-6.8-bz466901-backtrace-never-aborts.patch
+
+# Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
+Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -625,6 +631,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch338 -p1
 %patch342 -p1
 %patch343 -p1
+%patch347 -p1
+%patch348 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -888,7 +896,12 @@ fi
 %endif
 
 %changelog
-* Tue Nov  4 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-26
+* Thu Nov  6 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-27
+- Fix resolving of variables at locations lists in prelinked libs (BZ 466901),
+  bugreported by Michal Babej.
+- Never terminate `bt full' on a problem of variable resolving (for BZ 466901).
+
+* Thu Nov  6 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-26
 - Fix more the variable-length-arrays support (BZ 468266, feature BZ 377541).
 - Fix the watchpoints conditionals.
 - Fix on PPC spurious SIGTRAPs on active watchpoints.
