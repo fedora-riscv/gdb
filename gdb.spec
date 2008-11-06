@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?_with_upstream:.upstream}%{?dist}
+Release: 27%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
