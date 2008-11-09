@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{?dist}
+Release: 29%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -422,9 +422,6 @@ Patch342: gdb-6.8-ia64-breakpoint-restoration.patch
 # Test the watchpoints conditionals works.
 Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 
-# Never terminate `bt full' on a problem of variable resolving (for BZ 466901).
-Patch347: gdb-6.8-bz466901-backtrace-never-aborts.patch
-
 # Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
@@ -631,7 +628,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch338 -p1
 %patch342 -p1
 %patch343 -p1
-%patch347 -p1
 %patch348 -p1
 %patch124 -p1
 
@@ -896,6 +892,10 @@ fi
 %endif
 
 %changelog
+* Sun Nov  9 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-29
+- Fix more the variable-length-arrays support (BZ 468266, feature BZ 377541).
+- Integrate the `bt full' protection (for BZ 466901) into the VLA patch.
+
 * Thu Nov  6 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-28
 - Fix the "never terminate `bt full'" patch false GCC warning / build error.
 
