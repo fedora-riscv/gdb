@@ -16,7 +16,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{?dist}
+Release: 23%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -195,9 +195,6 @@ Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
 # ia32el.
 Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
 
-# Testcase for corrupted or missing location list information (BZ 196439).
-Patch187: gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
-
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
@@ -344,7 +341,10 @@ Patch301: gdb-6.6-buildid-readnever-silent.patch
 Patch304: gdb-6.7-kernel-headers-compat.patch
 
 # Fix/implement the Fortran dynamic arrays support (BZ 377541).
-Patch305: gdb-6.8-bz377541-fortran-dynamic-arrays.patch
+# Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
+Patch345: gdb-6.8-bz377541-vla-bound-undefined.patch
+Patch346: gdb-6.8-bz377541-vla-loc-kind.patch
+Patch305: gdb-6.8-bz377541-vla.patch
 
 # Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
 Patch306: gdb-6.8-watchpoint-inaccessible-memory.patch
@@ -394,6 +394,9 @@ Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
 
 # Fix occasional crash on a removed watchpoint.
 Patch338: gdb-6.8-breakpoint-gone.patch
+
+# Test the watchpoints conditionals works.
+Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
@@ -518,7 +521,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch177 -p1
 %patch178 -p1
 %patch179 -p1
-%patch187 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -568,6 +570,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch298 -p1
 %patch301 -p1
 %patch304 -p1
+%patch345 -p1
+%patch346 -p1
 %patch305 -p1
 %patch306 -p1
 %patch309 -p1
@@ -586,6 +590,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch336 -p1
 %patch337 -p1
 %patch338 -p1
+%patch343 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -838,6 +843,11 @@ fi
 %endif
 
 %changelog
+* Sun Nov  9 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-23
+- Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
+- Fix the watchpoints conditionals.
+- Fix on PPC spurious SIGTRAPs on active watchpoints.
+
 * Tue Sep  2 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-22
 - Fix PIE patch regression for loading binaries from valgrind (BZ 460319).
 

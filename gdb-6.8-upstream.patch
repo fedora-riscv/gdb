@@ -1638,3 +1638,321 @@ gdb/
        /* Shared library handling.  */
        set_gdbarch_skip_trampoline_code (gdbarch, ppc64_skip_trampoline_code);
        set_solib_svr4_fetch_link_map_offsets
+
+
+
+http://sourceware.org/ml/gdb-patches/2008-04/msg00379.html
+http://sourceware.org/ml/gdb-cvs/2008-04/msg00104.html
+
+2008-04-17  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* breakpoint.c (update_watchpoint): Always reparse
+	condition.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.c,v
+retrieving revision 1.309
+retrieving revision 1.310
+diff -u -r1.309 -r1.310
+--- src/gdb/breakpoint.c	2008/04/17 22:43:17	1.309
++++ src/gdb/breakpoint.c	2008/04/18 00:41:28	1.310
+@@ -994,14 +994,13 @@
+ 	    value_free (v);
+ 	}
+ 
+-      if (reparse && b->cond_string != NULL)
++      /* We just regenerated the list of breakpoint locations.
++         The new location does not have its condition field set to anything
++         and therefore, we must always reparse the cond_string, independently
++         of the value of the reparse flag.  */
++      if (b->cond_string != NULL)
+ 	{
+ 	  char *s = b->cond_string;
+-	  if (b->loc->cond)
+-	    {
+-	      xfree (b->loc->cond);
+-	      b->loc->cond = NULL;
+-	    }
+ 	  b->loc->cond = parse_exp_1 (&s, b->exp_valid_block, 0);
+ 	}
+     }
+
+
+
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=196439
+http://sourceware.org/ml/gdb-patches/2008-04/msg00628.html
+http://sourceware.org/ml/gdb-cvs/2008-05/msg00051.html
+
+Testcase:
+gdb-6.5-bz196439-valgrind-memcheck-compat-test.patch
+
+2008-05-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (dwarf_expr_frame_base): Error out on missing
+	SYMBOL_LOCATION_BATON.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/dwarf2loc.c,v
+retrieving revision 1.50
+retrieving revision 1.51
+diff -u -r1.50 -r1.51
+--- src/gdb/dwarf2loc.c	2008/03/26 14:53:28	1.50
++++ src/gdb/dwarf2loc.c	2008/05/04 12:44:16	1.51
+@@ -166,8 +166,13 @@
+     {
+       struct dwarf2_locexpr_baton *symbaton;
+       symbaton = SYMBOL_LOCATION_BATON (framefunc);
+-      *length = symbaton->size;
+-      *start = symbaton->data;
++      if (symbaton != NULL)
++	{
++	  *length = symbaton->size;
++	  *start = symbaton->data;
++	}
++      else
++	*start = NULL;
+     }
+ 
+   if (*start == NULL)
+
+
+
+http://sourceware.org/ml/gdb-patches/2008-04/msg00508.html
+http://sourceware.org/ml/gdb-cvs/2008-05/msg00017.html
+
+Test applicable from:
+gdb-6.8-watchpoint-conditionals-test.patch
+
+gdb/
+2008-05-02  Andreas Schwab  <schwab@suse.de>
+
+	* target.h (struct target_ops): Add
+	to_watchpoint_addr_within_range.
+	(target_watchpoint_addr_within_range): New function.
+	* target.c (update_current_target): Inherit
+	to_watchpoint_addr_within_range, defaulting to
+	default_watchpoint_addr_within_range.
+	(default_watchpoint_addr_within_range): New function.
+	(debug_to_watchpoint_addr_within_range): New function.
+	(setup_target_debug): Set to_watchpoint_addr_within_range.
+	* ppc-linux-nat.c (ppc_linux_watchpoint_addr_within_range):
+	New function.
+	(_initialize_ppc_linux_nat): Set to_watchpoint_addr_within_range.
+	* breakpoint.c (watchpoints_triggered): Use
+	target_watchpoint_addr_within_range.
+
+gdb/doc/
+2008-05-02  Andreas Schwab  <schwab@suse.de>
+
+	* gdbint.texinfo (Algorithms): Describe
+	target_watchpoint_addr_within_range.
+
+===================================================================
+RCS file: /cvs/src/src/gdb/target.h,v
+retrieving revision 1.117
+retrieving revision 1.118
+diff -u -r1.117 -r1.118
+--- src/gdb/target.h	2008/05/01 19:31:51	1.117
++++ src/gdb/target.h	2008/05/02 11:07:25	1.118
+@@ -367,6 +367,8 @@
+     int to_have_steppable_watchpoint;
+     int to_have_continuable_watchpoint;
+     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
++    int (*to_watchpoint_addr_within_range) (struct target_ops *,
++					    CORE_ADDR, CORE_ADDR, int);
+     int (*to_region_ok_for_hw_watchpoint) (CORE_ADDR, int);
+     void (*to_terminal_init) (void);
+     void (*to_terminal_inferior) (void);
+@@ -1093,6 +1095,9 @@
+ #define target_stopped_data_address_p(CURRENT_TARGET) (1)
+ #endif
+ 
++#define target_watchpoint_addr_within_range(target, addr, start, length) \
++  (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
++
+ extern const struct target_desc *target_read_description (struct target_ops *);
+ 
+ /* Command logging facility.  */
+===================================================================
+RCS file: /cvs/src/src/gdb/target.c,v
+retrieving revision 1.160
+retrieving revision 1.161
+diff -u -r1.160 -r1.161
+--- src/gdb/target.c	2008/04/24 10:21:44	1.160
++++ src/gdb/target.c	2008/05/02 11:07:25	1.161
+@@ -49,6 +49,9 @@
+ 
+ static void default_terminal_info (char *, int);
+ 
++static int default_watchpoint_addr_within_range (struct target_ops *,
++						 CORE_ADDR, CORE_ADDR, int);
++
+ static int default_region_ok_for_hw_watchpoint (CORE_ADDR, int);
+ 
+ static int nosymbol (char *, CORE_ADDR *);
+@@ -131,6 +134,9 @@
+ 
+ static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
+ 
++static int debug_to_watchpoint_addr_within_range (struct target_ops *,
++						  CORE_ADDR, CORE_ADDR, int);
++
+ static int debug_to_region_ok_for_hw_watchpoint (CORE_ADDR, int);
+ 
+ static void debug_to_terminal_init (void);
+@@ -416,9 +422,10 @@
+       INHERIT (to_insert_watchpoint, t);
+       INHERIT (to_remove_watchpoint, t);
+       INHERIT (to_stopped_data_address, t);
+-      INHERIT (to_stopped_by_watchpoint, t);
+       INHERIT (to_have_steppable_watchpoint, t);
+       INHERIT (to_have_continuable_watchpoint, t);
++      INHERIT (to_stopped_by_watchpoint, t);
++      INHERIT (to_watchpoint_addr_within_range, t);
+       INHERIT (to_region_ok_for_hw_watchpoint, t);
+       INHERIT (to_terminal_init, t);
+       INHERIT (to_terminal_inferior, t);
+@@ -544,6 +551,8 @@
+   de_fault (to_stopped_data_address,
+ 	    (int (*) (struct target_ops *, CORE_ADDR *))
+ 	    return_zero);
++  de_fault (to_watchpoint_addr_within_range,
++	    default_watchpoint_addr_within_range);
+   de_fault (to_region_ok_for_hw_watchpoint,
+ 	    default_region_ok_for_hw_watchpoint);
+   de_fault (to_terminal_init,
+@@ -1881,6 +1890,14 @@
+ }
+ 
+ static int
++default_watchpoint_addr_within_range (struct target_ops *target,
++				      CORE_ADDR addr,
++				      CORE_ADDR start, int length)
++{
++  return addr >= start && addr < start + length;
++}
++
++static int
+ return_zero (void)
+ {
+   return 0;
+@@ -2448,6 +2465,23 @@
+ }
+ 
+ static int
++debug_to_watchpoint_addr_within_range (struct target_ops *target,
++				       CORE_ADDR addr,
++				       CORE_ADDR start, int length)
++{
++  int retval;
++
++  retval = debug_target.to_watchpoint_addr_within_range (target, addr,
++							 start, length);
++
++  fprintf_filtered (gdb_stdlog,
++		    "target_watchpoint_addr_within_range (0x%lx, 0x%lx, %d) = %d\n",
++		    (unsigned long) addr, (unsigned long) start, length,
++		    retval);
++  return retval;
++}
++
++static int
+ debug_to_insert_hw_breakpoint (struct bp_target_info *bp_tgt)
+ {
+   int retval;
+@@ -2790,6 +2824,7 @@
+   current_target.to_remove_watchpoint = debug_to_remove_watchpoint;
+   current_target.to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
+   current_target.to_stopped_data_address = debug_to_stopped_data_address;
++  current_target.to_watchpoint_addr_within_range = debug_to_watchpoint_addr_within_range;
+   current_target.to_region_ok_for_hw_watchpoint = debug_to_region_ok_for_hw_watchpoint;
+   current_target.to_terminal_init = debug_to_terminal_init;
+   current_target.to_terminal_inferior = debug_to_terminal_inferior;
+===================================================================
+RCS file: /cvs/src/src/gdb/ppc-linux-nat.c,v
+retrieving revision 1.78
+retrieving revision 1.79
+diff -u -r1.78 -r1.79
+--- src/gdb/ppc-linux-nat.c	2008/01/16 04:48:55	1.78
++++ src/gdb/ppc-linux-nat.c	2008/05/02 11:07:25	1.79
+@@ -889,6 +889,16 @@
+   return ppc_linux_stopped_data_address (&current_target, &addr);
+ }
+ 
++static int
++ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
++					CORE_ADDR addr,
++					CORE_ADDR start, int length)
++{
++  addr &= ~7;
++  /* Check whether [start, start+length-1] intersects [addr, addr+7]. */
++  return start <= addr + 7 && start + length - 1 >= addr;
++}
++
+ static void
+ ppc_linux_store_inferior_registers (struct regcache *regcache, int regno)
+ {
+@@ -997,6 +1007,7 @@
+   t->to_remove_watchpoint = ppc_linux_remove_watchpoint;
+   t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
+   t->to_stopped_data_address = ppc_linux_stopped_data_address;
++  t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
+ 
+   t->to_read_description = ppc_linux_read_description;
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/breakpoint.c,v
+retrieving revision 1.317
+retrieving revision 1.318
+diff -u -r1.317 -r1.318
+--- src/gdb/breakpoint.c	2008/05/01 20:35:33	1.317
++++ src/gdb/breakpoint.c	2008/05/02 11:07:25	1.318
+@@ -2616,8 +2616,9 @@
+ 	for (loc = b->loc; loc; loc = loc->next)
+ 	  /* Exact match not required.  Within range is
+ 	     sufficient.  */
+-	  if (addr >= loc->address
+-	      && addr < loc->address + loc->length)
++	  if (target_watchpoint_addr_within_range (&current_target,
++						   addr, loc->address,
++						   loc->length))
+ 	    {
+ 	      b->watchpoint_triggered = watch_triggered_yes;
+ 	      break;
+===================================================================
+RCS file: /cvs/src/src/gdb/doc/gdbint.texinfo,v
+retrieving revision 1.282
+retrieving revision 1.283
+diff -u -r1.282 -r1.283
+--- src/gdb/doc/gdbint.texinfo	2008/04/30 21:16:46	1.282
++++ src/gdb/doc/gdbint.texinfo	2008/05/02 11:07:25	1.283
+@@ -9,7 +9,7 @@
+ @ifinfo
+ This file documents the internals of the GNU debugger @value{GDBN}.
+ Copyright (C) 1990, 1991, 1992, 1993, 1994, 1996, 1998, 1999, 2000, 2001,
+-   2002, 2003, 2004, 2005, 2006
++   2002, 2003, 2004, 2005, 2006, 2008
+    Free Software Foundation, Inc.
+ Contributed by Cygnus Solutions.  Written by John Gilmore.
+ Second Edition by Stan Shebs.
+@@ -711,10 +711,19 @@
+ resuming, this method should clear it.  For instance, the x86 debug
+ control register has sticky triggered flags.
+ 
++@findex target_watchpoint_addr_within_range
++@item target_watchpoint_addr_within_range (@var{target}, @var{addr}, @var{start}, @var{length})
++Check whether @var{addr} (as returned by @code{target_stopped_data_address})
++lies within the hardware-defined watchpoint region described by
++@var{start} and @var{length}.  This only needs to be provided if the
++granularity of a watchpoint is greater than one byte, i.e., if the
++watchpoint can also trigger on nearby addresses outside of the watched
++region.
++
+ @findex HAVE_STEPPABLE_WATCHPOINT
+ @item HAVE_STEPPABLE_WATCHPOINT
+ If defined to a non-zero value, it is not necessary to disable a
+-watchpoint to step over it.    Like @code{gdbarch_have_nonsteppable_watchpoint},
++watchpoint to step over it.  Like @code{gdbarch_have_nonsteppable_watchpoint},
+ this is usually set when watchpoints trigger at the instruction
+ which will perform an interesting read or write.  It should be
+ set if there is a temporary disable bit which allows the processor
