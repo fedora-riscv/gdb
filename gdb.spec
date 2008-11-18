@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?_with_upstream:.upstream}%{?dist}
+Release: 31%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -425,6 +425,9 @@ Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 # Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
+# Enable ia64 hardware watchpoints if created before starting inferior.
+Patch349: gdb-6.8-ia64-exec-hw-watchpoint.patch
+
 BuildRequires: ncurses-devel glibc-devel gcc make gzip texinfo dejagnu gettext
 BuildRequires: flex bison sharutils expat-devel
 Requires: readline
@@ -629,6 +632,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch342 -p1
 %patch343 -p1
 %patch348 -p1
+%patch349 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -892,6 +896,9 @@ fi
 %endif
 
 %changelog
+* Tue Nov 18 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-31
+- Enable ia64 hardware watchpoints if created before starting inferior.
+
 * Sun Nov  9 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-30
 - Fix a race in the testcase `gdb.threads/step-thread-exit.exp'.
 

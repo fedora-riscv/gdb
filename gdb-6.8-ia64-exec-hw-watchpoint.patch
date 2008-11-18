@@ -1,0 +1,119 @@
+It is a regression from:
+http://sourceware.org/ml/gdb-patches/2007-03/msg00290.html
+http://sourceware.org/ml/gdb-cvs/2007-03/msg00114.html
+
+Without started inferior the only target in the stack is `exec' which has no
+hardware-watchpoints support for sure.
+
+--- /dev/null	2008-11-16 09:11:50.595000000 +0100
++++ gdb-6.8/gdb/config/ia64/nm-linux.h	2008-11-18 11:00:34.000000000 +0100
+@@ -0,0 +1,31 @@
++/* Native support for GNU/Linux, for GDB, the GNU debugger.
++
++   Copyright 1999, 2000, 2001, 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#ifndef NM_LINUX_H
++#define NM_LINUX_H
++
++#include "config/nm-linux.h"
++
++/* Hardware watchpoints */
++
++#define TARGET_CAN_USE_HARDWARE_WATCHPOINT(type, cnt, ot) 1
++
++#endif /* #ifndef NM_LINUX_H */
+--- gdb-6.8/gdb/config/ia64/linux.mh-orig	2007-04-26 00:17:48.000000000 +0200
++++ gdb-6.8/gdb/config/ia64/linux.mh	2008-11-18 11:09:33.000000000 +0100
+@@ -1,6 +1,6 @@
+ # Host: Intel IA-64 running GNU/Linux
+ 
+-NAT_FILE= config/nm-linux.h
++NAT_FILE= nm-linux.h
+ NATDEPFILES= inf-ptrace.o fork-child.o corelow.o gcore.o \
+ 	core-regset.o ia64-linux-nat.o \
+ 	proc-service.o linux-thread-db.o linux-nat.o linux-fork.o
+--- /dev/null	2008-11-16 09:11:50.595000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.base/hw-watchpoint-available.exp	2008-11-18 11:28:40.000000000 +0100
+@@ -0,0 +1,35 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if {![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"] && ![istarget "ia64-*-*"]
++    && ![istarget "s390*-*-*"]} then {
++    verbose "Skipping hw-watchpoint-available test."
++    return
++}
++
++set testfile hw-watchpoint-available
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++gdb_test "watch watchee" "Hardware watchpoint 1: watchee"
+--- /dev/null	2008-11-16 09:11:50.595000000 +0100
++++ gdb-6.8/gdb/testsuite/gdb.base/hw-watchpoint-available.c	2008-11-18 11:24:38.000000000 +0100
+@@ -0,0 +1,27 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++int watchee;
++
++int
++main (void)
++{
++  return 0;
++}
