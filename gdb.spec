@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?_with_upstream:.upstream}%{?dist}
+Release: 33%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -428,15 +428,14 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 # Enable ia64 hardware watchpoints if created before starting inferior.
 Patch349: gdb-6.8-ia64-exec-hw-watchpoint.patch
 
-BuildRequires: ncurses-devel texinfo dejagnu gettext
-BuildRequires: flex bison sharutils expat-devel
+BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
 Requires: rpm-libs
 BuildRequires: rpm-devel
 
-# BuildRequires are set here only for the complete testsuite run.
 %if 0%{?_with_testsuite:1}
+BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc
 # Ensure the devel libraries are installed for both multilib arches.
@@ -896,6 +895,9 @@ fi
 %endif
 
 %changelog
+* Mon Dec  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-33
+- Make `--with testsuite' BuildRequires properly conditional.
+
 * Mon Dec  1 2008 Stepan Kasal <skasal@redhat.com> - 6.8-32
 - Remove trivial BuildRequires, use rpm macros in a few remaining places.
 
