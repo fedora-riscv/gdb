@@ -17,6 +17,9 @@ http://sourceware.org/ml/gdb-patches/2008-12/msg00243.html
 [ +linespec.c: Fedora patch. ]
 [ +top.c: Fedora patch. ]
 
+ui-file.c replaced by:
+http://sourceware.org/ml/gdb-patches/2008-12/msg00260.html
+
 ---
  gdb/ChangeLog       |   14 ++++++++++++++
  gdb/cli/cli-cmds.c  |    4 +++-
@@ -159,30 +162,6 @@ index 327ddc5..0103153 100644
    ui_out_field_string (uiout, "cwd", gdb_dirbuf);
  }
  
-diff --git a/gdb/ui-file.c b/gdb/ui-file.c
-index 9a1d892..2ed304f 100644
---- a/gdb/ui-file.c
-+++ b/gdb/ui-file.c
-@@ -481,7 +481,8 @@ stdio_file_write (struct ui_file *file, const char *buf, long length_buf)
-   if (stdio->magic != &stdio_file_magic)
-     internal_error (__FILE__, __LINE__,
- 		    _("stdio_file_write: bad magic number"));
--  fwrite (buf, length_buf, 1, stdio->file);
-+  if (fwrite (buf, length_buf, 1, stdio->file) != 1)
-+    error ("stdio_file_write: %s", safe_strerror (errno));
- }
- 
- static void
-@@ -491,7 +492,8 @@ stdio_file_fputs (const char *linebuffer, struct ui_file *file)
-   if (stdio->magic != &stdio_file_magic)
-     internal_error (__FILE__, __LINE__,
- 		    _("stdio_file_fputs: bad magic number"));
--  fputs (linebuffer, stdio->file);
-+  if (fputs (linebuffer, stdio->file) == EOF)
-+    error ("stdio_file_fputs: %s", safe_strerror (errno));
- }
- 
- static int
 diff --git a/gdb/utils.c b/gdb/utils.c
 index d14009f..725f00b 100644
 --- a/gdb/utils.c
@@ -229,3 +208,27 @@ Index: gdb-6.7/gdb/top.c
    current_directory = gdb_dirbuf;
  
  #ifdef __MSDOS__
+--- ./gdb/ui-file.c	1 Jan 2008 22:53:13 -0000	1.15
++++ ./gdb/ui-file.c	14 Dec 2008 18:16:56 -0000
+@@ -481,7 +481,9 @@ stdio_file_write (struct ui_file *file, 
+   if (stdio->magic != &stdio_file_magic)
+     internal_error (__FILE__, __LINE__,
+ 		    _("stdio_file_write: bad magic number"));
+-  fwrite (buf, length_buf, 1, stdio->file);
++  /* Calling error crashes when we are called from the exception framework.  */
++  if (fwrite (buf, length_buf, 1, stdio->file))
++    ;
+ }
+ 
+ static void
+@@ -491,7 +493,9 @@ stdio_file_fputs (const char *linebuffer
+   if (stdio->magic != &stdio_file_magic)
+     internal_error (__FILE__, __LINE__,
+ 		    _("stdio_file_fputs: bad magic number"));
+-  fputs (linebuffer, stdio->file);
++  /* Calling error crashes when we are called from the exception framework.  */
++  if (fputs (linebuffer, stdio->file))
++    ;
+ }
+ 
+ static int
