@@ -9,7 +9,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20081209
+Version: 6.8.50.20081214
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -834,7 +834,7 @@ fi
 %endif
 
 %changelog
-* Sun Dec 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20081209-1
+* Sun Dec 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20081214-1
 - Upgrade to the upstream gdb-6.8.50 snapshot.
 
 * Mon Dec  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-33
