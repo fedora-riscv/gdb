@@ -26,28 +26,19 @@
 
 	Fix scan_dyntag() for binaries provided by valgrind (BZ 460319).
 
---- ./gdb/Makefile.in	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/Makefile.in	2008-08-30 23:40:33.000000000 +0200
-@@ -1928,7 +1928,7 @@ amd64-tdep.o: amd64-tdep.c $(defs_h) $(a
- 	$(dummy_frame_h) $(frame_h) $(frame_base_h) $(frame_unwind_h) \
- 	$(inferior_h) $(gdbcmd_h) $(gdbcore_h) $(objfiles_h) $(regcache_h) \
- 	$(regset_h) $(symfile_h) $(gdb_assert_h) $(amd64_tdep_h) \
--	$(i387_tdep_h)
-+	$(i387_tdep_h) $(exceptions_h)
- annotate.o: annotate.c $(defs_h) $(annotate_h) $(value_h) $(target_h) \
- 	$(gdbtypes_h) $(breakpoint_h)
- arch-utils.o: arch-utils.c $(defs_h) $(arch_utils_h) $(buildsym_h) \
---- ./gdb/amd64-tdep.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/amd64-tdep.c	2008-08-30 23:40:33.000000000 +0200
-@@ -36,6 +36,7 @@
+Index: gdb-6.8.50.20081209/gdb/amd64-tdep.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/amd64-tdep.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/amd64-tdep.c	2008-12-14 14:56:49.000000000 +0100
+@@ -34,6 +34,7 @@
+ #include "regcache.h"
+ #include "regset.h"
  #include "symfile.h"
- #include "dwarf2-frame.h"
- #include "gdb_assert.h"
 +#include "exceptions.h"
  
- #include "amd64-tdep.h"
- #include "i387-tdep.h"
-@@ -731,16 +732,28 @@ amd64_alloc_frame_cache (void)
+ #include "gdb_assert.h"
+ 
+@@ -906,16 +907,28 @@ amd64_analyze_stack_align (CORE_ADDR pc,
     Any function that doesn't start with this sequence will be assumed
     to have no prologue and thus no valid frame pointer in %rbp.  */
  
@@ -78,9 +69,9 @@
 +      return 1;
 +    }
  
-   op = read_memory_unsigned_integer (pc, 1);
+   pc = amd64_analyze_stack_align (pc, current_pc, cache);
  
-@@ -753,18 +766,57 @@ amd64_analyze_prologue (CORE_ADDR pc, CO
+@@ -930,18 +943,57 @@ amd64_analyze_prologue (CORE_ADDR pc, CO
  
        /* If that's all, return now.  */
        if (current_pc <= pc + 1)
@@ -141,18 +132,29 @@
    return pc;
  }
  
---- ./gdb/auxv.c	2008-01-16 17:27:37.000000000 +0100
-+++ ./gdb/auxv.c	2008-08-30 23:40:33.000000000 +0200
+Index: gdb-6.8.50.20081209/gdb/auxv.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/auxv.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/auxv.c	2008-12-14 14:57:58.000000000 +0100
 @@ -80,7 +80,7 @@ procfs_xfer_auxv (struct target_ops *ops
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  int
- target_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+ default_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
 -		   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 +		   gdb_byte *endptr, ULONGEST *typep, CORE_ADDR *valp)
  {
-   const int sizeof_auxv_field = TYPE_LENGTH (builtin_type_void_data_ptr);
-   gdb_byte *ptr = *readptr;
-@@ -105,9 +105,10 @@ target_auxv_parse (struct target_ops *op
+   const int sizeof_auxv_field = gdbarch_ptr_bit (target_gdbarch)
+ 				/ TARGET_CHAR_BIT;
+@@ -107,7 +107,7 @@ default_auxv_parse (struct target_ops *o
+    Return 1 if an entry was read into *TYPEP and *VALP.  */
+ int
+ target_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+-                  gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
++                  gdb_byte *endptr, ULONGEST *typep, CORE_ADDR *valp)
+ {
+   struct target_ops *t;
+   for (t = ops; t != NULL; t = t->beneath)
+@@ -122,9 +122,10 @@ target_auxv_parse (struct target_ops *op
     an error getting the information.  On success, return 1 after
     storing the entry's value field in *VALP.  */
  int
@@ -165,7 +167,7 @@
    gdb_byte *data;
    LONGEST n = target_read_alloc (ops, TARGET_OBJECT_AUXV, NULL, &data);
    gdb_byte *ptr = data;
-@@ -117,10 +118,10 @@ target_auxv_search (struct target_ops *o
+@@ -134,10 +135,10 @@ target_auxv_search (struct target_ops *o
      return n;
  
    while (1)
@@ -178,7 +180,7 @@
  	  {
  	    xfree (data);
  	    *valp = val;
-@@ -143,7 +144,8 @@ target_auxv_search (struct target_ops *o
+@@ -160,7 +161,8 @@ target_auxv_search (struct target_ops *o
  int
  fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
  {
@@ -188,14 +190,13 @@
    gdb_byte *data;
    LONGEST len = target_read_alloc (ops, TARGET_OBJECT_AUXV, NULL,
  				   &data);
-@@ -153,14 +155,14 @@ fprint_target_auxv (struct ui_file *file
+@@ -170,13 +172,13 @@ fprint_target_auxv (struct ui_file *file
    if (len <= 0)
      return len;
  
 -  while (target_auxv_parse (ops, &ptr, data + len, &type, &val) > 0)
 +  while (target_auxv_parse (ops, &ptr, data + len, &at_type, &val) > 0)
      {
-       extern int addressprint;
        const char *name = "???";
        const char *description = "";
        enum { dec, hex, str } flavor = hex;
@@ -205,17 +206,28 @@
  	{
  #define TAG(tag, text, kind) \
  	case tag: name = #tag; description = text; flavor = kind; break
-@@ -213,7 +215,7 @@ fprint_target_auxv (struct ui_file *file
+@@ -231,7 +233,7 @@ fprint_target_auxv (struct ui_file *file
  	}
  
        fprintf_filtered (file, "%-4s %-20s %-30s ",
--			paddr_d (type), name, description);
-+			paddr_d (at_type), name, description);
+-			plongest (type), name, description);
++			plongest (at_type), name, description);
        switch (flavor)
  	{
  	case dec:
---- ./gdb/auxv.h	2008-01-01 23:53:09.000000000 +0100
-+++ ./gdb/auxv.h	2008-08-30 23:40:33.000000000 +0200
+@@ -252,7 +254,7 @@ fprint_target_auxv (struct ui_file *file
+ 	  break;
+ 	}
+       ++ents;
+-      if (type == AT_NULL)
++      if (at_type == AT_NULL)
+ 	break;
+     }
+ 
+Index: gdb-6.8.50.20081209/gdb/auxv.h
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/auxv.h	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/auxv.h	2008-12-14 14:56:49.000000000 +0100
 @@ -35,14 +35,14 @@ struct target_ops;		/* Forward declarati
     Return 1 if an entry was read into *TYPEP and *VALP.  */
  extern int target_auxv_parse (struct target_ops *ops,
@@ -233,9 +245,11 @@
  
  /* Print the contents of the target's AUXV on the specified file. */
  extern int fprint_target_auxv (struct ui_file *file, struct target_ops *ops);
---- ./gdb/breakpoint.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/breakpoint.c	2008-08-30 23:40:33.000000000 +0200
-@@ -3971,7 +3971,8 @@ describe_other_breakpoints (CORE_ADDR pc
+Index: gdb-6.8.50.20081209/gdb/breakpoint.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/breakpoint.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/breakpoint.c	2008-12-14 14:56:49.000000000 +0100
+@@ -3861,7 +3861,8 @@ describe_other_breakpoints (CORE_ADDR pc
  	      printf_filtered (" (thread %d)", b->thread);
  	    printf_filtered ("%s%s ",
  			     ((b->enable_state == bp_disabled || 
@@ -245,8 +259,8 @@
  			      ? " (disabled)"
  			      : b->enable_state == bp_permanent 
  			      ? " (permanent)"
-@@ -4623,6 +4624,62 @@ disable_breakpoints_in_unloaded_shlib (s
-   }
+@@ -4692,6 +4693,61 @@ create_catchpoint (int tempflag, char *c
+   return b;
  }
  
 +void
@@ -304,13 +318,14 @@
 +    }
 +}
 +
-+
  static void
  create_fork_vfork_event_catchpoint (int tempflag, char *cond_string,
- 				    enum bptype bp_kind)
---- ./gdb/breakpoint.h	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/breakpoint.h	2008-08-30 23:40:33.000000000 +0200
-@@ -144,6 +144,7 @@ enum enable_state
+                                     struct breakpoint_ops *ops)
+Index: gdb-6.8.50.20081209/gdb/breakpoint.h
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/breakpoint.h	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/breakpoint.h	2008-12-14 14:56:49.000000000 +0100
+@@ -126,6 +126,7 @@ enum enable_state
  			   automatically enabled and reset when the call 
  			   "lands" (either completes, or stops at another 
  			   eventpoint). */
@@ -318,7 +333,7 @@
      bp_permanent	/* There is a breakpoint instruction hard-wired into
  			   the target's code.  Don't try to write another
  			   breakpoint instruction on top of it, or restore
-@@ -828,6 +829,10 @@ extern void remove_thread_event_breakpoi
+@@ -818,6 +819,10 @@ extern void remove_thread_event_breakpoi
  
  extern void disable_breakpoints_in_shlibs (void);
  
@@ -329,9 +344,11 @@
  /* This function returns TRUE if ep is a catchpoint. */
  extern int ep_is_catchpoint (struct breakpoint *);
  
---- ./gdb/dwarf2read.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/dwarf2read.c	2008-08-30 23:40:33.000000000 +0200
-@@ -1222,7 +1222,7 @@ dwarf2_build_psymtabs (struct objfile *o
+Index: gdb-6.8.50.20081209/gdb/dwarf2read.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/dwarf2read.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/dwarf2read.c	2008-12-14 14:56:49.000000000 +0100
+@@ -1295,7 +1295,7 @@ dwarf2_build_psymtabs (struct objfile *o
    else
      dwarf2_per_objfile->loc_buffer = NULL;
  
@@ -340,9 +357,11 @@
        || (objfile->global_psymbols.size == 0
  	  && objfile->static_psymbols.size == 0))
      {
---- ./gdb/elfread.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/elfread.c	2008-08-30 23:40:33.000000000 +0200
-@@ -673,7 +673,7 @@ elf_symfile_read (struct objfile *objfil
+Index: gdb-6.8.50.20081209/gdb/elfread.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/elfread.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/elfread.c	2008-12-14 14:56:49.000000000 +0100
+@@ -680,7 +680,7 @@ elf_symfile_read (struct objfile *objfil
    /* If we are reinitializing, or if we have never loaded syms yet,
       set table to empty.  MAINLINE is cleared so that *_read_psymtab
       functions do not all also re-initialize the psymbol table. */
@@ -351,9 +370,11 @@
      {
        init_psymbol_list (objfile, 0);
        mainline = 0;
---- ./gdb/infrun.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/infrun.c	2008-08-30 23:40:33.000000000 +0200
-@@ -2314,6 +2314,11 @@ process_event_stop_test:
+Index: gdb-6.8.50.20081209/gdb/infrun.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/infrun.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/infrun.c	2008-12-14 14:56:49.000000000 +0100
+@@ -3229,6 +3229,11 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
  #endif
  	  target_terminal_inferior ();
  
@@ -365,11 +386,13 @@
  	  /* If requested, stop when the dynamic linker notifies
  	     gdb of events.  This allows the user to get control
  	     and place breakpoints in initializer routines for
---- ./gdb/objfiles.c	2008-01-01 23:53:12.000000000 +0100
-+++ ./gdb/objfiles.c	2008-08-30 23:40:33.000000000 +0200
-@@ -49,6 +49,9 @@
- #include "source.h"
- #include "addrmap.h"
+Index: gdb-6.8.50.20081209/gdb/objfiles.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/objfiles.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/objfiles.c	2008-12-14 14:56:49.000000000 +0100
+@@ -51,6 +51,9 @@
+ #include "arch-utils.h"
+ #include "exec.h"
  
 +#include "auxv.h"
 +#include "elf/common.h"
@@ -377,7 +400,7 @@
  /* Prototypes for local functions */
  
  static void objfile_alloc_data (struct objfile *objfile);
-@@ -260,7 +263,19 @@ init_entry_point_info (struct objfile *o
+@@ -271,7 +274,19 @@ init_entry_point_info (struct objfile *o
  CORE_ADDR
  entry_point_address (void)
  {
@@ -398,18 +421,19 @@
  }
  
  /* Create the terminating entry of OBJFILE's minimal symbol table.
---- ./gdb/solib-svr4.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/solib-svr4.c	2008-09-01 17:12:31.000000000 +0200
-@@ -31,6 +31,8 @@
- #include "gdbcore.h"
- #include "target.h"
- #include "inferior.h"
-+#include "auxv.h"
+Index: gdb-6.8.50.20081209/gdb/solib-svr4.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/solib-svr4.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/solib-svr4.c	2008-12-14 14:56:49.000000000 +0100
+@@ -44,6 +44,7 @@
+ #include "exec.h"
+ #include "auxv.h"
+ #include "exceptions.h"
 +#include "command.h"
  
- #include "gdb_assert.h"
- 
-@@ -246,7 +248,9 @@ static char *debug_loader_name;
+ static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
+ static int svr4_have_link_map_offsets (void);
+@@ -286,7 +287,9 @@ static CORE_ADDR main_lm_addr;
  
  /* Local function prototypes */
  
@@ -419,7 +443,7 @@
  
  static CORE_ADDR bfd_lookup_symbol (bfd *, char *);
  
-@@ -349,10 +353,12 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
+@@ -520,10 +523,12 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
    int arch_size, step, sect_size;
    long dyn_tag;
    CORE_ADDR dyn_ptr, dyn_addr;
@@ -432,7 +456,7 @@
  
    if (abfd == NULL)
      return 0;
-@@ -360,19 +366,81 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
+@@ -531,19 +536,81 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
    if (arch_size == -1)
     return 0;
  
@@ -516,7 +540,7 @@
  
    /* Iterate over BUF and scan for DYNTAG.  If found, set PTR and return.  */
    step = (arch_size == 32) ? sizeof (Elf32_External_Dyn)
-@@ -393,25 +461,103 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
+@@ -564,26 +631,105 @@ scan_dyntag (int dyntag, bfd *abfd, CORE
  	dyn_tag = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_tag);
  	dyn_ptr = bfd_h_get_64 (abfd, (bfd_byte *) x_dynp_64->d_un.d_ptr);
        }
@@ -562,13 +586,14 @@
 -	    entry.  */
 -	 if (ptr)
 -	   {
+-	     struct type *ptr_type;
 -	     gdb_byte ptr_buf[8];
 -	     CORE_ADDR ptr_addr;
 -
+-	     ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
 -	     ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
 -	     if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
--	       dyn_ptr = extract_typed_address (ptr_buf,
--						builtin_type_void_data_ptr);
+-	       dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
 -	     *ptr = dyn_ptr;
 -	   }
 -	 return 1;
@@ -612,8 +637,10 @@
 +
 +	    if (got == 0)
 +	      {
-+		dyn_ptr = extract_typed_address (ptr_buf,
-+						 builtin_type_void_data_ptr);
++		struct type *ptr_type;
++
++		ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
++		dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
 +		if (ptr != NULL)
 +		  {
 +		    if (debug_solib)
@@ -638,18 +665,18 @@
    }
  
    return 0;
-@@ -544,6 +690,10 @@ solib_svr4_r_map (void)
- {
+@@ -773,6 +919,10 @@ solib_svr4_r_map (void)
    struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+   struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
  
 +  if (debug_solib)
 +    fprintf_unfiltered (gdb_stdlog, 
 +                        "solib_svr4_r_map: read at 0x%s\n",
 +                        paddr_nz (debug_base + lmo->r_map_offset));
-   return read_memory_typed_address (debug_base + lmo->r_map_offset,
- 				    builtin_type_void_data_ptr);
+   return read_memory_typed_address (debug_base + lmo->r_map_offset, ptr_type);
  }
-@@ -713,6 +863,11 @@ svr4_current_sos (void)
+ 
+@@ -944,6 +1094,11 @@ svr4_current_sos (void)
    struct so_list *head = 0;
    struct so_list **link_ptr = &head;
    CORE_ADDR ldsomap = 0;
@@ -661,7 +688,7 @@
  
    /* Always locate the debug struct, in case it has moved.  */
    debug_base = 0;
-@@ -721,10 +876,19 @@ svr4_current_sos (void)
+@@ -952,10 +1107,19 @@ svr4_current_sos (void)
    /* If we can't find the dynamic linker's base structure, this
       must not be a dynamically linked executable.  Hmm.  */
    if (! debug_base)
@@ -682,7 +709,7 @@
    lm = solib_svr4_r_map ();
  
    while (lm)
-@@ -740,23 +904,103 @@ svr4_current_sos (void)
+@@ -972,26 +1136,104 @@ svr4_current_sos (void)
        new->lm_info->lm = xzalloc (lmo->link_map_size);
        make_cleanup (xfree, new->lm_info->lm);
  
@@ -704,14 +731,17 @@
           does have a name, so we can no longer use a missing name to
           decide when to ignore it. */
 -      if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
--	free_so (new);
 +      if (exec_bfd != NULL && IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
-+	{
+ 	{
+-	  main_lm_addr = new->lm_info->lm_addr;
+-	  free_so (new);
+-	}
 +          /* It is the first link map entry, i.e. it is the main executable.  */
 +
 +	  if (bfd_get_start_address (exec_bfd) == entry_point_address ())
 +	    {
-+              /* Non-pie case, main executable has not been relocated.  */
++	      /* Non-pie case, main executable has not been relocated.  */
++	      main_lm_addr = new->lm_info->lm_addr;
 +	      free_so (new);
 +	    }
 +	  else
@@ -788,7 +818,7 @@
  	  target_read_string (LM_NAME (new), &buffer,
  			      SO_NAME_MAX_PATH_SIZE - 1, &errcode);
  	  if (errcode != 0)
-@@ -764,47 +1008,60 @@ svr4_current_sos (void)
+@@ -999,47 +1241,60 @@ svr4_current_sos (void)
  		     safe_strerror (errcode));
  	  else
  	    {
@@ -834,15 +864,15 @@
 +			}
 +		      else
 +			debug_print_missing (new->so_name, build_id_filename);
++
++		      xfree (build_id_filename);
++		      xfree (build_id);
++		    }
  
 -		  /* Missing the build-id matching separate debug info file
 -		     would be handled while SO_NAME gets loaded.  */
 -		  name = build_id_to_filename (build_id, &build_id_filename, 0);
 -		  if (name != NULL)
-+		      xfree (build_id_filename);
-+		      xfree (build_id);
-+		    }
-+
 +		  if (debug_solib)
  		    {
 -		      strncpy (new->so_name, name, SO_NAME_MAX_PATH_SIZE - 1);
@@ -882,7 +912,7 @@
  	}
  
        /* On Solaris, the dynamic linker is not in the normal list of
-@@ -820,6 +1077,9 @@ svr4_current_sos (void)
+@@ -1055,6 +1310,9 @@ svr4_current_sos (void)
    if (head == NULL)
      return svr4_default_sos ();
  
@@ -892,7 +922,7 @@
    return head;
  }
  
-@@ -921,7 +1181,7 @@ for (resolve = 0; resolve <= 1; resolve+
+@@ -1086,7 +1344,7 @@ svr4_fetch_objfile_link_map (struct objf
  /* On some systems, the only way to recognize the link map entry for
     the main executable file is by looking at its name.  Return
     non-zero iff SONAME matches one of the known main executable names.  */
@@ -901,7 +931,7 @@
  static int
  match_main (char *soname)
  {
-@@ -935,6 +1195,7 @@ match_main (char *soname)
+@@ -1100,6 +1358,7 @@ match_main (char *soname)
  
    return (0);
  }
@@ -909,28 +939,25 @@
  
  /* Return 1 if PC lies in the dynamic symbol resolution code of the
     SVR4 run time loader.  */
-@@ -1086,11 +1347,17 @@ enable_break (void)
-   /* Find the .interp section; if not found, warn the user and drop
+@@ -1250,15 +1509,29 @@ enable_break (void)
+   /* Find the program interpreter; if not found, warn the user and drop
       into the old breakpoint at symbol code.  */
-   interp_sect = bfd_get_section_by_name (exec_bfd, ".interp");
+   interp_name = find_program_interpreter ();
 +
 +  if (debug_solib)
 +     fprintf_unfiltered (gdb_stdlog,
 +                         "enable_break: search for .interp in %s\n",
 +                         exec_bfd->filename);
-   if (interp_sect)
+   if (interp_name)
      {
-       unsigned int interp_sect_size;
-       char *buf;
        CORE_ADDR load_addr = 0;
 +      CORE_ADDR load_addr_mask = -1L;
        int load_addr_found = 0;
        int loader_found_in_list = 0;
        struct so_list *so;
-@@ -1098,6 +1365,14 @@ enable_break (void)
+       bfd *tmp_bfd = NULL;
        struct target_ops *tmp_bfd_target;
-       int tmp_fd = -1;
-       char *tmp_pathname = NULL;
+       volatile struct gdb_exception ex;
 +      int arch_size;
 +
 +      /* For 32bit inferiors with 64bit GDB we may get LOAD_ADDR at 0xff......
@@ -940,19 +967,19 @@
 +      if (arch_size > 0 && arch_size < sizeof (1UL) * 8)
 +        load_addr_mask = (1UL << arch_size) - 1;
  
-       /* Read the contents of the .interp section into a local buffer;
-          the contents specify the dynamic linker this program uses.  */
-@@ -1120,6 +1395,9 @@ enable_break (void)
-       if (tmp_fd >= 0)
- 	tmp_bfd = bfd_fopen (tmp_pathname, gnutarget, FOPEN_RB, tmp_fd);
+       sym_addr = 0;
  
+@@ -1275,6 +1548,9 @@ enable_break (void)
+         {
+ 	  tmp_bfd = solib_bfd_open (interp_name);
+ 	}
 +      if (debug_solib)
-+         fprintf_unfiltered (gdb_stdlog,
-+                            "enable_break: opening %s\n", tmp_pathname);
++	 fprintf_unfiltered (gdb_stdlog,
++			    "enable_break: opening %s\n", interp_name);
        if (tmp_bfd == NULL)
  	goto bkpt_at_symbol;
  
-@@ -1181,16 +1459,16 @@ enable_break (void)
+@@ -1328,16 +1604,16 @@ enable_break (void)
        interp_sect = bfd_get_section_by_name (tmp_bfd, ".text");
        if (interp_sect)
  	{
@@ -973,29 +1000,29 @@
  	  interp_plt_sect_high =
  	    interp_plt_sect_low + bfd_section_size (tmp_bfd, interp_sect);
  	}
-@@ -1225,7 +1503,11 @@ enable_break (void)
+@@ -1372,7 +1648,11 @@ enable_break (void)
  
        if (sym_addr != 0)
  	{
 -	  create_solib_event_breakpoint (load_addr + sym_addr);
 +	  create_solib_event_breakpoint ((load_addr + sym_addr)
 +					 & load_addr_mask);
-+          if (debug_solib)
-+            fprintf_unfiltered (gdb_stdlog,
-+                               "enable_break: solib bp set\n");
++	  if (debug_solib)
++	    fprintf_unfiltered (gdb_stdlog,
++			       "enable_break: solib bp set\n");
+ 	  xfree (interp_name);
  	  return 1;
  	}
- 
-@@ -1486,6 +1768,8 @@ svr4_solib_create_inferior_hook (void)
-   while (stop_signal != TARGET_SIGNAL_TRAP);
-   stop_soon = NO_STOP_QUIETLY;
+@@ -1638,6 +1918,8 @@ svr4_solib_create_inferior_hook (void)
+   while (tp->stop_signal != TARGET_SIGNAL_TRAP);
+   inf->stop_soon = NO_STOP_QUIETLY;
  #endif /* defined(_SCO_DS) */
-+ 
-+   disable_breakpoints_at_startup (1); 
++
++   disable_breakpoints_at_startup (1);
  }
  
  static void
-@@ -1666,6 +1950,75 @@ svr4_lp64_fetch_link_map_offsets (void)
+@@ -1819,6 +2101,75 @@ svr4_lp64_fetch_link_map_offsets (void)
  
    return lmp;
  }
@@ -1071,7 +1098,7 @@
  
  
  struct target_so_ops svr4_so_ops;
-@@ -1724,4 +2077,7 @@ _initialize_svr4_solib (void)
+@@ -1858,4 +2209,7 @@ _initialize_svr4_solib (void)
    svr4_so_ops.in_dynsym_resolve_code = svr4_in_dynsym_resolve_code;
    svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
    svr4_so_ops.same = svr4_same;
@@ -1079,9 +1106,11 @@
 +  add_info ("linkmap", info_linkmap_command,
 +	    "Display the inferior's linkmap.");
  }
---- ./gdb/solib.c	2008-01-07 16:19:58.000000000 +0100
-+++ ./gdb/solib.c	2008-09-01 17:16:12.000000000 +0200
-@@ -79,6 +79,8 @@ set_solib_ops (struct gdbarch *gdbarch, 
+Index: gdb-6.8.50.20081209/gdb/solib.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/solib.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/solib.c	2008-12-14 14:56:49.000000000 +0100
+@@ -80,6 +80,8 @@ set_solib_ops (struct gdbarch *gdbarch, 
  
  /* external data declarations */
  
@@ -1090,7 +1119,7 @@
  /* FIXME: gdbarch needs to control this variable, or else every
     configuration needs to call set_solib_ops.  */
  struct target_so_ops *current_target_so_ops;
-@@ -102,6 +104,8 @@ The search path for loading non-absolute
+@@ -103,6 +105,8 @@ The search path for loading non-absolute
  		    value);
  }
  
@@ -1099,7 +1128,7 @@
  /*
  
     GLOBAL FUNCTION
-@@ -391,7 +395,6 @@ free_so (struct so_list *so)
+@@ -405,7 +409,6 @@ free_so (struct so_list *so)
    xfree (so);
  }
  
@@ -1107,7 +1136,7 @@
  /* Return address of first so_list entry in master shared object list.  */
  struct so_list *
  master_so_list (void)
-@@ -399,7 +402,6 @@ master_so_list (void)
+@@ -413,7 +416,6 @@ master_so_list (void)
    return so_list_head;
  }
  
@@ -1115,7 +1144,7 @@
  /* A small stub to get us past the arg-passing pinhole of catch_errors.  */
  
  static int
-@@ -411,15 +413,40 @@ symbol_add_stub (void *arg)
+@@ -425,15 +427,40 @@ symbol_add_stub (void *arg)
    /* Have we already loaded this shared object?  */
    ALL_OBJFILES (so->objfile)
      {
@@ -1159,7 +1188,7 @@
    free_section_addr_info (sap);
  
    return (1);
-@@ -545,6 +572,10 @@ update_solib_list (int from_tty, struct 
+@@ -565,6 +592,10 @@ update_solib_list (int from_tty, struct 
  	    }
  	  else
  	    {
@@ -1170,7 +1199,7 @@
  	      if (! strcmp (gdb->so_original_name, i->so_original_name))
  		break;	      
  	    }
-@@ -599,28 +630,7 @@ update_solib_list (int from_tty, struct 
+@@ -619,28 +650,7 @@ update_solib_list (int from_tty, struct 
        /* Fill in the rest of each of the `struct so_list' nodes.  */
        for (i = inferior; i; i = i->next)
  	{
@@ -1200,7 +1229,7 @@
  
  	  /* Notify any observer that the shared object has been
               loaded now that we've added it to GDB's tables.  */
-@@ -716,6 +726,41 @@ solib_add (char *pattern, int from_tty, 
+@@ -736,6 +746,41 @@ solib_add (char *pattern, int from_tty, 
    }
  }
  
@@ -1242,7 +1271,7 @@
  
  /*
  
-@@ -1035,4 +1080,12 @@ This takes precedence over the environme
+@@ -1053,4 +1098,12 @@ This takes precedence over the environme
  				     reload_shared_libraries,
  				     show_solib_search_path,
  				     &setlist, &showlist);
@@ -1255,8 +1284,10 @@
 +			   NULL, NULL,
 +			   &setdebuglist, &showdebuglist);
  }
---- ./gdb/solist.h	2008-01-07 16:19:58.000000000 +0100
-+++ ./gdb/solist.h	2008-08-30 23:40:33.000000000 +0200
+Index: gdb-6.8.50.20081209/gdb/solist.h
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/solist.h	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/solist.h	2008-12-14 14:56:49.000000000 +0100
 @@ -61,6 +61,8 @@ struct so_list
      bfd *abfd;
      char symbols_loaded;	/* flag: symbols read in yet? */
@@ -1266,31 +1297,21 @@
      struct objfile *objfile;	/* objfile for loaded lib */
      struct section_table *sections;
      struct section_table *sections_end;
-@@ -127,9 +129,15 @@ void free_so (struct so_list *so);
- /* Return address of first so_list entry in master shared object list.  */
- struct so_list *master_so_list (void);
- 
-+/* Return address of first so_list entry in master shared object list.  */
-+struct so_list *master_so_list (void);
-+
- /* Find solib binary file and open it.  */
- extern int solib_open (char *in_pathname, char **found_pathname);
+@@ -138,4 +140,10 @@ struct symbol *solib_global_lookup (cons
+ 				    const char *linkage_name,
+ 				    const domain_enum domain);
  
 +/* Add the list of sections in so_list to the target to_sections.  */
 +extern void add_to_target_sections (int, struct target_ops *, struct so_list *);
 +
- /* FIXME: gdbarch needs to control this variable */
- extern struct target_so_ops *current_target_so_ops;
- 
-@@ -140,4 +148,6 @@ struct symbol *solib_global_lookup (cons
- 				    const domain_enum domain,
- 				    struct symtab **symtab);
- 
 +/* Controls the printing of debugging output.  */
 +extern int debug_solib;
++
  #endif
---- ./gdb/symfile-mem.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/symfile-mem.c	2008-08-30 23:40:33.000000000 +0200
+Index: gdb-6.8.50.20081209/gdb/symfile-mem.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/symfile-mem.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/symfile-mem.c	2008-12-14 14:56:49.000000000 +0100
 @@ -116,7 +116,7 @@ symbol_file_add_from_memory (struct bfd 
        }
  
@@ -1300,8 +1321,10 @@
  
    /* This might change our ideas about frames already looked at.  */
    reinit_frame_cache ();
---- ./gdb/symfile.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/symfile.c	2008-08-30 23:41:48.000000000 +0200
+Index: gdb-6.8.50.20081209/gdb/symfile.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/symfile.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/symfile.c	2008-12-14 14:56:49.000000000 +0100
 @@ -47,6 +47,7 @@
  #include "readline/readline.h"
  #include "gdb_assert.h"
@@ -1310,7 +1333,7 @@
  #include "observer.h"
  #include "exec.h"
  #include "parser-defs.h"
-@@ -815,7 +816,7 @@ syms_from_objfile (struct objfile *objfi
+@@ -787,7 +788,7 @@ syms_from_objfile (struct objfile *objfi
  
    /* Now either addrs or offsets is non-zero.  */
  
@@ -1319,16 +1342,16 @@
      {
        /* We will modify the main symbol table, make sure that all its users
           will be cleaned up if an error occurs during symbol reading.  */
-@@ -843,7 +844,7 @@ syms_from_objfile (struct objfile *objfi
+@@ -815,7 +816,7 @@ syms_from_objfile (struct objfile *objfi
  
       We no longer warn if the lowest section is not a text segment (as
       happens for the PA64 port.  */
 -  if (!mainline && addrs && addrs->other[0].name)
 +  if (/*!mainline &&*/ addrs && addrs->other[0].name)
      {
+       asection *lower_sect;
        asection *sect;
-       CORE_ADDR lower_offset = 0;	/* Shut up the GCC warning.  */
-@@ -1002,17 +1003,21 @@ new_symfile_objfile (struct objfile *obj
+@@ -916,17 +917,21 @@ new_symfile_objfile (struct objfile *obj
    /* If this is the main symbol file we have to clean up all users of the
       old main symbol file. Otherwise it is sufficient to fixup all the
       breakpoints that may have been redefined by this symbol file.  */
@@ -1352,7 +1375,7 @@
  
    /* We're done reading the symbol file; finish off complaints.  */
    clear_complaints (&symfile_complaints, 0, verbo);
-@@ -1055,7 +1060,7 @@ symbol_file_add_with_addrs_or_offsets (b
+@@ -969,7 +974,7 @@ symbol_file_add_with_addrs_or_offsets (b
       interactively wiping out any existing symbols.  */
  
    if ((have_full_symbols () || have_partial_symbols ())
@@ -1361,7 +1384,7 @@
        && from_tty
        && !query ("Load new symbol table from \"%s\"? ", name))
      error (_("Not confirmed."));
-@@ -1242,6 +1247,10 @@ symbol_file_clear (int from_tty)
+@@ -1160,6 +1165,10 @@ symbol_file_clear (int from_tty)
  		    symfile_objfile->name)
  	  : !query (_("Discard symbol table? "))))
      error (_("Not confirmed."));
@@ -1372,7 +1395,7 @@
      free_all_objfiles ();
  
      /* solib descriptors may have handles to objfiles.  Since their
-@@ -3335,6 +3344,8 @@ reread_symbols (void)
+@@ -3259,6 +3268,8 @@ reread_symbols (void)
  	      /* Discard cleanups as symbol reading was successful.  */
  	      discard_cleanups (old_cleanups);
  
@@ -1381,7 +1404,7 @@
  	      /* If the mtime has changed between the time we set new_modtime
  	         and now, we *want* this to be out of date, so don't call stat
  	         again now.  */
-@@ -3703,6 +3714,7 @@ clear_symtab_users (void)
+@@ -3628,6 +3639,7 @@ clear_symtab_users (void)
    breakpoint_re_set ();
    set_default_breakpoint (0, 0, 0, 0);
    clear_pc_function_cache ();
@@ -1389,9 +1412,11 @@
    observer_notify_new_objfile (NULL);
  
    /* Clear globals which might have pointed into a removed objfile.
---- ./gdb/varobj.c	2008-09-01 17:16:38.000000000 +0200
-+++ ./gdb/varobj.c	2008-08-30 23:40:33.000000000 +0200
-@@ -1075,6 +1075,62 @@ install_new_value (struct varobj *var, s
+Index: gdb-6.8.50.20081209/gdb/varobj.c
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/varobj.c	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/varobj.c	2008-12-14 14:56:49.000000000 +0100
+@@ -1116,6 +1116,62 @@ install_new_value (struct varobj *var, s
    return changed;
  }
  
@@ -1454,12 +1479,27 @@
  /* Update the values for a variable and its children.  This is a
     two-pronged attack.  First, re-parse the value for the root's
     expression to see if it's changed.  Then go all the way
---- ./gdb/varobj.h	2008-01-30 08:17:31.000000000 +0100
-+++ ./gdb/varobj.h	2008-08-30 23:40:33.000000000 +0200
-@@ -122,4 +122,6 @@ extern void varobj_invalidate (void);
+Index: gdb-6.8.50.20081209/gdb/varobj.h
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/varobj.h	2008-12-14 14:55:58.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/varobj.h	2008-12-14 14:56:49.000000000 +0100
+@@ -141,4 +141,6 @@ extern int varobj_editable_p (struct var
  
- extern int varobj_editable_p (struct varobj *var);
+ extern int varobj_floating_p (struct varobj *var);
  
 +extern void varobj_refresh(void);
 +
  #endif /* VAROBJ_H */
+Index: gdb-6.8.50.20081209/gdb/target.h
+===================================================================
+--- gdb-6.8.50.20081209.orig/gdb/target.h	2008-12-14 11:52:54.000000000 +0100
++++ gdb-6.8.50.20081209/gdb/target.h	2008-12-14 14:57:21.000000000 +0100
+@@ -524,7 +524,7 @@ struct target_ops
+        Return -1 if there is insufficient buffer for a whole entry.
+        Return 1 if an entry was read into *TYPEP and *VALP.  */
+     int (*to_auxv_parse) (struct target_ops *ops, gdb_byte **readptr,
+-                         gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp);
++                         gdb_byte *endptr, ULONGEST *typep, CORE_ADDR *valp);
+ 
+     /* Search SEARCH_SPACE_LEN bytes beginning at START_ADDR for the
+        sequence of bytes in PATTERN with length PATTERN_LEN.

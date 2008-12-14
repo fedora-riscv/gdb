@@ -4,11 +4,11 @@
 	print a warning.
 	(find_separate_debug_file): Pass in the objfile's name.
 
-Index: gdb-6.8/gdb/symfile.c
+Index: gdb-6.8.50.20081128/gdb/symfile.c
 ===================================================================
---- gdb-6.8.orig/gdb/symfile.c	2008-01-29 23:47:20.000000000 +0100
-+++ gdb-6.8/gdb/symfile.c	2008-07-14 10:26:30.000000000 +0200
-@@ -1348,7 +1348,8 @@ get_debug_link_info (struct objfile *obj
+--- gdb-6.8.50.20081128.orig/gdb/symfile.c	2008-10-03 18:36:10.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/symfile.c	2008-12-01 16:34:36.000000000 +0100
+@@ -1296,7 +1296,8 @@ get_debug_link_info (struct objfile *obj
  }
  
  static int
@@ -17,23 +17,10 @@ Index: gdb-6.8/gdb/symfile.c
 +			    const char *parent_name)
  {
    unsigned long file_crc = 0;
-   int fd;
-@@ -1357,6 +1358,12 @@ separate_debug_file_exists (const char *
+   bfd *abfd;
+@@ -1316,7 +1317,15 @@ separate_debug_file_exists (const char *
  
-   fd = open (name, O_RDONLY | O_BINARY);
-   if (fd < 0)
-+    /* Fail silently, this preserves existing behavior.  The
-+       assumption here is that the file wasn't found because there's
-+       no file to find (we shouldn't be printing warnings about
-+       missing debug info files when the user hasn't installed them).
-+       The alternative is to complain here - that better belongs in a
-+       warning.  */
-     return 0;
- 
-   while ((count = read (fd, buffer, sizeof (buffer))) > 0)
-@@ -1364,7 +1371,16 @@ separate_debug_file_exists (const char *
- 
-   close (fd);
+   bfd_close (abfd);
  
 -  return crc == file_crc;
 +  if (crc != file_crc)
@@ -44,12 +31,11 @@ Index: gdb-6.8/gdb/symfile.c
 +      return 0;
 +    }
 +
-+  /* No worries!  */
 +  return 1;
  }
  
  char *debug_file_directory = NULL;
-@@ -1416,6 +1432,8 @@ find_separate_debug_file (struct objfile
+@@ -1368,6 +1377,8 @@ find_separate_debug_file (struct objfile
    basename = get_debug_link_info (objfile, &crc32);
  
    if (basename == NULL)
@@ -58,7 +44,7 @@ Index: gdb-6.8/gdb/symfile.c
      return NULL;
  
    dir = xstrdup (objfile->name);
-@@ -1443,7 +1461,7 @@ find_separate_debug_file (struct objfile
+@@ -1395,7 +1406,7 @@ find_separate_debug_file (struct objfile
    strcpy (debugfile, dir);
    strcat (debugfile, basename);
  
@@ -67,7 +53,7 @@ Index: gdb-6.8/gdb/symfile.c
      {
        xfree (basename);
        xfree (dir);
-@@ -1456,7 +1474,7 @@ find_separate_debug_file (struct objfile
+@@ -1408,7 +1419,7 @@ find_separate_debug_file (struct objfile
    strcat (debugfile, "/");
    strcat (debugfile, basename);
  
@@ -76,7 +62,7 @@ Index: gdb-6.8/gdb/symfile.c
      {
        xfree (basename);
        xfree (dir);
-@@ -1469,7 +1487,7 @@ find_separate_debug_file (struct objfile
+@@ -1421,7 +1432,7 @@ find_separate_debug_file (struct objfile
    strcat (debugfile, dir);
    strcat (debugfile, basename);
  
@@ -85,7 +71,7 @@ Index: gdb-6.8/gdb/symfile.c
      {
        xfree (basename);
        xfree (dir);
-@@ -1488,7 +1506,7 @@ find_separate_debug_file (struct objfile
+@@ -1440,7 +1451,7 @@ find_separate_debug_file (struct objfile
        strcat (debugfile, "/");
        strcat (debugfile, basename);
  

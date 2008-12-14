@@ -3,6 +3,9 @@ If you provided some relative path to the shared library, such as with
 then gdb would fail to match the shared library name during the TLS lookup.
 
 
+Dropped the workaround/fix for gdb-6.8.50.20081128 - is it still needed?
+
+
 The testsuite needs `gdb-6.3-bz146810-solib_absolute_prefix_is_empty.patch'.
 The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 
@@ -20,57 +23,6 @@ The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 
 	Port to gdb-6.7.50.20080227.
 
-Index: gdb-6.7.50.20080227/gdb/solib-svr4.c
-===================================================================
---- gdb-6.7.50.20080227.orig/gdb/solib-svr4.c	2008-02-27 08:59:06.000000000 +0100
-+++ gdb-6.7.50.20080227/gdb/solib-svr4.c	2008-02-27 09:00:44.000000000 +0100
-@@ -1017,10 +1017,14 @@ CORE_ADDR
- svr4_fetch_objfile_link_map (struct objfile *objfile)
- {
-   CORE_ADDR lm;
-+  int resolve;
- 
-   if (locate_base () == 0)
-     return 0;   /* failed somehow... */
- 
-+for (resolve = 0; resolve <= 1; resolve++)
-+{
-+
-   /* Position ourselves on the first link map.  */
-   lm = solib_svr4_r_map ();  
-   while (lm)
-@@ -1059,6 +1063,21 @@ svr4_fetch_objfile_link_map (struct objf
- 		 safe_strerror (errcode));
-       else
-   	{
-+	  /* solib_svr4_r_map() may contain relative pathnames while
-+	     `objfile->name' is absolute.  */
-+	  if (resolve && buffer && buffer[0] != '/')
-+	    {
-+	      char *absolute;
-+	      int fd;
-+
-+	      fd = solib_open (buffer, &absolute);
-+	      if (fd != -1)
-+		{
-+		  make_cleanup (xfree, absolute);
-+		  buffer = absolute;
-+		  close (fd);
-+		}
-+	    }
- 	  /* Is this the linkmap for the file we want?  */
- 	  /* If the file is not a shared library and has no name,
- 	     we are sure it is the main executable, so we return that.  */
-@@ -1077,6 +1096,9 @@ svr4_fetch_objfile_link_map (struct objf
- 				  builtin_type_void_data_ptr);
-       do_cleanups (old_chain);
-     }
-+
-+}	/* resolve */
-+
-   return 0;
- }
- 
 Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug-main.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000

@@ -1,3 +1,6 @@
+http://sourceware.org/ml/gdb-patches/2005-05/threads.html#00637
+Proposed upstream but never committed upstream.
+
 2005-06-09  Jeff Johnston  <jjohnstn@redhat.com>
 
         * gdb.base/gdbinit.exp: New testcase.
@@ -16,11 +19,11 @@
         (source_command): Update documentation.  Check permissions if
         FROM_TTY is -1.
 
-Index: gdb-6.6/gdb/cli/cli-cmds.c
+Index: gdb-6.8.50.20081128/gdb/cli/cli-cmds.c
 ===================================================================
---- gdb-6.6.orig/gdb/cli/cli-cmds.c
-+++ gdb-6.6/gdb/cli/cli-cmds.c
-@@ -38,6 +38,7 @@
+--- gdb-6.8.50.20081128.orig/gdb/cli/cli-cmds.c	2008-12-07 10:12:24.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/cli/cli-cmds.c	2008-12-07 13:04:06.000000000 +0100
+@@ -36,6 +36,7 @@
  #include "objfiles.h"
  #include "source.h"
  #include "disasm.h"
@@ -28,7 +31,7 @@ Index: gdb-6.6/gdb/cli/cli-cmds.c
  
  #include "ui-out.h"
  
-@@ -461,12 +462,31 @@ source_script (char *file, int from_tty)
+@@ -460,7 +461,7 @@ source_script (char *file, int from_tty)
  
    if (fd == -1)
      {
@@ -36,23 +39,29 @@ Index: gdb-6.6/gdb/cli/cli-cmds.c
 +      if (from_tty > 0)
  	perror_with_name (file);
        else
- 	return;
+ 	{
+@@ -469,9 +470,33 @@ source_script (char *file, int from_tty)
+ 	}
      }
  
 +#ifdef HAVE_GETUID
 +  if (from_tty == -1)
 +    {
 +      struct stat statbuf;
++
 +      if (fstat (fd, &statbuf) < 0)
 +	{
-+	  perror_with_name (file);
 +	  close (fd);
-+	  return;
++	  /* Do not do_cleanups (old_cleanups) as FILE is allocated there.
++	     perror_with_name calls error which should call the cleanups.  */
++	  perror_with_name (file);
 +	}
 +      if (statbuf.st_uid != getuid () || (statbuf.st_mode & S_IWOTH))
 +	{
-+          warning (_("not using untrusted file \"%s\""), file);
++	  /* FILE gets freed by do_cleanups (old_cleanups).  */
++	  warning (_("not using untrusted file \"%s\""), file);
 +	  close (fd);
++	  do_cleanups (old_cleanups);
 +	  return;
 +	}
 +    }
@@ -61,10 +70,14 @@ Index: gdb-6.6/gdb/cli/cli-cmds.c
    stream = fdopen (fd, FOPEN_RT);
    script_from_file (stream, file);
  
-Index: gdb-6.6/gdb/testsuite/gdb.base/gdbinit.exp
++  /* FILE gets freed by do_cleanups (old_cleanups).  */
+   do_cleanups (old_cleanups);
+ }
+ 
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.base/gdbinit.exp
 ===================================================================
---- /dev/null
-+++ gdb-6.6/gdb/testsuite/gdb.base/gdbinit.exp
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.base/gdbinit.exp	2008-12-07 10:13:01.000000000 +0100
 @@ -0,0 +1,98 @@
 +#   Copyright 2005
 +#   Free Software Foundation, Inc.
@@ -81,7 +94,7 @@ Index: gdb-6.6/gdb/testsuite/gdb.base/gdbinit.exp
 +# 
 +# You should have received a copy of the GNU General Public License
 +# along with this program; if not, write to the Free Software
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 +
 +# Please email any bugs, comments, and/or additions to this file to:
 +# bug-gdb@prep.ai.mit.edu
@@ -107,15 +120,15 @@ Index: gdb-6.6/gdb/testsuite/gdb.base/gdbinit.exp
 +global gdb_prompt
 +global timeout
 +global gdb_spawn_id;
-+                                                                                
++
 +gdb_stop_suppressing_tests;
-+                                                                                
++
 +verbose "Spawning $GDB -nw"
-+                                                                                
++
 +if [info exists gdb_spawn_id] {
 +    return 0;
 +}
-+                                                                                
++
 +if ![is_remote host] {
 +   if { [which $GDB] == 0 } then {
 +        perror "$GDB does not exist."
@@ -164,17 +177,17 @@ Index: gdb-6.6/gdb/testsuite/gdb.base/gdbinit.exp
 +}
 +
 +remote_exec build "rm .gdbinit"
-Index: gdb-6.6/gdb/testsuite/gdb.base/gdbinit.sample
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.base/gdbinit.sample
 ===================================================================
---- /dev/null
-+++ gdb-6.6/gdb/testsuite/gdb.base/gdbinit.sample
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.base/gdbinit.sample	2008-12-07 10:13:01.000000000 +0100
 @@ -0,0 +1 @@
 +echo "\nin gdbinit"
-Index: gdb-6.6/gdb/main.c
+Index: gdb-6.8.50.20081128/gdb/main.c
 ===================================================================
---- gdb-6.6.orig/gdb/main.c
-+++ gdb-6.6/gdb/main.c
-@@ -644,7 +644,7 @@ extern int gdbtk_test (char *);
+--- gdb-6.8.50.20081128.orig/gdb/main.c	2008-12-07 10:12:24.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/main.c	2008-12-07 12:58:37.000000000 +0100
+@@ -690,7 +690,7 @@ Excess command line arguments ignored. (
  
        if (!inhibit_gdbinit)
  	{
@@ -183,7 +196,7 @@ Index: gdb-6.6/gdb/main.c
  	}
  
        /* Do stats; no need to do them elsewhere since we'll only
-@@ -722,7 +722,7 @@ extern int gdbtk_test (char *);
+@@ -778,7 +778,7 @@ Can't attach to process and specify a co
        || memcmp ((char *) &homebuf, (char *) &cwdbuf, sizeof (struct stat)))
      if (!inhibit_gdbinit)
        {
@@ -192,16 +205,3 @@ Index: gdb-6.6/gdb/main.c
        }
  
    for (i = 0; i < ncmd; i++)
-Index: gdb-6.6/gdb/Makefile.in
-===================================================================
---- gdb-6.6.orig/gdb/Makefile.in
-+++ gdb-6.6/gdb/Makefile.in
-@@ -2927,7 +2927,7 @@ cli-cmds.o: $(srcdir)/cli/cli-cmds.c $(d
- 	$(expression_h) $(frame_h) $(value_h) $(language_h) $(filenames_h) \
- 	$(objfiles_h) $(source_h) $(disasm_h) $(ui_out_h) $(top_h) \
- 	$(cli_decode_h) $(cli_script_h) $(cli_setshow_h) $(cli_cmds_h) \
--	$(tui_h)
-+	$(tui_h) $(gdb_stat_h)
- 	$(CC) -c $(INTERNAL_CFLAGS) $(srcdir)/cli/cli-cmds.c
- cli-decode.o: $(srcdir)/cli/cli-decode.c $(defs_h) $(symtab_h) \
- 	$(gdb_regex_h) $(gdb_string_h) $(completer_h) $(ui_out_h) \

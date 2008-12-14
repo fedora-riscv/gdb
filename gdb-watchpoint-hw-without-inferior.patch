@@ -1,0 +1,136 @@
+2008-12-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix hw watchpoints created before the inferior was started.
+	* breakpoint.c (update_watchpoint): Convert the bp_watchpoint and
+	bp_hardware_watchpoint types according to the current runtime state.
+	(insert_breakpoints): Call update_watchpoint even for `bp_watchpoint's.
+
+2008-12-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-hw.exp, gdb.base/watchpoint-hw.c: New.
+
+--- ./gdb/breakpoint.c	7 Dec 2008 15:59:51 -0000	1.364
++++ ./gdb/breakpoint.c	7 Dec 2008 21:20:54 -0000
+@@ -892,6 +892,28 @@ update_watchpoint (struct breakpoint *b,
+ 	  b->val_valid = 1;
+ 	}
+ 
++	/* Change the type of breakpoint between hardware assisted or an
++	   ordinary watchpoint depending on the hardware support and free
++	   hardware slots.  */
++	if (b->type == bp_watchpoint || b->type == bp_hardware_watchpoint)
++	  {
++	    int i, mem_cnt, target_resources_ok, other_type_used;
++
++	    i = hw_watchpoint_used_count (bp_hardware_watchpoint,
++					  &other_type_used);
++	    mem_cnt = can_use_hardware_watchpoint (val_chain);
++
++	    /* Hack around 'unused var' error for some targets here.  */
++	    (void) i;
++	    if (mem_cnt)
++	      target_resources_ok = TARGET_CAN_USE_HARDWARE_WATCHPOINT
++			 (bp_hardware_watchpoint, i + mem_cnt, other_type_used);
++	    if (!mem_cnt || target_resources_ok <= 0)
++	      b->type = bp_watchpoint;
++	    else
++	      b->type = bp_hardware_watchpoint;
++	  }
++
+       /* Look at each value on the value chain.  */
+       for (v = val_chain; v; v = next)
+ 	{
+@@ -1204,8 +1226,9 @@ insert_breakpoints (void)
+ {
+   struct breakpoint *bpt;
+ 
++  /* Software watchpoint may get converted to hardware ones.  */
+   ALL_BREAKPOINTS (bpt)
+-    if (is_hardware_watchpoint (bpt))
++    if (is_hardware_watchpoint (bpt) || bpt->type == bp_watchpoint)
+       update_watchpoint (bpt, 0 /* don't reparse. */);
+ 
+   update_global_location_list (1);
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/watchpoint-hw.c	7 Dec 2008 21:20:56 -0000
+@@ -0,0 +1,27 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Please email any bugs, comments, and/or additions to this file to:
++   bug-gdb@prep.ai.mit.edu  */
++
++int watchee;
++
++int
++main (void)
++{
++  return 0;
++}
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ ./gdb/testsuite/gdb.base/watchpoint-hw.exp	7 Dec 2008 21:20:56 -0000
+@@ -0,0 +1,50 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if {![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"] && ![istarget "ia64-*-*"]
++    && ![istarget "s390*-*-*"]} then {
++    verbose "Skipping watchpoint-hw test."
++    return
++}
++
++set testfile watchpoint-hw
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++# Create the watchpoint before the inferior gets started.  Now the native CPU
++# target is still not active and its `to_can_use_hw_breakpoint' is not
++# installed, therefore only a software watchpoint gets created.
++
++gdb_test "watch watchee" "atchpoint 1: watchee"
++
++# `runto_main' or `runto main' would delete the watchpoint created above.
++
++if { [gdb_start_cmd] < 0 } {
++    untested start
++    return -1
++}
++gdb_test "" "main .* at .*" "start"
++
++# Check it is really a `hw'-watchpoint.
++gdb_test "info watchpoints" "1 *hw watchpoint .* watchee"

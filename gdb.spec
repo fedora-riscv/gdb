@@ -9,11 +9,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8
+Version: 6.8.50.20081209
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -63,10 +63,6 @@ Patch2: gdb-6.3-rh-testversion-20041202.patch
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
-# Recognize i386 signal trampolines before CFI.  Ensures that signal
-# frames are identified as signal frames.
-Patch101: gdb-6.3-sigx86-20040621.patch
-
 # Use convert_from_func_ptr_addr on the solib breakpoint address;
 # simplifies and makes more consistent the logic.
 Patch104: gdb-6.3-ppcdotsolib-20041022.patch
@@ -96,9 +92,6 @@ Patch117: gdb-6.3-removebp-20041130.patch
 # --readnever option.
 Patch118: gdb-6.3-gstack-20050411.patch
 
-# Fix to ensure types are visible
-Patch120: gdb-6.3-type-fix-20041213.patch
-
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
 Patch124: gdb-6.3-pie-20050110.patch
@@ -118,9 +111,6 @@ Patch136: gdb-6.3-test-movedir-20050125.patch
 
 # Fix to support unwinding syscalls in ia64 corefiles
 # Patch138: gdb-6.3-ia64-corefile-fix-20050127.patch
-
-# Tolerate DW_AT_type referencing <0>.
-Patch139: gdb-6.3-dwattype0-20050201.patch
 
 # Fix gcore for threads
 Patch140: gdb-6.3-gcore-thread-20050204.patch
@@ -185,13 +175,6 @@ Patch176: gdb-6.3-large-core-20051206.patch
 # corrupted or missing PATH.
 Patch177: gdb-6.3-gstack-without-path-20060414.patch
 
-# Do not let errors related with debug registers break thread debugging.
-Patch178: gdb-6.3-catch-debug-registers-error-20060527.patch
-
-# Cope with waitpid modifying status even when returning zero, as on
-# ia32el.
-Patch179: gdb-6.3-ia32el-fix-waitpid-20060615.patch
-
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
@@ -211,7 +194,7 @@ Patch196: gdb-6.5-sharedlibrary-path.patch
 
 # Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
 # FIXME: It could be autodetected.
-Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch 
+Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch
 
 # Fix dereferencing registers for 32bit inferiors on 64bit hosts (BZ 181390).
 Patch200: gdb-6.5-bz181390-memory-address-width.patch
@@ -234,7 +217,7 @@ Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 
 # Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
 Patch215: gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch
-Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch 
+Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
 Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
@@ -249,7 +232,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.8 release fixups.
-Patch232: gdb-6.8-upstream.patch
+###Patch232: gdb-6.8-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -294,9 +277,6 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 Patch274: gdb-6.6-buildid-locate.patch
 
-# Fixed the kernel i386-on-x86_64 VDSO loading (producing `Lowest section in').
-Patch277: gdb-6.6-vdso-i386-on-amd64-warning.patch
-
 # Fix hardware watchpoints after inferior forks-off some process.
 # Threaded `set follow-fork-mode child' still not fixed there, glibc fixes reqd.
 # `set detach-on-fork off' not fixed there in general - it already assert-fails.
@@ -304,9 +284,6 @@ Patch280: gdb-6.6-multifork-debugreg.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 Patch282: gdb-6.7-charsign-test.patch
-
-# Fix rereading of the main executable on its change.
-Patch283: gdb-6.7-reread-exec_bfd.patch
 
 # Test PPC hiding of call-volatile parameter register.
 Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
@@ -339,12 +316,7 @@ Patch304: gdb-6.7-kernel-headers-compat.patch
 
 # Fix/implement the Fortran dynamic arrays support (BZ 377541).
 # Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
-Patch345: gdb-6.8-bz377541-vla-bound-undefined.patch
-Patch346: gdb-6.8-bz377541-vla-loc-kind.patch
 Patch305: gdb-6.8-bz377541-vla.patch
-
-# Backport fix of a segfault + PIE regression since 6.7.1 on PIE executables.
-Patch306: gdb-6.8-watchpoint-inaccessible-memory.patch
 
 # Test GCORE for shmid 0 shared memory mappings.
 Patch309: gdb-6.3-mapping-zero-inode-test.patch
@@ -358,9 +330,6 @@ Patch314: gdb-6.3-watchpoint-cond-gone-test.patch
 # Test various forms of threads tracking across exec() (BZ 442765).
 Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
 
-# Enable program counter for processing PTID to PC (sparc/sparc64)
-Patch316: gdb-6.8-sparc-fix.patch
-
 # Silence memcpy check which returns false positive (sparc64)
 Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 
@@ -370,25 +339,18 @@ Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 # Test a crash on libraries missing the .text section.
 Patch320: gdb-6.5-section-num-fixup-test.patch
 
-# Protect development in the build tree by automatic Makefile dependencies.
-Patch321: gdb-6.8-auto-dependencies.patch
-
 # Refuse creating watchpoints of an address value, suggested by Martin Stransky.
 Patch322: gdb-6.8-constant-watchpoints.patch
-
-# Disable randomization (such as by setarch -R), suggested by Jakub Jelinek.
-Patch323: gdb-6.8-disable-randomization.patch
 
 # Fix compatibility with recent glibc headers.
 Patch324: gdb-6.8-glibc-headers-compat.patch
 
-# Force build failure for missing libraries for --enable-tui.
 # Create a single binary `gdb' autodetecting --tui by its argv[0].
-Patch325: gdb-6.8-forced-enable-tui.patch
 Patch326: gdb-6.8-tui-singlebinary.patch
 
 # Support transparent debugging of inlined functions for an optimized code.
 Patch327: gdb-6.8-inlining.patch
+Patch350: gdb-6.8-inlining-addon.patch
 Patch328: gdb-6.8-inlining-by-name.patch
 
 # Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
@@ -403,21 +365,11 @@ Patch331: gdb-6.8-quit-never-aborts.patch
 # Support DW_TAG_constant for Fortran in recent Fedora/RH GCCs.
 Patch332: gdb-6.8-fortran-tag-constant.patch
 
-# Fix crash on DW_TAG_module for Fortran in recent Fedora/RH GCCs.
-Patch333: gdb-6.8-fortran-module-ignore.patch
-
 # bare names of constructors and destructors should be unique for GDB-6.8+.
 Patch334: gdb-6.8-ctors-dtors-unique.patch
 
 # Fix attaching to stopped processes and/or pending signals.
-Patch336: gdb-6.8-attach-signalled-upstream.patch
 Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
-
-# Fix occasional crash on a removed watchpoint.
-Patch338: gdb-6.8-breakpoint-gone.patch
-
-# Fix occasional stepping lockup on many threads, seen on ia64.
-Patch342: gdb-6.8-ia64-breakpoint-restoration.patch
 
 # Test the watchpoints conditionals works.
 Patch343: gdb-6.8-watchpoint-conditionals-test.patch
@@ -425,8 +377,11 @@ Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 # Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
-# Enable ia64 hardware watchpoints if created before starting inferior.
-Patch349: gdb-6.8-ia64-exec-hw-watchpoint.patch
+# Enable hardware watchpoints if created before starting inferior.
+Patch349: gdb-watchpoint-hw-without-inferior.patch
+
+# Fix upstream testsuite regression + make Fortran tests gfortran compatible.
+Patch351: gdb-fortran-testsuite-gfortran.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -504,12 +459,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+###patch232 -p1
+%patch305 -p1
 %patch1 -p1
 %patch3 -p1
 %patch4 -p1
 
-%patch101 -p1
 %patch104 -p1
 %patch105 -p1
 %patch106 -p1
@@ -518,14 +473,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch116 -p1
 %patch117 -p1
 %patch118 -p1
-%patch120 -p1
 %patch122 -p1
 %patch125 -p1
 %patch128 -p1
 %patch133 -p1
 %patch134 -p1
 %patch136 -p1
-%patch139 -p1
 %patch140 -p1
 %patch141 -p1
 %patch259 -p1
@@ -548,8 +501,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch170 -p1
 %patch176 -p1
 %patch177 -p1
-%patch178 -p1
-%patch179 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -585,10 +536,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch266 -p1
 %patch271 -p1
 %patch274 -p1
-%patch277 -p1
 %patch280 -p1
 %patch282 -p1
-%patch283 -p1
 %patch284 -p1
 %patch287 -p1
 %patch289 -p1
@@ -599,39 +548,29 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch298 -p1
 %patch301 -p1
 %patch304 -p1
-%patch345 -p1
-%patch346 -p1
-%patch305 -p1
-%patch306 -p1
 %patch309 -p1
 %patch311 -p1
 %patch314 -p1
 %patch315 -p1
-%patch316 -p1
 %patch317 -p1
 %patch318 -p1
 %patch320 -p1
-%patch321 -p1
 %patch322 -p1
-%patch323 -p1
 %patch324 -p1
-%patch325 -p1
 %patch326 -p1
 %patch327 -p1
+%patch350 -p1
 %patch328 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
 %patch332 -p1
-%patch333 -p1
 %patch334 -p1
-%patch336 -p1
 %patch337 -p1
-%patch338 -p1
-%patch342 -p1
 %patch343 -p1
 %patch348 -p1
 %patch349 -p1
+%patch351 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -895,6 +834,9 @@ fi
 %endif
 
 %changelog
+* Sun Dec 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20081209-1
+- Upgrade to the upstream gdb-6.8.50 snapshot.
+
 * Mon Dec  1 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-33
 - Make `--with testsuite' BuildRequires properly conditional.
 

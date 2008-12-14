@@ -1,7 +1,8 @@
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb-6.8/gdb/linux-nat.c
---- gdb-6.8-base/gdb/linux-nat.c	2008-08-27 18:09:35.000000000 +0200
-+++ gdb-6.8/gdb/linux-nat.c	2008-08-27 18:48:40.000000000 +0200
-@@ -117,6 +117,9 @@
+Index: gdb-6.8.50.20081128/gdb/linux-nat.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/linux-nat.c	2008-12-06 21:48:18.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/linux-nat.c	2008-12-06 22:00:42.000000000 +0100
+@@ -199,6 +199,9 @@ blocked.  */
  static struct target_ops *linux_ops;
  static struct target_ops linux_ops_saved;
  
@@ -11,19 +12,23 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb
  /* The method to call, if any, when a new thread is attached.  */
  static void (*linux_nat_new_thread) (ptid_t);
  
-@@ -531,6 +534,11 @@ linux_child_follow_fork (struct target_o
+@@ -871,7 +874,14 @@ linux_child_follow_fork (struct target_o
+ 	  fork_save_infrun_state (fp, 0);
  	}
        else
- 	{
-+	 /* We should check PID_WAS_STOPPED and detach it stopped accordingly.
-+	    In this point of code it cannot be 1 as we would not get FORK
-+	    executed without CONTINUE first which resets PID_WAS_STOPPED.
-+	    We would have to first TARGET_STOP and WAITPID it as with running
-+	    inferior PTRACE_DETACH, SIGSTOP will ignore the signal.  */
- 	  target_detach (NULL, 0);
- 	}
+-	target_detach (NULL, 0);
++	{
++	  /* We should check PID_WAS_STOPPED and detach it stopped accordingly.
++	     In this point of code it cannot be 1 as we would not get FORK
++	     executed without CONTINUE first which resets PID_WAS_STOPPED.
++	     We would have to first TARGET_STOP and WAITPID it as with running
++	     inferior PTRACE_DETACH, SIGSTOP will ignore the signal.  */
++	  target_detach (NULL, 0);
++	}
  
-@@ -936,6 +944,7 @@ linux_nat_post_attach_wait (ptid_t ptid,
+       inferior_ptid = ptid_build (child_pid, child_pid, 0);
+       add_inferior (child_pid);
+@@ -1203,6 +1213,7 @@ linux_nat_post_attach_wait (ptid_t ptid,
        if (debug_linux_nat)
  	fprintf_unfiltered (gdb_stdlog,
  			    "LNPAW: Attaching to a stopped process\n");
@@ -31,9 +36,9 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb
  
        /* The process is definitely stopped.  It is in a job control
  	 stop, unless the kernel predates the TASK_STOPPED /
-@@ -1128,6 +1137,9 @@ get_pending_status (struct lwp_info *lp,
-   else
-     *status = lp->status;
+@@ -1535,6 +1546,9 @@ GPT: lwp %s had signal %s, but it is in 
+ 	*status = lp->status;
+     }
  
 +  if (*status == 0 && GET_PID (lp->ptid) == pid_was_stopped)
 +    *status = W_STOPCODE (SIGSTOP);
@@ -41,16 +46,16 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb
    return 0;
  }
  
-@@ -1207,6 +1219,8 @@ linux_nat_detach (char *args, int from_t
- 
-   trap_ptid = null_ptid;
+@@ -1631,6 +1645,8 @@ linux_nat_detach (struct target_ops *ops
+   inferior_ptid = pid_to_ptid (pid);
+   linux_ops->to_detach (ops, args, from_tty);
  
 +  pid_was_stopped = 0;
 +
-   /* Destroy LWP info; it's no longer valid.  */
-   init_lwp_list ();
- 
-@@ -1340,6 +1354,14 @@ linux_nat_resume (ptid_t ptid, int step,
+   if (target_can_async_p ())
+     drain_queued_events (pid);
+ }
+@@ -1787,6 +1803,14 @@ linux_nat_resume (ptid_t ptid, int step_
       resume_callback.  */
    lp->stopped = 0;
  
@@ -65,9 +70,19 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/linux-nat.c gdb
    if (resume_all)
      iterate_over_lwps (resume_callback, NULL);
  
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.c gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-08-27 18:13:41.000000000 +0200
+@@ -3281,6 +3305,8 @@ linux_nat_mourn_inferior (struct target_
+        there are other viable forks to debug.  Delete the exiting
+        one and context-switch to the first available.  */
+     linux_fork_mourn_inferior ();
++
++  pid_was_stopped = 0;
+ }
+ 
+ static LONGEST
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-into-signal.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-05-01 20:50:14.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-into-signal.c	2008-12-06 21:57:23.000000000 +0100
 @@ -1,19 +1,20 @@
  /* This testcase is part of GDB, the GNU debugger.
  
@@ -106,9 +121,10 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.t
  
    abort ();
    /* NOTREACHED */
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-08-27 18:13:41.000000000 +0200
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-into-signal.exp
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-05-01 20:50:14.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-into-signal.exp	2008-12-06 21:57:23.000000000 +0100
 @@ -1,27 +1,29 @@
 -# Copyright 2008
 -# Free Software Foundation, Inc.
@@ -240,9 +256,10 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.t
 -gdb_test "set debug lin-lwp 1" "" ""
 -
  corefunc threaded
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.c gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.c	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.c	2008-08-27 18:13:41.000000000 +0200
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-stopped.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attach-stopped.c	2008-05-01 20:50:14.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-stopped.c	2008-12-06 21:57:23.000000000 +0100
 @@ -1,19 +1,20 @@
  /* This testcase is part of GDB, the GNU debugger.
  
@@ -268,9 +285,10 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.t
  
  /* This program is intended to be started outside of gdb, then
     manually stopped via a signal.  */
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-08-27 18:13:41.000000000 +0200
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-stopped.exp
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-05-01 20:50:14.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attach-stopped.exp	2008-12-06 21:57:23.000000000 +0100
 @@ -1,26 +1,33 @@
 -# Copyright 2008
 -# Free Software Foundation, Inc.
@@ -380,9 +398,10 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.t
         
      set test "$threadtype: attach2 to stopped, after setting file"
      gdb_test_multiple "attach $testpid" "$test" {
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.c gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-08-27 18:13:41.000000000 +0200
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attachstop-mt.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-05-01 20:50:14.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attachstop-mt.c	2008-12-06 21:57:23.000000000 +0100
 @@ -1,19 +1,20 @@
  /* This testcase is part of GDB, the GNU debugger.
  
@@ -408,52 +427,11 @@ diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.t
  
  /* This program is intended to be started outside of gdb, then
     manually stopped via a signal.  */
-diff -up -u -X /home/jkratoch2/.diffi.list -rup gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.exp gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp
---- gdb-6.8-base/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-08-27 17:44:23.000000000 +0200
-+++ gdb-6.8/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-08-27 18:13:41.000000000 +0200
-@@ -1,26 +1,33 @@
--# Copyright 2008
--# Free Software Foundation, Inc.
-+# Copyright 2006
- 
- # This program is free software; you can redistribute it and/or modify
- # it under the terms of the GNU General Public License as published by
--# the Free Software Foundation; either version 3 of the License, or
-+# the Free Software Foundation; either version 2 of the License, or
- # (at your option) any later version.
--#
-+# 
- # This program is distributed in the hope that it will be useful,
- # but WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU General Public License for more details.
--#
-+# 
- # You should have received a copy of the GNU General Public License
--# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+# along with this program; if not, write to the Free Software
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- 
- # This test was created by modifying gdb.threads/attachstop.
- # This file was created by Jan Kratochvil <jan.kratochvil@redhat.com>.
- # Regression for: https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=197584
- 
-+if $tracelevel then {
-+    strace $tracelevel
-+}
-+
-+set prms_id 0
-+set bug_id 0
-+
- # This test only works on Linux
--if { ![isnative] || [is_remote host] || ![istarget *-linux*] } {
--    continue
-+if { ![istarget "*-*-linux-gnu*"] } {
-+    return 0
- }
- 
- set testfile "attachstop-mt"
-@@ -169,12 +176,23 @@ gdb_test "bt" ".*sleep.*(func|main).*" "
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attachstop-mt.exp
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-09-28 13:39:45.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.threads/attachstop-mt.exp	2008-12-06 21:57:23.000000000 +0100
+@@ -176,12 +176,23 @@ gdb_test "bt" ".*sleep.*(func|main).*" "
  # Exit and detach the process.
  gdb_exit
  

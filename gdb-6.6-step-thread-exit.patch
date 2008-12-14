@@ -1,7 +1,8 @@
-diff -up -rup gdb-6.8-clean/gdb/linux-nat.c gdb-6.8-new/gdb/linux-nat.c
---- gdb-6.8-clean/gdb/linux-nat.c	2008-08-26 00:04:08.000000000 +0200
-+++ gdb-6.8-new/gdb/linux-nat.c	2008-08-26 00:04:50.000000000 +0200
-@@ -1083,15 +1083,17 @@ resume_set_callback (struct lwp_info *lp
+Index: gdb-6.8.50.20081128/gdb/linux-nat.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/linux-nat.c	2008-12-04 01:44:26.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/linux-nat.c	2008-12-04 10:21:32.000000000 +0100
+@@ -1661,15 +1661,17 @@ resume_set_callback (struct lwp_info *lp
  }
  
  static void
@@ -21,56 +22,40 @@ diff -up -rup gdb-6.8-clean/gdb/linux-nat.c gdb-6.8-new/gdb/linux-nat.c
  			target_pid_to_str (ptid),
  			signo ? strsignal (signo) : "0",
  			target_pid_to_str (inferior_ptid));
-@@ -2076,6 +2078,9 @@ retry:
- 	  /* Check if the thread has exited.  */
- 	  if ((WIFEXITED (status) || WIFSIGNALED (status)) && num_lwps > 1)
- 	    {
-+	      enum resume_step step = lp->step;
-+	      pid_t pid = GET_PID (lp->ptid);
+@@ -2586,6 +2588,9 @@ linux_nat_filter_event (int lwpid, int s
+   /* Check if the thread has exited.  */
+   if ((WIFEXITED (status) || WIFSIGNALED (status)) && num_lwps > 1)
+     {
++      enum resume_step step = lp->step;
++      pid_t pid = GET_PID (lp->ptid);
 +
- 	      /* If this is the main thread, we must stop all threads and
- 	         verify if they are still alive.  This is because in the nptl
- 	         thread model, there is no signal issued for exiting LWPs
-@@ -2096,6 +2101,10 @@ retry:
- 		fprintf_unfiltered (gdb_stdlog,
- 				    "LLW: %s exited.\n",
- 				    target_pid_to_str (lp->ptid));
-+	      /* Backward compatibility with:
-+		 gdb-6.3-step-thread-exit-20050211.patch  */
-+	      if (step == RESUME_STEP_USER)
-+		printf_unfiltered ("[Stepped over thread exit]\n");
+       /* If this is the main thread, we must stop all threads and
+ 	 verify if they are still alive.  This is because in the nptl
+ 	 thread model, there is no signal issued for exiting LWPs
+@@ -2609,6 +2614,26 @@ linux_nat_filter_event (int lwpid, int s
  
- 	      exit_lwp (lp);
+       exit_lwp (lp);
  
-@@ -2104,8 +2113,29 @@ retry:
- 	         ignored.  */
- 	      if (num_lwps > 0)
- 		{
--		  /* Make sure there is at least one thread running.  */
--		  gdb_assert (iterate_over_lwps (running_callback, NULL));
-+		  if (step == RESUME_STEP_USER)
-+		    {
-+		      /* Now stop the closest LWP's ...  */
-+		      lp = find_lwp_pid (pid_to_ptid (pid));
-+		      if (!lp)
-+		        lp = lwp_list;
-+		      errno = 0;
-+		      ptrace (PTRACE_CONT, GET_LWP (lp->ptid), 0,
-+			      (void *) (unsigned long) SIGSTOP);
-+		      if (debug_linux_nat)
-+			fprintf_unfiltered (gdb_stdlog,
-+					    "PTRACE_CONT %s, 0, 0 (%s)\n",
-+					    target_pid_to_str (lp->ptid),
-+					    errno ? safe_strerror (errno)
-+						  : "OK");
-+		      /* Avoid the silent `delayed SIGSTOP' handling.  */
-+		      lp->signalled = 0;
-+		    }
-+		  else
-+		    {
-+		      /* Make sure there is at least one thread running.  */
-+		      gdb_assert (iterate_over_lwps (running_callback, NULL));
-+		    }
- 
- 		  /* Discard the event.  */
- 		  status = 0;
++      if (step == RESUME_STEP_USER)
++	{
++	  /* Now stop the closest LWP's ...  */
++	  lp = find_lwp_pid (pid_to_ptid (pid));
++	  if (!lp)
++	    lp = lwp_list;
++	  gdb_assert (lp != NULL);
++	  errno = 0;
++	  ptrace (PTRACE_CONT, GET_LWP (lp->ptid), 0,
++		  (void *) (unsigned long) SIGSTOP);
++	  if (debug_linux_nat)
++	    fprintf_unfiltered (gdb_stdlog,
++				"PTRACE_CONT %s, 0, 0 (%s)\n",
++				target_pid_to_str (lp->ptid),
++				errno ? safe_strerror (errno)
++				      : "OK");
++	  /* Avoid the silent `delayed SIGSTOP' handling.  */
++	  lp->signalled = 0;
++	}
++
+       /* If there is at least one more LWP, then the exit signal was
+ 	 not the end of the debugged application and should be
+ 	 ignored.  */

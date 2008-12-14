@@ -23,40 +23,10 @@
 
 	Port to GDB-6.8pre.
 
-Index: gdb-6.8cvs20080219/gdb/Makefile.in
+Index: gdb-6.8.50.20081128/gdb/amd64-linux-nat.c
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/Makefile.in	2008-02-19 16:52:21.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/Makefile.in	2008-02-20 13:39:08.000000000 +0100
-@@ -785,6 +785,7 @@ gdb_expat_h = gdb_expat.h
- gdb_locale_h = gdb_locale.h
- gdb_obstack_h = gdb_obstack.h $(obstack_h)
- gdb_proc_service_h = gdb_proc_service.h $(gregset_h)
-+gdb_procfs32_h = gdb_procfs32.h $(gdb_user32_h)
- gdb_ptrace_h = gdb_ptrace.h
- gdb_regex_h = gdb_regex.h $(xregex_h)
- gdb_select_h = gdb_select.h
-@@ -794,6 +795,7 @@ gdb_string_h = gdb_string.h
- gdb_thread_db_h = gdb_thread_db.h
- gdbthread_h = gdbthread.h $(breakpoint_h) $(frame_h)
- gdbtypes_h = gdbtypes.h $(hashtab_h)
-+gdb_user32_h = gdb_user32.h $(gdb_stdint_h)
- gdb_vfork_h = gdb_vfork.h
- gdb_wait_h = gdb_wait.h
- glibc_tdep_h = glibc-tdep.h
-@@ -1888,7 +1890,8 @@ amd64fbsd-tdep.o: amd64fbsd-tdep.c $(def
- amd64-linux-nat.o: amd64-linux-nat.c $(defs_h) $(inferior_h) $(gdbcore_h) \
- 	$(regcache_h) $(linux_nat_h) $(gdb_assert_h) $(gdb_string_h) \
- 	$(gdb_proc_service_h) $(gregset_h) $(amd64_tdep_h) \
--	$(i386_linux_tdep_h) $(amd64_nat_h) $(amd64_linux_tdep_h)
-+	$(i386_linux_tdep_h) $(amd64_nat_h) $(amd64_linux_tdep_h) \
-+	$(i387_tdep_h) $(elf_bfd_h) $(gdb_procfs32_h)
- amd64-linux-tdep.o: amd64-linux-tdep.c $(defs_h) $(frame_h) $(gdbcore_h) \
- 	$(regcache_h) $(osabi_h) $(symtab_h) $(gdb_string_h) $(amd64_tdep_h) \
- 	$(solib_svr4_h) $(gdbtypes_h) $(reggroups_h) $(amd64_linux_tdep_h)
-Index: gdb-6.8cvs20080219/gdb/amd64-linux-nat.c
-===================================================================
---- gdb-6.8cvs20080219.orig/gdb/amd64-linux-nat.c	2008-02-16 19:10:27.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/amd64-linux-nat.c	2008-02-20 13:39:08.000000000 +0100
+--- gdb-6.8.50.20081128.orig/gdb/amd64-linux-nat.c	2008-03-01 05:39:36.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/amd64-linux-nat.c	2008-12-02 23:06:16.000000000 +0100
 @@ -50,6 +50,9 @@
  #include "amd64-tdep.h"
  #include "i386-linux-tdep.h"
@@ -200,7 +170,7 @@ Index: gdb-6.8cvs20080219/gdb/amd64-linux-nat.c
  /* Transfering the general-purpose registers between GDB, inferiors
     and core files.  */
  
-@@ -429,6 +551,11 @@ _initialize_amd64_linux_nat (void)
+@@ -431,6 +553,11 @@ _initialize_amd64_linux_nat (void)
    t->to_fetch_registers = amd64_linux_fetch_inferior_registers;
    t->to_store_registers = amd64_linux_store_inferior_registers;
  
@@ -212,11 +182,11 @@ Index: gdb-6.8cvs20080219/gdb/amd64-linux-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, amd64_linux_new_thread);
-Index: gdb-6.8cvs20080219/gdb/config.in
+Index: gdb-6.8.50.20081128/gdb/config.in
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/config.in	2008-01-10 19:17:06.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/config.in	2008-02-20 13:39:08.000000000 +0100
-@@ -385,6 +385,9 @@
+--- gdb-6.8.50.20081128.orig/gdb/config.in	2008-08-06 21:41:31.000000000 +0200
++++ gdb-6.8.50.20081128/gdb/config.in	2008-12-02 23:06:16.000000000 +0100
+@@ -456,6 +456,9 @@
  /* Define to 1 if you have the <sys/poll.h> header file. */
  #undef HAVE_SYS_POLL_H
  
@@ -226,7 +196,7 @@ Index: gdb-6.8cvs20080219/gdb/config.in
  /* Define to 1 if you have the <sys/procfs.h> header file. */
  #undef HAVE_SYS_PROCFS_H
  
-@@ -412,6 +415,9 @@
+@@ -483,6 +486,9 @@
  /* Define to 1 if you have the <sys/types.h> header file. */
  #undef HAVE_SYS_TYPES_H
  
@@ -236,14 +206,16 @@ Index: gdb-6.8cvs20080219/gdb/config.in
  /* Define to 1 if you have the <sys/user.h> header file. */
  #undef HAVE_SYS_USER_H
  
-Index: gdb-6.8cvs20080219/gdb/configure
+Index: gdb-6.8.50.20081128/gdb/configure
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/configure	2008-02-14 23:03:56.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/configure	2008-02-20 13:39:08.000000000 +0100
-@@ -11140,6 +11140,157 @@ done
+--- gdb-6.8.50.20081128.orig/gdb/configure	2008-11-21 23:35:57.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/configure	2008-12-02 23:08:29.000000000 +0100
+@@ -12026,6 +12026,157 @@ _ACEOF
  
+ fi
  
- 
++
++
 +for ac_header in sys/user32.h sys/procfs32.h
 +do
 +as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
@@ -393,28 +365,26 @@ Index: gdb-6.8cvs20080219/gdb/configure
 +
 +done
 +
-+
-+
- for ac_header in sys/wait.h wait.h
- do
- as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
-Index: gdb-6.8cvs20080219/gdb/configure.ac
+ # elf_hp.h is for HP/UX 64-bit shared library support.
+ # FIXME: kettenis/20030102: In most cases we include these (ctype.h, time.h)
+ # unconditionally, so what's the point in checking these?
+Index: gdb-6.8.50.20081128/gdb/configure.ac
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/configure.ac	2008-02-14 23:03:56.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/configure.ac	2008-02-20 13:39:08.000000000 +0100
-@@ -523,6 +523,7 @@ AC_CHECK_HEADERS(sys/user.h, [], [],
- # include <sys/param.h>
- #endif
- ])
-+AC_CHECK_HEADERS(sys/user32.h sys/procfs32.h)
- AC_CHECK_HEADERS(sys/wait.h wait.h)
- AC_CHECK_HEADERS(termios.h termio.h sgtty.h)
- AC_CHECK_HEADERS(unistd.h)
-Index: gdb-6.8cvs20080219/gdb/gcore.c
+--- gdb-6.8.50.20081128.orig/gdb/configure.ac	2008-11-21 23:35:58.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/configure.ac	2008-12-02 23:07:33.000000000 +0100
+@@ -686,6 +686,7 @@ AC_SUBST(PYTHON_CFLAGS)
+ AC_HEADER_DIRENT
+ AC_HEADER_STAT
+ AC_HEADER_STDC
++AC_CHECK_HEADERS([sys/user32.h sys/procfs32.h])
+ # elf_hp.h is for HP/UX 64-bit shared library support.
+ # FIXME: kettenis/20030102: In most cases we include these (ctype.h, time.h)
+ # unconditionally, so what's the point in checking these?
+Index: gdb-6.8.50.20081128/gdb/gcore.c
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/gcore.c	2008-02-19 16:52:21.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/gcore.c	2008-02-20 13:39:08.000000000 +0100
-@@ -317,6 +317,11 @@ gcore_create_callback (CORE_ADDR vaddr, 
+--- gdb-6.8.50.20081128.orig/gdb/gcore.c	2008-12-01 16:39:04.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/gcore.c	2008-12-02 23:06:16.000000000 +0100
+@@ -320,6 +320,11 @@ gcore_create_callback (CORE_ADDR vaddr, 
    asection *osec;
    flagword flags = SEC_ALLOC | SEC_HAS_CONTENTS | SEC_LOAD;
  
@@ -426,10 +396,10 @@ Index: gdb-6.8cvs20080219/gdb/gcore.c
    /* If the memory segment has no permissions set, ignore it, otherwise
       when we later try to access it for read/write, we'll get an error
       or jam the kernel.  */
-Index: gdb-6.8cvs20080219/gdb/gdb_procfs32.h
+Index: gdb-6.8.50.20081128/gdb/gdb_procfs32.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8cvs20080219/gdb/gdb_procfs32.h	2008-02-20 13:39:08.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/gdb_procfs32.h	2008-12-02 23:06:16.000000000 +0100
 @@ -0,0 +1,128 @@
 +#ifdef HAVE_SYS_PROCFS32_H
 +#include <sys/procfs32.h>
@@ -559,10 +529,10 @@ Index: gdb-6.8cvs20080219/gdb/gdb_procfs32.h
 +#endif	/* _SYS_PROCFS32_H */
 +
 +#endif /* HAVE_SYS_PROCFS32_H */
-Index: gdb-6.8cvs20080219/gdb/gdb_user32.h
+Index: gdb-6.8.50.20081128/gdb/gdb_user32.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8cvs20080219/gdb/gdb_user32.h	2008-02-20 13:39:08.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/gdb_user32.h	2008-12-02 23:06:16.000000000 +0100
 @@ -0,0 +1,108 @@
 +#ifdef HAVE_SYS_USER32_H
 +#include <sys/user32.h>
@@ -672,11 +642,11 @@ Index: gdb-6.8cvs20080219/gdb/gdb_user32.h
 +#endif	/* _SYS_USER32_H */
 +
 +#endif /* HAVE_SYS_USER32_H */
-Index: gdb-6.8cvs20080219/gdb/linux-nat.c
+Index: gdb-6.8.50.20081128/gdb/linux-nat.c
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/linux-nat.c	2008-02-19 17:27:21.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/linux-nat.c	2008-02-20 13:39:08.000000000 +0100
-@@ -104,6 +104,21 @@ static LONGEST (*super_xfer_partial) (st
+--- gdb-6.8.50.20081128.orig/gdb/linux-nat.c	2008-12-02 22:15:53.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/linux-nat.c	2008-12-02 23:13:18.000000000 +0100
+@@ -209,6 +209,21 @@ static LONGEST (*super_xfer_partial) (st
  				      const gdb_byte *,
  				      ULONGEST, LONGEST);
  
@@ -698,40 +668,29 @@ Index: gdb-6.8cvs20080219/gdb/linux-nat.c
  static int debug_linux_nat;
  static void
  show_debug_linux_nat (struct ui_file *file, int from_tty,
-@@ -2716,11 +2731,11 @@ linux_nat_do_thread_registers (bfd *obfd
+@@ -3470,7 +3485,7 @@ linux_nat_do_thread_registers (bfd *obfd
    else
      fill_gregset (regcache, &gregs, -1);
  
 -  note_data = (char *) elfcore_write_prstatus (obfd,
--					       note_data,
--					       note_size,
--					       lwp,
--					       stop_signal, &gregs);
 +  note_data = (char *) linux_elfcore_write_prstatus (obfd,
-+						     note_data,
-+						     note_size,
-+						     lwp,
-+						     stop_signal, &gregs);
+ 					       note_data,
+ 					       note_size,
+ 					       lwp,
+@@ -3520,10 +3535,10 @@ linux_nat_do_thread_registers (bfd *obfd
+       else
+ 	fill_fpregset (regcache, &fpregs, -1);
  
-   if (core_regset_p
-       && (regset = gdbarch_regset_from_core_section (gdbarch, ".reg2",
-@@ -2731,10 +2746,11 @@ linux_nat_do_thread_registers (bfd *obfd
-   else
-     fill_fpregset (regcache, &fpregs, -1);
+-      note_data = (char *) elfcore_write_prfpreg (obfd,
++      note_data = (char *) linux_elfcore_write_prfpreg (obfd,
+ 						  note_data,
+ 						  note_size,
+-						  &fpregs, sizeof (fpregs));
++						  &fpregs, sizeof (fpregs), regcache);
+     }
  
--  note_data = (char *) elfcore_write_prfpreg (obfd,
--					      note_data,
--					      note_size,
--					      &fpregs, sizeof (fpregs));
-+  note_data = (char *) linux_elfcore_write_prfpreg (obfd,
-+						    note_data,
-+						    note_size,
-+						    &fpregs, sizeof (fpregs),
-+						    regcache);
- 
- #ifdef FILL_FPXREGSET
-   if (core_regset_p
-@@ -2828,9 +2844,9 @@ linux_nat_make_corefile_notes (bfd *obfd
+   return note_data;
+@@ -3592,9 +3607,9 @@ linux_nat_make_corefile_notes (bfd *obfd
  		       psargs_end - string_end);
  	    }
  	}
@@ -744,11 +703,11 @@ Index: gdb-6.8cvs20080219/gdb/linux-nat.c
      }
  
    /* Dump information for threads.  */
-Index: gdb-6.8cvs20080219/gdb/linux-nat.h
+Index: gdb-6.8.50.20081128/gdb/linux-nat.h
 ===================================================================
---- gdb-6.8cvs20080219.orig/gdb/linux-nat.h	2008-02-19 14:26:32.000000000 +0100
-+++ gdb-6.8cvs20080219/gdb/linux-nat.h	2008-02-20 13:39:37.000000000 +0100
-@@ -124,3 +124,12 @@ void linux_nat_switch_fork (ptid_t new_p
+--- gdb-6.8.50.20081128.orig/gdb/linux-nat.h	2008-12-01 15:58:23.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/linux-nat.h	2008-12-02 23:06:16.000000000 +0100
+@@ -134,3 +134,12 @@ void linux_nat_switch_fork (ptid_t new_p
  
  /* Return the saved siginfo associated with PTID.  */
  struct siginfo *linux_nat_get_siginfo (ptid_t ptid);

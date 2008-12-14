@@ -1,24 +1,24 @@
 Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 
---- ./gdb/dwarf2loc.c-orig	2008-11-06 22:17:45.000000000 +0100
-+++ ./gdb/dwarf2loc.c	2008-11-06 22:18:01.000000000 +0100
-@@ -57,9 +57,12 @@ find_location_expression (struct dwarf2_
+Index: gdb-6.8.50.20081128/gdb/dwarf2loc.c
+===================================================================
+--- gdb-6.8.50.20081128.orig/gdb/dwarf2loc.c	2008-12-08 11:00:45.000000000 +0100
++++ gdb-6.8.50.20081128/gdb/dwarf2loc.c	2008-12-08 18:02:49.000000000 +0100
+@@ -55,7 +55,9 @@ find_location_expression (struct dwarf2_
+   CORE_ADDR low, high;
+   gdb_byte *loc_ptr, *buf_end;
    int length;
-   unsigned int addr_size = gdbarch_addr_bit (current_gdbarch) / TARGET_CHAR_BIT;
+-  struct objfile *objfile = dwarf2_per_cu_objfile (baton->per_cu);
++  struct objfile *objfile1 = dwarf2_per_cu_objfile (baton->per_cu);
++  struct objfile *objfile = objfile1->separate_debug_objfile
++			    ? objfile1->separate_debug_objfile : objfile1;
+   struct gdbarch *gdbarch = get_objfile_arch (objfile);
+   unsigned int addr_size = dwarf2_per_cu_addr_size (baton->per_cu);
    CORE_ADDR base_mask = ~(~(CORE_ADDR)1 << (addr_size * 8 - 1));
-+  struct objfile *objfile = (baton->objfile->separate_debug_objfile
-+                             ? baton->objfile->separate_debug_objfile
-+			     : baton->objfile);
-   /* Adjust base_address for relocatable objects.  */
--  CORE_ADDR base_offset = ANOFFSET (baton->objfile->section_offsets,
--				    SECT_OFF_TEXT (baton->objfile));
-+  CORE_ADDR base_offset = ANOFFSET (objfile->section_offsets,
-+				    SECT_OFF_TEXT (objfile));
-   CORE_ADDR base_address = baton->base_address + base_offset;
- 
-   loc_ptr = baton->data;
---- /dev/null	2008-11-06 15:02:28.406299691 +0100
-+++ gdb-6.8/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked.exp	2008-11-06 23:11:02.000000000 +0100
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked.exp	2008-12-08 18:00:43.000000000 +0100
 @@ -0,0 +1,102 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -122,8 +122,10 @@ Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 +
 +# `abort' can get expressed as `*__GI_abort'.
 +gdb_test "bt full" "in \[^ \]*abort \\(.*in func \\(.*\ti = -?\[0-9\].*in main \\(.*" "Backtrace after abort()"
---- /dev/null	2008-11-06 15:02:28.406299691 +0100
-+++ gdb-6.8/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-main.c	2008-11-06 22:59:05.000000000 +0100
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-main.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-main.c	2008-12-08 18:00:43.000000000 +0100
 @@ -0,0 +1,26 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -151,8 +153,10 @@ Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 +  func ();
 +  return 0;
 +}
---- /dev/null	2008-11-06 15:02:28.406299691 +0100
-+++ gdb-6.8/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-func.S	2008-11-06 22:49:50.000000000 +0100
+Index: gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-func.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-6.8.50.20081128/gdb/testsuite/gdb.dwarf2/dw2-loclist-prelinked-func.S	2008-12-08 18:00:43.000000000 +0100
 @@ -0,0 +1,328 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
