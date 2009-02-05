@@ -834,6 +834,8 @@ fi
 %endif
 
 %changelog
+- Drop the gdb.threads/attach-into-signal.exp change as obsolete.
+
 * Sun Dec 14 2008 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20081214-1
 - Upgrade to the upstream gdb-6.8.50 snapshot.
 
