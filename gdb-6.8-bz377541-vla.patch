@@ -1,5 +1,104 @@
+diff --git a/gdb/ada-lang.c b/gdb/ada-lang.c
+index a6d5757..5c44b52 100644
+--- a/gdb/ada-lang.c
++++ b/gdb/ada-lang.c
+@@ -1666,8 +1666,8 @@ ada_type_of_array (struct value *arr, int bounds)
+         return NULL;
+       while (arity > 0)
+         {
+-          struct type *range_type = alloc_type (objf);
+-          struct type *array_type = alloc_type (objf);
++          struct type *range_type = alloc_type (objf, NULL);
++          struct type *array_type = alloc_type (objf, NULL);
+           struct value *low = desc_one_bound (descriptor, arity, 0);
+           struct value *high = desc_one_bound (descriptor, arity, 1);
+           arity -= 1;
+@@ -1774,9 +1774,9 @@ packed_array_type (struct type *type, long *elt_bits)
+   if (TYPE_CODE (type) != TYPE_CODE_ARRAY)
+     return type;
+ 
+-  new_type = alloc_type (TYPE_OBJFILE (type));
+   new_elt_type = packed_array_type (ada_check_typedef (TYPE_TARGET_TYPE (type)),
+                                     elt_bits);
++  new_type = alloc_type (TYPE_OBJFILE (type), new_elt_type);
+   create_array_type (new_type, new_elt_type, TYPE_INDEX_TYPE (type));
+   TYPE_FIELD_BITSIZE (new_type, 0) = *elt_bits;
+   TYPE_NAME (new_type) = ada_type_name (type);
+@@ -6790,7 +6790,7 @@ variant_field_index (struct type *type)
+ static struct type *
+ empty_record (struct objfile *objfile)
+ {
+-  struct type *type = alloc_type (objfile);
++  struct type *type = alloc_type (objfile, NULL);
+   TYPE_CODE (type) = TYPE_CODE_STRUCT;
+   TYPE_NFIELDS (type) = 0;
+   TYPE_FIELDS (type) = NULL;
+@@ -6847,7 +6847,7 @@ ada_template_to_fixed_record_type_1 (struct type *type,
+         nfields++;
+     }
+ 
+-  rtype = alloc_type (TYPE_OBJFILE (type));
++  rtype = alloc_type (TYPE_OBJFILE (type), NULL);
+   TYPE_CODE (rtype) = TYPE_CODE_STRUCT;
+   INIT_CPLUS_SPECIFIC (rtype);
+   TYPE_NFIELDS (rtype) = nfields;
+@@ -7034,7 +7034,8 @@ template_to_static_fixed_type (struct type *type0)
+         new_type = static_unwrap_type (field_type);
+       if (type == type0 && new_type != field_type)
+         {
+-          TYPE_TARGET_TYPE (type0) = type = alloc_type (TYPE_OBJFILE (type0));
++          TYPE_TARGET_TYPE (type0) = type = alloc_type (TYPE_OBJFILE (type0),
++							NULL);
+           TYPE_CODE (type) = TYPE_CODE (type0);
+           INIT_CPLUS_SPECIFIC (type);
+           TYPE_NFIELDS (type) = nfields;
+@@ -7079,7 +7080,7 @@ to_record_with_fixed_variant_part (struct type *type, const gdb_byte *valaddr,
+   else
+     dval = dval0;
+ 
+-  rtype = alloc_type (TYPE_OBJFILE (type));
++  rtype = alloc_type (TYPE_OBJFILE (type), NULL);
+   TYPE_CODE (rtype) = TYPE_CODE_STRUCT;
+   INIT_CPLUS_SPECIFIC (rtype);
+   TYPE_NFIELDS (rtype) = nfields;
+@@ -7251,7 +7252,7 @@ to_fixed_array_type (struct type *type0, struct value *dval,
+       if (elt_type0 == elt_type)
+         result = type0;
+       else
+-        result = create_array_type (alloc_type (TYPE_OBJFILE (type0)),
++        result = create_array_type (alloc_type (TYPE_OBJFILE (type0), NULL),
+                                     elt_type, TYPE_INDEX_TYPE (type0));
+     }
+   else
+@@ -7281,7 +7282,7 @@ to_fixed_array_type (struct type *type0, struct value *dval,
+           struct type *range_type =
+             to_fixed_range_type (TYPE_FIELD_NAME (index_type_desc, i),
+                                  dval, TYPE_OBJFILE (type0));
+-          result = create_array_type (alloc_type (TYPE_OBJFILE (type0)),
++          result = create_array_type (alloc_type (TYPE_OBJFILE (type0), NULL),
+                                       result, range_type);
+         }
+       if (!ignore_too_big && TYPE_LENGTH (result) > varsize_limit)
+@@ -9546,7 +9547,7 @@ to_fixed_range_type (char *name, struct value *dval, struct objfile *objfile)
+       if (L < INT_MIN || U > INT_MAX)
+ 	return raw_type;
+       else
+-	return create_range_type (alloc_type (objfile), raw_type, 
++	return create_range_type (alloc_type (objfile, NULL), raw_type, 
+ 				  discrete_type_low_bound (raw_type),
+ 				  discrete_type_high_bound (raw_type));
+     }
+@@ -9611,7 +9612,7 @@ to_fixed_range_type (char *name, struct value *dval, struct objfile *objfile)
+ 
+       if (objfile == NULL)
+         objfile = TYPE_OBJFILE (base_type);
+-      type = create_range_type (alloc_type (objfile), base_type, L, U);
++      type = create_range_type (alloc_type (objfile, NULL), base_type, L, U);
+       TYPE_NAME (type) = name;
+       return type;
+     }
 diff --git a/gdb/c-typeprint.c b/gdb/c-typeprint.c
-index b18e437..7095e46 100644
+index 0929516..2aaf9ad 100644
 --- a/gdb/c-typeprint.c
 +++ b/gdb/c-typeprint.c
 @@ -559,7 +559,12 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
@@ -16,11 +115,24 @@ index b18e437..7095e46 100644
  	&& !TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
  	fprintf_filtered (stream, "%d",
  			  (TYPE_LENGTH (type)
+diff --git a/gdb/coffread.c b/gdb/coffread.c
+index 6059d68..6a24c2c 100644
+--- a/gdb/coffread.c
++++ b/gdb/coffread.c
+@@ -346,7 +346,7 @@ coff_alloc_type (int index)
+      We will fill it in later if we find out how.  */
+   if (type == NULL)
+     {
+-      type = alloc_type (current_objfile);
++      type = alloc_type (current_objfile, NULL);
+       *type_addr = type;
+     }
+   return type;
 diff --git a/gdb/dwarf2expr.c b/gdb/dwarf2expr.c
-index 707c0de..9b4c726 100644
+index 75a4ec7..aa8ab33 100644
 --- a/gdb/dwarf2expr.c
 +++ b/gdb/dwarf2expr.c
-@@ -738,6 +738,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -752,6 +752,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  	  ctx->initialized = 0;
  	  goto no_push;
  
@@ -35,7 +147,7 @@ index 707c0de..9b4c726 100644
  	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
  	}
 diff --git a/gdb/dwarf2expr.h b/gdb/dwarf2expr.h
-index 5d9581c..b79f811 100644
+index 7047922..a287b6f 100644
 --- a/gdb/dwarf2expr.h
 +++ b/gdb/dwarf2expr.h
 @@ -67,10 +67,10 @@ struct dwarf_expr_context
@@ -51,7 +163,7 @@ index 5d9581c..b79f811 100644
    /* The current depth of dwarf expression recursion, via DW_OP_call*,
       DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index 080cd06..a70b2fc 100644
+index cad3db8..65751a4 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
 @@ -107,6 +107,9 @@ struct dwarf_expr_baton
@@ -226,9 +338,9 @@ index 080cd06..a70b2fc 100644
  /* Evaluate a location description, starting at DATA and with length
     SIZE, to find the current location of variable VAR in the context
     of FRAME.  */
-@@ -201,8 +327,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -200,8 +326,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+ 			  struct dwarf2_per_cu_data *per_cu)
  {
-   struct gdbarch *arch = get_frame_arch (frame);
    struct value *retval;
 -  struct dwarf_expr_baton baton;
    struct dwarf_expr_context *ctx;
@@ -236,7 +348,7 @@ index 080cd06..a70b2fc 100644
  
    if (size == 0)
      {
-@@ -212,19 +338,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -211,19 +337,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
        return retval;
      }
  
@@ -257,7 +369,7 @@ index 080cd06..a70b2fc 100644
    if (ctx->num_pieces > 0)
      {
        int i;
-@@ -262,6 +377,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -261,6 +376,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
      {
        CORE_ADDR address = dwarf_expr_fetch (ctx, 0);
  
@@ -268,7 +380,7 @@ index 080cd06..a70b2fc 100644
        retval = allocate_value (SYMBOL_TYPE (var));
        VALUE_LVAL (retval) = lval_memory;
        set_value_lazy (retval, 1);
-@@ -270,7 +389,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -269,7 +388,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
  
    set_value_initialized (retval, ctx->initialized);
  
@@ -277,7 +389,7 @@ index 080cd06..a70b2fc 100644
  
    return retval;
  }
-@@ -588,7 +707,7 @@ static int
+@@ -587,7 +706,7 @@ static int
  loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
  {
    /* FIXME: Could print the entire list of locations.  */
@@ -286,7 +398,7 @@ index 080cd06..a70b2fc 100644
    return 1;
  }
  
-@@ -604,16 +723,56 @@ loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
+@@ -603,16 +722,56 @@ loclist_tracepoint_var_ref (struct symbol * symbol, struct agent_expr * ax,
  
    data = find_location_expression (dlbaton, &size, ax->scope);
    if (data == NULL)
@@ -347,7 +459,7 @@ index 080cd06..a70b2fc 100644
 +  missing_tracepoint_var_ref
 +};
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index 632568e..a2e5abf 100644
+index 76577f1..bf46761 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
 @@ -71,5 +71,11 @@ struct dwarf2_loclist_baton
@@ -363,10 +475,10 @@ index 632568e..a2e5abf 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index a6584c4..829fa4e 100644
+index 925cfd0..481cdfc 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -1023,7 +1023,14 @@ static void store_in_ref_table (struct die_info *,
+@@ -1024,7 +1024,14 @@ static void store_in_ref_table (struct die_info *,
  
  static unsigned int dwarf2_get_ref_die_offset (struct attribute *);
  
@@ -382,7 +494,7 @@ index a6584c4..829fa4e 100644
  
  static struct die_info *follow_die_ref (struct die_info *,
  					struct attribute *,
-@@ -1078,6 +1085,9 @@ static void age_cached_comp_units (void);
+@@ -1079,6 +1086,9 @@ static void age_cached_comp_units (void);
  
  static void free_one_cached_comp_unit (void *);
  
@@ -392,7 +504,7 @@ index a6584c4..829fa4e 100644
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1097,6 +1107,9 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
+@@ -1098,6 +1108,9 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -402,7 +514,43 @@ index a6584c4..829fa4e 100644
  /* Try to locate the sections we need for DWARF 2 debugging
     information and return true if we have enough to do something.  */
  
-@@ -4466,6 +4479,26 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3900,7 +3913,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+   /* The name is already allocated along with this objfile, so we don't
+      need to duplicate it for the type.  */
+   fnp->physname = physname ? physname : "";
+-  fnp->type = alloc_type (objfile);
++  fnp->type = alloc_type (objfile, NULL);
+   this_type = read_type_die (die, cu);
+   if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
+     {
+@@ -4084,7 +4097,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
+     return NULL;
+ 
+   domain_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (pfn_type, 0));
+-  type = alloc_type (objfile);
++  type = alloc_type (objfile, NULL);
+   smash_to_method_type (type, domain_type, TYPE_TARGET_TYPE (pfn_type),
+ 			TYPE_FIELDS (pfn_type), TYPE_NFIELDS (pfn_type),
+ 			TYPE_VARARGS (pfn_type));
+@@ -4121,7 +4134,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+   if (type)
+     return type;
+ 
+-  type = alloc_type (objfile);
++  type = alloc_type (objfile, NULL);
+   INIT_CPLUS_SPECIFIC (type);
+   name = dwarf2_name (die, cu);
+   if (name != NULL)
+@@ -4334,7 +4347,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+   struct attribute *attr;
+   const char *name;
+ 
+-  type = alloc_type (objfile);
++  type = alloc_type (objfile, NULL);
+ 
+   TYPE_CODE (type) = TYPE_CODE_ENUM;
+   name = dwarf2_full_name (die, cu);
+@@ -4484,6 +4497,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -420,8 +568,11 @@ index a6584c4..829fa4e 100644
 +  /* These generic type attributes need to be fetched by
 +     evaluate_subexp_standard <multi_f77_subscript>'s call of
 +     value_subscripted_rvalue only for the innermost array type.  */
-+
 +  fetch_die_type_attrs (die, type, cu);
++
++  /* These generic type attributes are checked for allocated/associated
++     validity while accessing FIELD_LOC_KIND_DWARF_BLOCK.  */
++  fetch_die_type_attrs (die, range_type, cu);
 +
 +  return type;
 +}
@@ -429,7 +580,7 @@ index a6584c4..829fa4e 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -4479,7 +4512,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4497,7 +4533,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -438,7 +589,7 @@ index a6584c4..829fa4e 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -4526,16 +4559,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4544,16 +4580,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -460,7 +611,7 @@ index a6584c4..829fa4e 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -4891,29 +4919,93 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4909,29 +4940,95 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct objfile *objfile = cu->objfile;
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -468,8 +619,10 @@ index a6584c4..829fa4e 100644
 +  int length;
 +
 +  index_type = builtin_type_int32;
-+  range_type = create_range_type_nfields (NULL, index_type, 2);
-+  TYPE_UNSIGNED (range_type) = 1;
++  /* RANGE_TYPE is allocated from OBJFILE, not OBJFILE_INTERNAL.  */
++  range_type = alloc_type (objfile, index_type);
++  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
++  range_type = create_range_type (range_type, index_type, 0, -1);
 +
 +  /* C/C++ should probably have the low bound 0 but C/C++ does not use
 +     DW_TAG_string_type.  */
@@ -572,7 +725,7 @@ index a6584c4..829fa4e 100644
    type = create_string_type (NULL, range_type);
  
    return set_die_type (die, type, cu);
-@@ -5007,7 +5099,6 @@ static struct type *
+@@ -5025,7 +5122,6 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -580,20 +733,18 @@ index a6584c4..829fa4e 100644
    const char *name = NULL;
    struct type *this_type;
  
-@@ -5112,9 +5203,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
-   struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
+@@ -5131,8 +5227,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
--  struct attribute *attr;
+   struct attribute *attr;
 -  int low = 0;
 -  int high = -1;
-+  struct attribute *attr, *byte_stride_attr;
 +  int low, high, byte_stride_int;
-+  enum dwarf2_get_attr_constant_value high_type, byte_stride_type;
++  enum dwarf2_get_attr_constant_value high_type;
    char *name;
    
    base_type = die_type (die, cu);
-@@ -5127,42 +5218,89 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5145,42 +5241,90 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -602,13 +753,8 @@ index a6584c4..829fa4e 100644
 -      /* FORTRAN implies a lower bound of 1, if not given.  */
 -      low = 1;
 -    }
-+  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
-+  byte_stride_attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-+  byte_stride_type = dwarf2_get_attr_constant_value (byte_stride_attr,
-+						     &byte_stride_int);
-+
-+  range_type = create_range_type_nfields
-+    (NULL, base_type, byte_stride_type == dwarf2_attr_unknown ? 2 : 3);
++  /* LOW_BOUND and HIGH_BOUND are set for real below.  */
++  range_type = create_range_type (NULL, base_type, 0, -1);
  
 -  /* FIXME: For variable sized arrays either of these could be
 -     a variable rather than a constant value.  We'll allow it,
@@ -673,7 +819,10 @@ index a6584c4..829fa4e 100644
 +      high_type = dwarf2_get_attr_constant_value (attr, &high);
 +      /* It does not hurt but it is needlessly ineffective in check_typedef.  */
 +      if (high_type != dwarf2_attr_unknown)
-+	TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
++      	{
++	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (range_type) = 1;
++	  TYPE_DYNAMIC (range_type) = 1;
++	}
 +      /* Pass it now as the regular DW_AT_upper_bound.  */
 +    }
 +  switch (high_type)
@@ -694,26 +843,29 @@ index a6584c4..829fa4e 100644
      }
  
 -  range_type = create_range_type (NULL, base_type, low, high);
-+  switch (byte_stride_type)
++  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
++  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
++  switch (dwarf2_get_attr_constant_value (attr, &byte_stride_int))
 +    {
 +    case dwarf2_attr_unknown:
 +      break;
 +    case dwarf2_attr_const:
 +      if (byte_stride_int == 0)
-+	warning (_("Found DW_AT_byte_stride with unsupported value 0"));
-+      SET_TYPE_BYTE_STRIDE (range_type, byte_stride_int);
++	complaint (&symfile_complaints,
++		   _("Found DW_AT_byte_stride with unsupported value 0"));
++      TYPE_BYTE_STRIDE (range_type) = byte_stride_int;
 +      break;
 +    case dwarf2_attr_block:
 +      TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 2);
 +      TYPE_FIELD_DWARF_BLOCK (range_type, 2) = dwarf2_attr_to_locexpr_baton
-+							 (byte_stride_attr, cu);
++								     (attr, cu);
 +      TYPE_DYNAMIC (range_type) = 1;
 +      break;
 +    }
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -7450,10 +7588,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -7468,10 +7612,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -728,7 +880,7 @@ index a6584c4..829fa4e 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -7486,6 +7626,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -7504,6 +7650,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  					     sizeof (struct symbol));
        OBJSTAT (objfile, n_syms++);
        memset (sym, 0, sizeof (struct symbol));
@@ -737,7 +889,7 @@ index a6584c4..829fa4e 100644
  
        /* Cache this symbol's name and the name's demangled form (if any).  */
        SYMBOL_LANGUAGE (sym) = cu->language;
-@@ -9291,26 +9433,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
+@@ -9309,26 +9457,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
    return result;
  }
  
@@ -788,7 +940,7 @@ index a6584c4..829fa4e 100644
  }
  
  /* THIS_CU has a reference to PER_CU.  If necessary, load the new compilation
-@@ -10088,6 +10239,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -10106,6 +10263,34 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -823,7 +975,7 @@ index a6584c4..829fa4e 100644
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -10117,35 +10296,24 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+@@ -10135,35 +10320,24 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
        SYMBOL_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
@@ -873,7 +1025,7 @@ index a6584c4..829fa4e 100644
      }
  }
  
-@@ -10420,6 +10588,27 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -10438,6 +10612,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -887,21 +1039,25 @@ index a6584c4..829fa4e 100644
 +
 +  attr = dwarf2_attr (die, DW_AT_data_location, cu);
 +  if (attr_form_is_block (attr))
-+    TYPE_DATA_LOCATION (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
++    TYPE_DATA_LOCATION_DWARF_BLOCK (type) = dwarf2_attr_to_locexpr_baton (attr,
++									  cu);
++  gdb_assert (!TYPE_DATA_LOCATION_IS_ADDR (type));
 +
 +  attr = dwarf2_attr (die, DW_AT_allocated, cu);
 +  if (attr_form_is_block (attr))
 +    TYPE_ALLOCATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
++  gdb_assert (!TYPE_NOT_ALLOCATED (type));
 +
 +  attr = dwarf2_attr (die, DW_AT_associated, cu);
 +  if (attr_form_is_block (attr))
 +    TYPE_ASSOCIATED (type) = dwarf2_attr_to_locexpr_baton (attr, cu);
++  gdb_assert (!TYPE_NOT_ASSOCIATED (type));
 +}
 +
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -10428,6 +10617,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -10446,6 +10645,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -911,7 +1067,7 @@ index a6584c4..829fa4e 100644
      {
        gdb_assert (cu->per_cu != NULL);
 diff --git a/gdb/eval.c b/gdb/eval.c
-index ccb6b74..e3221ef 100644
+index 038334b..3e2c320 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -40,6 +40,7 @@
@@ -1013,7 +1169,22 @@ index ccb6b74..e3221ef 100644
        }
  
      case BINOP_LOGICAL_AND:
-@@ -2686,9 +2708,12 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
+@@ -2624,12 +2646,13 @@ evaluate_subexp_with_coercion (struct expression *exp,
+     {
+     case OP_VAR_VALUE:
+       var = exp->elts[pc + 2].symbol;
++      /* address_of_variable will call object_address_set for check_typedef.  */
++      val = address_of_variable (var, exp->elts[pc + 1].block);
+       type = check_typedef (SYMBOL_TYPE (var));
+       if (TYPE_CODE (type) == TYPE_CODE_ARRAY
+ 	  && CAST_IS_CONVERSION)
+ 	{
+ 	  (*pos) += 4;
+-	  val = address_of_variable (var, exp->elts[pc + 1].block);
+ 	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
+ 			     val);
+ 	}
+@@ -2681,9 +2704,13 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
  
      case OP_VAR_VALUE:
        (*pos) += 4;
@@ -1024,13 +1195,14 @@ index ccb6b74..e3221ef 100644
 +	 need to have executed object_address_set which needs valid
 +	 SYMBOL_VALUE_ADDRESS of the symbol.  Still VALUE returned by
 +	 read_var_value we left as lazy.  */
-+      type = value_type (read_var_value (exp->elts[pc + 2].symbol, NULL));
++      type = value_type (read_var_value (exp->elts[pc + 2].symbol,
++					deprecated_safe_get_selected_frame ()));
 +      return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
  
      default:
        val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
 diff --git a/gdb/f-lang.h b/gdb/f-lang.h
-index 3b3487e..4707603 100644
+index 711bdba..123a783 100644
 --- a/gdb/f-lang.h
 +++ b/gdb/f-lang.h
 @@ -28,6 +28,10 @@ extern void f_error (char *);	/* Defined in f-exp.y */
@@ -1045,7 +1217,7 @@ index 3b3487e..4707603 100644
  			struct ui_file *, int,
  			const struct value_print_options *);
 diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
-index 081d24a..47ad0f3 100644
+index 6c9668f..852b9a8 100644
 --- a/gdb/f-typeprint.c
 +++ b/gdb/f-typeprint.c
 @@ -31,7 +31,7 @@
@@ -1057,15 +1229,6 @@ index 081d24a..47ad0f3 100644
  #include "gdb_string.h"
  #include <errno.h>
  
-@@ -39,7 +39,7 @@
- static void f_type_print_args (struct type *, struct ui_file *);
- #endif
- 
--static void f_type_print_varspec_suffix (struct type *, struct ui_file *,
-+static void f_type_print_varspec_suffix (struct type *, struct ui_file *, int,
- 					 int, int, int);
- 
- void f_type_print_varspec_prefix (struct type *, struct ui_file *,
 @@ -48,6 +48,34 @@ void f_type_print_varspec_prefix (struct type *, struct ui_file *,
  void f_type_print_base (struct type *, struct ui_file *, int, int);
  
@@ -1111,32 +1274,7 @@ index 081d24a..47ad0f3 100644
    f_type_print_base (type, stream, show, level);
    code = TYPE_CODE (type);
    if ((varstring != NULL && *varstring != '\0')
-@@ -80,7 +111,7 @@ f_print_type (struct type *type, char *varstring, struct ui_file *stream,
-          so don't print an additional pair of ()'s */
- 
-       demangled_args = varstring[strlen (varstring) - 1] == ')'; 
--      f_type_print_varspec_suffix (type, stream, show, 0, demangled_args);
-+      f_type_print_varspec_suffix (type, stream, show, 0, demangled_args, 0);
-    }
- }
- 
-@@ -150,11 +181,13 @@ f_type_print_varspec_prefix (struct type *type, struct ui_file *stream,
- 
- static void
- f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
--			     int show, int passed_a_ptr, int demangled_args)
-+			     int show, int passed_a_ptr, int demangled_args,
-+			     int arrayprint_recurse_level)
- {
-   int upper_bound, lower_bound;
--  static int arrayprint_recurse_level = 0;
-   int retcode;
-+  /* No static variables (such as ARRAYPRINT_RECURSE_LEVEL) permitted as ERROR
-+     may occur during the evaluation of DWARF_BLOCK values.  */
- 
-   if (type == 0)
-     return;
-@@ -164,6 +197,9 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
+@@ -166,6 +197,9 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
  
    QUIT;
  
@@ -1146,54 +1284,8 @@ index 081d24a..47ad0f3 100644
    switch (TYPE_CODE (type))
      {
      case TYPE_CODE_ARRAY:
-@@ -173,7 +209,8 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
- 	fprintf_filtered (stream, "(");
- 
-       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_ARRAY)
--	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0);
-+	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0,
-+				     arrayprint_recurse_level);
- 
-       lower_bound = f77_get_lowerbound (type);
-       if (lower_bound != 1)	/* Not the default.  */
-@@ -191,7 +228,8 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
- 	}
- 
-       if (TYPE_CODE (TYPE_TARGET_TYPE (type)) != TYPE_CODE_ARRAY)
--	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0);
-+	f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 0, 0,
-+				     arrayprint_recurse_level);
-       if (arrayprint_recurse_level == 1)
- 	fprintf_filtered (stream, ")");
-       else
-@@ -201,13 +239,14 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
- 
-     case TYPE_CODE_PTR:
-     case TYPE_CODE_REF:
--      f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 1, 0);
-+      f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0, 1, 0,
-+				   arrayprint_recurse_level);
-       fprintf_filtered (stream, ")");
-       break;
- 
-     case TYPE_CODE_FUNC:
-       f_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream, 0,
--				   passed_a_ptr, 0);
-+				   passed_a_ptr, 0, arrayprint_recurse_level);
-       if (passed_a_ptr)
- 	fprintf_filtered (stream, ")");
- 
-@@ -362,7 +401,7 @@ f_type_print_base (struct type *type, struct ui_file *stream, int show,
- 	  fprintfi_filtered (level, stream, "%s",
- 			     TYPE_FIELD_NAME (type, index));
- 	  f_type_print_varspec_suffix (TYPE_FIELD_TYPE (type, index),
--				       stream, 0, 0, 0);
-+				       stream, 0, 0, 0, 0);
- 	  fputs_filtered ("\n", stream);
- 	} 
-       fprintfi_filtered (level, stream, "End Type ");
 diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
-index f893b49..3c15edb 100644
+index 5721041..a4d69fb 100644
 --- a/gdb/f-valprint.c
 +++ b/gdb/f-valprint.c
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
@@ -1217,7 +1309,7 @@ index f893b49..3c15edb 100644
    if (TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED (type))
      error (_("Lower bound may not be '*' in F77"));
  
-@@ -72,6 +74,8 @@ f77_get_lowerbound (struct type *type)
+@@ -72,14 +74,17 @@ f77_get_lowerbound (struct type *type)
  int
  f77_get_upperbound (struct type *type)
  {
@@ -1225,8 +1317,22 @@ index f893b49..3c15edb 100644
 +
    if (TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
      {
-       /* We have an assumed size array on our hands.  Assume that
-@@ -135,24 +139,29 @@ f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
+-      /* We have an assumed size array on our hands.  Assume that
+-	 upper_bound == lower_bound so that we show at least 1 element.
+-	 If the user wants to see more elements, let him manually ask for 'em
+-	 and we'll subscript the array and show him.  */
++      /* We have an assumed size array on our hands.  As type_length_get
++	 already assumes a length zero of arrays with underfined bounds VALADDR
++	 passed to the Fortran functions does not contained the real inferior
++	 memory content.  User should request printing of specific array
++	 elements instead.  */
+ 
+-      return f77_get_lowerbound (type);
++      return f77_get_lowerbound (type) - 1;
+     }
+ 
+   return TYPE_ARRAY_UPPER_BOUND_VALUE (type);
+@@ -135,24 +140,29 @@ f77_create_arrayprint_offset_tbl (struct type *type, struct ui_file *stream)
        upper = f77_get_upperbound (tmp_type);
        lower = f77_get_lowerbound (tmp_type);
  
@@ -1262,7 +1368,7 @@ index f893b49..3c15edb 100644
      }
  }
  
-@@ -172,34 +181,34 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
+@@ -172,34 +182,34 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
  
    if (nss != ndimensions)
      {
@@ -1306,7 +1412,7 @@ index f893b49..3c15edb 100644
  	    fprintf_filtered (stream, "...");
  	}
      }
-@@ -251,6 +260,9 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
+@@ -251,6 +261,9 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
    CORE_ADDR addr;
    int index;
  
@@ -1316,18 +1422,8 @@ index f893b49..3c15edb 100644
    CHECK_TYPEDEF (type);
    switch (TYPE_CODE (type))
      {
-@@ -567,8 +579,7 @@ info_common_command (char *comname, int from_tty)
-       while (entry != NULL)
- 	{
- 	  printf_filtered ("%s = ", SYMBOL_PRINT_NAME (entry->symbol));
--	  print_variable_value (entry->symbol, fi, gdb_stdout);
--	  printf_filtered ("\n");
-+	  print_variable_value_nl (entry->symbol, fi, gdb_stdout);
- 	  entry = entry->next;
- 	}
-     }
 diff --git a/gdb/findvar.c b/gdb/findvar.c
-index f7b6e63..3989957 100644
+index 1048887..b9e7711 100644
 --- a/gdb/findvar.c
 +++ b/gdb/findvar.c
 @@ -35,6 +35,7 @@
@@ -1338,12 +1434,12 @@ index f7b6e63..3989957 100644
  
  /* Basic byte-swapping routines.  GDB has needed these for a long time...
     All extract a target-format integer at ADDR which is LEN bytes long.  */
-@@ -383,27 +384,16 @@ symbol_read_needs_frame (struct symbol *sym)
+@@ -382,27 +383,16 @@ symbol_read_needs_frame (struct symbol *sym)
+ /* Given a struct symbol for a variable,
     and a stack frame id, read the value of the variable
     and return a (pointer to a) struct value containing the value. 
-    If the variable cannot be found, return a zero pointer.
--   If FRAME is NULL, use the selected frame.  */
-+   If FRAME is NULL, use the selected frame.
+-   If the variable cannot be found, return a zero pointer.  */
++   If the variable cannot be found, return a zero pointer.
 +   We have to first find the address of the variable before allocating struct
 +   value to return as its size may depend on DW_OP_PUSH_OBJECT_ADDRESS possibly
 +   used by its type.  */
@@ -1368,9 +1464,9 @@ index f7b6e63..3989957 100644
 -
 -  len = TYPE_LENGTH (type);
  
-   /* FIXME drow/2003-09-06: this call to the selected frame should be
-      pushed upwards to the callers.  */
-@@ -413,31 +403,39 @@ read_var_value (struct symbol *var, struct frame_info *frame)
+   if (symbol_read_needs_frame (var))
+     gdb_assert (frame);
+@@ -410,31 +400,39 @@ read_var_value (struct symbol *var, struct frame_info *frame)
    switch (SYMBOL_CLASS (var))
      {
      case LOC_CONST:
@@ -1429,7 +1525,7 @@ index f7b6e63..3989957 100644
  	return v;
        }
  
-@@ -485,12 +483,23 @@ read_var_value (struct symbol *var, struct frame_info *frame)
+@@ -476,12 +474,23 @@ read_var_value (struct symbol *var, struct frame_info *frame)
        break;
  
      case LOC_BLOCK:
@@ -1459,7 +1555,7 @@ index f7b6e63..3989957 100644
  
      case LOC_REGISTER:
      case LOC_REGPARM_ADDR:
-@@ -511,7 +520,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
+@@ -499,7 +508,6 @@ read_var_value (struct symbol *var, struct frame_info *frame)
  	      error (_("Value of register variable not available."));
  
  	    addr = value_as_address (regval);
@@ -1467,7 +1563,7 @@ index f7b6e63..3989957 100644
  	  }
  	else
  	  {
-@@ -556,18 +564,33 @@ read_var_value (struct symbol *var, struct frame_info *frame)
+@@ -542,18 +550,33 @@ read_var_value (struct symbol *var, struct frame_info *frame)
        break;
  
      case LOC_OPTIMIZED_OUT:
@@ -1507,7 +1603,7 @@ index f7b6e63..3989957 100644
  }
  
  /* Install default attributes for register values.  */
-@@ -604,10 +627,11 @@ struct value *
+@@ -590,10 +613,11 @@ struct value *
  value_from_register (struct type *type, int regnum, struct frame_info *frame)
  {
    struct gdbarch *gdbarch = get_frame_arch (frame);
@@ -1521,7 +1617,7 @@ index f7b6e63..3989957 100644
      {
        /* The ISA/ABI need to something weird when obtaining the
           specified value from this register.  It might need to
-@@ -621,7 +645,7 @@ value_from_register (struct type *type, int regnum, struct frame_info *frame)
+@@ -607,7 +631,7 @@ value_from_register (struct type *type, int regnum, struct frame_info *frame)
        VALUE_FRAME_ID (v) = get_frame_id (frame);
        VALUE_REGNUM (v) = regnum;
        gdbarch_register_to_value (gdbarch,
@@ -1531,7 +1627,7 @@ index f7b6e63..3989957 100644
    else
      {
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 5b9d0e8..f814ce3 100644
+index 8102321..e6190cf 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -38,6 +38,8 @@
@@ -1543,92 +1639,201 @@ index 5b9d0e8..f814ce3 100644
  
  /* These variables point to the objects
     representing the predefined C data types.  */
-@@ -478,11 +480,13 @@ make_qualified_type (struct type *type, int new_flags,
-   struct type *ntype;
- 
-   ntype = type;
--  do {
--    if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
--      return ntype;
--    ntype = TYPE_CHAIN (ntype);
--  } while (ntype != type);
-+  do
-+    {
-+      if (TYPE_INSTANCE_FLAGS (ntype) == new_flags)
-+	return ntype;
-+      ntype = TYPE_CHAIN (ntype);
-+    }
-+  while (ntype != type);
- 
-   /* Create a new type instance.  */
-   if (storage == NULL)
-@@ -690,16 +694,21 @@ allocate_stub_method (struct type *type)
-    RESULT_TYPE, or creating a new type, inheriting the objfile from
-    INDEX_TYPE.
- 
--   Indices will be of type INDEX_TYPE, and will range from LOW_BOUND
--   to HIGH_BOUND, inclusive.
-+   Indices will be of type INDEX_TYPE.  NFIELDS should be 2 for standard
-+   arrays, 3 for custom TYPE_BYTE_STRIDE.  Use CREATE_RANGE_TYPE for common
-+   constant TYPE_LOW_BOUND/TYPE_HIGH_BOUND ranges instead.
+@@ -146,6 +148,23 @@ static void print_bit_vector (B_TYPE *, int);
+ static void print_arg_types (struct field *, int, int);
+ static void dump_fn_fieldlists (struct type *, int);
+ static void print_cplus_stuff (struct type *, int);
++static void type_init_refc (struct type *new_type, struct type *parent_type);
 +
-+   You must to decide TYPE_UNSIGNED yourself as being done in CREATE_RANGE_TYPE.
++/* A reference count structure for the type reference count map.  Each
++   type in a hierarchy of types is mapped to the same reference
++   count.  */
++struct type_refc_entry
++{
++  /* One type in the hierarchy.  Each type in the hierarchy gets its
++     own slot.  */
++  struct type *type;
++
++  /* A pointer to the shared reference count.  */
++  int *refc;
++};
++
++/* The hash table holding all reference counts.  */
++static htab_t type_refc_table;
  
-    FIXME: Maybe we should check the TYPE_CODE of RESULT_TYPE to make
-    sure it is TYPE_CODE_UNDEF before we bash it into a range type?  */
+ 
+ /* Alloc a new type structure and fill it with some defaults.  If
+@@ -154,23 +173,25 @@ static void print_cplus_stuff (struct type *, int);
+    structure by xmalloc () (for permanent types).  */
  
  struct type *
--create_range_type (struct type *result_type, struct type *index_type,
--		   int low_bound, int high_bound)
-+create_range_type_nfields (struct type *result_type, struct type *index_type,
-+                           int nfields)
+-alloc_type (struct objfile *objfile)
++alloc_type (struct objfile *objfile, struct type *parent)
  {
-+  int fieldno;
-+
-   if (result_type == NULL)
+   struct type *type;
+ 
+   /* Alloc the structure and start off with all fields zeroed.  */
+ 
+-  if (objfile == NULL)
++  switch ((long) objfile)
      {
-       result_type = alloc_type (TYPE_OBJFILE (index_type));
-@@ -710,17 +719,33 @@ create_range_type (struct type *result_type, struct type *index_type,
++    case (long) OBJFILE_INTERNAL:
++    case (long) OBJFILE_MALLOC:
+       type = XZALLOC (struct type);
+       TYPE_MAIN_TYPE (type) = XZALLOC (struct main_type);
+-    }
+-  else
+-    {
++      break;
++    default:
+       type = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct type);
+       TYPE_MAIN_TYPE (type) = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+ 					      struct main_type);
+       OBJSTAT (objfile, n_types++);
++      break;
+     }
+ 
+   /* Initialize the fields that might not be zero.  */
+@@ -180,6 +201,9 @@ alloc_type (struct objfile *objfile)
+   TYPE_VPTR_FIELDNO (type) = -1;
+   TYPE_CHAIN (type) = type;	/* Chain back to itself.  */
+ 
++  if (objfile == NULL)
++    type_init_refc (type, parent);
++
+   return (type);
+ }
+ 
+@@ -194,16 +218,24 @@ alloc_type_instance (struct type *oldtype)
+ 
+   /* Allocate the structure.  */
+ 
+-  if (TYPE_OBJFILE (oldtype) == NULL)
+-    type = XZALLOC (struct type);
+-  else
+-    type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
+-			   struct type);
+-
++  switch ((long) TYPE_OBJFILE (oldtype))
++    {
++    case (long) OBJFILE_INTERNAL:
++    case (long) OBJFILE_MALLOC:
++      type = XZALLOC (struct type);
++      break;
++    default:
++      type = OBSTACK_ZALLOC (&TYPE_OBJFILE (oldtype)->objfile_obstack,
++			     struct type);
++      break;
++    }
+   TYPE_MAIN_TYPE (type) = TYPE_MAIN_TYPE (oldtype);
+ 
+   TYPE_CHAIN (type) = type;	/* Chain back to itself for now.  */
+ 
++  if (TYPE_OBJFILE (oldtype) == NULL)
++    type_init_refc (type, oldtype);
++
+   return (type);
+ }
+ 
+@@ -248,7 +280,7 @@ make_pointer_type (struct type *type, struct type **typeptr)
+ 
+   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
+     {
+-      ntype = alloc_type (TYPE_OBJFILE (type));
++      ntype = alloc_type (TYPE_OBJFILE (type), type);
+       if (typeptr)
+ 	*typeptr = ntype;
+     }
+@@ -260,6 +292,9 @@ make_pointer_type (struct type *type, struct type **typeptr)
+       smash_type (ntype);
+       TYPE_CHAIN (ntype) = chain;
+       TYPE_OBJFILE (ntype) = objfile;
++
++      /* Callers may only supply storage if there is an objfile.  */
++      gdb_assert (objfile);
+     }
+ 
+   TYPE_TARGET_TYPE (ntype) = type;
+@@ -328,7 +363,7 @@ make_reference_type (struct type *type, struct type **typeptr)
+ 
+   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
+     {
+-      ntype = alloc_type (TYPE_OBJFILE (type));
++      ntype = alloc_type (TYPE_OBJFILE (type), type);
+       if (typeptr)
+ 	*typeptr = ntype;
+     }
+@@ -340,6 +375,9 @@ make_reference_type (struct type *type, struct type **typeptr)
+       smash_type (ntype);
+       TYPE_CHAIN (ntype) = chain;
+       TYPE_OBJFILE (ntype) = objfile;
++
++      /* Callers may only supply storage if there is an objfile.  */
++      gdb_assert (objfile);
+     }
+ 
+   TYPE_TARGET_TYPE (ntype) = type;
+@@ -388,7 +426,7 @@ make_function_type (struct type *type, struct type **typeptr)
+ 
+   if (typeptr == 0 || *typeptr == 0)	/* We'll need to allocate one.  */
+     {
+-      ntype = alloc_type (TYPE_OBJFILE (type));
++      ntype = alloc_type (TYPE_OBJFILE (type), type);
+       if (typeptr)
+ 	*typeptr = ntype;
+     }
+@@ -398,6 +436,9 @@ make_function_type (struct type *type, struct type **typeptr)
+       objfile = TYPE_OBJFILE (ntype);
+       smash_type (ntype);
+       TYPE_OBJFILE (ntype) = objfile;
++
++      /* Callers may only supply storage if there is an objfile.  */
++      gdb_assert (objfile);
+     }
+ 
+   TYPE_TARGET_TYPE (ntype) = type;
+@@ -643,7 +684,7 @@ lookup_memberptr_type (struct type *type, struct type *domain)
+ {
+   struct type *mtype;
+ 
+-  mtype = alloc_type (TYPE_OBJFILE (type));
++  mtype = alloc_type (TYPE_OBJFILE (type), NULL);
+   smash_to_memberptr_type (mtype, domain, type);
+   return (mtype);
+ }
+@@ -655,7 +696,7 @@ lookup_methodptr_type (struct type *to_type)
+ {
+   struct type *mtype;
+ 
+-  mtype = alloc_type (TYPE_OBJFILE (to_type));
++  mtype = alloc_type (TYPE_OBJFILE (to_type), NULL);
+   TYPE_TARGET_TYPE (mtype) = to_type;
+   TYPE_DOMAIN_TYPE (mtype) = TYPE_DOMAIN_TYPE (to_type);
+   TYPE_LENGTH (mtype) = cplus_method_ptr_size (to_type);
+@@ -696,19 +737,20 @@ create_range_type (struct type *result_type, struct type *index_type,
+ 		   int low_bound, int high_bound)
+ {
+   if (result_type == NULL)
+-    result_type = alloc_type (TYPE_OBJFILE (index_type));
++    result_type = alloc_type (TYPE_OBJFILE (index_type), index_type);
+   TYPE_CODE (result_type) = TYPE_CODE_RANGE;
+   TYPE_TARGET_TYPE (result_type) = index_type;
+   if (TYPE_STUB (index_type))
      TYPE_TARGET_STUB (result_type) = 1;
    else
      TYPE_LENGTH (result_type) = TYPE_LENGTH (check_typedef (index_type));
 -  TYPE_NFIELDS (result_type) = 2;
-+  TYPE_NFIELDS (result_type) = nfields;
-   TYPE_FIELDS (result_type) = (struct field *)
--    TYPE_ALLOC (result_type, 2 * sizeof (struct field));
--  memset (TYPE_FIELDS (result_type), 0, 2 * sizeof (struct field));
--  TYPE_FIELD_BITPOS (result_type, 0) = low_bound;
--  TYPE_FIELD_BITPOS (result_type, 1) = high_bound;
-+    TYPE_ALLOC (result_type,
-+		TYPE_NFIELDS (result_type) * sizeof (struct field));
-+  memset (TYPE_FIELDS (result_type), 0,
-+	  TYPE_NFIELDS (result_type) * sizeof (struct field));
-+
-+  return (result_type);
-+}
-+
-+/* Simplified CREATE_RANGE_TYPE_NFIELDS for constant ranges from LOW_BOUND to
-+   HIGH_BOUND, inclusive.  TYPE_BYTE_STRIDE is always set to zero (default
-+   native target type length).  */
-+
-+struct type *
-+create_range_type (struct type *result_type, struct type *index_type,
-+		   int low_bound, int high_bound)
-+{
-+  result_type = create_range_type_nfields (result_type, index_type, 2);
-+
-+  TYPE_LOW_BOUND (result_type) = low_bound;
-+  TYPE_HIGH_BOUND (result_type) = high_bound;
++  TYPE_NFIELDS (result_type) = 3;
+   TYPE_FIELDS (result_type) = TYPE_ZALLOC (result_type,
+ 					   TYPE_NFIELDS (result_type)
+ 					   * sizeof (struct field));
+   TYPE_LOW_BOUND (result_type) = low_bound;
+   TYPE_HIGH_BOUND (result_type) = high_bound;
++  TYPE_BYTE_STRIDE (result_type) = 0;
  
    if (low_bound >= 0)
      TYPE_UNSIGNED (result_type) = 1;
- 
--  return (result_type);
-+  return result_type;
- }
- 
- /* Set *LOWP and *HIGHP to the lower and upper bounds of discrete type
-@@ -734,6 +759,9 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
+@@ -727,6 +769,9 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
    switch (TYPE_CODE (type))
      {
      case TYPE_CODE_RANGE:
@@ -1638,8 +1843,19 @@ index 5b9d0e8..f814ce3 100644
        *lowp = TYPE_LOW_BOUND (type);
        *highp = TYPE_HIGH_BOUND (type);
        return 1;
-@@ -816,17 +844,6 @@ create_array_type (struct type *result_type,
+@@ -805,30 +850,65 @@ create_array_type (struct type *result_type,
+ 
+   if (result_type == NULL)
+     {
+-      result_type = alloc_type (TYPE_OBJFILE (range_type));
++      result_type = alloc_type (TYPE_OBJFILE (range_type), range_type);
      }
++  else
++    {
++      /* Callers may only supply storage if there is an objfile.  */
++      gdb_assert (TYPE_OBJFILE (result_type));
++    }
++
    TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
    TYPE_TARGET_TYPE (result_type) = element_type;
 -  if (get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
@@ -1655,9 +1871,9 @@ index 5b9d0e8..f814ce3 100644
 -      TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
    TYPE_NFIELDS (result_type) = 1;
    TYPE_FIELDS (result_type) =
-     (struct field *) TYPE_ALLOC (result_type, sizeof (struct field));
-@@ -834,9 +851,48 @@ create_array_type (struct type *result_type,
-   TYPE_FIELD_TYPE (result_type, 0) = range_type;
+     (struct field *) TYPE_ZALLOC (result_type, sizeof (struct field));
++  /* FIXME: type alloc.  */
+   TYPE_INDEX_TYPE (result_type) = range_type;
    TYPE_VPTR_FIELDNO (result_type) = -1;
  
 -  /* TYPE_FLAG_TARGET_STUB will take care of zero length arrays */
@@ -1707,7 +1923,21 @@ index 5b9d0e8..f814ce3 100644
  
    return (result_type);
  }
-@@ -1380,6 +1436,65 @@ stub_noname_complaint (void)
+@@ -865,7 +945,12 @@ create_set_type (struct type *result_type, struct type *domain_type)
+ {
+   if (result_type == NULL)
+     {
+-      result_type = alloc_type (TYPE_OBJFILE (domain_type));
++      result_type = alloc_type (TYPE_OBJFILE (domain_type), domain_type);
++    }
++  else
++    {
++      /* Callers may only supply storage if there is an objfile.  */
++      gdb_assert (TYPE_OBJFILE (result_type));
+     }
+   TYPE_CODE (result_type) = TYPE_CODE_SET;
+   TYPE_NFIELDS (result_type) = 1;
+@@ -1368,6 +1453,65 @@ stub_noname_complaint (void)
    complaint (&symfile_complaints, _("stub type has NULL name"));
  }
  
@@ -1773,7 +2003,7 @@ index 5b9d0e8..f814ce3 100644
  /* Added by Bryan Boreham, Kewill, Sun Sep 17 18:07:17 1989.
  
     If this is a stubbed struct (i.e. declared as struct foo *), see if
-@@ -1396,7 +1511,8 @@ stub_noname_complaint (void)
+@@ -1384,7 +1528,8 @@ stub_noname_complaint (void)
  /* Find the real type of TYPE.  This function returns the real type,
     after removing all layers of typedefs and completing opaque or stub
     types.  Completion changes the TYPE argument, but stripping of
@@ -1783,73 +2013,32 @@ index 5b9d0e8..f814ce3 100644
  
  struct type *
  check_typedef (struct type *type)
-@@ -1506,34 +1622,87 @@ check_typedef (struct type *type)
+@@ -1420,7 +1565,7 @@ check_typedef (struct type *type)
+ 	  if (sym)
+ 	    TYPE_TARGET_TYPE (type) = SYMBOL_TYPE (sym);
+ 	  else					/* TYPE_CODE_UNDEF */
+-	    TYPE_TARGET_TYPE (type) = alloc_type (NULL);
++	    TYPE_TARGET_TYPE (type) = alloc_type (NULL, NULL);
+ 	}
+       type = TYPE_TARGET_TYPE (type);
+     }
+@@ -1494,34 +1639,37 @@ check_typedef (struct type *type)
          }
      }
  
 -  if (TYPE_TARGET_STUB (type))
-+  if (TYPE_DYNAMIC (type) || (TYPE_CODE (type) == TYPE_CODE_RANGE
-+			      && TYPE_RANGE_HIGH_BOUND_IS_COUNT (type)))
++  /* copy_type_recursive automatically makes the resulting type containing only
++     constant values expected by the callers of this function.  */
++  if (TYPE_DYNAMIC (type))
 +    {
-+      struct type *ntype;
++      htab_t copied_types;
++      struct type *type_old = type;
 +
-+      /* make_cv_type does not copy the contents of TYPE_MAIN_TYPE while we are
-+	 changing fields in it below.  Do a full TYPE_MAIN_TYPE copy.
-+	 Sure FIXME as it is at least a memory leak.  */
++      copied_types = create_copied_types_hash (NULL);
++      type = copy_type_recursive (type, copied_types);
++      htab_delete (copied_types);
 +
-+      ntype = alloc_type (TYPE_OBJFILE (type));
-+      *TYPE_MAIN_TYPE (ntype) = *TYPE_MAIN_TYPE (type);
-+      TYPE_LENGTH (ntype) = TYPE_LENGTH (type);
-+      TYPE_INSTANCE_FLAGS (ntype) = TYPE_INSTANCE_FLAGS (type);
-+      if (TYPE_NFIELDS (type))
-+	{
-+	  size_t size = sizeof (*TYPE_FIELDS (type)) * TYPE_NFIELDS (type);
-+
-+	  if (TYPE_OBJFILE (type))
-+	    TYPE_FIELDS (ntype) = obstack_alloc
-+	      (&TYPE_OBJFILE (type)->objfile_obstack, size);
-+	  else
-+	    TYPE_FIELDS (ntype) = xzalloc (size);
-+	  memcpy (TYPE_FIELDS (ntype), TYPE_FIELDS (type), size);
-+	}
-+      type = ntype;
-+
-+      if (TYPE_CODE (type) == TYPE_CODE_ARRAY
-+	  || TYPE_CODE (type) == TYPE_CODE_STRING)
-+	{
-+	  struct type *range_type;
-+
-+	  gdb_assert (TYPE_NFIELDS (type) == 1);
-+	  range_type = TYPE_INDEX_TYPE (type);
-+	  gdb_assert (TYPE_CODE (range_type) == TYPE_CODE_RANGE);
-+	  TYPE_INDEX_TYPE (type) = check_typedef (range_type);
-+	}
-+      else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
-+	{
-+	  int fieldno;
-+
-+	  /* Evaluate the DWARF ranges and set them statically.  */
-+	  for (fieldno = 0; fieldno < TYPE_NFIELDS (type); fieldno++)
-+	    if (TYPE_RANGE_BOUND_IS_DWARF_BLOCK (type, fieldno))
-+	      {
-+		struct dwarf2_locexpr_baton *dlbaton;
-+		CORE_ADDR val;
-+
-+		dlbaton = TYPE_FIELD_DWARF_BLOCK (type, fieldno);
-+		val = dwarf_locexpr_baton_eval (dlbaton);
-+		TYPE_RANGE_BOUND_UNSET_DWARF_BLOCK (type, fieldno);
-+		TYPE_FIELD_BITPOS (type, fieldno) = val;
-+	      }
-+
-+	  /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT-modified TYPE_HIGH_BOUND
-+	     meanint the count (not the high bound) into a regular bound.  */
-+	  if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
-+	    {
-+	      TYPE_RANGE_HIGH_BOUND_IS_COUNT (type) = 0;
-+	      TYPE_HIGH_BOUND (type) = TYPE_LOW_BOUND (type)
-+				       + TYPE_HIGH_BOUND (type) - 1;
-+	    }
-+	}
++      gdb_assert (TYPE_DYNAMIC (type) == 0);
 +    }
 +
 +  if (!currently_reading_symtab
@@ -1866,7 +2055,7 @@ index 5b9d0e8..f814ce3 100644
  	}
        else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 -	       && TYPE_NFIELDS (type) == 1
--	       && (TYPE_CODE (range_type = TYPE_FIELD_TYPE (type, 0))
+-	       && (TYPE_CODE (range_type = TYPE_INDEX_TYPE (type))
 -		   == TYPE_CODE_RANGE))
 +	       || TYPE_CODE (type) == TYPE_CODE_STRING)
  	{
@@ -1874,8 +2063,8 @@ index 5b9d0e8..f814ce3 100644
 -	     number of elements and the target type's length.
 -	     Watch out for Ada null Ada arrays where the high bound
 -	     is smaller than the low bound.  */
--	  const int low_bound = TYPE_FIELD_BITPOS (range_type, 0);
--	  const int high_bound = TYPE_FIELD_BITPOS (range_type, 1);
+-	  const int low_bound = TYPE_LOW_BOUND (range_type);
+-	  const int high_bound = TYPE_HIGH_BOUND (range_type);
 -	  int nb_elements;
 -	
 -	  if (high_bound < low_bound)
@@ -1889,7 +2078,7 @@ index 5b9d0e8..f814ce3 100644
  	  TYPE_TARGET_STUB (type) = 0;
  	}
        else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
-@@ -1541,9 +1710,12 @@ check_typedef (struct type *type)
+@@ -1529,9 +1677,12 @@ check_typedef (struct type *type)
  	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
  	  TYPE_TARGET_STUB (type) = 0;
  	}
@@ -1902,8 +2091,776 @@ index 5b9d0e8..f814ce3 100644
    return type;
  }
  
+@@ -1753,7 +1904,7 @@ init_type (enum type_code code, int length, int flags,
+ {
+   struct type *type;
+ 
+-  type = alloc_type (objfile);
++  type = alloc_type (objfile, NULL);
+   TYPE_CODE (type) = code;
+   TYPE_LENGTH (type) = length;
+ 
+@@ -1783,15 +1934,24 @@ init_type (enum type_code code, int length, int flags,
+   if (flags & TYPE_FLAG_FIXED_INSTANCE)
+     TYPE_FIXED_INSTANCE (type) = 1;
+ 
+-  if ((name != NULL) && (objfile != NULL))
+-    {
+-      TYPE_NAME (type) = obsavestring (name, strlen (name), 
+-				       &objfile->objfile_obstack);
+-    }
+-  else
+-    {
+-      TYPE_NAME (type) = name;
+-    }
++  if (name)
++    switch ((long) objfile)
++      {
++      case (long) OBJFILE_INTERNAL:
++	TYPE_NAME (type) = name;
++	break;
++      case (long) OBJFILE_MALLOC:
++	TYPE_NAME (type) = xstrdup (name);
++	break;
++#if 0 /* OBJFILE_MALLOC duplication now.  */
++      case (long) NULL:
++	internal_error (__FILE__, __LINE__,
++			_("OBJFILE pointer NULL should be OBJFILE_* instead"));
++#endif
++      default:
++	TYPE_NAME (type) = obsavestring (name, strlen (name), 
++					 &objfile->objfile_obstack);
++      }
+ 
+   /* C++ fancies.  */
+ 
+@@ -1803,6 +1963,10 @@ init_type (enum type_code code, int length, int flags,
+     {
+       INIT_CPLUS_SPECIFIC (type);
+     }
++
++  if (!objfile)
++    type_incref (type);
++
+   return (type);
+ }
+ 
+@@ -2916,33 +3080,47 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
+ }
+ 
+ /* Allocate the hash table used by copy_type_recursive to walk
+-   types without duplicates.  We use OBJFILE's obstack, because
+-   OBJFILE is about to be deleted.  */
++   types without duplicates.   */
+ 
+ htab_t
+ create_copied_types_hash (struct objfile *objfile)
+ {
+-  return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
+-			       NULL, &objfile->objfile_obstack,
+-			       hashtab_obstack_allocate,
+-			       dummy_obstack_deallocate);
++  if (objfile == NULL)
++    {
++      /* NULL OBJFILE is for TYPE_DYNAMIC types already contained in
++	 OBJFILE_MALLOC memory, such as those from VALUE_HISTORY_CHAIN.  Table
++	 element entries get allocated by xmalloc - so use xfree.  */
++      return htab_create (1, type_pair_hash, type_pair_eq, xfree);
++    }
++  else
++    {
++      /* Use OBJFILE's obstack, because OBJFILE is about to be deleted.  Table
++	 element entries get allocated by xmalloc - so use xfree.  */
++      return htab_create_alloc_ex (1, type_pair_hash, type_pair_eq,
++				   xfree, &objfile->objfile_obstack,
++				   hashtab_obstack_allocate,
++				   dummy_obstack_deallocate);
++    }
+ }
+ 
+-/* Recursively copy (deep copy) TYPE, if it is associated with
+-   OBJFILE.  Return a new type allocated using malloc, a saved type if
+-   we have already visited TYPE (using COPIED_TYPES), or TYPE if it is
+-   not associated with OBJFILE.  */
++/* A helper for copy_type_recursive.  This does all the work.
++   REPRESENTATIVE is a pointer to a type.  This is used to register
++   newly-created types in the type_refc_table.  Initially it pointer
++   to a NULL pointer, but it is filled in the first time a type is
++   copied.  OBJFILE is used only for an assertion checking.  */
+ 
+-struct type *
+-copy_type_recursive (struct objfile *objfile, 
+-		     struct type *type,
+-		     htab_t copied_types)
++static struct type *
++copy_type_recursive_1 (struct objfile *objfile, 
++		       struct type *type,
++		       htab_t copied_types,
++		       struct type **representative)
+ {
+   struct type_pair *stored, pair;
+   void **slot;
+   struct type *new_type;
+ 
+-  if (TYPE_OBJFILE (type) == NULL)
++  if (TYPE_OBJFILE (type) == OBJFILE_INTERNAL
++      || (objfile == OBJFILE_MALLOC && !TYPE_DYNAMIC (type)))
+     return type;
+ 
+   /* This type shouldn't be pointing to any types in other objfiles;
+@@ -2954,11 +3132,15 @@ copy_type_recursive (struct objfile *objfile,
+   if (*slot != NULL)
+     return ((struct type_pair *) *slot)->new;
+ 
+-  new_type = alloc_type (NULL);
++  new_type = alloc_type (OBJFILE_MALLOC, *representative);
++  if (!*representative)
++    *representative = new_type;
+ 
+   /* We must add the new type to the hash table immediately, in case
+-     we encounter this type again during a recursive call below.  */
+-  stored = obstack_alloc (&objfile->objfile_obstack, sizeof (struct type_pair));
++     we encounter this type again during a recursive call below.  Memory could
++     be allocated from OBJFILE in the case we will be removing OBJFILE, this
++     optimization is missed and xfree is called for it from COPIED_TYPES.  */
++  stored = xmalloc (sizeof (*stored));
+   stored->old = type;
+   stored->new = new_type;
+   *slot = stored;
+@@ -2968,6 +3150,13 @@ copy_type_recursive (struct objfile *objfile,
+   *TYPE_MAIN_TYPE (new_type) = *TYPE_MAIN_TYPE (type);
+   TYPE_OBJFILE (new_type) = NULL;
+ 
++  /* Pre-clear the fields processed by delete_main_type.  If DWARF block
++     evaluations below call error we would leave an unfreeable TYPE.  */
++  TYPE_TARGET_TYPE (new_type) = NULL;
++  TYPE_VPTR_BASETYPE (new_type) = NULL;
++  TYPE_NFIELDS (new_type) = 0;
++  TYPE_FIELDS (new_type) = NULL;
++
+   if (TYPE_NAME (type))
+     TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
+   if (TYPE_TAG_NAME (type))
+@@ -2976,12 +3165,45 @@ copy_type_recursive (struct objfile *objfile,
+   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
+   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
+ 
++  if (TYPE_ALLOCATED (new_type))
++    {
++      gdb_assert (!TYPE_NOT_ALLOCATED (new_type));
++
++      if (!dwarf_locexpr_baton_eval (TYPE_ALLOCATED (new_type)))
++        TYPE_NOT_ALLOCATED (new_type) = 1;
++      TYPE_ALLOCATED (new_type) = NULL;
++    }
++
++  if (TYPE_ASSOCIATED (new_type))
++    {
++      gdb_assert (!TYPE_NOT_ASSOCIATED (new_type));
++
++      if (!dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (new_type)))
++        TYPE_NOT_ASSOCIATED (new_type) = 1;
++      TYPE_ASSOCIATED (new_type) = NULL;
++    }
++
++  if (!TYPE_DATA_LOCATION_IS_ADDR (new_type)
++      && TYPE_DATA_LOCATION_DWARF_BLOCK (new_type))
++    {
++      if (TYPE_NOT_ALLOCATED (new_type)
++          || TYPE_NOT_ASSOCIATED (new_type))
++	TYPE_DATA_LOCATION_DWARF_BLOCK (new_type) = NULL;
++      else
++	{
++	  TYPE_DATA_LOCATION_IS_ADDR (new_type) = 1;
++	  TYPE_DATA_LOCATION_ADDR (new_type) = dwarf_locexpr_baton_eval
++				    (TYPE_DATA_LOCATION_DWARF_BLOCK (new_type));
++	}
++    }
++
+   /* Copy the fields.  */
+   if (TYPE_NFIELDS (type))
+     {
+       int i, nfields;
+ 
+       nfields = TYPE_NFIELDS (type);
++      TYPE_NFIELDS (new_type) = nfields;
+       TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
+       for (i = 0; i < nfields; i++)
+ 	{
+@@ -2990,8 +3212,8 @@ copy_type_recursive (struct objfile *objfile,
+ 	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
+ 	  if (TYPE_FIELD_TYPE (type, i))
+ 	    TYPE_FIELD_TYPE (new_type, i)
+-	      = copy_type_recursive (objfile, TYPE_FIELD_TYPE (type, i),
+-				     copied_types);
++	      = copy_type_recursive_1 (objfile, TYPE_FIELD_TYPE (type, i),
++				       copied_types, representative);
+ 	  if (TYPE_FIELD_NAME (type, i))
+ 	    TYPE_FIELD_NAME (new_type, i) = 
+ 	      xstrdup (TYPE_FIELD_NAME (type, i));
+@@ -3010,6 +3232,16 @@ copy_type_recursive (struct objfile *objfile,
+ 				  xstrdup (TYPE_FIELD_STATIC_PHYSNAME (type,
+ 								       i)));
+ 	      break;
++	    case FIELD_LOC_KIND_DWARF_BLOCK:
++	      /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
++		 it is expected to be made constant by CHECK_TYPEDEF.  */
++	      if (TYPE_NOT_ALLOCATED (new_type)
++		  || TYPE_NOT_ASSOCIATED (new_type))
++		SET_FIELD_DWARF_BLOCK (TYPE_FIELD (new_type, i), NULL);
++	      else
++		SET_FIELD_BITPOS (TYPE_FIELD (new_type, i),
++		   dwarf_locexpr_baton_eval (TYPE_FIELD_DWARF_BLOCK (type, i)));
++	      break;
+ 	    default:
+ 	      internal_error (__FILE__, __LINE__,
+ 			      _("Unexpected type field location kind: %d"),
+@@ -3018,17 +3250,32 @@ copy_type_recursive (struct objfile *objfile,
+ 	}
+     }
+ 
++  /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
++  if (TYPE_CODE (type) == TYPE_CODE_RANGE
++      && TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
++    {
++      TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
++      TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (type)
++				   + TYPE_HIGH_BOUND (type) - 1;
++    }
++
++  /* Both FIELD_LOC_KIND_DWARF_BLOCK and TYPE_RANGE_HIGH_BOUND_IS_COUNT were
++     possibly converted.  */
++  TYPE_DYNAMIC (new_type) = 0;
++
+   /* Copy pointers to other types.  */
+   if (TYPE_TARGET_TYPE (type))
+     TYPE_TARGET_TYPE (new_type) = 
+-      copy_type_recursive (objfile, 
+-			   TYPE_TARGET_TYPE (type),
+-			   copied_types);
++      copy_type_recursive_1 (objfile, 
++			     TYPE_TARGET_TYPE (type),
++			     copied_types,
++			     representative);
+   if (TYPE_VPTR_BASETYPE (type))
+     TYPE_VPTR_BASETYPE (new_type) = 
+-      copy_type_recursive (objfile,
+-			   TYPE_VPTR_BASETYPE (type),
+-			   copied_types);
++      copy_type_recursive_1 (objfile,
++			     TYPE_VPTR_BASETYPE (type),
++			     copied_types,
++			     representative);
+   /* Maybe copy the type_specific bits.
+ 
+      NOTE drow/2005-12-09: We do not copy the C++-specific bits like
+@@ -3046,6 +3293,20 @@ copy_type_recursive (struct objfile *objfile,
+   return new_type;
+ }
+ 
++/* Recursively copy (deep copy) TYPE.  Return a new type allocated using
++   malloc, a saved type if we have already visited TYPE (using COPIED_TYPES),
++   or TYPE if it is not associated with OBJFILE.  */
++
++struct type *
++copy_type_recursive (struct type *type,
++		     htab_t copied_types)
++{
++  struct type *representative = NULL;
++
++  return copy_type_recursive_1 (TYPE_OBJFILE (type), type, copied_types,
++				&representative);
++}
++
+ /* Make a copy of the given TYPE, except that the pointer & reference
+    types are not preserved.
+    
+@@ -3059,7 +3320,7 @@ copy_type (const struct type *type)
+ 
+   gdb_assert (TYPE_OBJFILE (type) != NULL);
+ 
+-  new_type = alloc_type (TYPE_OBJFILE (type));
++  new_type = alloc_type (TYPE_OBJFILE (type), NULL);
+   TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
+   TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
+   memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
+@@ -3068,6 +3329,242 @@ copy_type (const struct type *type)
+   return new_type;
+ }
+ 
++static void delete_type (struct type *type);
++
++/* A helper for delete_type which deletes a main_type and the things to which
++   it refers.  TYPE is a type whose main_type we wish to destroy.  */
++
++static void
++delete_main_type (struct main_type *main_type)
++{
++  int i;
++  void **slot;
++  struct
++    {
++      struct main_type *main_type;
++    } type_local = { main_type }, *type = &type_local;
++
++  gdb_assert (TYPE_OBJFILE (type) == OBJFILE_MALLOC);
++
++  xfree (TYPE_NAME (type));
++  xfree (TYPE_TAG_NAME (type));
++
++  for (i = 0; i < TYPE_NFIELDS (type); ++i)
++    {
++      xfree (TYPE_FIELD_NAME (type, i));
++
++      if (TYPE_FIELD_LOC_KIND (type, i) == FIELD_LOC_KIND_PHYSNAME)
++	xfree (TYPE_FIELD_STATIC_PHYSNAME (type, i));
++    }
++  xfree (TYPE_FIELDS (type));
++
++  /* Strangely, HAVE_CPLUS_STRUCT will return true when there isn't
++     one at all.  */
++  gdb_assert (!HAVE_CPLUS_STRUCT (type) || !TYPE_CPLUS_SPECIFIC (type));
++
++  xfree (TYPE_MAIN_TYPE (type));
++}
++
++/* Store `struct main_type *' entries which got `struct type *' deleted.  */
++
++static htab_t deleted_main_types_hash;
++
++/* To be called before any call of delete_type.  */
++
++static void
++delete_type_begin (void)
++{
++  gdb_assert (deleted_main_types_hash == NULL);
++
++  deleted_main_types_hash = htab_create_alloc (10, htab_hash_pointer,
++			    htab_eq_pointer, NULL, xcalloc, xfree);
++}
++
++/* Helper for delete_type_finish.  */
++
++static int
++delete_type_finish_traverse (void **slot, void *unused)
++{
++  struct main_type *main_type = *slot;
++
++  delete_main_type (main_type);
++
++  return 1;
++}
++
++/* To be called after all the calls of delete_type.  Each MAIN_TYPE must have
++   either none or all of its TYPE entries deleted.  */
++
++static void
++delete_type_finish (void)
++{
++  htab_traverse (deleted_main_types_hash, delete_type_finish_traverse, NULL);
++
++  htab_delete (deleted_main_types_hash);
++  deleted_main_types_hash = NULL;
++}
++
++/* Delete TYPE and remember MAIN_TYPE it references.  TYPE must have been
++   allocated using xmalloc -- not using an objfile.  You must wrap calls of
++   this function by delete_type_begin and delete_type_finish.  */
++
++static void
++delete_type (struct type *type)
++{
++  void **slot;
++
++  if (!type)
++    return;
++
++  if (TYPE_OBJFILE (type) == OBJFILE_INTERNAL)
++    return;
++  gdb_assert (TYPE_OBJFILE (type) == OBJFILE_MALLOC);
++
++  slot = htab_find_slot (deleted_main_types_hash, TYPE_MAIN_TYPE (type),
++			 INSERT);
++  gdb_assert (!*slot);
++  *slot = TYPE_MAIN_TYPE (type);
++
++  xfree (type);
++}
++
++/* Hash function for type_refc_table.  */
++
++static hashval_t
++type_refc_hash (const void *p)
++{
++  const struct type_refc_entry *entry = p;
++  return htab_hash_pointer (entry->type);
++}
++
++/* Equality function for type_refc_table.  */
++
++static int
++type_refc_equal (const void *a, const void *b)
++{
++  const struct type_refc_entry *left = a;
++  const struct type_refc_entry *right = b;
++  return left->type == right->type;
++}
++
++/* Insert the new type NEW_TYPE into the table.  Does nothing if
++   NEW_TYPE has an objfile.  If PARENT_TYPE is not NULL, then NEW_TYPE
++   will be inserted into the same hierarchy as PARENT_TYPE.  In this
++   case, PARENT_TYPE must already exist in the reference count map.
++   If PARENT_TYPE is NULL, a new reference count is allocated and set
++   to one.  */
++
++static void
++type_init_refc (struct type *new_type, struct type *parent_type)
++{
++  int *refc;
++  void **slot;
++  struct type_refc_entry *new_entry;
++
++  if (TYPE_OBJFILE (new_type))
++    return;
++
++  if (parent_type)
++    {
++      struct type_refc_entry entry, *found;
++      entry.type = parent_type;
++      found = htab_find (type_refc_table, &entry);
++      gdb_assert (found);
++      refc = found->refc;
++    }
++  else
++    {
++      refc = xmalloc (sizeof (int));
++      *refc = 0;
++    }
++
++  new_entry = XNEW (struct type_refc_entry);
++  new_entry->type = new_type;
++  new_entry->refc = refc;
++
++  slot = htab_find_slot (type_refc_table, new_entry, INSERT);
++  gdb_assert (!*slot);
++  *slot = new_entry;
++}
++
++/* Increment the reference count for TYPE.  */
++
++void
++type_incref (struct type *type)
++{
++  struct type_refc_entry entry, *found;
++
++  if (TYPE_OBJFILE (type))
++    return;
++
++  entry.type = type;
++  found = htab_find (type_refc_table, &entry);
++  gdb_assert (found);
++  ++*(found->refc);
++}
++
++/* A traverse callback for type_refc_table which removes any entry
++   whose reference count pointer is REFC.  REFC may be NULL to delete all the
++   unused entries - use such cleanup only in the GDB idle state as GDB code
++   does not necessarily reference county TYPEs during its processing.  */
++
++static int
++type_refc_remove (void **slot, void *refc)
++{
++  struct type_refc_entry *entry = *slot;
++
++  if (entry->refc == refc || (refc == NULL && *entry->refc == 0))
++    {
++      delete_type (entry->type);
++
++      xfree (entry);
++      htab_clear_slot (type_refc_table, slot);
++    }
++
++  return 1;
++}
++
++/* Decrement the reference count for TYPE.  If TYPE has no more
++   references, delete it.  */
++
++void
++type_decref (struct type *type)
++{
++  struct type_refc_entry entry, *found;
++
++  if (TYPE_OBJFILE (type))
++    return;
++
++  entry.type = type;
++  found = htab_find (type_refc_table, &entry);
++  gdb_assert (found);
++  --*(found->refc);
++  if (*(found->refc) == 0)
++    {
++      void *refc = found->refc;
++
++      /* Clear all table entries referring to this count.  CHECK: Should not be
++         the deletion delayed till free_all_types?  */
++      delete_type_begin ();
++      htab_traverse (type_refc_table, type_refc_remove, refc);
++      delete_type_finish ();
++
++      /* Delete the reference count itself.  */
++      xfree (refc);
++    }
++}
++
++/* Free all the types that have been allocated (except for those released).
++   Called after each command, successful or not.  */
++
++void
++free_all_types (void)
++{
++  delete_type_begin ();
++  htab_traverse (type_refc_table, type_refc_remove, NULL);
++  delete_type_finish ();
++}
++
+ static struct type *
+ build_flt (int bit, char *name, const struct floatformat **floatformats)
+ {
+@@ -3105,7 +3602,7 @@ build_complex (int bit, char *name, struct type *target_type)
+       return builtin_type_error;
+     }
+   t = init_type (TYPE_CODE_COMPLEX, 2 * bit / TARGET_CHAR_BIT,
+-		 0, name, (struct objfile *) NULL);
++		 0, name, OBJFILE_INTERNAL);
+   TYPE_TARGET_TYPE (t) = target_type;
+   return t;
+ }
+@@ -3119,56 +3616,56 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
+   builtin_type->builtin_void =
+     init_type (TYPE_CODE_VOID, 1,
+ 	       0,
+-	       "void", (struct objfile *) NULL);
++	       "void", OBJFILE_INTERNAL);
+   builtin_type->builtin_char =
+     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       (TYPE_FLAG_NOSIGN
+                 | (gdbarch_char_signed (gdbarch) ? 0 : TYPE_FLAG_UNSIGNED)),
+-	       "char", (struct objfile *) NULL);
++	       "char", OBJFILE_INTERNAL);
+   builtin_type->builtin_signed_char =
+     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       0,
+-	       "signed char", (struct objfile *) NULL);
++	       "signed char", OBJFILE_INTERNAL);
+   builtin_type->builtin_unsigned_char =
+     init_type (TYPE_CODE_INT, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "unsigned char", (struct objfile *) NULL);
++	       "unsigned char", OBJFILE_INTERNAL);
+   builtin_type->builtin_short =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
+-	       0, "short", (struct objfile *) NULL);
++	       0, "short", OBJFILE_INTERNAL);
+   builtin_type->builtin_unsigned_short =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED, "unsigned short", 
+-	       (struct objfile *) NULL);
++	       OBJFILE_INTERNAL);
+   builtin_type->builtin_int =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+-	       0, "int", (struct objfile *) NULL);
++	       0, "int", OBJFILE_INTERNAL);
+   builtin_type->builtin_unsigned_int =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED, "unsigned int", 
+-	       (struct objfile *) NULL);
++	       OBJFILE_INTERNAL);
+   builtin_type->builtin_long =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+-	       0, "long", (struct objfile *) NULL);
++	       0, "long", OBJFILE_INTERNAL);
+   builtin_type->builtin_unsigned_long =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED, "unsigned long", 
+-	       (struct objfile *) NULL);
++	       OBJFILE_INTERNAL);
+   builtin_type->builtin_long_long =
+     init_type (TYPE_CODE_INT,
+ 	       gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
+-	       0, "long long", (struct objfile *) NULL);
++	       0, "long long", OBJFILE_INTERNAL);
+   builtin_type->builtin_unsigned_long_long =
+     init_type (TYPE_CODE_INT,
+ 	       gdbarch_long_long_bit (gdbarch) / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED, "unsigned long long", 
+-	       (struct objfile *) NULL);
++	       OBJFILE_INTERNAL);
+   builtin_type->builtin_float
+     = build_flt (gdbarch_float_bit (gdbarch), "float",
+ 		 gdbarch_float_format (gdbarch));
+@@ -3187,26 +3684,26 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
+   builtin_type->builtin_string =
+     init_type (TYPE_CODE_STRING, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       0,
+-	       "string", (struct objfile *) NULL);
++	       "string", OBJFILE_INTERNAL);
+   builtin_type->builtin_bool =
+     init_type (TYPE_CODE_BOOL, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       0,
+-	       "bool", (struct objfile *) NULL);
++	       "bool", OBJFILE_INTERNAL);
+ 
+   /* The following three are about decimal floating point types, which
+      are 32-bits, 64-bits and 128-bits respectively.  */
+   builtin_type->builtin_decfloat
+     = init_type (TYPE_CODE_DECFLOAT, 32 / 8,
+ 	        0,
+-	       "_Decimal32", (struct objfile *) NULL);
++	       "_Decimal32", OBJFILE_INTERNAL);
+   builtin_type->builtin_decdouble
+     = init_type (TYPE_CODE_DECFLOAT, 64 / 8,
+ 	       0,
+-	       "_Decimal64", (struct objfile *) NULL);
++	       "_Decimal64", OBJFILE_INTERNAL);
+   builtin_type->builtin_declong
+     = init_type (TYPE_CODE_DECFLOAT, 128 / 8,
+ 	       0,
+-	       "_Decimal128", (struct objfile *) NULL);
++	       "_Decimal128", OBJFILE_INTERNAL);
+ 
+   /* Pointer/Address types.  */
+ 
+@@ -3245,27 +3742,28 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_addr_bit (gdbarch) / 8,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "__CORE_ADDR", (struct objfile *) NULL);
++	       "__CORE_ADDR", OBJFILE_INTERNAL);
+ 
+ 
+   /* The following set of types is used for symbols with no
+      debug information.  */
+   builtin_type->nodebug_text_symbol =
+     init_type (TYPE_CODE_FUNC, 1, 0, 
+-	       "<text variable, no debug info>", NULL);
++	       "<text variable, no debug info>", OBJFILE_INTERNAL);
+   TYPE_TARGET_TYPE (builtin_type->nodebug_text_symbol) =
+     builtin_type->builtin_int;
+   builtin_type->nodebug_data_symbol =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
+-	       "<data variable, no debug info>", NULL);
++	       "<data variable, no debug info>", OBJFILE_INTERNAL);
+   builtin_type->nodebug_unknown_symbol =
+     init_type (TYPE_CODE_INT, 1, 0,
+-	       "<variable (not text or data), no debug info>", NULL);
++	       "<variable (not text or data), no debug info>",
++	       OBJFILE_INTERNAL);
+   builtin_type->nodebug_tls_symbol =
+     init_type (TYPE_CODE_INT, 
+ 	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
+-	       "<thread local variable, no debug info>", NULL);
++	       "<thread local variable, no debug info>", OBJFILE_INTERNAL);
+ 
+   return builtin_type;
+ }
+@@ -3276,6 +3774,9 @@ _initialize_gdbtypes (void)
+ {
+   gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
+ 
++  type_refc_table = htab_create_alloc (20, type_refc_hash, type_refc_equal,
++				       NULL, xcalloc, xfree);
++
+   /* FIXME: The following types are architecture-neutral.  However,
+      they contain pointer_type and reference_type fields potentially
+      caching pointer or reference types that *are* architecture
+@@ -3284,47 +3785,47 @@ _initialize_gdbtypes (void)
+   builtin_type_int0 =
+     init_type (TYPE_CODE_INT, 0 / 8,
+ 	       0,
+-	       "int0_t", (struct objfile *) NULL);
++	       "int0_t", OBJFILE_INTERNAL);
+   builtin_type_int8 =
+     init_type (TYPE_CODE_INT, 8 / 8,
+ 	       TYPE_FLAG_NOTTEXT,
+-	       "int8_t", (struct objfile *) NULL);
++	       "int8_t", OBJFILE_INTERNAL);
+   builtin_type_uint8 =
+     init_type (TYPE_CODE_INT, 8 / 8,
+ 	       TYPE_FLAG_UNSIGNED | TYPE_FLAG_NOTTEXT,
+-	       "uint8_t", (struct objfile *) NULL);
++	       "uint8_t", OBJFILE_INTERNAL);
+   builtin_type_int16 =
+     init_type (TYPE_CODE_INT, 16 / 8,
+ 	       0,
+-	       "int16_t", (struct objfile *) NULL);
++	       "int16_t", OBJFILE_INTERNAL);
+   builtin_type_uint16 =
+     init_type (TYPE_CODE_INT, 16 / 8,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "uint16_t", (struct objfile *) NULL);
++	       "uint16_t", OBJFILE_INTERNAL);
+   builtin_type_int32 =
+     init_type (TYPE_CODE_INT, 32 / 8,
+ 	       0,
+-	       "int32_t", (struct objfile *) NULL);
++	       "int32_t", OBJFILE_INTERNAL);
+   builtin_type_uint32 =
+     init_type (TYPE_CODE_INT, 32 / 8,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "uint32_t", (struct objfile *) NULL);
++	       "uint32_t", OBJFILE_INTERNAL);
+   builtin_type_int64 =
+     init_type (TYPE_CODE_INT, 64 / 8,
+ 	       0,
+-	       "int64_t", (struct objfile *) NULL);
++	       "int64_t", OBJFILE_INTERNAL);
+   builtin_type_uint64 =
+     init_type (TYPE_CODE_INT, 64 / 8,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "uint64_t", (struct objfile *) NULL);
++	       "uint64_t", OBJFILE_INTERNAL);
+   builtin_type_int128 =
+     init_type (TYPE_CODE_INT, 128 / 8,
+ 	       0,
+-	       "int128_t", (struct objfile *) NULL);
++	       "int128_t", OBJFILE_INTERNAL);
+   builtin_type_uint128 =
+     init_type (TYPE_CODE_INT, 128 / 8,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "uint128_t", (struct objfile *) NULL);
++	       "uint128_t", OBJFILE_INTERNAL);
+ 
+   builtin_type_ieee_single =
+     build_flt (-1, "builtin_type_ieee_single", floatformats_ieee_single);
+@@ -3344,15 +3845,15 @@ _initialize_gdbtypes (void)
+   builtin_type_void =
+     init_type (TYPE_CODE_VOID, 1,
+ 	       0,
+-	       "void", (struct objfile *) NULL);
++	       "void", OBJFILE_INTERNAL);
+   builtin_type_true_char =
+     init_type (TYPE_CODE_CHAR, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       0,
+-	       "true character", (struct objfile *) NULL);
++	       "true character", OBJFILE_INTERNAL);
+   builtin_type_true_unsigned_char =
+     init_type (TYPE_CODE_CHAR, TARGET_CHAR_BIT / TARGET_CHAR_BIT,
+ 	       TYPE_FLAG_UNSIGNED,
+-	       "true character", (struct objfile *) NULL);
++	       "true character", OBJFILE_INTERNAL);
+ 
+   add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
+ Set debugging of C++ overloading."), _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 333eb31..a925dac 100644
+index c90b6d7..86df022 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -209,6 +209,11 @@ enum type_instance_flag_value
@@ -1911,39 +2868,84 @@ index 333eb31..a925dac 100644
  #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
  
 +/* Type needs to be evaluated on each CHECK_TYPEDEF and its results must not be
-+   sticky.  Used for TYPE_RANGE_BOUND_IS_DWARF_BLOCK.  */
++   sticky.  */
 +
 +#define TYPE_DYNAMIC(t)		(TYPE_MAIN_TYPE (t)->flag_dynamic)
 +
  /* Static type.  If this is set, the corresponding type had 
   * a static modifier.
   * Note: This may be unnecessary, since static data members
-@@ -352,6 +357,8 @@ struct main_type
+@@ -266,6 +271,36 @@ enum type_instance_flag_value
+ 
+ #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
+ 
++/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
++
++#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
++  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
++
++/* Not allocated.  TYPE_ALLOCATED(t) must be NULL in such case.  If this flag
++   is unset and TYPE_ALLOCATED(t) is NULL then the type is allocated.  If this
++   flag is unset and TYPE_ALLOCATED(t) is not NULL then its DWARF block
++   determines the actual allocation state.  */
++
++#define TYPE_NOT_ALLOCATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_allocated)
++
++/* Not associated.  TYPE_ASSOCIATED(t) must be NULL in such case.  If this flag
++   is unset and TYPE_ASSOCIATED(t) is NULL then the type is associated.  If
++   this flag is unset and TYPE_ASSOCIATED(t) is not NULL then its DWARF block
++   determines the actual association state.  */
++
++#define TYPE_NOT_ASSOCIATED(t)	(TYPE_MAIN_TYPE (t)->flag_not_associated)
++
++/* Address of the actual data as for DW_AT_data_location.  Its dwarf block must
++   not be evaluated unless both TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are
++   false.  If TYPE_DATA_LOCATION_IS_ADDR set then TYPE_DATA_LOCATION_ADDR value
++   is the actual data address value.  If unset and
++   TYPE_DATA_LOCATION_DWARF_BLOCK is NULL then the value is the normal
++   VALUE_ADDRESS copy.  If unset and TYPE_DATA_LOCATION_DWARF_BLOCK is not NULL
++   then its DWARF block determines the actual data address.  */
++
++#define TYPE_DATA_LOCATION_IS_ADDR(t) \
++  (TYPE_MAIN_TYPE (t)->flag_data_location_is_addr)
++
+ /* Constant type.  If this is set, the corresponding type has a
+  * const modifier.
+  */
+@@ -352,6 +387,11 @@ struct main_type
    unsigned int flag_stub_supported : 1;
    unsigned int flag_nottext : 1;
    unsigned int flag_fixed_instance : 1;
 +  unsigned int flag_dynamic : 1;
 +  unsigned int flag_range_high_bound_is_count : 1;
++  unsigned int flag_not_allocated : 1;
++  unsigned int flag_not_associated : 1;
++  unsigned int flag_data_location_is_addr : 1;
  
    /* Number of fields described for this type.  This field appears at
       this location because it packs nicely here.  */
-@@ -414,6 +421,15 @@ struct main_type
+@@ -414,6 +454,20 @@ struct main_type
  
    struct type *target_type;
  
-+  /* For DW_AT_data_location.  FIXME: Support also its constant form.  */
-+  struct dwarf2_locexpr_baton *data_location;
++  /* For DW_AT_data_location.  */
++  union
++    {
++      struct dwarf2_locexpr_baton *dwarf_block;
++      CORE_ADDR addr;
++    }
++  data_location;
 +
-+  /* For DW_AT_allocated.  FIXME: Support also its constant form.  */
++  /* For DW_AT_allocated.  */
 +  struct dwarf2_locexpr_baton *allocated;
 +
-+  /* For DW_AT_associated.  FIXME: Support also its constant form.  */
++  /* For DW_AT_associated.  */
 +  struct dwarf2_locexpr_baton *associated;
 +
    /* For structure and union types, a description of each field.
       For set and pascal array types, there is one "field",
       whose type is the domain type of the set or array.
-@@ -795,9 +811,9 @@ extern void allocate_cplus_struct_type (struct type *);
+@@ -795,9 +849,9 @@ extern void allocate_cplus_struct_type (struct type *);
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -1956,41 +2958,32 @@ index 333eb31..a925dac 100644
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  #define TYPE_OBJFILE(thistype) TYPE_MAIN_TYPE(thistype)->objfile
-@@ -807,23 +823,53 @@ extern void allocate_cplus_struct_type (struct type *);
+@@ -807,23 +861,44 @@ extern void allocate_cplus_struct_type (struct type *);
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->fields
  #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
-+#define TYPE_DATA_LOCATION(thistype) TYPE_MAIN_TYPE (thistype)->data_location
++#define TYPE_DATA_LOCATION_DWARF_BLOCK(thistype) TYPE_MAIN_TYPE (thistype)->data_location.dwarf_block
++#define TYPE_DATA_LOCATION_ADDR(thistype) TYPE_MAIN_TYPE (thistype)->data_location.addr
 +#define TYPE_ALLOCATED(thistype) TYPE_MAIN_TYPE (thistype)->allocated
 +#define TYPE_ASSOCIATED(thistype) TYPE_MAIN_TYPE (thistype)->associated
  
  #define TYPE_INDEX_TYPE(type) TYPE_FIELD_TYPE (type, 0)
-+/* `TYPE_NFIELDS (range_type) >= 3' check is required before accessing it:  */
-+#define SET_TYPE_BYTE_STRIDE(range_type, n) \
-+  (TYPE_FIELD_BITPOS (range_type, 2) = (n))
  #define TYPE_LOW_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 0)
  #define TYPE_HIGH_BOUND(range_type) TYPE_FIELD_BITPOS (range_type, 1)
 -
 -/* Moto-specific stuff for FORTRAN arrays */
 -
 -#define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
--   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),1))
-+#define TYPE_BYTE_STRIDE(range_type) \
-+  (TYPE_NFIELDS (range_type) < 3 ? 0 : TYPE_FIELD_BITPOS (range_type, 2))
+-   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),1))
++#define TYPE_BYTE_STRIDE(range_type) TYPE_FIELD_BITPOS (range_type, 2)
 +
 +/* Whether we should use TYPE_FIELD_DWARF_BLOCK (and not TYPE_FIELD_BITPOS).  */
 +#define TYPE_RANGE_BOUND_IS_DWARF_BLOCK(range_type, fieldno) \
 +  (TYPE_FIELD_LOC_KIND (range_type, fieldno) == FIELD_LOC_KIND_DWARF_BLOCK)
 +#define TYPE_RANGE_BOUND_SET_DWARF_BLOCK(range_type, fieldno) \
 +  (TYPE_FIELD_LOC_KIND (range_type, fieldno) = FIELD_LOC_KIND_DWARF_BLOCK)
-+#define TYPE_RANGE_BOUND_UNSET_DWARF_BLOCK(range_type, fieldno) \
-+  (TYPE_FIELD_LOC_KIND (range_type, fieldno) = FIELD_LOC_KIND_BITPOS)
 +#define TYPE_ARRAY_BOUND_IS_DWARF_BLOCK(array_type, fieldno) \
 +  TYPE_RANGE_BOUND_IS_DWARF_BLOCK (TYPE_INDEX_TYPE (array_type), fieldno)
-+
-+/* Is HIGH_BOUND a low-bound relative count (1) or the high bound itself (0)?  */
-+#define TYPE_RANGE_HIGH_BOUND_IS_COUNT(range_type) \
-+  (TYPE_MAIN_TYPE (range_type)->flag_range_high_bound_is_count)
 +
 +/* Unbound arrays, such as GCC array[]; at end of struct.  */
 +#define TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED(rangetype) \
@@ -1998,39 +2991,75 @@ index 333eb31..a925dac 100644
 +#define TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED(rangetype) \
 +   TYPE_FIELD_ARTIFICIAL((rangetype),1)
  #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
--   (TYPE_FIELD_ARTIFICIAL((TYPE_FIELD_TYPE((arraytype),0)),0))
+-   (TYPE_FIELD_ARTIFICIAL(TYPE_INDEX_TYPE((arraytype)),0))
 -
 -#define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
--   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),1))
+-   (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
 +   TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (TYPE_INDEX_TYPE (arraytype))
 +#define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
 +   TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (TYPE_INDEX_TYPE (arraytype))
  
  #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
--   (TYPE_FIELD_BITPOS((TYPE_FIELD_TYPE((arraytype),0)),0))
+-   (TYPE_LOW_BOUND(TYPE_INDEX_TYPE((arraytype))))
 +  TYPE_LOW_BOUND (TYPE_INDEX_TYPE (arraytype))
 +#define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
 +  TYPE_HIGH_BOUND (TYPE_INDEX_TYPE (arraytype))
 +/* TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) with a fallback to the
 +   element size if no specific stride value is known.  */
 +#define TYPE_ARRAY_BYTE_STRIDE_VALUE(arraytype)		\
-+  (TYPE_NFIELDS (TYPE_INDEX_TYPE (arraytype)) < 2	\
++  (TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)) == 0	\
 +   ? TYPE_LENGTH (TYPE_TARGET_TYPE (arraytype))		\
 +   : TYPE_BYTE_STRIDE (TYPE_INDEX_TYPE (arraytype)))
  
  /* C++ */
  
-@@ -1162,12 +1208,26 @@ extern struct type *make_function_type (struct type *, struct type **);
+@@ -1078,6 +1153,16 @@ extern struct type *builtin_type_error;
+    (TYPE_UNSIGNED(t) ? UMIN_OF_SIZE(TYPE_LENGTH(t)) \
+     : MIN_OF_SIZE(TYPE_LENGTH(t)))
  
- extern struct type *lookup_function_type (struct type *);
- 
-+extern struct type *create_range_type_nfields (struct type *result_type,
-+					       struct type *index_type,
-+					       int nfields);
++/* Virtual OBJFILE used for builtin types.  */
++#define OBJFILE_INTERNAL ((struct objfile *) 1L)
 +
- extern struct type *create_range_type (struct type *, struct type *, int,
- 				       int);
++/* Virtual OBJFILE used for types allocated by malloc.  FIXME: Currently
++   backward compatible with the old NULL value; fix then also init_type.  */
++#define OBJFILE_MALLOC ((struct objfile *) 0L)
++
++#define OBJFILE_IS_VIRTUAL(objfile) ((objfile) == OBJFILE_INTERNAL	\
++				     || (objfile) == OBJFILE_MALLOC)
++
+ /* Allocate space for storing data associated with a particular type.
+    We ensure that the space is allocated using the same mechanism that
+    was used to allocate the space for the type structure itself.  I.E.
+@@ -1087,18 +1172,18 @@ extern struct type *builtin_type_error;
+    builtin types), then the data space will be allocated with xmalloc,
+    the same as for the type structure. */
  
+-#define TYPE_ALLOC(t,size)  \
+-   (TYPE_OBJFILE (t) != NULL  \
+-    ? obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size) \
+-    : xmalloc (size))
++#define TYPE_ALLOC(t,size)						\
++   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
++    ? xmalloc (size)							\
++    : obstack_alloc (&TYPE_OBJFILE (t) -> objfile_obstack, size))
+ 
+-#define TYPE_ZALLOC(t,size)  \
+-   (TYPE_OBJFILE (t) != NULL  \
+-    ? memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),  \
+-	      0, size)  \
+-    : xzalloc (size))
++#define TYPE_ZALLOC(t,size)						\
++   (OBJFILE_IS_VIRTUAL (TYPE_OBJFILE (t))				\
++    ? xzalloc (size)							\
++    : memset (obstack_alloc (&TYPE_OBJFILE (t)->objfile_obstack, size),	\
++	      0, size))
+ 
+-extern struct type *alloc_type (struct objfile *);
++extern struct type *alloc_type (struct objfile *, struct type *);
+ 
+ extern struct type *init_type (enum type_code, int, int, char *,
+ 			       struct objfile *);
+@@ -1172,6 +1257,16 @@ extern struct type *create_range_type (struct type *, struct type *, int,
  extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  
@@ -2047,19 +3076,67 @@ index 333eb31..a925dac 100644
  extern struct type *create_string_type (struct type *, struct type *);
  
  extern struct type *create_set_type (struct type *, struct type *);
+@@ -1263,10 +1358,15 @@ extern void maintenance_print_type (char *, int);
+ 
+ extern htab_t create_copied_types_hash (struct objfile *objfile);
+ 
+-extern struct type *copy_type_recursive (struct objfile *objfile,
+-					 struct type *type,
++extern struct type *copy_type_recursive (struct type *type,
+ 					 htab_t copied_types);
+ 
+ extern struct type *copy_type (const struct type *type);
+ 
++extern void type_incref (struct type *type);
++
++extern void type_decref (struct type *type);
++
++extern void free_all_types (void);
++
+ #endif /* GDBTYPES_H */
+diff --git a/gdb/jv-lang.c b/gdb/jv-lang.c
+index 0728866..cc82cb4 100644
+--- a/gdb/jv-lang.c
++++ b/gdb/jv-lang.c
+@@ -302,7 +302,7 @@ type_from_class (struct value *clas)
+   if (type != NULL)
+     return type;
+ 
+-  type = alloc_type (objfile);
++  type = alloc_type (objfile, NULL);
+   TYPE_CODE (type) = TYPE_CODE_STRUCT;
+   INIT_CPLUS_SPECIFIC (type);
+ 
+diff --git a/gdb/mdebugread.c b/gdb/mdebugread.c
+index 7cbcc59..e507c3b 100644
+--- a/gdb/mdebugread.c
++++ b/gdb/mdebugread.c
+@@ -4696,7 +4696,7 @@ new_type (char *name)
+ {
+   struct type *t;
+ 
+-  t = alloc_type (current_objfile);
++  t = alloc_type (current_objfile, NULL);
+   TYPE_NAME (t) = name;
+   TYPE_CPLUS_SPECIFIC (t) = (struct cplus_struct_type *) &cplus_struct_default;
+   return t;
+diff --git a/gdb/mi/mi-main.c b/gdb/mi/mi-main.c
+index b905a9e..83c6b48 100644
+--- a/gdb/mi/mi-main.c
++++ b/gdb/mi/mi-main.c
+@@ -1317,6 +1317,7 @@ mi_cmd_execute (struct mi_parse *parse)
+   struct cleanup *cleanup;
+   int i;
+   free_all_values ();
++  free_all_types ();
+ 
+   current_token = xstrdup (parse->token);
+   cleanup = make_cleanup (free_current_contents, &current_token);
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
-index 6d6b915..2ab5a56 100644
+index a51ba68..55a39f5 100644
 --- a/gdb/printcmd.c
 +++ b/gdb/printcmd.c
-@@ -43,6 +43,7 @@
- #include "disasm.h"
- #include "dfp.h"
- #include "valprint.h"
-+#include "exceptions.h"
- 
- #ifdef TUI
- #include "tui/tui.h"		/* For tui_active et.al.   */
-@@ -876,6 +877,11 @@ print_command_1 (char *exp, int inspect, int voidprint)
+@@ -878,6 +878,11 @@ print_command_1 (char *exp, int inspect, int voidprint)
    else
      val = access_value_history (0);
  
@@ -2071,68 +3148,608 @@ index 6d6b915..2ab5a56 100644
    if (voidprint || (val && value_type (val) &&
  		    TYPE_CODE (value_type (val)) != TYPE_CODE_VOID))
      {
-@@ -1731,17 +1737,30 @@ disable_display_command (char *args, int from_tty)
- 
+diff --git a/gdb/stabsread.c b/gdb/stabsread.c
+index 3457784..976a5a7 100644
+--- a/gdb/stabsread.c
++++ b/gdb/stabsread.c
+@@ -322,7 +322,7 @@ dbx_alloc_type (int typenums[2], struct objfile *objfile)
  
- /* Print the value in stack frame FRAME of a variable specified by a
--   struct symbol.  */
-+   struct symbol.  Printed value gets terminated by a newline.  */
- 
- void
--print_variable_value (struct symbol *var, struct frame_info *frame,
--		      struct ui_file *stream)
-+print_variable_value_nl (struct symbol *var, struct frame_info *frame,
-+			 struct ui_file *stream)
- {
--  struct value *val = read_var_value (var, frame);
--  struct value_print_options opts;
-+  struct value *val = NULL;	/* A false GCC warning.  */
-+  struct gdb_exception e;
- 
--  get_user_print_options (&opts);
--  value_print (val, stream, &opts);
-+  TRY_CATCH (e, RETURN_MASK_ERROR)
-+    {
-+      val = read_var_value (var, frame);
-+    }
-+  if (e.reason < 0)
-+    exception_print (stream, e);
-+  else
-+    {
-+      struct value_print_options opts;
-+
-+      get_user_print_options (&opts);
-+      value_print (val, stream, &opts);
-+
-+      fputc_filtered ('\n', stream);
-+    }
- }
- 
- static void
-diff --git a/gdb/stack.c b/gdb/stack.c
-index 3c1019b..79afba4 100644
---- a/gdb/stack.c
-+++ b/gdb/stack.c
-@@ -1378,8 +1378,7 @@ print_block_frame_locals (struct block *b, struct frame_info *frame,
- 	    fputs_filtered ("\t", stream);
- 	  fputs_filtered (SYMBOL_PRINT_NAME (sym), stream);
- 	  fputs_filtered (" = ", stream);
--	  print_variable_value (sym, frame, stream);
--	  fprintf_filtered (stream, "\n");
-+	  print_variable_value_nl (sym, frame, stream);
- 	  break;
- 
- 	default:
-@@ -1591,8 +1590,7 @@ print_frame_arg_vars (struct frame_info *frame, struct ui_file *stream)
- 
- 	  sym2 = lookup_symbol (SYMBOL_LINKAGE_NAME (sym),
- 				b, VAR_DOMAIN, NULL);
--	  print_variable_value (sym2, frame, stream);
--	  fprintf_filtered (stream, "\n");
-+	  print_variable_value_nl (sym2, frame, stream);
- 	}
+   if (typenums[0] == -1)
+     {
+-      return (alloc_type (objfile));
++      return (alloc_type (objfile, NULL));
      }
  
+   type_addr = dbx_lookup_type (typenums);
+@@ -332,7 +332,7 @@ dbx_alloc_type (int typenums[2], struct objfile *objfile)
+      We will fill it in later if we find out how.  */
+   if (*type_addr == 0)
+     {
+-      *type_addr = alloc_type (objfile);
++      *type_addr = alloc_type (objfile, NULL);
+     }
+ 
+   return (*type_addr);
+diff --git a/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S b/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S
+new file mode 100644
+index 0000000..66f7a39
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S
+@@ -0,0 +1,455 @@
++	.file	"x86_64-vla-typedef.c"
++	.section	.debug_abbrev,"",@progbits
++.Ldebug_abbrev0:
++	.section	.debug_info,"",@progbits
++.Ldebug_info0:
++	.section	.debug_line,"",@progbits
++.Ldebug_line0:
++	.text
++.Ltext0:
++.globl foo
++	.type	foo, @function
++foo:
++.LFB2:
++	.file 1 "x86_64-vla-typedef.c"
++	.loc 1 22 0
++	pushq	%rbp
++.LCFI0:
++	movq	%rsp, %rbp
++.LCFI1:
++	subq	$64, %rsp
++.LCFI2:
++	movl	%edi, -36(%rbp)
++	.loc 1 22 0
++	movq	%rsp, %rax
++	movq	%rax, -48(%rbp)
++	.loc 1 23 0
++	movl	-36(%rbp), %edx
++	movslq	%edx,%rax
++	subq	$1, %rax
++	movq	%rax, -24(%rbp)
++	.loc 1 24 0
++	movslq	%edx,%rax
++	addq	$15, %rax
++	addq	$15, %rax
++	shrq	$4, %rax
++	salq	$4, %rax
++	subq	%rax, %rsp
++	movq	%rsp, -56(%rbp)
++	movq	-56(%rbp), %rax
++	addq	$15, %rax
++	shrq	$4, %rax
++	salq	$4, %rax
++	movq	%rax, -56(%rbp)
++	movq	-56(%rbp), %rax
++	movq	%rax, -16(%rbp)
++	.loc 1 27 0
++	movl	$0, -4(%rbp)
++	jmp	.L2
++.L3:
++	.loc 1 28 0
++	movl	-4(%rbp), %esi
++	movl	-4(%rbp), %eax
++	movl	%eax, %ecx
++	movq	-16(%rbp), %rdx
++	movslq	%esi,%rax
++	movb	%cl, (%rdx,%rax)
++	.loc 1 27 0
++	addl	$1, -4(%rbp)
++.L2:
++	movl	-4(%rbp), %eax
++	cmpl	-36(%rbp), %eax
++	jl	.L3
++	.loc 1 30 0
++	.globl	break_here
++break_here:
++	movq	-16(%rbp), %rax
++	movb	$0, (%rax)
++	movq	-48(%rbp), %rsp
++	.loc 1 31 0
++	leave
++	ret
++.LFE2:
++	.size	foo, .-foo
++	.section	.debug_frame,"",@progbits
++.Lframe0:
++	.long	.LECIE0-.LSCIE0
++.LSCIE0:
++	.long	0xffffffff
++	.byte	0x1
++	.string	""
++	.uleb128 0x1
++	.sleb128 -8
++	.byte	0x10
++	.byte	0xc
++	.uleb128 0x7
++	.uleb128 0x8
++	.byte	0x90
++	.uleb128 0x1
++	.align 8
++.LECIE0:
++.LSFDE0:
++	.long	.LEFDE0-.LASFDE0
++.LASFDE0:
++	.long	.Lframe0
++	.quad	.LFB2
++	.quad	.LFE2-.LFB2
++	.byte	0x4
++	.long	.LCFI0-.LFB2
++	.byte	0xe
++	.uleb128 0x10
++	.byte	0x86
++	.uleb128 0x2
++	.byte	0x4
++	.long	.LCFI1-.LCFI0
++	.byte	0xd
++	.uleb128 0x6
++	.align 8
++.LEFDE0:
++	.section	.eh_frame,"a",@progbits
++.Lframe1:
++	.long	.LECIE1-.LSCIE1
++.LSCIE1:
++	.long	0x0
++	.byte	0x1
++	.string	"zR"
++	.uleb128 0x1
++	.sleb128 -8
++	.byte	0x10
++	.uleb128 0x1
++	.byte	0x3
++	.byte	0xc
++	.uleb128 0x7
++	.uleb128 0x8
++	.byte	0x90
++	.uleb128 0x1
++	.align 8
++.LECIE1:
++.LSFDE1:
++	.long	.LEFDE1-.LASFDE1
++.LASFDE1:
++	.long	.LASFDE1-.Lframe1
++	.long	.LFB2
++	.long	.LFE2-.LFB2
++	.uleb128 0x0
++	.byte	0x4
++	.long	.LCFI0-.LFB2
++	.byte	0xe
++	.uleb128 0x10
++	.byte	0x86
++	.uleb128 0x2
++	.byte	0x4
++	.long	.LCFI1-.LCFI0
++	.byte	0xd
++	.uleb128 0x6
++	.align 8
++.LEFDE1:
++	.text
++.Letext0:
++	.section	.debug_loc,"",@progbits
++.Ldebug_loc0:
++.LLST0:
++	.quad	.LFB2-.Ltext0
++	.quad	.LCFI0-.Ltext0
++	.value	0x2
++	.byte	0x77
++	.sleb128 8
++	.quad	.LCFI0-.Ltext0
++	.quad	.LCFI1-.Ltext0
++	.value	0x2
++	.byte	0x77
++	.sleb128 16
++	.quad	.LCFI1-.Ltext0
++	.quad	.LFE2-.Ltext0
++	.value	0x2
++	.byte	0x76
++	.sleb128 16
++	.quad	0x0
++	.quad	0x0
++	.section	.debug_info
++	.long	.Ldebug_end - .Ldebug_start
++.Ldebug_start:
++	.value	0x2
++	.long	.Ldebug_abbrev0
++	.byte	0x8
++	.uleb128 0x1
++	.long	.LASF2
++	.byte	0x1
++	.long	.LASF3
++	.long	.LASF4
++	.quad	.Ltext0
++	.quad	.Letext0
++	.long	.Ldebug_line0
++	.uleb128 0x2
++	.byte	0x1
++	.string	"foo"
++	.byte	0x1
++	.byte	0x16
++	.byte	0x1
++	.quad	.LFB2
++	.quad	.LFE2
++	.long	.LLST0
++	.long	0x83
++	.uleb128 0x3
++	.long	.LASF5
++	.byte	0x1
++	.byte	0x15
++	.long	0x83
++	.byte	0x2
++	.byte	0x91
++	.sleb128 -52
++.Ltag_typedef:
++	.uleb128 0x4
++	.long	.LASF6
++	.byte	0x1
++	.byte	0x17
++	.long	.Ltag_array_type - .debug_info
++	.uleb128 0x5	/* Abbrev Number: 5 (DW_TAG_variable) */
++	.long	.LASF0
++	.byte	0x1
++	.byte	0x18
++#if 1
++	.long	.Ltag_typedef - .debug_info
++#else
++	/* Debugging only: Skip the typedef indirection.  */
++	.long	.Ltag_array_type - .debug_info
++#endif
++	/* DW_AT_location: DW_FORM_block1: start */
++	.byte	0x3
++	.byte	0x91
++	.sleb128 -32
++#if 0
++	.byte	0x6	/* DW_OP_deref */
++#else
++	.byte	0x96	/* DW_OP_nop */
++#endif
++	/* DW_AT_location: DW_FORM_block1: end */
++	.uleb128 0x6
++	.string	"i"
++	.byte	0x1
++	.byte	0x19
++	.long	0x83
++	.byte	0x2
++	.byte	0x91
++	.sleb128 -20
++	.byte	0x0
++	.uleb128 0x7
++	.byte	0x4
++	.byte	0x5
++	.string	"int"
++.Ltag_array_type:
++	.uleb128 0x8	/* Abbrev Number: 8 (DW_TAG_array_type) */
++	.long	0xa0 + (2f - 1f)	/* DW_AT_type: DW_FORM_ref4 */
++	.long	0x9d + (2f - 1f)	/* DW_AT_sibling: DW_FORM_ref4 */
++1:	/* DW_AT_data_location: DW_FORM_block1: start */
++	.byte	2f - 3f	/* length */
++3:
++	.byte	0x97	/* DW_OP_push_object_address */
++	.byte	0x6	/* DW_OP_deref */
++2:	/* DW_AT_data_location: DW_FORM_block1: end */
++	.uleb128 0x9
++	.long	0x9d + (2b - 1b)	/* DW_AT_type: DW_FORM_ref4 */
++	.byte	0x3
++	.byte	0x91
++	.sleb128 -40
++	.byte	0x6
++	.byte	0x0
++	.uleb128 0xa
++	.byte	0x8
++	.byte	0x7
++	.uleb128 0xb
++	.byte	0x1
++	.byte	0x6
++	.long	.LASF1
++	.byte	0x0
++.Ldebug_end:
++	.section	.debug_abbrev
++	.uleb128 0x1
++	.uleb128 0x11
++	.byte	0x1
++	.uleb128 0x25
++	.uleb128 0xe
++	.uleb128 0x13
++	.uleb128 0xb
++	.uleb128 0x3
++	.uleb128 0xe
++	.uleb128 0x1b
++	.uleb128 0xe
++	.uleb128 0x11
++	.uleb128 0x1
++	.uleb128 0x12
++	.uleb128 0x1
++	.uleb128 0x10
++	.uleb128 0x6
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x2
++	.uleb128 0x2e
++	.byte	0x1
++	.uleb128 0x3f
++	.uleb128 0xc
++	.uleb128 0x3
++	.uleb128 0x8
++	.uleb128 0x3a
++	.uleb128 0xb
++	.uleb128 0x3b
++	.uleb128 0xb
++	.uleb128 0x27
++	.uleb128 0xc
++	.uleb128 0x11
++	.uleb128 0x1
++	.uleb128 0x12
++	.uleb128 0x1
++	.uleb128 0x40
++	.uleb128 0x6
++	.uleb128 0x1
++	.uleb128 0x13
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x3
++	.uleb128 0x5
++	.byte	0x0
++	.uleb128 0x3
++	.uleb128 0xe
++	.uleb128 0x3a
++	.uleb128 0xb
++	.uleb128 0x3b
++	.uleb128 0xb
++	.uleb128 0x49
++	.uleb128 0x13
++	.uleb128 0x2
++	.uleb128 0xa
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x4
++	.uleb128 0x16
++	.byte	0x0
++	.uleb128 0x3
++	.uleb128 0xe
++	.uleb128 0x3a
++	.uleb128 0xb
++	.uleb128 0x3b
++	.uleb128 0xb
++	.uleb128 0x49
++	.uleb128 0x13
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x5
++	.uleb128 0x34
++	.byte	0x0
++	.uleb128 0x3
++	.uleb128 0xe
++	.uleb128 0x3a
++	.uleb128 0xb
++	.uleb128 0x3b
++	.uleb128 0xb
++	.uleb128 0x49
++	.uleb128 0x13
++	.uleb128 0x2
++	.uleb128 0xa
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x6
++	.uleb128 0x34
++	.byte	0x0
++	.uleb128 0x3
++	.uleb128 0x8
++	.uleb128 0x3a
++	.uleb128 0xb
++	.uleb128 0x3b
++	.uleb128 0xb
++	.uleb128 0x49
++	.uleb128 0x13
++	.uleb128 0x2
++	.uleb128 0xa
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x7
++	.uleb128 0x24
++	.byte	0x0
++	.uleb128 0xb
++	.uleb128 0xb
++	.uleb128 0x3e
++	.uleb128 0xb
++	.uleb128 0x3
++	.uleb128 0x8
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x8	/* Abbrev Number: 8 (DW_TAG_array_type) */
++	.uleb128 0x1
++	.byte	0x1
++	.uleb128 0x49	/* DW_AT_type */
++	.uleb128 0x13	/* DW_FORM_ref4 */
++	.uleb128 0x1	/* DW_AT_sibling */
++	.uleb128 0x13	/* DW_FORM_ref4 */
++	.uleb128 0x50	/* DW_AT_data_location */
++	.uleb128 0xa	/* DW_FORM_block1 */
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0x9
++	.uleb128 0x21
++	.byte	0x0
++	.uleb128 0x49	/* DW_AT_type */
++	.uleb128 0x13	/* DW_FORM_ref4 */
++	.uleb128 0x2f
++	.uleb128 0xa
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0xa
++	.uleb128 0x24
++	.byte	0x0
++	.uleb128 0xb
++	.uleb128 0xb
++	.uleb128 0x3e
++	.uleb128 0xb
++	.byte	0x0
++	.byte	0x0
++	.uleb128 0xb
++	.uleb128 0x24
++	.byte	0x0
++	.uleb128 0xb
++	.uleb128 0xb
++	.uleb128 0x3e
++	.uleb128 0xb
++	.uleb128 0x3
++	.uleb128 0xe
++	.byte	0x0
++	.byte	0x0
++	.byte	0x0
++	.section	.debug_pubnames,"",@progbits
++	.long	0x16
++	.value	0x2
++	.long	.Ldebug_info0
++	.long	0xa8
++	.long	0x2d
++	.string	"foo"
++	.long	0x0
++	.section	.debug_aranges,"",@progbits
++	.long	0x2c
++	.value	0x2
++	.long	.Ldebug_info0
++	.byte	0x8
++	.byte	0x0
++	.value	0x0
++	.value	0x0
++	.quad	.Ltext0
++	.quad	.Letext0-.Ltext0
++	.quad	0x0
++	.quad	0x0
++	.section	.debug_str,"MS",@progbits,1
++.LASF0:
++	.string	"array"
++.LASF5:
++	.string	"size"
++.LASF3:
++	.string	"x86_64-vla-typedef.c"
++.LASF6:
++	.string	"array_t"
++.LASF1:
++	.string	"char"
++.LASF4:
++	.string	"gdb.arch"
++.LASF2:
++	.string	"GNU C 4.3.2 20081105 (Red Hat 4.3.2-7)"
++	.ident	"GCC: (GNU) 4.3.2 20081105 (Red Hat 4.3.2-7)"
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c
+new file mode 100644
+index 0000000..b809c4e
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c
+@@ -0,0 +1,43 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#if 0
++
++void
++foo (int size)
++{
++  typedef char array_t[size];
++  array_t array;
++  int i;
++
++  for (i = 0; i < size; i++)
++    array[i] = i;
++
++  array[0] = 0;	/* break-here */
++}
++
++#else
++
++int
++main (void)
++{
++  foo (26);
++  foo (78);
++  return 0;
++}
++
++#endif
+diff --git a/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
+new file mode 100644
+index 0000000..b05411e
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
+@@ -0,0 +1,64 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test DW_AT_data_location accessed through DW_TAG_typedef intermediate.
++
++if ![istarget "x86_64-*-*"] then {
++    verbose "Skipping over gdb.arch/x86_64-vla-typedef.exp test made only for x86_64."
++    return
++}
++
++set testfile x86_64-vla-typedef
++set srcasmfile ${testfile}-foo.S
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++set binobjfile ${objdir}/${subdir}/${testfile}-foo.o
++if  { [gdb_compile "${srcdir}/${subdir}/${srcasmfile}" "${binobjfile}" object {}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile} ${binobjfile}" "${binfile}" executable {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++if ![runto_main] {
++    untested x86_64-vla-typedef
++    return -1
++}
++
++gdb_breakpoint "break_here"
++
++gdb_continue_to_breakpoint "break_here"
++
++gdb_test "whatis array" "type = array_t" "first: whatis array"
++
++gdb_test "ptype array" "type = char \\\[26\\\]" "first: ptype array"
++
++gdb_test "p array\[1\]" "\\$\[0-9\] = 1 '\\\\001'"
++gdb_test "p array\[2\]" "\\$\[0-9\] = 2 '\\\\002'"
++gdb_test "p array\[3\]" "\\$\[0-9\] = 3 '\\\\003'"
++gdb_test "p array\[4\]" "\\$\[0-9\] = 4 '\\\\004'"
++
++gdb_continue_to_breakpoint "break_here"
++
++gdb_test "whatis array" "type = array_t" "second: whatis array"
++
++gdb_test "ptype array" "type = char \\\[78\\\]" "second: ptype array"
 diff --git a/gdb/testsuite/gdb.base/vla-overflow.c b/gdb/testsuite/gdb.base/vla-overflow.c
 new file mode 100644
 index 0000000..c5d5ee0
@@ -2412,469 +4029,6 @@ index 0000000..5da7378
 +gdb_test "p temp1" " = '1' <repeats 78 times>" "second: print temp1"
 +gdb_test "p temp2" " = '2' <repeats 78 times>" "second: print temp2"
 +gdb_test "p temp3" " = '3' <repeats 48 times>" "second: print temp3"
-diff --git a/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-func.S b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-func.S
-new file mode 100644
-index 0000000..aae5b56
---- /dev/null
-+++ b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-func.S
-@@ -0,0 +1,336 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2008 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+/*
-+#include <stdlib.h>
-+
-+void
-+func (void)
-+{
-+  int i;
-+
-+  abort ();
-+}
-+*/
-+	.file	"dw2-loclist-prelinked.c"
-+	.section	.debug_abbrev,"",@progbits
-+.Ldebug_abbrev0:
-+	.section	.debug_info,"",@progbits
-+.Ldebug_info0:
-+	.section	.debug_line,"",@progbits
-+.Ldebug_line0:
-+	.text
-+.Ltext0:
-+.globl func
-+	.type	func, @function
-+func:
-+.LFB2:
-+	.file 1 "dw2-loclist-prelinked.c"
-+	.loc 1 5 0
-+	pushl	%ebp
-+.LCFI0:
-+	movl	%esp, %ebp
-+.LCFI1:
-+	subl	$24, %esp
-+.LCFI2:
-+	.loc 1 8 0
-+	call	abort
-+.LFE2:
-+	.size	func, .-func
-+	.section	.debug_frame,"",@progbits
-+.Lframe0:
-+	.long	.LECIE0-.LSCIE0
-+.LSCIE0:
-+	.long	0xffffffff
-+	.byte	0x1
-+	.string	""
-+	.uleb128 0x1
-+	.sleb128 -4
-+	.byte	0x8
-+	.byte	0xc
-+	.uleb128 0x4
-+	.uleb128 0x4
-+	.byte	0x88
-+	.uleb128 0x1
-+	.align 4
-+.LECIE0:
-+.LSFDE0:
-+	.long	.LEFDE0-.LASFDE0
-+.LASFDE0:
-+	.long	.Lframe0
-+	.long	.LFB2
-+	.long	.LFE2-.LFB2
-+	.byte	0x4
-+	.long	.LCFI0-.LFB2
-+	.byte	0xe
-+	.uleb128 0x8
-+	.byte	0x85
-+	.uleb128 0x2
-+	.byte	0x4
-+	.long	.LCFI1-.LCFI0
-+	.byte	0xd
-+	.uleb128 0x5
-+	.align 4
-+.LEFDE0:
-+	.text
-+.Letext0:
-+#if 0 /* FRAMEBASE_MISSING */
-+	.section	.debug_loc,"",@progbits
-+.Ldebug_loc0:
-+.LLST0:
-+	.long	.LFB2-.Ltext0
-+	.long	.LCFI0-.Ltext0
-+	.value	0x2
-+	.byte	0x74
-+	.sleb128 4
-+	.long	.LCFI0-.Ltext0
-+	.long	.LCFI1-.Ltext0
-+	.value	0x2
-+	.byte	0x74
-+	.sleb128 8
-+	.long	.LCFI1-.Ltext0
-+	.long	.LFE2-.Ltext0
-+	.value	0x2
-+	.byte	0x75
-+	.sleb128 8
-+	.long	0x0
-+	.long	0x0
-+#endif /* FRAMEBASE_MISSING */
-+	.section	.debug_info
-+	.long	.Ldebug_info_end - .Ldebug_info_start
-+.Ldebug_info_start:
-+	.value	0x2
-+	.long	.Ldebug_abbrev0
-+	.byte	0x4
-+	.uleb128 0x1
-+	.long	.LASF10
-+	.byte	0x1
-+	.long	.LASF11
-+	.long	.LASF12
-+	.long	.Ltext0
-+	.long	.Letext0
-+	.long	.Ldebug_line0
-+	.uleb128 0x2
-+	.byte	0x4
-+	.byte	0x7
-+	.long	.LASF0
-+	.uleb128 0x3
-+	.byte	0x4
-+	.byte	0x5
-+	.string	"int"
-+	.uleb128 0x2
-+	.byte	0x4
-+	.byte	0x5
-+	.long	.LASF1
-+	.uleb128 0x2
-+	.byte	0x1
-+	.byte	0x8
-+	.long	.LASF2
-+	.uleb128 0x2
-+	.byte	0x2
-+	.byte	0x7
-+	.long	.LASF3
-+	.uleb128 0x2
-+	.byte	0x4
-+	.byte	0x7
-+	.long	.LASF4
-+	.uleb128 0x2
-+	.byte	0x1
-+	.byte	0x6
-+	.long	.LASF5
-+	.uleb128 0x2
-+	.byte	0x2
-+	.byte	0x5
-+	.long	.LASF6
-+	.uleb128 0x2
-+	.byte	0x8
-+	.byte	0x5
-+	.long	.LASF7
-+	.uleb128 0x2
-+	.byte	0x8
-+	.byte	0x7
-+	.long	.LASF8
-+	.uleb128 0x4
-+	.byte	0x4
-+	.byte	0x7
-+	.uleb128 0x2
-+	.byte	0x1
-+	.byte	0x6
-+	.long	.LASF9
-+	.uleb128 0x5
-+	.byte	0x1
-+	.long	.LASF13
-+	.byte	0x1
-+	.byte	0x5
-+	.byte	0x1
-+	.long	.LFB2
-+	.long	.LFE2
-+#if 0 /* FRAMEBASE_MISSING */
-+	.long	.LLST0		/* DW_AT_frame_base : 0x0 (location list) */
-+#endif /* FRAMEBASE_MISSING */
-+	.uleb128 0x6
-+	.string	"i"
-+	.byte	0x1
-+	.byte	0x6
-+	.long	0x2c
-+	.byte	0x2
-+	.byte	0x91
-+	.sleb128 -12
-+	.byte	0x0
-+	.byte	0x0
-+.Ldebug_info_end:
-+	.section	.debug_abbrev
-+	.uleb128 0x1
-+	.uleb128 0x11
-+	.byte	0x1
-+	.uleb128 0x25
-+	.uleb128 0xe
-+	.uleb128 0x13
-+	.uleb128 0xb
-+	.uleb128 0x3
-+	.uleb128 0xe
-+	.uleb128 0x1b
-+	.uleb128 0xe
-+	.uleb128 0x11
-+	.uleb128 0x1
-+	.uleb128 0x12
-+	.uleb128 0x1
-+	.uleb128 0x10
-+	.uleb128 0x6
-+	.byte	0x0
-+	.byte	0x0
-+	.uleb128 0x2
-+	.uleb128 0x24
-+	.byte	0x0
-+	.uleb128 0xb
-+	.uleb128 0xb
-+	.uleb128 0x3e
-+	.uleb128 0xb
-+	.uleb128 0x3
-+	.uleb128 0xe
-+	.byte	0x0
-+	.byte	0x0
-+	.uleb128 0x3
-+	.uleb128 0x24
-+	.byte	0x0
-+	.uleb128 0xb
-+	.uleb128 0xb
-+	.uleb128 0x3e
-+	.uleb128 0xb
-+	.uleb128 0x3
-+	.uleb128 0x8
-+	.byte	0x0
-+	.byte	0x0
-+	.uleb128 0x4
-+	.uleb128 0x24
-+	.byte	0x0
-+	.uleb128 0xb
-+	.uleb128 0xb
-+	.uleb128 0x3e
-+	.uleb128 0xb
-+	.byte	0x0
-+	.byte	0x0
-+	.uleb128 0x5
-+	.uleb128 0x2e
-+	.byte	0x1
-+	.uleb128 0x3f
-+	.uleb128 0xc
-+	.uleb128 0x3
-+	.uleb128 0xe
-+	.uleb128 0x3a
-+	.uleb128 0xb
-+	.uleb128 0x3b
-+	.uleb128 0xb
-+	.uleb128 0x27
-+	.uleb128 0xc
-+	.uleb128 0x11
-+	.uleb128 0x1
-+	.uleb128 0x12
-+	.uleb128 0x1
-+#if 0 /* FRAMEBASE_MISSING */
-+	.uleb128 0x40
-+	.uleb128 0x6
-+#endif /* FRAMEBASE_MISSING */
-+	.byte	0x0
-+	.byte	0x0
-+	.uleb128 0x6
-+	.uleb128 0x34
-+	.byte	0x0
-+	.uleb128 0x3
-+	.uleb128 0x8
-+	.uleb128 0x3a
-+	.uleb128 0xb
-+	.uleb128 0x3b
-+	.uleb128 0xb
-+	.uleb128 0x49
-+	.uleb128 0x13
-+	.uleb128 0x2
-+	.uleb128 0xa
-+	.byte	0x0
-+	.byte	0x0
-+	.byte	0x0
-+	.section	.debug_pubnames,"",@progbits
-+	.long	0x17
-+	.value	0x2
-+	.long	.Ldebug_info0
-+	.long	0x98
-+	.long	0x75
-+	.string	"func"
-+	.long	0x0
-+	.section	.debug_aranges,"",@progbits
-+	.long	0x1c
-+	.value	0x2
-+	.long	.Ldebug_info0
-+	.byte	0x4
-+	.byte	0x0
-+	.value	0x0
-+	.value	0x0
-+	.long	.Ltext0
-+	.long	.Letext0-.Ltext0
-+	.long	0x0
-+	.long	0x0
-+	.section	.debug_str,"MS",@progbits,1
-+.LASF7:
-+	.string	"long long int"
-+.LASF0:
-+	.string	"unsigned int"
-+.LASF11:
-+	.string	"dw2-framebase-missing-func.c"
-+.LASF12:
-+	.string	"gdb-6.8/gdb/testsuite/gdb.dwarf2"
-+.LASF4:
-+	.string	"long unsigned int"
-+.LASF8:
-+	.string	"long long unsigned int"
-+.LASF2:
-+	.string	"unsigned char"
-+.LASF9:
-+	.string	"char"
-+.LASF1:
-+	.string	"long int"
-+.LASF3:
-+	.string	"short unsigned int"
-+.LASF5:
-+	.string	"signed char"
-+.LASF10:
-+	.string	"GNU C 4.3.2 20081007 (Red Hat 4.3.2-6)"
-+.LASF13:
-+	.string	"func"
-+.LASF6:
-+	.string	"short int"
-+	.ident	"GCC: (GNU) 4.3.2 20081007 (Red Hat 4.3.2-6)"
-+	.section	.note.GNU-stack,"",@progbits
-diff --git a/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-main.c b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-main.c
-new file mode 100644
-index 0000000..d4ad8eb
---- /dev/null
-+++ b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-main.c
-@@ -0,0 +1,26 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2008 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+/* dw2-framebase-missing-func.S */
-+extern void func (void);
-+
-+int
-+main (void)
-+{
-+  func ();
-+  return 0;
-+}
-diff --git a/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing.exp b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing.exp
-new file mode 100644
-index 0000000..8d047bb
---- /dev/null
-+++ b/gdb/testsuite/gdb.dwarf2/dw2-framebase-missing.exp
-@@ -0,0 +1,83 @@
-+# Copyright 2008 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 2 of the License, or
-+# (at your option) any later version.
-+# 
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+# 
-+# You should have received a copy of the GNU General Public License
-+# along with this program; if not, write to the Free Software
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-+
-+# Minimal DWARF-2 unit test
-+
-+# This test can only be run on i386/x86_64 targets which support DWARF-2.
-+# For now pick a sampling of likely targets.
-+if {(![istarget *-*-linux*]
-+     && ![istarget *-*-gnu*]
-+     && ![istarget *-*-elf*]
-+     && ![istarget *-*-openbsd*])
-+    || (![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"])} {
-+    return 0  
-+}
-+
-+set testfile "dw2-framebase-missing"
-+set srcfuncfile ${testfile}-func.S
-+set srcmainfile ${testfile}-main.c
-+set binfile ${objdir}/${subdir}/${testfile}
-+
-+remote_exec build "rm -f ${binfile}"
-+
-+# get the value of gcc_compiled
-+if [get_compiler_info ${binfile}] {
-+    return -1
-+}
-+
-+# This test can only be run on gcc as we use additional_flags=FIXME
-+if {$gcc_compiled == 0} {
-+    return 0
-+}
-+
-+if  { [gdb_compile "${srcdir}/${subdir}/${srcmainfile} ${srcdir}/${subdir}/${srcfuncfile}" \
-+		   "${binfile}" executable [list debug additional_flags=-m32]] != "" } {
-+    return -1
-+}
-+
-+gdb_exit
-+gdb_start
-+gdb_reinitialize_dir $srcdir/$subdir
-+gdb_load ${binfile}
-+
-+gdb_run_cmd
-+
-+gdb_test "" "Program received signal SIGABRT, Aborted..*" "Enter abort()"
-+
-+# Incorrect:
-+# #0  0x00110430 in __kernel_vsyscall ()
-+# No symbol table info available.
-+# #1  0x003d44c0 in raise () from /lib/libc.so.6
-+# No symbol table info available.
-+# #2  0x003d5e88 in abort () from /lib/libc.so.6
-+# No symbol table info available.
-+# #3  0x44f10437 in func () at dw2-framebase-missing.c:8
-+# 	i = Could not find the frame base for "func".
-+
-+# Correct:
-+# #0  0x00110430 in __kernel_vsyscall ()
-+# No symbol table info available.
-+# #1  0x003d44c0 in raise () from /lib/libc.so.6
-+# No symbol table info available.
-+# #2  0x003d5e88 in abort () from /lib/libc.so.6
-+# No symbol table info available.
-+# #3  0x4ae36437 in func () at dw2-framebase-missing.c:8
-+# 	i = Could not find the frame base for "func".
-+# #4  0x0804851a in main () at ../../../gdb/testsuite/gdb.dwarf2/dw2-framebase-missing-main.c:24
-+# No locals.
-+
-+# `abort' can get expressed as `*__GI_abort'.
-+gdb_test "bt full" "in \[^ \]*abort \\(.*in func \\(.*\ti = Could not find the frame base for \"func\".\r\n.*in main \\(.*" "Backtrace after abort()"
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-stripped.c b/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
 new file mode 100644
 index 0000000..1f02d90
@@ -3010,10 +4164,10 @@ index 0000000..1c6e84a
 +         "step"
 diff --git a/gdb/testsuite/gdb.fortran/dynamic.exp b/gdb/testsuite/gdb.fortran/dynamic.exp
 new file mode 100644
-index 0000000..91f47d7
+index 0000000..77a1203
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/dynamic.exp
-@@ -0,0 +1,141 @@
+@@ -0,0 +1,156 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -3148,6 +4302,8 @@ index 0000000..91f47d7
 +# Intel Fortran Compiler 10.1.008 has a bug here - (2:11,7:7)
 +# as it produces DW_AT_lower_bound == DW_AT_upper_bound == 7.
 +gdb_test "ptype vart" "type = (PTR TO -> \\( )?real(\\(kind=4\\)|\\*4) \\(2:11,7:\\*\\)\\)?"
++gdb_test "p varz" "\\$\[0-9\]* = \\(\\)"
++gdb_test "p vart" "\\$\[0-9\]* = \\(\\)"
 +gdb_test "p varz(3)" "\\$\[0-9\]* = 4"
 +# maps to foo::vary(1,1)
 +gdb_test "p vart(2,7)" "\\$\[0-9\]* = 8"
@@ -3155,12 +4311,25 @@ index 0000000..91f47d7
 +gdb_test "p vart(3,8)" "\\$\[0-9\]* = 9"
 +# maps to foo::vary(1,3)
 +gdb_test "p vart(2,9)" "\\$\[0-9\]* = 10"
++
++set test "quit #1"
++gdb_test_multiple "quit" $test {
++    -re "The program is running.  Quit anyway \\(and kill it\\)\\? \\(y or n\\) " {
++	pass $test
++    }
++}
++set test "quit #2"
++gdb_test_multiple "y" $test {
++    eof {
++	pass $test
++    }
++}
 diff --git a/gdb/testsuite/gdb.fortran/dynamic.f90 b/gdb/testsuite/gdb.fortran/dynamic.f90
 new file mode 100644
-index 0000000..9dd7ce0
+index 0000000..0f43564
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/dynamic.f90
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,98 @@
 +! Copyright 2007 Free Software Foundation, Inc.
 +!
 +! This program is free software; you can redistribute it and/or modify
@@ -3186,20 +4355,20 @@ index 0000000..9dd7ce0
 +  real, pointer :: varv (:, :, :)
 +  real, target :: varu (1, 2, 3)
 +  logical :: l
-+  allocate (varx (1:6, 5:15, 17:28))		! varx-init
++  allocate (varx (1:6, 5:15, 17:28))            ! varx-init
 +  l = allocated (varx)
-+  varx(:, :, :) = 6				! varx-allocated
++  varx(:, :, :) = 6                             ! varx-allocated
 +  varx(1, 5, 17) = 7
 +  varx(2, 6, 18) = 8
 +  varx(6, 15, 28) = 9
-+  varv => varx					! varx-filled
++  varv => varx                                  ! varx-filled
 +  l = associated (varv)
-+  varv(3, 7, 19) = 10				! varv-associated
-+  varv => null ()				! varv-filled
++  varv(3, 7, 19) = 10                           ! varv-associated
++  varv => null ()                               ! varv-filled
 +  l = associated (varv)
-+  deallocate (varx)				! varv-deassociated
++  deallocate (varx)                             ! varv-deassociated
 +  l = allocated (varx)
-+  varu(:, :, :) = 10				! varx-deallocated
++  varu(:, :, :) = 10                            ! varx-deallocated
 +  allocate (varv (1:6, 5:15, 17:28))
 +  l = associated (varv)
 +  varv(:, :, :) = 6
@@ -3216,19 +4385,20 @@ index 0000000..9dd7ce0
 +subroutine foo (vary, varw)
 +  real :: vary (:, :)
 +  real :: varw (:, :, :)
-+  vary(:, :) = 4				! vary-passed
++  vary(:, :) = 4                                ! vary-passed
 +  vary(1, 1) = 8
 +  vary(2, 2) = 9
 +  vary(1, 3) = 10
-+  varw(:, :, :) = 5				! vary-filled
++  varw(:, :, :) = 5                             ! vary-filled
 +  varw(1, 1, 1) = 6
-+  varw(2, 2, 2) = 7				! varw-almostfilled
++  varw(2, 2, 2) = 7                             ! varw-almostfilled
 +end subroutine foo
 +subroutine bar (varz, vart)
 +  real :: varz (*)
 +  real :: vart (2:11, 7:*)
 +  varz(1:3) = 4
-+  varz(2) = 5					! varz-almostfilled
++  varz(2) = 5                                   ! varz-almostfilled
++  vart(2,7) = vart(2,7)
 +end subroutine bar
 +program test
 +  interface
@@ -3260,10 +4430,10 @@ index 0000000..9dd7ce0
 +end
 diff --git a/gdb/testsuite/gdb.fortran/string.exp b/gdb/testsuite/gdb.fortran/string.exp
 new file mode 100644
-index 0000000..b1120c3
+index 0000000..ab72206
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/string.exp
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,72 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -3323,9 +4493,22 @@ index 0000000..b1120c3
 +gdb_continue_to_breakpoint "var-finish"
 +gdb_test "p e" "\\$\[0-9\]* = 'e   '" "p e re-set"
 +gdb_test "p f" "\\$\[0-9\]* = \\(\\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f2  ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\)" "p *f re-set"
++
++set test "quit #1"
++gdb_test_multiple "quit" $test {
++    -re "The program is running.  Quit anyway \\(and kill it\\)\\? \\(y or n\\) " {
++	pass $test
++    }
++}
++set test "quit #2"
++gdb_test_multiple "y" $test {
++    eof {
++	pass $test
++    }
++}
 diff --git a/gdb/testsuite/gdb.fortran/string.f90 b/gdb/testsuite/gdb.fortran/string.f90
 new file mode 100644
-index 0000000..66cd98f
+index 0000000..226dc5d
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/string.f90
 @@ -0,0 +1,37 @@
@@ -3356,29 +4539,41 @@ index 0000000..66cd98f
 +  character (len=*) :: f (1:7, 8:10)
 +  c = 'c'
 +  d = 'd'
-+  e = 'e'					! var-init
++  e = 'e'                                       ! var-init
 +  f = 'f'
 +  f(1,9) = 'f2'
-+  c = 'c'					! var-finish
++  c = 'c'                                       ! var-finish
 +end subroutine foo
 +  character (len=4) :: g, h (1:7, 8:10)
 +  g = 'g'
 +  h = 'h'
 +  call foo (g, h)
 +end
+diff --git a/gdb/top.c b/gdb/top.c
+index d5ef706..6045e21 100644
+--- a/gdb/top.c
++++ b/gdb/top.c
+@@ -377,6 +377,7 @@ execute_command (char *p, int from_tty)
+     }
+   
+   free_all_values ();
++  free_all_types ();
+ 
+   /* Force cleanup of any alloca areas if using C alloca instead of
+      a builtin alloca.  */
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
-index edf87cd..174fb58 100644
+index 1f824fa..60a4c5b 100644
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
-@@ -34,6 +34,7 @@
- #include "typeprint.h"
+@@ -35,6 +35,7 @@
  #include "gdb_string.h"
+ #include "exceptions.h"
  #include "valprint.h"
 +#include "dwarf2loc.h"
  #include <errno.h>
  
  extern void _initialize_typeprint (void);
-@@ -75,6 +76,9 @@ void
+@@ -76,6 +77,9 @@ void
  type_print (struct type *type, char *varstring, struct ui_file *stream,
  	    int show)
  {
@@ -3388,7 +4583,7 @@ index edf87cd..174fb58 100644
    LA_PRINT_TYPE (type, varstring, stream, show, 0);
  }
  
-@@ -86,7 +90,8 @@ whatis_exp (char *exp, int show)
+@@ -115,7 +119,8 @@ whatis_exp (char *exp, int show)
  {
    struct expression *expr;
    struct value *val;
@@ -3398,7 +4593,7 @@ index edf87cd..174fb58 100644
    struct type *real_type = NULL;
    struct type *type;
    int full = 0;
-@@ -97,12 +102,13 @@ whatis_exp (char *exp, int show)
+@@ -126,12 +131,13 @@ whatis_exp (char *exp, int show)
    if (exp)
      {
        expr = parse_expression (exp);
@@ -3413,7 +4608,7 @@ index edf87cd..174fb58 100644
    type = value_type (val);
  
    get_user_print_options (&opts);
-@@ -139,8 +145,7 @@ whatis_exp (char *exp, int show)
+@@ -168,8 +174,7 @@ whatis_exp (char *exp, int show)
    type_print (type, "", gdb_stdout, show);
    printf_filtered ("\n");
  
@@ -3424,7 +4619,7 @@ index edf87cd..174fb58 100644
  
  static void
 diff --git a/gdb/valarith.c b/gdb/valarith.c
-index 59f67d3..f5517ae 100644
+index f38cdb8..8e103cf 100644
 --- a/gdb/valarith.c
 +++ b/gdb/valarith.c
 @@ -164,9 +164,9 @@ an integer nor a pointer of the same type."));
@@ -3468,7 +4663,7 @@ index 59f67d3..f5517ae 100644
  	  /* Emit warning unless we have an array of unknown size.
  	     An array of unknown size has lowerbound 0 and upperbound -1.  */
  	  if (upperbound > -1)
-@@ -194,53 +207,62 @@ value_subscript (struct value *array, struct value *idx)
+@@ -194,49 +207,52 @@ value_subscript (struct value *array, struct value *idx)
  	  c_style = 1;
  	}
  
@@ -3532,17 +4727,7 @@ index 59f67d3..f5517ae 100644
 +	      value_contents (array) + offset, elt_size);
 +    }
  
-   if (VALUE_LVAL (array) == lval_internalvar)
-     VALUE_LVAL (v) = lval_internalvar_component;
-   else
-     VALUE_LVAL (v) = VALUE_LVAL (array);
-+
-   VALUE_ADDRESS (v) = VALUE_ADDRESS (array);
-+  /* We need to already adjust the address according to the former type as
-+     V will have a different type (ELT_TYPE) which may no longer contain the
-+     adjustment code like TYPE_FORTRAN_ARRAY_DATA_LOCATION.  */
-+  object_address_get_data (array_type, &VALUE_ADDRESS (v));
-+
+   set_value_component_location (v, array);
    VALUE_REGNUM (v) = VALUE_REGNUM (array);
    VALUE_FRAME_ID (v) = VALUE_FRAME_ID (array);
 -  set_value_offset (v, value_offset (array) + elt_offs);
@@ -3551,7 +4736,7 @@ index 59f67d3..f5517ae 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 05e5351..83f15a8 100644
+index 9810f2b..c3a48b4 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -38,6 +38,7 @@
@@ -3562,7 +4747,16 @@ index 05e5351..83f15a8 100644
  
  #include <errno.h>
  #include "gdb_string.h"
-@@ -568,6 +569,49 @@ value_one (struct type *type, enum lval_type lv)
+@@ -371,8 +372,6 @@ value_cast (struct type *type, struct value *arg2)
+ 	  new_length = val_length / element_length;
+ 	  if (val_length % element_length != 0)
+ 	    warning (_("array element type size does not divide object size in cast"));
+-	  /* FIXME-type-allocation: need a way to free this type when
+-	     we are done with it.  */
+ 	  range_type = create_range_type ((struct type *) NULL,
+ 					  TYPE_TARGET_TYPE (range_type),
+ 					  low_bound,
+@@ -568,6 +567,64 @@ value_one (struct type *type, enum lval_type lv)
    return val;
  }
  
@@ -3571,13 +4765,20 @@ index 05e5351..83f15a8 100644
 +const char *
 +object_address_data_not_valid (struct type *type)
 +{
++  /* Attributes are present only at the target type of a typedef.  Make the
++     call conditional as it would otherwise loop through type_length_get.  */
++  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
++    CHECK_TYPEDEF (type);
++
 +  /* DW_AT_associated has a preference over DW_AT_allocated.  */
-+  if (TYPE_ASSOCIATED (type) != NULL
-+      && 0 == dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (type)))
++  if (TYPE_NOT_ASSOCIATED (type)
++      || (TYPE_ASSOCIATED (type) != NULL
++	  && 0 == dwarf_locexpr_baton_eval (TYPE_ASSOCIATED (type))))
 +    return N_("object is not associated");
 +
-+  if (TYPE_ALLOCATED (type) != NULL
-+      && 0 == dwarf_locexpr_baton_eval (TYPE_ALLOCATED (type)))
++  if (TYPE_NOT_ALLOCATED (type)
++      || (TYPE_ALLOCATED (type) != NULL
++	  && 0 == dwarf_locexpr_baton_eval (TYPE_ALLOCATED (type))))
 +    return N_("object is not allocated");
 +
 +  return NULL;
@@ -3596,6 +4797,11 @@ index 05e5351..83f15a8 100644
 +  gdb_assert (address_return != NULL);
 +
 +  object_address_set (*address_return);
++
++  /* TYPE_DATA_LOCATION_DWARF_BLOCK / TYPE_DATA_LOCATION_ADDR are present only
++     at the target type of a typedef.  */
++  CHECK_TYPEDEF (type);
++
 +  if (object_address_data_not_valid (type) != NULL)
 +    {
 +      /* Do not try to evaluate DW_AT_data_location as it may even crash
@@ -3603,8 +4809,11 @@ index 05e5351..83f15a8 100644
 +      return 0;
 +    }
 +
-+  if (TYPE_DATA_LOCATION (type) != NULL)
-+    *address_return = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION (type));
++  if (TYPE_DATA_LOCATION_IS_ADDR (type))
++    *address_return = TYPE_DATA_LOCATION_ADDR (type);
++  else if (TYPE_DATA_LOCATION_DWARF_BLOCK (type) != NULL)
++    *address_return
++      = dwarf_locexpr_baton_eval (TYPE_DATA_LOCATION_DWARF_BLOCK (type));
 +
 +  return 1;
 +}
@@ -3612,18 +4821,16 @@ index 05e5351..83f15a8 100644
  /* Return a value with type TYPE located at ADDR.
  
     Call value_at only if the data needs to be fetched immediately;
-@@ -637,11 +681,21 @@ value_fetch_lazy (struct value *val)
+@@ -637,11 +694,19 @@ value_fetch_lazy (struct value *val)
    allocate_value_contents (val);
    if (VALUE_LVAL (val) == lval_memory)
      {
 -      CORE_ADDR addr = VALUE_ADDRESS (val) + value_offset (val);
 -      int length = TYPE_LENGTH (check_typedef (value_enclosing_type (val)));
-+      CORE_ADDR addr;
-+      int length;
++      CORE_ADDR addr = VALUE_ADDRESS (val);
  
 -      if (length)
 -	read_memory (addr, value_contents_all_raw (val), length);
-+      addr = VALUE_ADDRESS (val);
 +      if (object_address_get_data (value_type (val), &addr))
 +	{
 +	  struct type *type = value_enclosing_type (val);
@@ -3638,7 +4845,17 @@ index 05e5351..83f15a8 100644
      }
    else if (VALUE_LVAL (val) == lval_register)
      {
-@@ -1085,6 +1139,7 @@ struct value *
+@@ -1036,7 +1101,8 @@ address_of_variable (struct symbol *var, struct block *b)
+ 
+   val = value_of_variable (var, b);
+ 
+-  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
++  if ((VALUE_LVAL (val) == lval_memory && value_lazy (val)
++       && object_address_get_data (type, &VALUE_ADDRESS (val)))
+       || TYPE_CODE (type) == TYPE_CODE_FUNC)
+     {
+       CORE_ADDR addr = VALUE_ADDRESS (val);
+@@ -1145,6 +1211,7 @@ struct value *
  value_coerce_array (struct value *arg1)
  {
    struct type *type = check_typedef (value_type (arg1));
@@ -3646,7 +4863,7 @@ index 05e5351..83f15a8 100644
  
    /* If the user tries to do something requiring a pointer with an
       array that has not yet been pushed to the target, then this would
-@@ -1094,8 +1149,12 @@ value_coerce_array (struct value *arg1)
+@@ -1154,8 +1221,12 @@ value_coerce_array (struct value *arg1)
    if (VALUE_LVAL (arg1) != lval_memory)
      error (_("Attempt to take address of value not located in memory."));
  
@@ -3660,11 +4877,170 @@ index 05e5351..83f15a8 100644
  }
  
  /* Given a value which is a function, return a value which is a pointer
+@@ -2989,8 +3060,6 @@ value_slice (struct value *array, int lowbound, int length)
+       || lowbound + length - 1 > upperbound)
+     error (_("slice out of range"));
+ 
+-  /* FIXME-type-allocation: need a way to free this type when we are
+-     done with it.  */
+   slice_range_type = create_range_type ((struct type *) NULL,
+ 					TYPE_TARGET_TYPE (range_type),
+ 					lowbound, 
+diff --git a/gdb/value.c b/gdb/value.c
+index 4d4329e..47739c9 100644
+--- a/gdb/value.c
++++ b/gdb/value.c
+@@ -225,7 +225,9 @@ allocate_value_lazy (struct type *type)
+   val->next = all_values;
+   all_values = val;
+   val->type = type;
++  type_incref (type);
+   val->enclosing_type = type;
++  type_incref (type);
+   VALUE_LVAL (val) = not_lval;
+   VALUE_ADDRESS (val) = 0;
+   VALUE_FRAME_ID (val) = null_frame_id;
+@@ -269,13 +271,9 @@ struct value *
+ allocate_repeat_value (struct type *type, int count)
+ {
+   int low_bound = current_language->string_lower_bound;		/* ??? */
+-  /* FIXME-type-allocation: need a way to free this type when we are
+-     done with it.  */
+   struct type *range_type
+   = create_range_type ((struct type *) NULL, builtin_type_int32,
+ 		       low_bound, count + low_bound - 1);
+-  /* FIXME-type-allocation: need a way to free this type when we are
+-     done with it.  */
+   return allocate_value (create_array_type ((struct type *) NULL,
+ 					    type, range_type));
+ }
+@@ -335,6 +333,8 @@ value_type (struct value *value)
+ void
+ deprecated_set_value_type (struct value *value, struct type *type)
+ {
++  type_incref (type);
++  type_decref (value->type);
+   value->type = type;
+ }
+ 
+@@ -552,6 +552,9 @@ value_free (struct value *val)
+ {
+   if (val)
+     {
++      type_decref (val->type);
++      type_decref (val->enclosing_type);
++
+       if (VALUE_LVAL (val) == lval_computed)
+ 	{
+ 	  struct lval_funcs *funcs = val->location.computed.funcs;
+@@ -655,6 +658,8 @@ value_copy (struct value *arg)
+     val = allocate_value_lazy (encl_type);
+   else
+     val = allocate_value (encl_type);
++  type_incref (arg->type);
++  type_decref (val->type);
+   val->type = arg->type;
+   VALUE_LVAL (val) = VALUE_LVAL (arg);
+   val->location = arg->location;
+@@ -693,6 +698,7 @@ set_value_component_location (struct value *component, struct value *whole)
+     VALUE_LVAL (component) = VALUE_LVAL (whole);
+ 
+   component->location = whole->location;
++
+   if (VALUE_LVAL (whole) == lval_computed)
+     {
+       struct lval_funcs *funcs = whole->location.computed.funcs;
+@@ -700,6 +706,8 @@ set_value_component_location (struct value *component, struct value *whole)
+       if (funcs->copy_closure)
+         component->location.computed.closure = funcs->copy_closure (whole);
+     }
++
++  object_address_get_data (value_type (whole), &VALUE_ADDRESS (component));
+ }
+ 
+ 
+@@ -830,6 +838,25 @@ show_values (char *num_exp, int from_tty)
+       num_exp[1] = '\0';
+     }
+ }
++
++/* Sanity check for memory leaks and proper types reference counting.  */
++
++static void
++value_history_cleanup (void *unused)
++{
++  while (value_history_chain)
++    {
++      struct value_history_chunk *chunk = value_history_chain;
++      int i;
++
++      for (i = 0; i < ARRAY_SIZE (chunk->values); i++)
++      	value_free (chunk->values[i]);
++
++      value_history_chain = chunk->next;
++      xfree (chunk);
++    }
++  value_history_count = 0;
++}
+ 
+ /* Internal variables.  These are variables within the debugger
+    that hold values assigned by debugger commands.
+@@ -1067,12 +1094,21 @@ preserve_one_value (struct value *value, struct objfile *objfile,
+ 		    htab_t copied_types)
+ {
+   if (TYPE_OBJFILE (value->type) == objfile)
+-    value->type = copy_type_recursive (objfile, value->type, copied_types);
++    {
++      /* No need to decref the old type here, since we know it has no
++	 reference count.  */
++      value->type = copy_type_recursive (value->type, copied_types);
++      type_incref (value->type);
++    }
+ 
+   if (TYPE_OBJFILE (value->enclosing_type) == objfile)
+-    value->enclosing_type = copy_type_recursive (objfile,
+-						 value->enclosing_type,
+-						 copied_types);
++    {
++      /* No need to decref the old type here, since we know it has no
++	 reference count.  */
++      value->enclosing_type = copy_type_recursive (value->enclosing_type,
++						   copied_types);
++      type_incref (value->enclosing_type);
++    }
+ }
+ 
+ /* Update the internal variables and value history when OBJFILE is
+@@ -1461,6 +1497,8 @@ value_static_field (struct type *type, int fieldno)
+ struct value *
+ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
+ {
++  type_incref (new_encl_type);
++  type_decref (val->enclosing_type);
+   if (TYPE_LENGTH (new_encl_type) > TYPE_LENGTH (value_enclosing_type (val))) 
+     val->contents =
+       (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
+@@ -1516,6 +1554,8 @@ value_primitive_field (struct value *arg1, int offset,
+ 	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
+ 		  TYPE_LENGTH (value_enclosing_type (arg1)));
+ 	}
++      type_incref (type);
++      type_decref (v->type);
+       v->type = type;
+       v->offset = value_offset (arg1);
+       v->embedded_offset = (offset + value_embedded_offset (arg1)
+@@ -1944,4 +1984,6 @@ init-if-undefined VARIABLE = EXPRESSION\n\
+ Set an internal VARIABLE to the result of the EXPRESSION if it does not\n\
+ exist or does not contain a value.  The EXPRESSION is not evaluated if the\n\
+ VARIABLE is already initialized."));
++
++  make_final_cleanup (value_history_cleanup, NULL);
+ }
 diff --git a/gdb/value.h b/gdb/value.h
-index a882004..f6aece1 100644
+index aa43365..ad5306a 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
-@@ -286,6 +286,10 @@ extern struct value *value_from_decfloat (struct type *type,
+@@ -348,6 +348,10 @@ extern struct value *value_from_decfloat (struct type *type,
  					  const gdb_byte *decbytes);
  extern struct value *value_from_string (char *string);
  
@@ -3675,20 +5051,7 @@ index a882004..f6aece1 100644
  extern struct value *value_at (struct type *type, CORE_ADDR addr);
  extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
  
-@@ -557,9 +561,9 @@ extern int val_print_string (CORE_ADDR addr, int len, int width,
- 			     struct ui_file *stream,
- 			     const struct value_print_options *options);
- 
--extern void print_variable_value (struct symbol *var,
--				  struct frame_info *frame,
--				  struct ui_file *stream);
-+extern void print_variable_value_nl (struct symbol *var,
-+				     struct frame_info *frame,
-+				     struct ui_file *stream);
- 
- extern int check_field (struct type *, const char *);
- 
-@@ -590,5 +594,7 @@ extern struct value *value_allocate_space_in_inferior (int);
+@@ -658,5 +662,7 @@ extern struct value *value_allocate_space_in_inferior (int);
  
  extern struct value *value_of_local (const char *name, int complain);
  

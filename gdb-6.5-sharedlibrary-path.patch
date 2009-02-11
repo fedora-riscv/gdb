@@ -80,11 +80,9 @@ Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug-shared.c
 +   bug-gdb@prep.ai.mit.edu  */
 +
 +__thread int var = 42;
-Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug.exp	2008-02-27 09:00:15.000000000 +0100
-@@ -0,0 +1,81 @@
+--- /dev/null	2009-02-10 00:19:00.494289687 +0100
++++ gdb-6.8.50.20090209-x/gdb/testsuite/gdb.threads/tls-sepdebug.exp	2009-02-10 00:49:38.000000000 +0100
+@@ -0,0 +1,86 @@
 +# Copyright 2006 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -109,14 +107,17 @@ Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug.exp
 +set srcmainfile   ${testfile}-main.c
 +set srcsharedfile ${testfile}-shared.c
 +
-+# DO NOT use ${objdir} obsolute reference here as we test relative directories
-+# below and the absolute pathnames must not get encoded to the binaries.
++set binmainfile        ${objdir}/${subdir}/${testfile}-main
++set binsharedbase      ${testfile}-shared.so
++set binsharedfile      ${objdir}/${subdir}/${binsharedbase}
++set binshareddebugfile ${objdir}/${subdir}/${binsharedbase}.debug
 +
-+set binmainfile        ${testfile}-main
-+set binsharedfile      ${testfile}-shared.so
-+set binshareddebugfile ${testfile}-shared.so.debug
++# Use explicit -soname as otherwise the full path to the library would get
++# encoded into ${binmainfile} making LD_LIBRARY_PATH tests useless.
 +
-+if  { [gdb_compile_shlib "${srcdir}/${subdir}/${srcsharedfile}" "${binsharedfile}" {debug}] != "" } {
++# FIXME: gcc dependency (-Wl,-soname).
++
++if  { [gdb_compile_shlib "${srcdir}/${subdir}/${srcsharedfile}" "${binsharedfile}" [list debug additional_flags=-Wl,-soname=${binsharedbase}]] != "" } {
 +    untested "Couldn't compile test library"
 +    return -1
 +}
@@ -130,7 +131,9 @@ Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug.exp
 +    remote_exec build "objcopy --add-gnu-debuglink=${binshareddebugfile} ${binsharedfile}"
 +}
 +
-+if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcmainfile}" "${binmainfile}" executable [list debug shlib=${binsharedfile}]] != "" } {
++# Do not use `shlib=' as it will automatically add also -rpath for gcc.
++
++if  { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcmainfile} ${binsharedfile}" "${binmainfile}" executable {debug}] != "" } {
 +    untested "Couldn't compile test program"
 +    return -1
 +}
@@ -141,7 +144,7 @@ Index: gdb-6.7.50.20080227/gdb/testsuite/gdb.threads/tls-sepdebug.exp
 +# \$PWD is easy - it is the absolute way
 +# ${subdir} would fail on "print var"
 +
-+foreach ld_library_path { \$PWD ${subdir} } name { absolute relative }  {
++foreach ld_library_path [list [pwd]/${subdir} ./${subdir}] name { absolute relative }  {
 +
 +    gdb_exit
 +    gdb_start

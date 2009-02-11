@@ -1,3 +1,10 @@
+infcall.c <unwind_on_signal_p>:
+Revert the change of: gdb-6.8-inlining.patch
+causing: FAIL: gdb.base/unwindonsignal.exp: unwindonsignal, stack unwound
+
+resume() -> target_resume() move of clear_inline_frame_state() is for:
+gdb.mi/mi-nsmoribund.exp
+
 Index: gdb-6.8.50.20081214/gdb/testsuite/gdb.opt/inline-bt.c
 ===================================================================
 --- gdb-6.8.50.20081214.orig/gdb/testsuite/gdb.opt/inline-bt.c	2009-02-09 13:28:48.000000000 +0100
@@ -597,6 +604,15 @@ Index: gdb-6.8.50.20081214/gdb/infrun.c
 ===================================================================
 --- gdb-6.8.50.20081214.orig/gdb/infrun.c	2009-02-09 13:29:51.000000000 +0100
 +++ gdb-6.8.50.20081214/gdb/infrun.c	2009-02-09 13:30:16.000000000 +0100
+@@ -1147,8 +1150,6 @@ a command like `return' or `jump' to con
+ 	    step = 0;
+ 	}
+ 
+-      clear_inline_frame_state (resume_ptid);
+-
+       if (debug_displaced
+           && use_displaced_stepping (gdbarch)
+           && tp->trap_expected)
 @@ -1201,6 +1201,8 @@ clear_proceed_status_thread (struct thre
  
    /* Discard any remaining commands or status from previous stop.  */
@@ -606,6 +622,24 @@ Index: gdb-6.8.50.20081214/gdb/infrun.c
  }
  
  static int
+--- ./gdb/target.c	2009-02-10 23:45:59.000000000 +0100
++++ ./gdb/target.c	2009-02-10 23:43:29.000000000 +0100
+@@ -41,6 +41,7 @@
+ #include "target-descriptions.h"
+ #include "gdbthread.h"
+ #include "solib.h"
++#include "inline-frame.h"
+ 
+ static void target_info (char *, int);
+ 
+@@ -1938,6 +1939,7 @@ target_pid_to_str (ptid_t ptid)
+ void
+ target_resume (ptid_t ptid, int step, enum target_signal signal)
+ {
++  clear_inline_frame_state (ptid);
+   dcache_invalidate (target_dcache);
+   (*current_target.to_resume) (ptid, step, signal);
+   set_executing (ptid, 1);
 Index: gdb-6.8.50.20081214/gdb/inline-frame.h
 ===================================================================
 --- gdb-6.8.50.20081214.orig/gdb/inline-frame.h	2009-02-09 13:28:48.000000000 +0100
@@ -621,3 +655,23 @@ Index: gdb-6.8.50.20081214/gdb/inline-frame.h
  /* Return the number of hidden functions inlined into the current
     frame.  */
  
+--- gdb-6.8.50.20090209/gdb/infcall.c	2009-02-10 00:16:10.000000000 +0100
++++ gdb-6.8.50.20090209/gdb/infcall.c-removed	2009-02-10 00:15:58.000000000 +0100
+@@ -841,8 +841,15 @@ When the function is done executing, GDB
+ 
+ 	  if (unwind_on_signal_p)
+ 	    {
+-	      /* The user wants the context restored.  Calling error will
+-	         run inf_status_cleanup, which does all the work.  */
++	      /* The user wants the context restored. */
++
++	      /* We must get back to the frame we were before the
++		 dummy call.  */
++	      dummy_frame_pop (dummy_id);
++
++	      /* We also need to restore inferior status to that before the
++		 dummy call.  */
++	      restore_inferior_status (inf_status);
+ 
+ 	      /* FIXME: Insert a bunch of wrap_here; name can be very
+ 		 long if it's a C++ name with arguments and stuff.  */
