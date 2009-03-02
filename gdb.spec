@@ -9,7 +9,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090228
+Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -370,11 +370,16 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 # The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
 Patch349: gdb-archer.patch
 
+# Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
+# - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
+Patch352: gdb-6.8-bz457187-largefile.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
 Requires: rpm-libs
 BuildRequires: rpm-devel
+%{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
 
@@ -556,6 +561,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch337 -p1
 %patch343 -p1
 %patch348 -p1
+%patch352 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -629,6 +635,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 %else
 	--without-libunwind				\
 %endif
+	--enable-64-bit-bfd				\
 %if 0%{?_with_debug:1}
 	--enable-static --disable-shared --enable-debug	\
 %endif
@@ -806,7 +813,8 @@ fi
 %{_bindir}/pstack
 %{_mandir}/*/gstack.1*
 %{_mandir}/*/pstack.1*
-%{_datadir}/%{name}
+%{python_sitelib}/gdb
+%{_datadir}/gdb
 %endif	# 0%{!?_with_upstream:1}
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
@@ -822,18 +830,22 @@ fi
 %endif
 
 %changelog
-* Sat Feb 28 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090228-1
+* Mon Mar  2 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-1
 - Include the Archer Project: http://sourceware.org/gdb/wiki/ProjectArcher
   * [python] Python scripting support: http://sourceware.org/gdb/wiki/PythonGdb
   * [catch-syscall] Trap and display syscalls.
   * [delayed-symfile] Improve startup performance by lazily read psymtabs.
   * [exception-rewind] Fix fatal C++ exceptions in an inferior function call.
+  * [expr] Expressions, single-quote elimination, C++ input canonicalization.
+  * [using-directive] C++ namespaces.
   * [vla] C variable length arrays / DW_FORM_block / Fortran dynamic arrays.
   * [misc] Fix debuginfoless `return' (BZ 365111), fix command-line macros for
     expected GCC (BZ 479914), new testcase for valgrind (for BZ 483262),
     implement `info common' for Fortran, fix Fortran logical-kind=8 (BZ 465310),
-    fix static variable in C++ constructors (BZ 445912)
+    fix static variable in C++ constructors (BZ 445912), fix power7 (BZ 485319).
 - Upgrade to the FSF GDB gdb-6.8.50 snapshot.
+- Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
+  - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
 
 * Tue Feb 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 6.8.50.20090210-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_11_Mass_Rebuild
