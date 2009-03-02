@@ -11,11 +11,11 @@
 
         * gdb.texinfo (File Options): Document --readnever.
 
-Index: gdb-6.8.50.20081128/gdb/doc/gdb.texinfo
+Index: gdb-6.8.50.20090226/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-6.8.50.20081128.orig/gdb/doc/gdb.texinfo	2008-11-27 10:23:01.000000000 +0100
-+++ gdb-6.8.50.20081128/gdb/doc/gdb.texinfo	2008-12-02 19:07:35.000000000 +0100
-@@ -994,6 +994,12 @@ Read each symbol file's entire symbol ta
+--- gdb-6.8.50.20090226.orig/gdb/doc/gdb.texinfo	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/doc/gdb.texinfo	2009-02-28 07:19:50.000000000 +0100
+@@ -988,6 +988,12 @@ Read each symbol file's entire symbol ta
  the default, which is to read it incrementally as it is needed.
  This makes startup slower, but makes future operations faster.
  
@@ -28,11 +28,11 @@ Index: gdb-6.8.50.20081128/gdb/doc/gdb.texinfo
  @end table
  
  @node Mode Options
-Index: gdb-6.8.50.20081128/gdb/main.c
+Index: gdb-6.8.50.20090226/gdb/main.c
 ===================================================================
---- gdb-6.8.50.20081128.orig/gdb/main.c	2008-12-02 18:07:21.000000000 +0100
-+++ gdb-6.8.50.20081128/gdb/main.c	2008-12-02 19:07:35.000000000 +0100
-@@ -295,6 +295,7 @@ captured_main (void *data)
+--- gdb-6.8.50.20090226.orig/gdb/main.c	2009-02-28 07:15:57.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/main.c	2009-02-28 07:20:20.000000000 +0100
+@@ -427,6 +427,7 @@ captured_main (void *data)
        {"xdb", no_argument, &xdb_commands, 1},
        {"dbx", no_argument, &dbx_commands, 1},
        {"readnow", no_argument, &readnow_symbol_files, 1},
@@ -40,18 +40,18 @@ Index: gdb-6.8.50.20081128/gdb/main.c
        {"r", no_argument, &readnow_symbol_files, 1},
        {"quiet", no_argument, &quiet, 1},
        {"q", no_argument, &quiet, 1},
-@@ -895,6 +896,7 @@ Options:\n\n\
-   fputs_unfiltered (_(" file.\n\
+@@ -1070,6 +1071,7 @@ Options:\n\n\
+   fputs_unfiltered (_("\
    --quiet            Do not print version number on startup.\n\
    --readnow          Fully read symbol files on first access.\n\
 +  --readnever        Do not read symbol files.\n\
  "), stream);
    fputs_unfiltered (_("\
    --se=FILE          Use FILE as symbol file and executable file.\n\
-Index: gdb-6.8.50.20081128/gdb/symfile.c
+Index: gdb-6.8.50.20090226/gdb/symfile.c
 ===================================================================
---- gdb-6.8.50.20081128.orig/gdb/symfile.c	2008-12-01 16:34:36.000000000 +0100
-+++ gdb-6.8.50.20081128/gdb/symfile.c	2008-12-02 19:07:35.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/symfile.c	2009-02-27 07:51:56.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/symfile.c	2009-02-28 07:19:50.000000000 +0100
 @@ -77,6 +77,7 @@ static void clear_symtab_users_cleanup (
  
  /* Global variables owned by this file */
@@ -60,32 +60,32 @@ Index: gdb-6.8.50.20081128/gdb/symfile.c
  
  /* External variables and functions referenced. */
  
-Index: gdb-6.8.50.20081128/gdb/dwarf2read.c
+Index: gdb-6.8.50.20090226/gdb/dwarf2read.c
 ===================================================================
---- gdb-6.8.50.20081128.orig/gdb/dwarf2read.c	2008-11-15 19:49:50.000000000 +0100
-+++ gdb-6.8.50.20081128/gdb/dwarf2read.c	2008-12-02 19:08:53.000000000 +0100
-@@ -46,6 +46,7 @@
- #include "command.h"
+--- gdb-6.8.50.20090226.orig/gdb/dwarf2read.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/dwarf2read.c	2009-02-28 07:21:27.000000000 +0100
+@@ -48,6 +48,7 @@
  #include "gdbcmd.h"
  #include "addrmap.h"
+ #include "f-lang.h"
 +#include "top.h"
  
  #include <fcntl.h>
  #include "gdb_string.h"
-@@ -1122,7 +1123,8 @@ dwarf2_has_info (struct objfile *objfile
-   dwarf_loc_section = 0;
+@@ -1169,7 +1170,8 @@ dwarf2_has_info (struct objfile *objfile
+   dwarf_aranges_section = 0;
    
-   bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, NULL);
+   bfd_map_over_sections (objfile->obfd, dwarf2_locate_sections, &update_sizes);
 -  return (dwarf_info_section != NULL && dwarf_abbrev_section != NULL);
 +  return !readnever_symbol_files
 +	 && dwarf_info_section != NULL && dwarf_abbrev_section != NULL;
  }
  
  /* When loading sections, we can either look for ".<name>", or for
-Index: gdb-6.8.50.20081128/gdb/top.h
+Index: gdb-6.8.50.20090226/gdb/top.h
 ===================================================================
---- gdb-6.8.50.20081128.orig/gdb/top.h	2008-01-01 23:53:13.000000000 +0100
-+++ gdb-6.8.50.20081128/gdb/top.h	2008-12-02 19:07:35.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/top.h	2009-01-03 06:57:53.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/top.h	2009-02-28 07:19:50.000000000 +0100
 @@ -59,6 +59,7 @@ extern void set_prompt (char *);
  
  /* From random places.  */

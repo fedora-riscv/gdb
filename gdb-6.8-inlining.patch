@@ -5,10 +5,10 @@ http://sourceware.org/ml/gdb-patches/2008-07/msg00317.html
 
 Removed dwarf_expr_frame_base NULL check duplicity with *-vla.patch.
 
-Index: gdb-6.8.50.20090209/gdb/NEWS
+Index: gdb-6.8.50.20090226/gdb/NEWS
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/NEWS	2009-02-07 16:00:57.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/NEWS	2009-02-09 16:06:54.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/NEWS	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/NEWS	2009-02-28 07:34:29.000000000 +0100
 @@ -1,6 +1,11 @@
  		What has changed in GDB?
  	     (Organized release by release)
@@ -20,11 +20,11 @@ Index: gdb-6.8.50.20090209/gdb/NEWS
 +
  *** Changes since GDB 6.8
  
- * GDB now supports automatic retrieval of shared library files from
-Index: gdb-6.8.50.20090209/gdb/block.c
+ * GDB now has support for multi-byte and wide character sets on the
+Index: gdb-6.8.50.20090226/gdb/block.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/block.c	2009-01-03 06:57:50.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/block.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/block.c	2009-01-03 06:57:50.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/block.c	2009-02-28 07:34:09.000000000 +0100
 @@ -47,8 +47,16 @@ contained_in (const struct block *a, con
  {
    if (!a || !b)
@@ -67,10 +67,10 @@ Index: gdb-6.8.50.20090209/gdb/block.c
  /* Return the blockvector immediately containing the innermost lexical
     block containing the specified pc value and section, or 0 if there
     is none.  PBLOCK is a pointer to the block.  If PBLOCK is NULL, we
-Index: gdb-6.8.50.20090209/gdb/block.h
+Index: gdb-6.8.50.20090226/gdb/block.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/block.h	2009-01-03 06:57:50.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/block.h	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/block.h	2009-01-03 06:57:50.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/block.h	2009-02-28 07:34:09.000000000 +0100
 @@ -65,7 +65,7 @@ struct block
    CORE_ADDR endaddr;
  
@@ -89,10 +89,10 @@ Index: gdb-6.8.50.20090209/gdb/block.h
  extern int contained_in (const struct block *, const struct block *);
  
  extern struct blockvector *blockvector_for_pc (CORE_ADDR, struct block **);
-Index: gdb-6.8.50.20090209/gdb/blockframe.c
+Index: gdb-6.8.50.20090226/gdb/blockframe.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/blockframe.c	2009-01-03 06:57:50.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/blockframe.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/blockframe.c	2009-01-03 06:57:50.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/blockframe.c	2009-02-28 07:34:09.000000000 +0100
 @@ -36,6 +36,7 @@
  #include "command.h"
  #include "gdbcmd.h"
@@ -161,11 +161,11 @@ Index: gdb-6.8.50.20090209/gdb/blockframe.c
  	return frame;
  
        frame = get_prev_frame (frame);
-Index: gdb-6.8.50.20090209/gdb/breakpoint.c
+Index: gdb-6.8.50.20090226/gdb/breakpoint.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/breakpoint.c	2009-02-09 16:04:10.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/breakpoint.c	2009-02-09 16:06:00.000000000 +0100
-@@ -2615,19 +2615,21 @@ watchpoint_check (void *p)
+--- gdb-6.8.50.20090226.orig/gdb/breakpoint.c	2009-02-28 07:33:47.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/breakpoint.c	2009-02-28 07:34:09.000000000 +0100
+@@ -2641,19 +2641,21 @@ watchpoint_check (void *p)
      within_current_scope = 1;
    else
      {
@@ -195,7 +195,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
  
        /* in_function_epilogue_p() returns a non-zero value if we're still
  	 in the function but the stack frame has already been invalidated.
-@@ -2639,10 +2641,9 @@ watchpoint_check (void *p)
+@@ -2665,10 +2667,9 @@ watchpoint_check (void *p)
  	 that the watchpoint frame couldn't be found by frame_find_by_id()
  	 because the current PC is currently in an epilogue.  Calling
  	 gdbarch_in_function_epilogue_p() also when fr == NULL fixes that. */
@@ -208,7 +208,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
  	/* If we end up stopping, the current frame will get selected
  	   in normal_stop.  So this call to select_frame won't affect
  	   the user.  */
-@@ -2876,7 +2877,7 @@ bpstat_check_breakpoint_conditions (bpst
+@@ -2902,7 +2903,7 @@ bpstat_check_breakpoint_conditions (bpst
    struct breakpoint *b = bl->owner;
  
    if (frame_id_p (b->frame_id)
@@ -217,7 +217,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
      bs->stop = 0;
    else if (bs->stop)
      {
-@@ -2891,8 +2892,12 @@ bpstat_check_breakpoint_conditions (bpst
+@@ -2917,8 +2918,12 @@ bpstat_check_breakpoint_conditions (bpst
        
        if (bl->cond && bl->owner->disposition != disp_del_at_next_stop)
  	{
@@ -232,7 +232,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
  	  select_frame (get_current_frame ());
  	  value_is_zero
  	    = catch_errors (breakpoint_cond_eval, (bl->cond),
-@@ -4862,6 +4867,11 @@ set_momentary_breakpoint (struct symtab_
+@@ -5162,6 +5167,11 @@ set_momentary_breakpoint (struct symtab_
  			  enum bptype type)
  {
    struct breakpoint *b;
@@ -244,7 +244,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
    b = set_raw_breakpoint (sal, type);
    b->enable_state = bp_enabled;
    b->disposition = disp_donttouch;
-@@ -5872,7 +5882,6 @@ watch_command_1 (char *arg, int accessfl
+@@ -6175,7 +6185,6 @@ watch_command_1 (char *arg, int accessfl
    struct block *exp_valid_block;
    struct value *val, *mark, *val_chain;
    struct frame_info *frame;
@@ -252,7 +252,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
    char *exp_start = NULL;
    char *exp_end = NULL;
    char *tok, *id_tok_start, *end_tok;
-@@ -6033,34 +6042,34 @@ watch_command_1 (char *arg, int accessfl
+@@ -6336,34 +6345,34 @@ watch_command_1 (char *arg, int accessfl
      bp_type = bp_watchpoint;
  
    frame = block_innermost_frame (exp_valid_block);
@@ -305,7 +305,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
      }
  
    /* Now set up the breakpoint.  */
-@@ -6241,7 +6250,6 @@ until_break_command (char *arg, int from
+@@ -6544,7 +6553,6 @@ until_break_command (char *arg, int from
    struct symtabs_and_lines sals;
    struct symtab_and_line sal;
    struct frame_info *frame = get_selected_frame (NULL);
@@ -313,7 +313,7 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
    struct breakpoint *breakpoint;
    struct breakpoint *breakpoint2 = NULL;
    struct cleanup *old_chain;
-@@ -6274,20 +6282,22 @@ until_break_command (char *arg, int from
+@@ -6577,20 +6585,22 @@ until_break_command (char *arg, int from
         we don't specify a frame at which we need to stop.  */
      breakpoint = set_momentary_breakpoint (sal, null_frame_id, bp_until);
    else
@@ -342,10 +342,10 @@ Index: gdb-6.8.50.20090209/gdb/breakpoint.c
  					      bp_until);
        make_cleanup_delete_breakpoint (breakpoint2);
      }
-Index: gdb-6.8.50.20090209/gdb/buildsym.c
+Index: gdb-6.8.50.20090226/gdb/buildsym.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/buildsym.c	2009-01-03 06:57:50.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/buildsym.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/buildsym.c	2009-01-03 06:57:50.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/buildsym.c	2009-02-28 07:34:09.000000000 +0100
 @@ -1159,6 +1159,12 @@ end_symtab (CORE_ADDR end_addr, struct o
  	  struct symbol *sym;
  	  struct dict_iterator iter;
@@ -359,10 +359,10 @@ Index: gdb-6.8.50.20090209/gdb/buildsym.c
  	  for (sym = dict_iterator_first (BLOCK_DICT (block), &iter);
  	       sym != NULL;
  	       sym = dict_iterator_next (&iter))
-Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
+Index: gdb-6.8.50.20090226/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/doc/gdb.texinfo	2009-02-09 16:04:10.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/doc/gdb.texinfo	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/doc/gdb.texinfo	2009-02-28 07:33:47.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/doc/gdb.texinfo	2009-02-28 07:34:09.000000000 +0100
 @@ -137,6 +137,7 @@ software in general.  We will miss him.
  * Stack::                       Examining the stack
  * Source::                      Examining source files
@@ -371,7 +371,7 @@ Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
  * Macros::                      Preprocessor Macros
  * Tracepoints::                 Debugging remote targets non-intrusively
  * Overlays::                    Debugging programs that use overlays
-@@ -1812,7 +1813,7 @@ To request debugging information, specif
+@@ -1824,7 +1825,7 @@ To request debugging information, specif
  the compiler.
  
  Programs that are to be shipped to your customers are compiled with
@@ -380,7 +380,7 @@ Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
  compilers are unable to handle the @samp{-g} and @samp{-O} options
  together.  Using those compilers, you cannot generate optimized
  executables containing debugging information.
-@@ -1821,22 +1822,7 @@ executables containing debugging informa
+@@ -1833,22 +1834,7 @@ executables containing debugging informa
  without @samp{-O}, making it possible to debug optimized code.  We
  recommend that you @emph{always} use @samp{-g} whenever you compile a
  program.  You may think your program is correct, but there is no sense
@@ -404,7 +404,7 @@ Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
  
  Older versions of the @sc{gnu} C compiler permitted a variant option
  @w{@samp{-gg}} for debugging information.  @value{GDBN} no longer supports this
-@@ -8297,6 +8283,107 @@ $1 = 1
+@@ -8393,6 +8379,107 @@ $1 = 1
  $2 = (void *) 0x8049560
  @end smallexample
  
@@ -512,10 +512,10 @@ Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
  @node Macros
  @chapter C Preprocessor Macros
  
-Index: gdb-6.8.50.20090209/gdb/dwarf2loc.c
+Index: gdb-6.8.50.20090226/gdb/dwarf2loc.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/dwarf2loc.c	2009-02-09 15:38:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/dwarf2loc.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/dwarf2loc.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/dwarf2loc.c	2009-02-28 07:34:09.000000000 +0100
 @@ -31,6 +31,7 @@
  #include "regcache.h"
  #include "objfiles.h"
@@ -536,19 +536,19 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2loc.c
  
    /* If we found a frame-relative symbol then it was certainly within
       some function associated with a frame. If we can't find the frame,
-Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
+Index: gdb-6.8.50.20090226/gdb/dwarf2read.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/dwarf2read.c	2009-02-09 16:03:46.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/dwarf2read.c	2009-02-09 16:06:00.000000000 +0100
-@@ -46,6 +46,7 @@
- #include "hashtab.h"
- #include "command.h"
- #include "gdbcmd.h"
-+#include "block.h"
+--- gdb-6.8.50.20090226.orig/gdb/dwarf2read.c	2009-02-28 07:33:47.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/dwarf2read.c	2009-02-28 07:36:45.000000000 +0100
+@@ -49,6 +49,7 @@
  #include "addrmap.h"
+ #include "f-lang.h"
  #include "top.h"
++#include "block.h"
  
-@@ -2788,12 +2789,8 @@ process_die (struct die_info *die, struc
+ #include <fcntl.h>
+ #include "gdb_string.h"
+@@ -2947,12 +2948,8 @@ process_die (struct die_info *die, struc
        read_file_scope (die, cu);
        break;
      case DW_TAG_subprogram:
@@ -562,15 +562,11 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
        break;
      case DW_TAG_lexical_block:
      case DW_TAG_try_block:
-@@ -3056,10 +3053,25 @@ read_func_scope (struct die_info *die, s
-   CORE_ADDR lowpc;
-   CORE_ADDR highpc;
-   struct die_info *child_die;
--  struct attribute *attr;
-+  struct attribute *attr, *call_line, *call_file;
-   char *name;
+@@ -3233,6 +3230,22 @@ read_func_scope (struct die_info *die, s
    CORE_ADDR baseaddr;
    struct block *block;
+   unsigned die_children;
++  struct attribute *call_line, *call_file;
 +  int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
 +
 +  if (inlined_func)
@@ -589,7 +585,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
-@@ -6949,6 +6961,9 @@ die_specification (struct die_info *die,
+@@ -7310,6 +7323,9 @@ die_specification (struct die_info *die,
  					     *spec_cu);
  
    if (spec_attr == NULL)
@@ -599,7 +595,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
      return NULL;
    else
      return follow_die_ref (die, spec_attr, spec_cu);
-@@ -7632,6 +7647,7 @@ new_symbol (struct die_info *die, struct
+@@ -7993,6 +8009,7 @@ new_symbol (struct die_info *die, struct
    struct attribute *attr = NULL;
    struct attribute *attr2 = NULL;
    CORE_ADDR baseaddr;
@@ -607,7 +603,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
-@@ -7661,13 +7677,17 @@ new_symbol (struct die_info *die, struct
+@@ -8022,13 +8039,17 @@ new_symbol (struct die_info *die, struct
  	SYMBOL_TYPE (sym) = type;
        else
  	SYMBOL_TYPE (sym) = die_type (die, cu);
@@ -627,7 +623,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
        if (attr)
  	{
  	  int file_index = DW_UNSND (attr);
-@@ -7714,6 +7734,14 @@ new_symbol (struct die_info *die, struct
+@@ -8075,6 +8096,14 @@ new_symbol (struct die_info *die, struct
  	      add_symbol_to_list (sym, cu->list_in_scope);
  	    }
  	  break;
@@ -642,7 +638,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
  	case DW_TAG_variable:
  	  /* Compilation with minimal debug info may result in variables
  	     with missing type entries. Change the misleading `void' type
-@@ -7761,7 +7789,14 @@ new_symbol (struct die_info *die, struct
+@@ -8130,7 +8159,14 @@ new_symbol (struct die_info *die, struct
  	    }
  	  break;
  	case DW_TAG_formal_parameter:
@@ -658,10 +654,10 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
  	  attr = dwarf2_attr (die, DW_AT_location, cu);
  	  if (attr)
  	    {
-Index: gdb-6.8.50.20090209/gdb/frame-unwind.c
+Index: gdb-6.8.50.20090226/gdb/frame-unwind.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/frame-unwind.c	2009-01-03 06:57:51.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/frame-unwind.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/frame-unwind.c	2009-01-03 06:57:51.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/frame-unwind.c	2009-02-28 07:34:09.000000000 +0100
 @@ -21,6 +21,7 @@
  #include "frame.h"
  #include "frame-unwind.h"
@@ -682,10 +678,10 @@ Index: gdb-6.8.50.20090209/gdb/frame-unwind.c
    return table;
  }
  
-Index: gdb-6.8.50.20090209/gdb/frame.c
+Index: gdb-6.8.50.20090226/gdb/frame.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/frame.c	2009-02-09 15:48:46.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/frame.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/frame.c	2009-02-28 07:22:02.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/frame.c	2009-02-28 07:34:09.000000000 +0100
 @@ -41,8 +41,14 @@
  #include "objfiles.h"
  #include "exceptions.h"
@@ -1042,10 +1038,10 @@ Index: gdb-6.8.50.20090209/gdb/frame.c
  }
  
  /* Per "frame.h", return the ``address'' of the frame.  Code should
-Index: gdb-6.8.50.20090209/gdb/frame.h
+Index: gdb-6.8.50.20090226/gdb/frame.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/frame.h	2009-02-05 18:28:20.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/frame.h	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/frame.h	2009-02-05 18:28:20.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/frame.h	2009-02-28 07:34:09.000000000 +0100
 @@ -34,6 +34,9 @@
     frame_unwind_WHAT...(): Unwind THIS frame's WHAT from the NEXT
     frame.
@@ -1107,10 +1103,10 @@ Index: gdb-6.8.50.20090209/gdb/frame.h
  extern struct frame_id frame_unwind_id (struct frame_info *next_frame);
  
  /* Assuming that a frame is `normal', return its base-address, or 0 if
-Index: gdb-6.8.50.20090209/gdb/gdbthread.h
+Index: gdb-6.8.50.20090226/gdb/gdbthread.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/gdbthread.h	2009-01-18 18:42:16.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/gdbthread.h	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/gdbthread.h	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/gdbthread.h	2009-02-28 07:34:09.000000000 +0100
 @@ -83,6 +83,13 @@ struct thread_info
       This is how we know when we step into a subroutine call, and how
       to set the frame for the breakpoint used to step out.  */
@@ -1125,11 +1121,11 @@ Index: gdb-6.8.50.20090209/gdb/gdbthread.h
    int current_line;
    struct symtab *current_symtab;
  
-Index: gdb-6.8.50.20090209/gdb/infcall.c
+Index: gdb-6.8.50.20090226/gdb/infcall.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/infcall.c	2009-01-19 20:05:00.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/infcall.c	2009-02-09 16:08:45.000000000 +0100
-@@ -841,15 +841,8 @@ When the function is done executing, GDB
+--- gdb-6.8.50.20090226.orig/gdb/infcall.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/infcall.c	2009-02-28 07:34:09.000000000 +0100
+@@ -898,15 +898,8 @@ The program being debugged exited while 
  
  	  if (unwind_on_signal_p)
  	    {
@@ -1147,10 +1143,10 @@ Index: gdb-6.8.50.20090209/gdb/infcall.c
  
  	      /* FIXME: Insert a bunch of wrap_here; name can be very
  		 long if it's a C++ name with arguments and stuff.  */
-Index: gdb-6.8.50.20090209/gdb/infcmd.c
+Index: gdb-6.8.50.20090226/gdb/infcmd.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/infcmd.c	2009-01-26 00:35:51.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/infcmd.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/infcmd.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/infcmd.c	2009-02-28 07:34:09.000000000 +0100
 @@ -52,6 +52,7 @@
  #include "cli/cli-decode.h"
  #include "gdbthread.h"
@@ -1159,7 +1155,7 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
  
  /* Functions exported for general use, in inferior.h: */
  
-@@ -739,6 +740,17 @@ Can't resume all threads and specify pro
+@@ -744,6 +745,17 @@ Can't resume all threads and specify pro
    continue_1 (all_threads);
  }
  
@@ -1177,7 +1173,7 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
  /* Step until outside of current statement.  */
  
  static void
-@@ -916,6 +928,20 @@ step_once (int skip_subroutines, int sin
+@@ -921,6 +933,20 @@ step_once (int skip_subroutines, int sin
  	 THREAD is set.  */
        struct thread_info *tp = inferior_thread ();
        clear_proceed_status ();
@@ -1198,7 +1194,7 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
  
        frame = get_current_frame ();
        tp->step_frame_id = get_frame_id (frame);
-@@ -1168,6 +1194,7 @@ until_next_command (int from_tty)
+@@ -1173,6 +1199,7 @@ until_next_command (int from_tty)
    clear_proceed_status ();
  
    frame = get_current_frame ();
@@ -1206,7 +1202,7 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
  
    /* Step until either exited from this function or greater
       than the current line (if in symbolic section) or pc (if
-@@ -1195,7 +1222,6 @@ until_next_command (int from_tty)
+@@ -1200,7 +1227,6 @@ until_next_command (int from_tty)
      }
  
    tp->step_over_calls = STEP_OVER_ALL;
@@ -1214,7 +1210,7 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
  
    tp->step_multi = 0;		/* Only one call to proceed */
  
-@@ -1528,6 +1554,37 @@ finish_command (char *arg, int from_tty)
+@@ -1533,6 +1559,37 @@ finish_command (char *arg, int from_tty)
  
    clear_proceed_status ();
  
@@ -1252,10 +1248,10 @@ Index: gdb-6.8.50.20090209/gdb/infcmd.c
    /* Find the function we will return from.  */
  
    function = find_pc_function (get_frame_pc (get_selected_frame (NULL)));
-Index: gdb-6.8.50.20090209/gdb/inferior.h
+Index: gdb-6.8.50.20090226/gdb/inferior.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/inferior.h	2009-02-09 15:39:01.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/inferior.h	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/inferior.h	2009-02-27 00:04:34.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/inferior.h	2009-02-28 07:34:09.000000000 +0100
 @@ -259,6 +259,9 @@ extern void error_is_running (void);
  /* Calls error_is_running if the current thread is running.  */
  extern void ensure_not_running (void);
@@ -1266,10 +1262,10 @@ Index: gdb-6.8.50.20090209/gdb/inferior.h
  /* From infcmd.c */
  
  extern void tty_command (char *, int);
-Index: gdb-6.8.50.20090209/gdb/infrun.c
+Index: gdb-6.8.50.20090226/gdb/infrun.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/infrun.c	2009-02-09 16:02:31.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/infrun.c	2009-02-09 16:09:19.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/infrun.c	2009-02-28 07:31:50.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/infrun.c	2009-02-28 07:37:36.000000000 +0100
 @@ -48,6 +48,7 @@
  #include "gdb_assert.h"
  #include "mi/mi-common.h"
@@ -1287,7 +1283,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  
  /* Command list pointer for the "stop" placeholder.  */
  
-@@ -1146,6 +1147,8 @@ a command like `return' or `jump' to con
+@@ -1151,6 +1152,8 @@ a command like `return' or `jump' to con
  	    step = 0;
  	}
  
@@ -1296,7 +1292,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
        if (debug_displaced
            && use_displaced_stepping (gdbarch)
            && tp->trap_expected)
-@@ -1187,6 +1190,7 @@ clear_proceed_status_thread (struct thre
+@@ -1192,6 +1195,7 @@ clear_proceed_status_thread (struct thre
    tp->step_range_start = 0;
    tp->step_range_end = 0;
    tp->step_frame_id = null_frame_id;
@@ -1304,7 +1300,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    tp->step_over_calls = STEP_OVER_UNDEBUGGABLE;
    tp->stop_requested = 0;
  
-@@ -1531,6 +1535,9 @@ init_wait_for_inferior (void)
+@@ -1536,6 +1540,9 @@ init_wait_for_inferior (void)
    init_infwait_state ();
  
    displaced_step_clear ();
@@ -1314,7 +1310,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  }
  
  
-@@ -1586,7 +1593,7 @@ struct execution_control_state
+@@ -1591,7 +1598,7 @@ struct execution_control_state
    int wait_some_more;
  };
  
@@ -1323,7 +1319,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  
  void handle_inferior_event (struct execution_control_state *ecs);
  
-@@ -1944,10 +1951,21 @@ fetch_inferior_event (void *client_data)
+@@ -1949,10 +1956,21 @@ fetch_inferior_event (void *client_data)
      display_gdb_prompt (0);
  }
  
@@ -1346,7 +1342,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  init_execution_control_state (struct execution_control_state *ecs)
  {
    ecs->random_signal = 0;
-@@ -1958,16 +1976,10 @@ init_execution_control_state (struct exe
+@@ -1963,16 +1981,10 @@ init_execution_control_state (struct exe
  void
  init_thread_stepping_state (struct thread_info *tss)
  {
@@ -1363,8 +1359,8 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  }
  
  /* Return the cached copy of the last pid/waitstatus returned by
-@@ -2137,6 +2149,22 @@ ensure_not_running (void)
-     error_is_running ();
+@@ -2186,6 +2198,22 @@ deal_with_syscall_event (struct executio
+     }
  }
  
 +static int
@@ -1386,7 +1382,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  /* Given an execution control state that has been freshly filled in
     by an event from the inferior, figure out what it means and take
     appropriate action.  */
-@@ -2828,6 +2856,12 @@ targets should add new threads to the th
+@@ -2880,6 +2908,12 @@ targets should add new threads to the th
    ecs->random_signal = 0;
    stopped_by_random_signal = 0;
  
@@ -1399,7 +1395,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    if (ecs->event_thread->stop_signal == TARGET_SIGNAL_TRAP
        && ecs->event_thread->trap_expected
        && gdbarch_single_step_through_delay_p (current_gdbarch)
-@@ -3060,8 +3094,8 @@ process_event_stop_test:
+@@ -3112,8 +3146,8 @@ process_event_stop_test:
  	  && ecs->event_thread->stop_signal != TARGET_SIGNAL_0
  	  && (ecs->event_thread->step_range_start <= stop_pc
  	      && stop_pc < ecs->event_thread->step_range_end)
@@ -1410,7 +1406,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  	  && ecs->event_thread->step_resume_breakpoint == NULL)
  	{
  	  /* The inferior is about to take a signal that will take it
-@@ -3447,10 +3481,10 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
+@@ -3499,10 +3533,10 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
       NOTE: frame_id_eq will never report two invalid frame IDs as
       being equal, so to get into this block, both the current and
       previous frame must have valid frame IDs.  */
@@ -1424,7 +1420,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  	  || execution_direction == EXEC_REVERSE))
      {
        CORE_ADDR real_stop_pc;
-@@ -3693,6 +3727,82 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
+@@ -3745,6 +3779,82 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
        return;
      }
  
@@ -1507,7 +1503,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    if ((stop_pc == stop_pc_sal.pc)
        && (ecs->event_thread->current_line != stop_pc_sal.line
   	  || ecs->event_thread->current_symtab != stop_pc_sal.symtab))
-@@ -3718,9 +3828,7 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
+@@ -3770,9 +3880,7 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
  
    ecs->event_thread->step_range_start = stop_pc_sal.pc;
    ecs->event_thread->step_range_end = stop_pc_sal.end;
@@ -1518,7 +1514,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
  
    if (debug_infrun)
       fprintf_unfiltered (gdb_stdlog, "infrun: keep going\n");
-@@ -4987,6 +5095,7 @@ struct inferior_status
+@@ -5024,6 +5132,7 @@ struct inferior_status
    CORE_ADDR step_range_start;
    CORE_ADDR step_range_end;
    struct frame_id step_frame_id;
@@ -1526,7 +1522,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    enum step_over_calls_kind step_over_calls;
    CORE_ADDR step_resume_break_address;
    int stop_after_trap;
-@@ -5016,6 +5125,7 @@ save_inferior_status (void)
+@@ -5053,6 +5162,7 @@ save_inferior_status (void)
    inf_status->step_range_start = tp->step_range_start;
    inf_status->step_range_end = tp->step_range_end;
    inf_status->step_frame_id = tp->step_frame_id;
@@ -1534,7 +1530,7 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    inf_status->step_over_calls = tp->step_over_calls;
    inf_status->stop_after_trap = stop_after_trap;
    inf_status->stop_soon = inf->stop_soon;
-@@ -5069,6 +5179,7 @@ restore_inferior_status (struct inferior
+@@ -5106,6 +5216,7 @@ restore_inferior_status (struct inferior
    tp->step_range_start = inf_status->step_range_start;
    tp->step_range_end = inf_status->step_range_end;
    tp->step_frame_id = inf_status->step_frame_id;
@@ -1542,10 +1538,10 @@ Index: gdb-6.8.50.20090209/gdb/infrun.c
    tp->step_over_calls = inf_status->step_over_calls;
    stop_after_trap = inf_status->stop_after_trap;
    inf->stop_soon = inf_status->stop_soon;
-Index: gdb-6.8.50.20090209/gdb/inline-frame.c
+Index: gdb-6.8.50.20090226/gdb/inline-frame.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/inline-frame.c	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/inline-frame.c	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,382 @@
 +/* Inline frame unwinder for GDB.
 +
@@ -1929,10 +1925,10 @@ Index: gdb-6.8.50.20090209/gdb/inline-frame.c
 +
 +  return inline_count;
 +}
-Index: gdb-6.8.50.20090209/gdb/inline-frame.h
+Index: gdb-6.8.50.20090226/gdb/inline-frame.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/inline-frame.h	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/inline-frame.h	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,62 @@
 +/* Definitions for inline frame support.
 +
@@ -1996,10 +1992,10 @@ Index: gdb-6.8.50.20090209/gdb/inline-frame.h
 +int frame_inlined_callees (struct frame_info *this_frame);
 +
 +#endif /* !defined (INLINE_FRAME_H) */
-Index: gdb-6.8.50.20090209/gdb/minsyms.c
+Index: gdb-6.8.50.20090226/gdb/minsyms.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/minsyms.c	2009-02-09 16:02:28.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/minsyms.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/minsyms.c	2009-02-28 07:31:49.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/minsyms.c	2009-02-28 07:34:09.000000000 +0100
 @@ -767,7 +767,7 @@ prim_record_minimal_symbol_and_info (con
  
    if (msym_bunch_index == BUNCH_SIZE)
@@ -2009,10 +2005,10 @@ Index: gdb-6.8.50.20090209/gdb/minsyms.c
        msym_bunch_index = 0;
        new->next = msym_bunch;
        msym_bunch = new;
-Index: gdb-6.8.50.20090209/gdb/s390-tdep.c
+Index: gdb-6.8.50.20090226/gdb/s390-tdep.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/s390-tdep.c	2009-01-03 06:57:53.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/s390-tdep.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/s390-tdep.c	2009-02-22 02:02:19.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/s390-tdep.c	2009-02-28 07:34:09.000000000 +0100
 @@ -1182,6 +1182,7 @@ s390_prologue_frame_unwind_cache (struct
    CORE_ADDR prev_sp;
    int frame_pointer;
@@ -2046,10 +2042,10 @@ Index: gdb-6.8.50.20090209/gdb/s390-tdep.c
  	  || get_frame_type (get_next_frame (this_frame)) != NORMAL_FRAME))
      {
        /* See the comment in s390_in_function_epilogue_p on why this is
-Index: gdb-6.8.50.20090209/gdb/stack.c
+Index: gdb-6.8.50.20090226/gdb/stack.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/stack.c	2009-01-26 20:09:58.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/stack.c	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/stack.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/stack.c	2009-02-28 07:35:20.000000000 +0100
 @@ -45,6 +45,7 @@
  #include "valprint.h"
  #include "gdbthread.h"
@@ -2089,7 +2085,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
  /* Show or print a stack frame FRAME briefly.  The output is format
     according to PRINT_LEVEL and PRINT_WHAT printing the frame's
     relative level, function name, argument list, and file name and
-@@ -537,7 +562,7 @@ print_frame_info (struct frame_info *fra
+@@ -538,7 +563,7 @@ print_frame_info (struct frame_info *fra
      {
        int done = 0;
        int mid_statement = ((print_what == SRC_LINE)
@@ -2098,16 +2094,16 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
  
        if (annotation_level)
  	done = identify_source_line (sal.symtab, sal.line, mid_statement,
-@@ -594,7 +619,7 @@ print_frame (struct frame_info *frame, i
-   stb = ui_out_stream_new (uiout);
-   old_chain = make_cleanup_ui_out_stream_delete (stb);
+@@ -591,7 +616,7 @@ find_frame_funname (struct frame_info *f
+   *funname = NULL;
+   *funlang = language_unknown;
  
 -  func = find_pc_function (get_frame_address_in_block (frame));
 +  func = get_frame_function (frame);
    if (func)
      {
        /* In certain pathological cases, the symtabs give the wrong
-@@ -615,8 +640,13 @@ print_frame (struct frame_info *frame, i
+@@ -612,8 +637,13 @@ find_frame_funname (struct frame_info *f
           changed (and we'll create a find_pc_minimal_function or some
           such).  */
  
@@ -2123,7 +2119,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
  
        if (msymbol != NULL
  	  && (SYMBOL_VALUE_ADDRESS (msymbol)
-@@ -673,7 +703,7 @@ print_frame (struct frame_info *frame, i
+@@ -687,7 +717,7 @@ print_frame (struct frame_info *frame, i
      }
    get_user_print_options (&opts);
    if (opts.addressprint)
@@ -2132,7 +2128,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
  	|| print_what == LOC_AND_ADDRESS)
        {
  	annotate_frame_address ();
-@@ -853,8 +883,16 @@ parse_frame_specification_1 (const char 
+@@ -867,8 +897,16 @@ parse_frame_specification_1 (const char 
  	{
  	  if (frame_id_eq (id, get_frame_id (fid)))
  	    {
@@ -2151,7 +2147,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
  	      return fid;
  	    }
  	}
-@@ -988,8 +1026,10 @@ frame_info (char *addr_exp, int from_tty
+@@ -1002,8 +1040,10 @@ frame_info (char *addr_exp, int from_tty
  	printf_filtered (_(" Outermost frame: %s\n"),
  			 frame_stop_reason_string (reason));
      }
@@ -2164,7 +2160,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
      {
        printf_filtered (" called by frame at ");
        fputs_filtered (paddress (get_frame_base (calling_frame_info)),
-@@ -1449,7 +1489,9 @@ print_frame_local_vars (struct frame_inf
+@@ -1465,7 +1505,9 @@ print_frame_local_vars (struct frame_inf
        if (print_block_frame_locals (block, frame, num_tabs, stream))
  	values_printed = 1;
        /* After handling the function's top-level block, stop.  Don't
@@ -2175,7 +2171,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
        if (BLOCK_FUNCTION (block))
  	break;
        block = BLOCK_SUPERBLOCK (block);
-@@ -1520,7 +1562,9 @@ print_frame_label_vars (struct frame_inf
+@@ -1536,7 +1578,9 @@ print_frame_label_vars (struct frame_inf
  	return;
  
        /* After handling the function's top-level block, stop.  Don't
@@ -2186,7 +2182,7 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
        if (BLOCK_FUNCTION (block))
  	break;
        block = BLOCK_SUPERBLOCK (block);
-@@ -1790,6 +1834,9 @@ return_command (char *retval_exp, int fr
+@@ -1874,6 +1918,9 @@ return_command (char *retval_exp, int fr
    thisframe = get_selected_frame ("No selected frame.");
    thisfun = get_frame_function (thisframe);
  
@@ -2196,11 +2192,11 @@ Index: gdb-6.8.50.20090209/gdb/stack.c
    /* Compute the return value.  If the computation triggers an error,
       let it bail.  If the return type can't be handled, set
       RETURN_VALUE to NULL, and QUERY_PREFIX to an informational
-Index: gdb-6.8.50.20090209/gdb/symtab.c
+Index: gdb-6.8.50.20090226/gdb/symtab.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/symtab.c	2009-02-09 16:02:29.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/symtab.c	2009-02-09 16:06:00.000000000 +0100
-@@ -1373,10 +1373,13 @@ lookup_symbol_aux_local (const char *nam
+--- gdb-6.8.50.20090226.orig/gdb/symtab.c	2009-02-28 07:31:49.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/symtab.c	2009-02-28 07:34:09.000000000 +0100
+@@ -1408,10 +1408,13 @@ lookup_symbol_aux_local (const char *nam
        sym = lookup_symbol_aux_block (name, linkage_name, block, domain);
        if (sym != NULL)
  	return sym;
@@ -2215,7 +2211,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
  
    return NULL;
  }
-@@ -2609,6 +2612,7 @@ find_function_start_sal (struct symbol *
+@@ -2668,6 +2671,7 @@ find_function_start_sal (struct symbol *
  
    CORE_ADDR pc;
    struct symtab_and_line sal;
@@ -2223,7 +2219,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
  
    pc = BLOCK_START (block);
    fixup_symbol_section (sym, objfile);
-@@ -2647,6 +2651,25 @@ find_function_start_sal (struct symbol *
+@@ -2706,6 +2710,25 @@ find_function_start_sal (struct symbol *
  
    sal.pc = pc;
  
@@ -2249,7 +2245,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
    return sal;
  }
  
-@@ -3669,6 +3692,24 @@ add_macro_name (const char *name, const 
+@@ -3728,6 +3751,24 @@ add_macro_name (const char *name, const 
  			    datum->text, datum->word);
  }
  
@@ -2274,7 +2270,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
  char **
  default_make_symbol_completion_list (char *text, char *word)
  {
-@@ -3681,9 +3722,9 @@ default_make_symbol_completion_list (cha
+@@ -3740,9 +3781,9 @@ default_make_symbol_completion_list (cha
    struct partial_symtab *ps;
    struct minimal_symbol *msymbol;
    struct objfile *objfile;
@@ -2286,7 +2282,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
    struct partial_symbol **psym;
    /* The symbol we are completing on.  Points in same buffer as text.  */
    char *sym_text;
-@@ -3793,41 +3834,43 @@ default_make_symbol_completion_list (cha
+@@ -3852,41 +3893,43 @@ default_make_symbol_completion_list (cha
    }
  
    /* Search upwards from currently selected frame (so that we can
@@ -2361,7 +2357,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
  
    /* Go through the symtabs and check the externs and statics for
       symbols which match.  */
-@@ -3846,9 +3889,6 @@ default_make_symbol_completion_list (cha
+@@ -3905,9 +3948,6 @@ default_make_symbol_completion_list (cha
    {
      QUIT;
      b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (s), STATIC_BLOCK);
@@ -2371,7 +2367,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
      ALL_BLOCK_SYMBOLS (b, iter, sym)
        {
  	COMPLETION_LIST_ADD_SYMBOL (sym, sym_text, sym_text_len, text, word);
-@@ -4315,6 +4355,25 @@ skip_prologue_using_sal (CORE_ADDR func_
+@@ -4374,6 +4414,25 @@ skip_prologue_using_sal (CORE_ADDR func_
  	     line mark the prologue -> body transition.  */
  	  if (sal.line >= prologue_sal.line)
  	    break;
@@ -2397,11 +2393,11 @@ Index: gdb-6.8.50.20090209/gdb/symtab.c
  	  /* The case in which compiler's optimizer/scheduler has
  	     moved instructions into the prologue.  We look ahead in
  	     the function looking for address ranges whose
-Index: gdb-6.8.50.20090209/gdb/symtab.h
+Index: gdb-6.8.50.20090226/gdb/symtab.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/symtab.h	2009-02-06 22:33:58.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/symtab.h	2009-02-09 16:06:00.000000000 +0100
-@@ -556,9 +556,18 @@ struct symbol
+--- gdb-6.8.50.20090226.orig/gdb/symtab.h	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/symtab.h	2009-02-28 07:34:09.000000000 +0100
+@@ -559,9 +559,18 @@ struct symbol
  
    unsigned is_argument : 1;
  
@@ -2423,7 +2419,7 @@ Index: gdb-6.8.50.20090209/gdb/symtab.h
  
    unsigned short line;
  
-@@ -589,6 +598,7 @@ struct symbol
+@@ -592,6 +601,7 @@ struct symbol
  #define SYMBOL_DOMAIN(symbol)	(symbol)->domain
  #define SYMBOL_CLASS(symbol)		(symbol)->aclass
  #define SYMBOL_IS_ARGUMENT(symbol)	(symbol)->is_argument
@@ -2431,10 +2427,10 @@ Index: gdb-6.8.50.20090209/gdb/symtab.h
  #define SYMBOL_TYPE(symbol)		(symbol)->type
  #define SYMBOL_LINE(symbol)		(symbol)->line
  #define SYMBOL_SYMTAB(symbol)		(symbol)->symtab
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.base/break.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.base/break.exp
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/testsuite/gdb.base/break.exp	2009-01-19 20:05:01.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.base/break.exp	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/testsuite/gdb.base/break.exp	2009-01-19 20:05:01.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.base/break.exp	2009-02-28 07:34:09.000000000 +0100
 @@ -880,6 +880,13 @@ gdb_expect {
          # marker4() is defined at line 46 when compiled with -DPROTOTYPES
  	pass "run until breakpoint set at small function, optimized file (line bp_location14)"
@@ -2449,10 +2445,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.base/break.exp
      -re ".*$gdb_prompt " {
  	fail "run until breakpoint set at small function, optimized file"
      }
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.cp/annota2.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.cp/annota2.exp
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/testsuite/gdb.cp/annota2.exp	2009-01-03 06:58:04.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.cp/annota2.exp	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/testsuite/gdb.cp/annota2.exp	2009-01-03 06:58:04.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.cp/annota2.exp	2009-02-28 07:34:09.000000000 +0100
 @@ -119,10 +119,11 @@ gdb_expect {
  # continue until exit
  # this will test:
@@ -2466,10 +2462,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.cp/annota2.exp
  	  { pass "continue until exit" }
    -re ".*$gdb_prompt$"     { fail "continue to exit" }
    timeout	            { fail "continue to exit (timeout)" }
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.c
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-bt.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.c	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-bt.c	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,47 @@
 +/* Copyright (C) 2008 Free Software Foundation, Inc.
 +
@@ -2518,10 +2514,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.c
 +
 +  return 0;
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-bt.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.exp	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-bt.exp	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,63 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -2586,10 +2582,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-bt.exp
 +gdb_test "info frame" ".*inlined into frame.*" "func1 inlined (3)"
 +gdb_test "up" "#2  .*func2.*" "up from func1 (3)"
 +gdb_test "info frame" ".*inlined into frame.*" "func2 inlined (3)"
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.c
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-cmds.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.c	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-cmds.c	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,85 @@
 +/* Copyright (C) 2008 Free Software Foundation, Inc.
 +
@@ -2676,10 +2672,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.c
 +
 +  return 0;
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-cmds.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.exp	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-cmds.exp	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,279 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -2960,10 +2956,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-cmds.exp
 +gdb_test "info frame" ".*inlined into frame.*" "outer_inline2 inlined"
 +gdb_test "up" "#4  main.*" "up from outer_inline2"
 +gdb_test "info frame" ".*\n caller of frame.*" "main not inlined"
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.c
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-locals.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.c	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-locals.c	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,52 @@
 +/* Copyright (C) 2008 Free Software Foundation, Inc.
 +
@@ -3017,10 +3013,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.c
 +
 +  return 0;
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-locals.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.exp	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-locals.exp	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,118 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -3140,10 +3136,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-locals.exp
 +}
 +
 +gdb_test "print array\[0\]" "\\\$$decimal = 184" "print local (3)"
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-markers.c
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-markers.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-markers.c	2009-02-09 16:06:00.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/inline-markers.c	2009-02-28 07:34:09.000000000 +0100
 @@ -0,0 +1,36 @@
 +/* Copyright (C) 2008 Free Software Foundation, Inc.
 +
@@ -3181,11 +3177,11 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/inline-markers.c
 +{
 +  inlined_fn (); /* inlined */
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/lib/gdb.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/lib/gdb.exp
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/testsuite/lib/gdb.exp	2009-02-09 16:02:35.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/testsuite/lib/gdb.exp	2009-02-09 16:06:00.000000000 +0100
-@@ -1471,6 +1471,37 @@ proc skip_hp_tests {} {
+--- gdb-6.8.50.20090226.orig/gdb/testsuite/lib/gdb.exp	2009-02-28 07:31:58.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/lib/gdb.exp	2009-02-28 07:34:09.000000000 +0100
+@@ -1474,6 +1474,37 @@ proc skip_hp_tests {} {
      return $skip_hp
  }
  
@@ -3223,11 +3219,11 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/lib/gdb.exp
  set compiler_info		"unknown"
  set gcc_compiled		0
  set hp_cc_compiler		0
-Index: gdb-6.8.50.20090209/gdb/valops.c
+Index: gdb-6.8.50.20090226/gdb/valops.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/valops.c	2009-02-09 15:40:36.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/valops.c	2009-02-09 16:06:00.000000000 +0100
-@@ -1074,7 +1074,7 @@ value_of_variable (struct symbol *var, s
+--- gdb-6.8.50.20090226.orig/gdb/valops.c	2009-02-27 07:51:56.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/valops.c	2009-02-28 07:34:09.000000000 +0100
+@@ -1072,7 +1072,7 @@ value_of_variable (struct symbol *var, s
        frame = block_innermost_frame (b);
        if (!frame)
  	{
@@ -3236,11 +3232,11 @@ Index: gdb-6.8.50.20090209/gdb/valops.c
  	      && SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)))
  	    error (_("No frame is currently executing in block %s."),
  		   SYMBOL_PRINT_NAME (BLOCK_FUNCTION (b)));
-Index: gdb-6.8.50.20090209/gdb/Makefile.in
+Index: gdb-6.8.50.20090226/gdb/Makefile.in
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/Makefile.in	2009-02-09 16:02:35.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/Makefile.in	2009-02-09 16:06:00.000000000 +0100
-@@ -634,6 +634,7 @@ SFILES = ada-exp.y ada-lang.c ada-typepr
+--- gdb-6.8.50.20090226.orig/gdb/Makefile.in	2009-02-28 07:31:58.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/Makefile.in	2009-02-28 07:34:09.000000000 +0100
+@@ -663,6 +663,7 @@ SFILES = ada-exp.y ada-lang.c ada-typepr
  	inf-loop.c \
  	infcall.c \
  	infcmd.c inflow.c infrun.c \
@@ -3248,7 +3244,7 @@ Index: gdb-6.8.50.20090209/gdb/Makefile.in
  	interps.c \
  	jv-exp.y jv-lang.c jv-valprint.c jv-typeprint.c \
  	language.c linespec.c \
-@@ -804,6 +805,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $
+@@ -835,6 +836,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $
  	user-regs.o \
  	frame.o frame-unwind.o doublest.o \
  	frame-base.o \
@@ -3256,10 +3252,10 @@ Index: gdb-6.8.50.20090209/gdb/Makefile.in
  	gnu-v2-abi.o gnu-v3-abi.o cp-abi.o cp-support.o \
  	cp-namespace.o \
  	reggroups.o regset.o \
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/Makefile.in
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/Makefile.in
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/testsuite/gdb.opt/Makefile.in	2008-04-18 01:06:54.000000000 +0200
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.opt/Makefile.in	2009-02-09 16:06:00.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/testsuite/gdb.opt/Makefile.in	2008-04-18 01:06:54.000000000 +0200
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.opt/Makefile.in	2009-02-28 07:34:09.000000000 +0100
 @@ -1,7 +1,7 @@
  VPATH = @srcdir@
  srcdir = @srcdir@

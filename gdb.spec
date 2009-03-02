@@ -9,11 +9,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090210
+Version: 6.8.50.20090228
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -305,15 +305,8 @@ Patch296: gdb-6.5-gcore-buffer-limit-test.patch
 #  - It requires recent glibc to work in this case properly.
 Patch298: gdb-6.6-threads-static-test.patch
 
-# Fix false `(no debugging symbols found)' on `-readnever' runs.
-Patch301: gdb-6.6-buildid-readnever-silent.patch
-
 # Fix #include <asm/ptrace.h> on kernel-headers-2.6.25-0.40.rc1.git2.fc9.x86_64.
 Patch304: gdb-6.7-kernel-headers-compat.patch
-
-# Fix/implement the Fortran dynamic arrays support (BZ 377541).
-# Fix the variable-length-arrays support (BZ 468266, feature BZ 377541).
-Patch305: gdb-6.8-bz377541-vla.patch
 
 # Test GCORE for shmid 0 shared memory mappings.
 Patch309: gdb-6.3-mapping-zero-inode-test.patch
@@ -374,11 +367,16 @@ Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 # Fix resolving of variables at locations lists in prelinked libs (BZ 466901).
 Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
+# The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
+Patch349: gdb-archer.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
 Requires: rpm-libs
 BuildRequires: rpm-devel
+Requires: python-libs
+BuildRequires: python-devel
 
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
@@ -451,7 +449,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %if 0%{!?_with_upstream:1}
 
 ###patch232 -p1
-%patch305 -p1
+%patch349 -p1
 %patch1 -p1
 %patch3 -p1
 %patch4 -p1
@@ -536,7 +534,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch294 -p1
 %patch296 -p1
 %patch298 -p1
-%patch301 -p1
 %patch304 -p1
 %patch309 -p1
 %patch311 -p1
@@ -609,6 +606,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--sysconfdir=%{_sysconfdir}			\
 	--mandir=%{_mandir}				\
 	--infodir=%{_infodir}				\
+	--with-gdb-datadir=%{_datadir}/%{name}		\
 	--enable-gdb-build-warnings=,-Wno-unused	\
 %ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparcv9 sparc64
 	--disable-werror				\
@@ -625,6 +623,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-system-readline				\
 	--with-expat					\
 	--enable-tui					\
+	--with-python					\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -807,6 +806,7 @@ fi
 %{_bindir}/pstack
 %{_mandir}/*/gstack.1*
 %{_mandir}/*/pstack.1*
+%{_datadir}/%{name}
 %endif	# 0%{!?_with_upstream:1}
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
@@ -822,6 +822,19 @@ fi
 %endif
 
 %changelog
+* Sat Feb 28 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090228-1
+- Include the Archer Project: http://sourceware.org/gdb/wiki/ProjectArcher
+  * [python] Python scripting support: http://sourceware.org/gdb/wiki/PythonGdb
+  * [catch-syscall] Trap and display syscalls.
+  * [delayed-symfile] Improve startup performance by lazily read psymtabs.
+  * [exception-rewind] Fix fatal C++ exceptions in an inferior function call.
+  * [vla] C variable length arrays / DW_FORM_block / Fortran dynamic arrays.
+  * [misc] Fix debuginfoless `return' (BZ 365111), fix command-line macros for
+    expected GCC (BZ 479914), new testcase for valgrind (for BZ 483262),
+    implement `info common' for Fortran, fix Fortran logical-kind=8 (BZ 465310),
+    fix static variable in C++ constructors (BZ 445912)
+- Upgrade to the FSF GDB gdb-6.8.50 snapshot.
+
 * Tue Feb 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 6.8.50.20090210-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_11_Mass_Rebuild
 

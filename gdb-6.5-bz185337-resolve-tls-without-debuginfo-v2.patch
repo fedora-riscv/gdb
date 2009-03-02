@@ -30,22 +30,20 @@ glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
   <81a2>     DW_AT_name        : (indirect string, offset: 0x280e): __errno_location
   <81a8>     DW_AT_MIPS_linkage_name: (indirect string, offset: 0x2808): *__GI___errno_location
 
-Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
+Index: gdb-6.8.50.20090226/gdb/dwarf2read.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/dwarf2read.c	2009-02-09 15:50:59.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/dwarf2read.c	2009-02-09 15:51:57.000000000 +0100
-@@ -6031,8 +6031,8 @@ read_partial_die (struct partial_die_inf
+--- gdb-6.8.50.20090226.orig/gdb/dwarf2read.c	2009-02-28 07:22:44.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/dwarf2read.c	2009-02-28 07:31:33.000000000 +0100
+@@ -6376,6 +6376,8 @@ read_partial_die (struct partial_die_inf
+       switch (attr.name)
  	{
  	case DW_AT_name:
- 
--	  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name.  */
--	  if (part_die->name == NULL)
 +	  /* Prefer DW_AT_MIPS_linkage_name over DW_AT_name for non-C.  */
-+	  if (cu->language == language_c || part_die->name == NULL)
- 	    part_die->name = DW_STRING (&attr);
- 	  break;
- 	case DW_AT_comp_dir:
-@@ -6040,7 +6040,9 @@ read_partial_die (struct partial_die_inf
++if (cu->language == language_c || part_die->name == NULL)
+ 	  switch (part_die->tag)
+ 	    {
+ 	    case DW_TAG_compile_unit:
+@@ -6399,7 +6401,9 @@ read_partial_die (struct partial_die_inf
  	    part_die->dirname = DW_STRING (&attr);
  	  break;
  	case DW_AT_MIPS_linkage_name:
@@ -56,7 +54,7 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
  	  break;
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
-@@ -8278,9 +8280,13 @@ dwarf2_linkage_name (struct die_info *di
+@@ -8650,9 +8654,13 @@ dwarf2_linkage_name (struct die_info *di
  {
    struct attribute *attr;
  
@@ -70,13 +68,13 @@ Index: gdb-6.8.50.20090209/gdb/dwarf2read.c
 +      if (attr && DW_STRING (attr))
 +	return DW_STRING (attr);
 +    }
-   attr = dwarf2_attr (die, DW_AT_name, cu);
-   if (attr && DW_STRING (attr))
-     return DW_STRING (attr);
-Index: gdb-6.8.50.20090209/gdb/gdbtypes.c
+   return dwarf2_name (die, cu);
+ }
+ 
+Index: gdb-6.8.50.20090226/gdb/gdbtypes.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/gdbtypes.c	2009-02-09 15:38:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/gdbtypes.c	2009-02-09 15:56:14.000000000 +0100
+--- gdb-6.8.50.20090226.orig/gdb/gdbtypes.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/gdbtypes.c	2009-02-28 07:22:55.000000000 +0100
 @@ -3643,6 +3643,8 @@ gdbtypes_post_init (struct gdbarch *gdba
      init_type (TYPE_CODE_INT, 
  	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
@@ -99,11 +97,11 @@ Index: gdb-6.8.50.20090209/gdb/gdbtypes.c
    builtin_type->nodebug_data_symbol =
      init_type (TYPE_CODE_INT, 
  	       gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-Index: gdb-6.8.50.20090209/gdb/gdbtypes.h
+Index: gdb-6.8.50.20090226/gdb/gdbtypes.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/gdbtypes.h	2009-02-09 15:38:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/gdbtypes.h	2009-02-09 15:51:57.000000000 +0100
-@@ -1050,6 +1050,7 @@ struct builtin_type
+--- gdb-6.8.50.20090226.orig/gdb/gdbtypes.h	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/gdbtypes.h	2009-02-28 07:22:55.000000000 +0100
+@@ -1053,6 +1053,7 @@ struct builtin_type
  
    /* Types used for symbols with no debug information.  */
    struct type *nodebug_text_symbol;
@@ -111,7 +109,7 @@ Index: gdb-6.8.50.20090209/gdb/gdbtypes.h
    struct type *nodebug_data_symbol;
    struct type *nodebug_unknown_symbol;
    struct type *nodebug_tls_symbol;
-@@ -1062,6 +1063,7 @@ struct builtin_type
+@@ -1065,6 +1066,7 @@ struct builtin_type
    struct type *builtin_char;
    struct type *builtin_short;
    struct type *builtin_int;
@@ -119,11 +117,11 @@ Index: gdb-6.8.50.20090209/gdb/gdbtypes.h
    struct type *builtin_long;
    struct type *builtin_signed_char;
    struct type *builtin_unsigned_char;
-Index: gdb-6.8.50.20090209/gdb/parse.c
+Index: gdb-6.8.50.20090226/gdb/parse.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/parse.c	2009-01-03 06:57:52.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/parse.c	2009-02-09 15:51:57.000000000 +0100
-@@ -449,7 +449,12 @@ write_exp_msymbol (struct minimal_symbol
+--- gdb-6.8.50.20090226.orig/gdb/parse.c	2009-02-27 00:04:32.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/parse.c	2009-02-28 07:22:55.000000000 +0100
+@@ -508,7 +508,12 @@ write_exp_msymbol (struct minimal_symbol
      case mst_text:
      case mst_file_text:
      case mst_solib_trampoline:
@@ -137,11 +135,11 @@ Index: gdb-6.8.50.20090209/gdb/parse.c
        break;
  
      case mst_data:
-Index: gdb-6.8.50.20090209/gdb/target.c
+Index: gdb-6.8.50.20090226/gdb/target.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/target.c	2009-02-09 15:50:39.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/target.c	2009-02-09 15:51:57.000000000 +0100
-@@ -842,6 +842,25 @@ pop_all_targets (int quitting)
+--- gdb-6.8.50.20090226.orig/gdb/target.c	2009-02-28 07:22:09.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/target.c	2009-02-28 07:22:55.000000000 +0100
+@@ -827,6 +827,25 @@ pop_all_targets (int quitting)
    pop_all_targets_above (dummy_stratum, quitting);
  }
  
@@ -167,7 +165,7 @@ Index: gdb-6.8.50.20090209/gdb/target.c
  /* Using the objfile specified in OBJFILE, find the address for the
     current thread's thread-local storage with offset OFFSET.  */
  CORE_ADDR
-@@ -932,7 +951,28 @@ target_translate_tls_address (struct obj
+@@ -917,7 +936,28 @@ target_translate_tls_address (struct obj
    /* It wouldn't be wrong here to try a gdbarch method, too; finding
       TLS is an ABI-specific thing.  But we don't do that yet.  */
    else
@@ -197,10 +195,10 @@ Index: gdb-6.8.50.20090209/gdb/target.c
  
    return addr;
  }
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.dwarf2/dw2-errno.c
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.dwarf2/dw2-errno.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2009-02-09 15:51:57.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2009-02-28 07:22:55.000000000 +0100
 @@ -0,0 +1,28 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -230,10 +228,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.dwarf2/dw2-errno.c
 +
 +  return 0;	/* breakpoint */
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
+Index: gdb-6.8.50.20090226/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2009-02-09 15:51:57.000000000 +0100
++++ gdb-6.8.50.20090226/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2009-02-28 07:22:55.000000000 +0100
 @@ -0,0 +1,67 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
