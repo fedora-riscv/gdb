@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -386,21 +386,23 @@ BuildRequires: python-devel
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc
+BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc glibc-static
 # Ensure the devel libraries are installed for both multilib arches.
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
 # Copied from gcc-4.1.2-32
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
 %ifarch %{multilib_64_archs} ppc
-BuildRequires: %{_exec_prefix}/lib64/libgnat-4.3.so %{_exec_prefix}/lib/libgnat-4.3.so
+BuildRequires: %{_exec_prefix}/lib64/libgnat-4.4.so %{_exec_prefix}/lib/libgnat-4.4.so
 %endif
 %endif
 %ifarch %{multilib_64_archs} sparc sparcv9 ppc
 BuildRequires: /lib/libc.so.6 %{_exec_prefix}/lib/libc.so /lib64/libc.so.6 %{_exec_prefix}/lib64/libc.so
 BuildRequires: /lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
 BuildRequires: %{_exec_prefix}/lib/libstdc++.so.6 %{_exec_prefix}/lib64/libstdc++.so.6
-BuildRequires: %{_exec_prefix}/lib64/libgcj.so.9 %{_exec_prefix}/lib/libgcj.so.9
+BuildRequires: %{_exec_prefix}/lib64/libgcj.so.10 %{_exec_prefix}/lib/libgcj.so.10
+# multilib glibc-static is open Bug 488472:
+#BuildRequires: %{_exec_prefix}/lib64/libc.a %{_exec_prefix}/lib/libc.a
 # for gcc-java:
 BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 %endif
@@ -612,7 +614,8 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--sysconfdir=%{_sysconfdir}			\
 	--mandir=%{_mandir}				\
 	--infodir=%{_infodir}				\
-	--with-gdb-datadir=%{_datadir}/%{name}		\
+	--with-gdb-datadir=%{_datadir}/gdb		\
+	--with-pythondir=%{python_sitelib}		\
 	--enable-gdb-build-warnings=,-Wno-unused	\
 %ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparcv9 sparc64
 	--disable-werror				\
@@ -755,6 +758,9 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
+# A part of the libstdc++ rpm.
+rm -rf $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -830,11 +836,21 @@ fi
 %endif
 
 %changelog
+* Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-3
+- Archer update to the snapshot: 6cf16c0711e844094ab694b3d929f7bd30b49f61
+- Fix crash on the inlined functions support.
+- Fix crash from the PIE support, its varobj_refresh() was called only before
+  varobj_invalidate() which is sufficient.
+- Fix BuildRequires for the `--with testsuite' runs.
+- Use the newly introduced `--with-pythondir' option.
+- Remove libstdcxx [python] pretty printers (as included in libstdc++ rpm now).
+
 * Fri Mar 06 2009 Jesse Keating <jkeating@redhat.com> - 6.8.50.20090302-2
 - Rebuild for new rpm libs
 
 * Mon Mar  2 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-1
 - Include the Archer Project: http://sourceware.org/gdb/wiki/ProjectArcher
+  snapshot: 8cc3753a9aad85bf53bef54c04334c60d16cb251
   * [python] Python scripting support: http://sourceware.org/gdb/wiki/PythonGdb
   * [catch-syscall] Trap and display syscalls.
   * [delayed-symfile] Improve startup performance by lazily read psymtabs.
