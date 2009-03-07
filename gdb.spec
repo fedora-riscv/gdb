@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -840,6 +840,10 @@ fi
 %endif
 
 %changelog
+* Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-6
+- Archer update to the snapshot: 543fb2154d3bd551344b990b911be5c6cc703504
+ - Fixes [delayed-symfile] excessive `(no debugging symbols found)' messages.
+
 * Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-5
 - Improve `gdb-6.6-buildid-locate-rpm.patch' by dlopen() (+pkg-config compat.).
 

@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 6cf16c0711e844094ab694b3d929f7bd30b49f61
+commit 543fb2154d3bd551344b990b911be5c6cc703504
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -866,7 +866,7 @@ index 8f0140c..d451769 100644
  
  /* Set BLOCK's using member to USING; if needed, allocate memory via
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index b23b294..e9bc53f 100644
+index b23b294..38a17a1 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -191,6 +191,8 @@ static int is_hardware_watchpoint (struct breakpoint *bpt);
@@ -1004,7 +1004,28 @@ index b23b294..e9bc53f 100644
  		  len = TYPE_LENGTH (value_type (v));
  		  type = hw_write;
  		  if (b->type == bp_read_watchpoint)
-@@ -4134,6 +4160,8 @@ set_raw_breakpoint_without_location (enum bptype bptype)
+@@ -3948,8 +3974,8 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
+     }
+ 
+   /* If we found a permanent breakpoint at this address, go over the
+-     list again and declare all the other breakpoints there to be the
+-     duplicates.  */
++     list again and declare all the other breakpoints there (except
++     other permanent breakpoints) to be the duplicates.  */
+   if (perm_bp)
+     {
+       perm_bp->duplicate = 0;
+@@ -3963,7 +3989,8 @@ check_duplicates_for (CORE_ADDR address, struct obj_section *section)
+       ALL_BP_LOCATIONS (b)
+ 	if (b != perm_bp)
+ 	  {
+-	    if (b->owner->enable_state != bp_disabled
++	    if (b->owner->enable_state != bp_permanent
++		&& b->owner->enable_state != bp_disabled
+ 		&& b->owner->enable_state != bp_call_disabled
+ 		&& b->enabled && !b->shlib_disabled		
+ 		&& b->address == address	/* address / overlay match */
+@@ -4134,6 +4161,8 @@ set_raw_breakpoint_without_location (enum bptype bptype)
    b->frame_id = null_frame_id;
    b->forked_inferior_pid = null_ptid;
    b->exec_pathname = NULL;
@@ -1013,7 +1034,7 @@ index b23b294..e9bc53f 100644
    b->ops = NULL;
    b->condition_not_parsed = 0;
  
-@@ -4660,7 +4688,241 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
+@@ -4660,7 +4689,241 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
    print_mention_catch_vfork
  };
  
@@ -1256,7 +1277,7 @@ index b23b294..e9bc53f 100644
   
     If TEMPFLAG is non-zero, then make the breakpoint temporary.
     If COND_STRING is not NULL, then store it in the breakpoint.
-@@ -4668,16 +4930,13 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
+@@ -4668,16 +4931,13 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
     to the catchpoint.  */
  
  static struct breakpoint *
@@ -1275,7 +1296,7 @@ index b23b294..e9bc53f 100644
  
    b = set_raw_breakpoint (sal, bp_catchpoint);
    set_breakpoint_count (breakpoint_count + 1);
-@@ -4691,6 +4950,23 @@ create_catchpoint (int tempflag, char *cond_string,
+@@ -4691,6 +4951,23 @@ create_catchpoint (int tempflag, char *cond_string,
    b->disposition = tempflag ? disp_del : disp_donttouch;
    b->ops = ops;
  
@@ -1299,7 +1320,7 @@ index b23b294..e9bc53f 100644
    mention (b);
    update_global_location_list (1);
  
-@@ -4775,6 +5051,23 @@ static struct breakpoint_ops catch_exec_breakpoint_ops =
+@@ -4775,6 +5052,23 @@ static struct breakpoint_ops catch_exec_breakpoint_ops =
    print_mention_catch_exec
  };
  
@@ -1323,7 +1344,7 @@ index b23b294..e9bc53f 100644
  static int
  hw_breakpoint_used_count (void)
  {
-@@ -5310,8 +5603,6 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
+@@ -5310,8 +5604,6 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
  			 cond_string, type, disposition,
  			 thread, ignore_count, ops, from_tty, enabled);
      }
@@ -1332,7 +1353,7 @@ index b23b294..e9bc53f 100644
  }
  
  /* Parse ARG which is assumed to be a SAL specification possibly
-@@ -5637,7 +5928,6 @@ break_command_really (char *arg, char *cond_string, int thread,
+@@ -5637,7 +5929,6 @@ break_command_really (char *arg, char *cond_string, int thread,
        b->ops = ops;
        b->enable_state = enabled ? bp_enabled : bp_disabled;
  
@@ -1340,7 +1361,7 @@ index b23b294..e9bc53f 100644
        mention (b);
      }
    
-@@ -5649,6 +5939,11 @@ break_command_really (char *arg, char *cond_string, int thread,
+@@ -5649,6 +5940,11 @@ break_command_really (char *arg, char *cond_string, int thread,
    discard_cleanups (breakpoint_chain);
    /* But cleanup everything else. */
    do_cleanups (old_chain);
@@ -1352,7 +1373,7 @@ index b23b294..e9bc53f 100644
  }
  
  /* Set a breakpoint. 
-@@ -6131,7 +6426,7 @@ can_use_hardware_watchpoint (struct value *v)
+@@ -6131,7 +6427,7 @@ can_use_hardware_watchpoint (struct value *v)
  		  || (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
  		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
  		{
@@ -1361,7 +1382,7 @@ index b23b294..e9bc53f 100644
  		  int       len   = TYPE_LENGTH (value_type (v));
  
  		  if (!TARGET_REGION_OK_FOR_HW_WATCHPOINT (vaddr, len))
-@@ -6668,6 +6963,122 @@ catch_ada_exception_command (char *arg, int from_tty,
+@@ -6668,6 +6964,122 @@ catch_ada_exception_command (char *arg, int from_tty,
                                     from_tty);
  }
  
@@ -1484,7 +1505,7 @@ index b23b294..e9bc53f 100644
  /* Implement the "catch assert" command.  */
  
  static void
-@@ -7134,6 +7545,7 @@ delete_breakpoint (struct breakpoint *bpt)
+@@ -7134,6 +7546,7 @@ delete_breakpoint (struct breakpoint *bpt)
      xfree (bpt->source_file);
    if (bpt->exec_pathname != NULL)
      xfree (bpt->exec_pathname);
@@ -1492,7 +1513,7 @@ index b23b294..e9bc53f 100644
  
    /* Be sure no bpstat's are pointing at it after it's been freed.  */
    /* FIXME, how can we find all bpstat's?
-@@ -8041,6 +8453,56 @@ single_step_breakpoint_inserted_here_p (CORE_ADDR pc)
+@@ -8041,6 +8454,56 @@ single_step_breakpoint_inserted_here_p (CORE_ADDR pc)
    return 0;
  }
  
@@ -1549,7 +1570,7 @@ index b23b294..e9bc53f 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -8073,6 +8535,8 @@ static void
+@@ -8073,6 +8536,8 @@ static void
  add_catch_command (char *name, char *docstring,
  		   void (*sfunc) (char *args, int from_tty,
  				  struct cmd_list_element *command),
@@ -1558,7 +1579,7 @@ index b23b294..e9bc53f 100644
  		   void *user_data_catch,
  		   void *user_data_tcatch)
  {
-@@ -8082,11 +8546,13 @@ add_catch_command (char *name, char *docstring,
+@@ -8082,11 +8547,13 @@ add_catch_command (char *name, char *docstring,
  		     &catch_cmdlist);
    set_cmd_sfunc (command, sfunc);
    set_cmd_context (command, user_data_catch);
@@ -1572,7 +1593,7 @@ index b23b294..e9bc53f 100644
  }
  
  void
-@@ -8361,36 +8827,50 @@ Set temporary catchpoints to catch events."),
+@@ -8361,36 +8828,50 @@ Set temporary catchpoints to catch events."),
  Catch an exception, when caught.\n\
  With an argument, catch only exceptions with the given name."),
  		     catch_catch_command,
@@ -8714,7 +8735,7 @@ index 845b320..ad6e7d7 100644
  
  extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index 10e7388..86941fe 100644
+index 10e7388..d2c0f1e 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -955,8 +955,10 @@ Connect to process ID @var{number}, as with the @code{attach} command.
@@ -8846,7 +8867,44 @@ index 10e7388..86941fe 100644
  @item fork
  A call to @code{fork}.  This is currently only available for HP-UX
  and @sc{gnu}/Linux.
-@@ -6536,6 +6640,12 @@ Without this format, @value{GDBN} displays pointers to and arrays of
+@@ -4711,6 +4815,24 @@ the program to report that some thread has stopped before prompting for
+ another command.  In background execution, @value{GDBN} immediately gives
+ a command prompt so that you can issue other commands while your program runs.
+ 
++You need to explicitly enable asynchronous mode before you can use
++background execution commands.  You can use these commands to
++manipulate the asynchronous mode setting:
++
++@table @code
++@kindex set target-async
++@item set target-async on
++Enable asynchronous mode.
++@item set target-async off
++Disable asynchronous mode.
++@kindex show target-async
++@item show target-async
++Show the current target-async setting.
++@end table
++
++If the target doesn't support async mode, @value{GDBN} issues an error
++message if you attempt to use the background execution commands.
++
+ To specify background execution, add a @code{&} to the command.  For example,
+ the background form of the @code{continue} command is @code{continue&}, or
+ just @code{c&}.  The execution commands that accept background execution
+@@ -4776,11 +4898,6 @@ only the current thread.  To stop the whole program in non-stop mode,
+ use @code{interrupt -a}.
+ @end table
+ 
+-You may need to explicitly enable async mode before you can use background
+-execution commands, with the @code{set target-async 1} command.  If the
+-target doesn't support async mode, @value{GDBN} issues an error message
+-if you attempt to use the background execution commands.
+-
+ @node Thread-Specific Breakpoints
+ @subsection Thread-Specific Breakpoints
+ 
+@@ -6536,6 +6653,12 @@ Without this format, @value{GDBN} displays pointers to and arrays of
  @code{char}, @w{@code{unsigned char}}, and @w{@code{signed char}} as
  strings.  Single-byte members of a vector are displayed as an integer
  array.
@@ -8859,7 +8917,7 @@ index 10e7388..86941fe 100644
  @end table
  
  For example, to print the program counter in hex (@pxref{Registers}), type
-@@ -7408,6 +7518,20 @@ On HP-UX systems, if you refer to a function or variable name that
+@@ -7408,6 +7531,20 @@ On HP-UX systems, if you refer to a function or variable name that
  begins with a dollar sign, @value{GDBN} searches for a user or system
  name first, before it searches for a convenience variable.
  
@@ -8880,7 +8938,7 @@ index 10e7388..86941fe 100644
  @node Registers
  @section Registers
  
-@@ -7931,13 +8055,17 @@ support:
+@@ -7931,13 +8068,17 @@ support:
  @table @code
  @item set target-charset @var{charset}
  @kindex set target-charset
@@ -8904,7 +8962,7 @@ index 10e7388..86941fe 100644
  @item set host-charset @var{charset}
  @kindex set host-charset
  Set the current host character set to @var{charset}.
-@@ -7947,10 +8075,9 @@ system it is running on; you can override that default using the
+@@ -7947,10 +8088,9 @@ system it is running on; you can override that default using the
  @code{set host-charset} command.
  
  @value{GDBN} can only use certain character sets as its host character
@@ -8918,7 +8976,7 @@ index 10e7388..86941fe 100644
  
  @item set charset @var{charset}
  @kindex set charset
-@@ -7974,37 +8101,6 @@ Show the name of the current target charset.
+@@ -7974,37 +8114,6 @@ Show the name of the current target charset.
  
  @end table
  
@@ -8956,7 +9014,7 @@ index 10e7388..86941fe 100644
  Here is an example of @value{GDBN}'s character set support in action.
  Assume that the following source code has been placed in the file
  @file{charset-test.c}:
-@@ -12510,6 +12606,12 @@ It is possible for the function you call via the @code{print} or
+@@ -12510,6 +12619,12 @@ It is possible for the function you call via the @code{print} or
  the function, or if you passed it incorrect arguments).  What happens
  in that case is controlled by the @code{set unwindonsignal} command.
  
@@ -8969,7 +9027,7 @@ index 10e7388..86941fe 100644
  @table @code
  @item set unwindonsignal
  @kindex set unwindonsignal
-@@ -12526,6 +12628,23 @@ received.
+@@ -12526,6 +12641,23 @@ received.
  @kindex show unwindonsignal
  Show the current setting of stack unwinding in the functions called by
  @value{GDBN}.
@@ -8993,7 +9051,7 @@ index 10e7388..86941fe 100644
  @end table
  
  @cindex weak alias functions
-@@ -17815,7 +17934,7 @@ command:
+@@ -17815,7 +17947,7 @@ command:
  @table @code
  @kindex source
  @cindex execute commands from a file
@@ -9002,7 +9060,7 @@ index 10e7388..86941fe 100644
  Execute the command file @var{filename}.
  @end table
  
-@@ -17832,6 +17951,11 @@ If @code{-v}, for verbose mode, is given then @value{GDBN} displays
+@@ -17832,6 +17964,11 @@ If @code{-v}, for verbose mode, is given then @value{GDBN} displays
  each command as it is executed.  The option must be given before
  @var{filename}, and is interpreted as part of the filename anywhere else.
  
@@ -9014,7 +9072,7 @@ index 10e7388..86941fe 100644
  Commands that would ask for confirmation if used interactively proceed
  without asking when used in a command file.  Many @value{GDBN} commands that
  normally print messages to say what they are doing omit the messages
-@@ -18093,8 +18217,6 @@ containing @code{end}.  For example:
+@@ -18093,8 +18230,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -9023,7 +9081,7 @@ index 10e7388..86941fe 100644
  >print 23
  >end
  23
-@@ -18107,6 +18229,14 @@ in a Python script.  This can be controlled using @code{maint set
+@@ -18107,6 +18242,14 @@ in a Python script.  This can be controlled using @code{maint set
  python print-stack}: if @code{on}, the default, then Python stack
  printing is enabled; if @code{off}, then Python stack printing is
  disabled.
@@ -9038,7 +9096,7 @@ index 10e7388..86941fe 100644
  @end table
  
  @node Python API
-@@ -18114,6 +18244,14 @@ disabled.
+@@ -18114,6 +18257,14 @@ disabled.
  @cindex python api
  @cindex programming in python
  
@@ -9053,7 +9111,7 @@ index 10e7388..86941fe 100644
  @cindex python stdout
  @cindex python pagination
  At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
-@@ -18125,8 +18263,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
+@@ -18125,8 +18276,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
  @menu
  * Basic Python::                Basic Python Functions.
  * Exception Handling::
@@ -9072,7 +9130,7 @@ index 10e7388..86941fe 100644
  @end menu
  
  @node Basic Python
-@@ -18152,10 +18299,30 @@ command as having originated from the user invoking it interactively.
+@@ -18152,10 +18312,30 @@ command as having originated from the user invoking it interactively.
  It must be a boolean value.  If omitted, it defaults to @code{False}.
  @end defun
  
@@ -9107,7 +9165,7 @@ index 10e7388..86941fe 100644
  spaces if the parameter has a multi-part name.  For example,
  @samp{print object} is a valid parameter name.
  
-@@ -18179,6 +18346,28 @@ If no exception is raised, the return value is always an instance of
+@@ -18179,6 +18359,28 @@ If no exception is raised, the return value is always an instance of
  @code{gdb.Value} (@pxref{Values From Inferior}).
  @end defun
  
@@ -9136,7 +9194,7 @@ index 10e7388..86941fe 100644
  @findex gdb.write
  @defun write string
  Print a string to @value{GDBN}'s paginated standard output stream.
-@@ -18193,6 +18382,66 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
+@@ -18193,6 +18395,66 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
  function.
  @end defun
  
@@ -9203,7 +9261,7 @@ index 10e7388..86941fe 100644
  @node Exception Handling
  @subsubsection Exception Handling
  @cindex python exceptions
-@@ -18224,6 +18473,44 @@ message as its value, and the Python call stack backtrace at the
+@@ -18224,6 +18486,44 @@ message as its value, and the Python call stack backtrace at the
  Python statement closest to where the @value{GDBN} error occured as the
  traceback.
  
@@ -9248,7 +9306,7 @@ index 10e7388..86941fe 100644
  @node Values From Inferior
  @subsubsection Values From Inferior
  @cindex values from inferior, with Python
-@@ -18258,8 +18545,21 @@ bar = some_val['foo']
+@@ -18258,8 +18558,21 @@ bar = some_val['foo']
  
  Again, @code{bar} will also be a @code{gdb.Value} object.
  
@@ -9272,7 +9330,7 @@ index 10e7388..86941fe 100644
  
  @defmethod Value dereference
  This method returns a new @code{gdb.Value} object whose contents is
-@@ -18282,7 +18582,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
+@@ -18282,7 +18595,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
  value pointed to by @code{foo}.
  @end defmethod
  
@@ -9281,7 +9339,7 @@ index 10e7388..86941fe 100644
  If this @code{gdb.Value} represents a string, then this method
  converts the contents to a Python string.  Otherwise, this method will
  throw an exception.
-@@ -18309,6 +18609,468 @@ The optional @var{errors} argument is the same as the corresponding
+@@ -18309,6 +18622,468 @@ The optional @var{errors} argument is the same as the corresponding
  argument to Python's @code{string.decode} method.
  @end defmethod
  
@@ -9750,7 +9808,7 @@ index 10e7388..86941fe 100644
  @node Commands In Python
  @subsubsection Commands In Python
  
-@@ -18320,7 +19082,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
+@@ -18320,7 +19095,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
  command is implemented using an instance of the @code{gdb.Command}
  class, most commonly using a subclass.
  
@@ -9759,7 +9817,7 @@ index 10e7388..86941fe 100644
  The object initializer for @code{Command} registers the new command
  with @value{GDBN}.  This initializer is normally invoked from the
  subclass' own @code{__init__} method.
-@@ -18332,11 +19094,11 @@ an exception is raised.
+@@ -18332,11 +19107,11 @@ an exception is raised.
  
  There is no support for multi-line commands.
  
@@ -9773,7 +9831,7 @@ index 10e7388..86941fe 100644
  one of the @samp{COMPLETE_} constants defined below.  This argument
  tells @value{GDBN} how to perform completion for this command.  If not
  given, @value{GDBN} will attempt to complete using the object's
-@@ -18563,6 +19325,374 @@ registration of the command with @value{GDBN}.  Depending on how the
+@@ -18563,6 +19338,374 @@ registration of the command with @value{GDBN}.  Depending on how the
  Python code is read into @value{GDBN}, you may need to import the
  @code{gdb} module explicitly.
  
@@ -10148,7 +10206,7 @@ index 10e7388..86941fe 100644
  @node Interpreters
  @chapter Command Interpreters
  @cindex command interpreters
-@@ -22273,6 +23403,103 @@ Unfreezing a variable does not update it, only subsequent
+@@ -22273,6 +23416,103 @@ Unfreezing a variable does not update it, only subsequent
  (gdb)
  @end smallexample
  
@@ -10252,7 +10310,7 @@ index 10e7388..86941fe 100644
  
  @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  @node GDB/MI Data Manipulation
-@@ -23832,6 +25059,10 @@ as possible presense of the @code{frozen} field in the output
+@@ -23832,6 +25072,10 @@ as possible presense of the @code{frozen} field in the output
  of @code{-varobj-create}.
  @item pending-breakpoints
  Indicates presence of the @option{-f} option to the @code{-break-insert} command.
@@ -10263,6 +10321,35 @@ index 10e7388..86941fe 100644
  @item thread-info
  Indicates presence of the @code{-thread-info} command.
  
+@@ -25402,28 +26646,6 @@ data in a @file{gmon.out} file, be sure to move it to a safe location.
+ Configuring with @samp{--enable-profiling} arranges for @value{GDBN} to be
+ compiled with the @samp{-pg} compiler option.
+ 
+-@kindex maint set linux-async
+-@kindex maint show linux-async
+-@cindex asynchronous support
+-@item maint set linux-async
+-@itemx maint show linux-async
+-Control the GNU/Linux native asynchronous support 
+-(@pxref{Background Execution}) of @value{GDBN}.
+-
+-GNU/Linux native asynchronous support will be disabled until you use
+-the @samp{maint set linux-async} command to enable it.
+-
+-@kindex maint set remote-async
+-@kindex maint show remote-async
+-@cindex asynchronous support
+-@item maint set remote-async
+-@itemx maint show remote-async
+-Control the remote asynchronous support 
+-(@pxref{Background Execution}) of @value{GDBN}.
+-
+-Remote asynchronous support will be disabled until you use
+-the @samp{maint set remote-async} command to enable it.
+-
+ @kindex maint show-debug-regs
+ @cindex x86 hardware debug registers
+ @item maint show-debug-regs
 diff --git a/gdb/dwarf2-frame.c b/gdb/dwarf2-frame.c
 index ce11d89..eaa6a13 100644
 --- a/gdb/dwarf2-frame.c
@@ -20738,12 +20825,45 @@ index 0000000..8b13789
 +++ b/gdb/python/lib/gdb/libstdcxx/v6/__init__.py
 @@ -0,0 +1 @@
 +
+diff --git a/gdb/python/lib/gdb/libstdcxx/v6/hook.in b/gdb/python/lib/gdb/libstdcxx/v6/hook.in
+new file mode 100644
+index 0000000..fe7c072
+--- /dev/null
++++ b/gdb/python/lib/gdb/libstdcxx/v6/hook.in
+@@ -0,0 +1,27 @@
++# -*- python -*-
++# Copyright (C) 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import sys
++import gdb
++
++# Update module path.
++dir = '@dir@'
++if not dir in sys.path:
++    sys.path.insert(0, dir)
++
++# Load the pretty-printers.
++from libstdcxx.v6.printers import register_libstdcxx_printers
++register_libstdcxx_printers (gdb.current_objfile ())
 diff --git a/gdb/python/lib/gdb/libstdcxx/v6/printers.py b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
 new file mode 100644
-index 0000000..7a77ad4
+index 0000000..ccef97d
 --- /dev/null
 +++ b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
-@@ -0,0 +1,647 @@
+@@ -0,0 +1,646 @@
 +# Pretty-printers for libstc++.
 +
 +# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -20773,8 +20893,9 @@ index 0000000..7a77ad4
 +        self.val = val
 +
 +    def to_string (self):
-+        return '%s (count %d) %s' % (self.typename, self.val['_M_refcount'],
-+                                     self.val['_M_ptr'])
++        return '%s (count %d) %s' % (self.typename,
++        self.val['_M_refcount']['_M_pi']['_M_use_count'],
++        self.val['_M_ptr'])
 +
 +class UniquePointerPrinter:
 +    "Print a unique_ptr"
@@ -21358,21 +21479,20 @@ index 0000000..7a77ad4
 +    pretty_printers_dict[re.compile('^std::queue<.*>$')] = lambda val: StdStackOrQueuePrinter("std::queue", val)
 +    pretty_printers_dict[re.compile('^std::set<.*>$')] = lambda val: StdSetPrinter("std::set", val)
 +    pretty_printers_dict[re.compile('^std::stack<.*>$')] = lambda val: StdStackOrQueuePrinter("std::stack", val)
++    pretty_printers_dict[re.compile('^std::unique_ptr<.*>$')] = UniquePointerPrinter
 +    pretty_printers_dict[re.compile('^std::vector<.*>$')] = StdVectorPrinter
-+    # vector<bool>
 +
-+    # C++0x stuff.
-+    # array - the default seems reasonable
-+    # smart_ptr?  seems to only be in boost right now
-+    pretty_printers_dict[re.compile('^std::tr1::shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
-+    pretty_printers_dict[re.compile('^std::tr1::weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
-+    pretty_printers_dict[re.compile('^std::tr1::unique_ptr<.*>$')] = UniquePointerPrinter
-+    pretty_printers_dict[re.compile('^std::tr1::unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
-+    pretty_printers_dict[re.compile('^std::tr1::unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
-+    pretty_printers_dict[re.compile('^std::tr1::unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
-+    pretty_printers_dict[re.compile('^std::tr1::unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
++    # These are the C++0x printers. They also exist in the standard namespace.
++    # For array - the default GDB pretty-printer seems reasonable.
++    pretty_printers_dict[re.compile('^std::(tr1::)?shared_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::shared_ptr', val)
++    pretty_printers_dict[re.compile('^std::(tr1::)?weak_ptr<.*>$')] = lambda val: StdPointerPrinter ('std::weak_ptr', val)
++    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_map<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_map', val)
++    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_set<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_set', val)
++    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multimap<.*>$')] = lambda val: Tr1UnorderedMapPrinter ('std::tr1::unordered_multimap', val)
++    pretty_printers_dict[re.compile('^std::(tr1::)?unordered_multiset<.*>$')] = lambda val: Tr1UnorderedSetPrinter ('std::tr1::unordered_multiset', val)
 +
-+    # Extensions.
++
++    # Extensions to std, tr1 pretty-printers.
 +    pretty_printers_dict[re.compile('^__gnu_cxx::slist<.*>$')] = StdSlistPrinter
 +
 +    if True:
@@ -21390,7 +21510,6 @@ index 0000000..7a77ad4
 +pretty_printers_dict = {}
 +
 +build_libstdcxx_dictionary ()
-+register_libstdcxx_printers (gdb.current_objfile())
 diff --git a/gdb/python/python-block.c b/gdb/python/python-block.c
 new file mode 100644
 index 0000000..8019e9d
@@ -28514,7 +28633,7 @@ index 973a57f..56b1d91 100644
 +
  #endif /* #ifndef STACK_H */
 diff --git a/gdb/symfile.c b/gdb/symfile.c
-index 63b5c1d..8ca5457 100644
+index 63b5c1d..b047e94 100644
 --- a/gdb/symfile.c
 +++ b/gdb/symfile.c
 @@ -929,6 +929,17 @@ new_symfile_objfile (struct objfile *objfile, int mainline, int verbo)
@@ -28571,7 +28690,7 @@ index 63b5c1d..8ca5457 100644
      debugfile = find_separate_debug_file (objfile);
    if (debugfile)
      {
-@@ -1049,8 +1064,9 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
+@@ -1049,8 +1064,10 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd, int from_tty,
        xfree (debugfile);
      }
  
@@ -28579,11 +28698,12 @@ index 63b5c1d..8ca5457 100644
 -      && print_symbol_loading)
 +  /* has_any_debug_symbols is not fully compatible with the former calls which
 +     would just be needlessly expensive here.  */
-+  if (print_symbol_loading && !has_any_debug_symbols (objfile) && mainline)
++  if ((from_tty || info_verbose) && print_symbol_loading
++      && !has_any_debug_symbols (objfile) && mainline)
      {
        wrap_here ("");
        printf_unfiltered (_("(no debugging symbols found)"));
-@@ -2423,13 +2439,15 @@ reread_symbols (void)
+@@ -2423,13 +2440,15 @@ reread_symbols (void)
  	         zero is OK since dbxread.c also does what it needs to do if
  	         objfile->global_psymbols.size is 0.  */
  	      (*objfile->sf->sym_read) (objfile, 0);
@@ -28600,7 +28720,7 @@ index 63b5c1d..8ca5457 100644
  	      /* We're done reading the symbol file; finish off complaints.  */
  	      clear_complaints (&symfile_complaints, 0, 1);
  
-@@ -2726,7 +2744,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
+@@ -2726,7 +2745,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
  }
  
  struct partial_symtab *
@@ -28609,7 +28729,7 @@ index 63b5c1d..8ca5457 100644
  {
    struct partial_symtab *psymtab;
  
-@@ -3040,7 +3058,8 @@ again2:
+@@ -3040,7 +3059,8 @@ again2:
  
  struct partial_symtab *
  start_psymtab_common (struct objfile *objfile,
@@ -30022,6 +30142,18 @@ index 7f4cd8f..8dcc3d6 100644
  /* Command logging facility.  */
  
  #define target_log_command(p)						\
+diff --git a/gdb/testsuite/ChangeLog b/gdb/testsuite/ChangeLog
+index e3aaeab..e886869 100644
+--- a/gdb/testsuite/ChangeLog
++++ b/gdb/testsuite/ChangeLog
+@@ -1,3 +1,7 @@
++2009-03-05  Pedro Alves  <pedro@codesourcery.com>
++
++	* gdb.arch/i386-permbkpt.S, gdb.arch/i386-permbkpt.exp: New.
++
+ 2009-02-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* gdb.base/macscp.exp (objfile): Move it to ${objdir}/${subdir}/.
 diff --git a/gdb/testsuite/configure.ac b/gdb/testsuite/configure.ac
 index 3d8fae4..5fb9067 100644
 --- a/gdb/testsuite/configure.ac
@@ -30035,6 +30167,100 @@ index 3d8fae4..5fb9067 100644
  # Free Software Foundation, Inc.
  #
  # This program is free software; you can redistribute it and/or modify
+diff --git a/gdb/testsuite/gdb.arch/i386-permbkpt.S b/gdb/testsuite/gdb.arch/i386-permbkpt.S
+new file mode 100644
+index 0000000..02a31d6
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/i386-permbkpt.S
+@@ -0,0 +1,30 @@
++/* Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   This file is part of the gdb testsuite.  */
++
++#define CONCAT1(a, b) CONCAT2(a, b)
++#define CONCAT2(a, b) a ## b
++
++#ifdef SYMBOL_PREFIX
++# define SYMBOL(str)     CONCAT1(SYMBOL_PREFIX, str)
++#else
++# define SYMBOL(str)     str
++#endif
++
++	.global SYMBOL(main)
++SYMBOL(main):
++	int3
++	ret
+diff --git a/gdb/testsuite/gdb.arch/i386-permbkpt.exp b/gdb/testsuite/gdb.arch/i386-permbkpt.exp
+new file mode 100644
+index 0000000..f1930e5
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/i386-permbkpt.exp
+@@ -0,0 +1,52 @@
++# Copyright (C) 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++
++# This file is part of the gdb testsuite.
++
++if $tracelevel {
++    strace $tracelevel
++}
++
++# Test inserting breakpoints over permanent breakpoints on i386 and amd64.
++
++if { ![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"] } then {
++    verbose "Skipping i386 test for multi break at permanent breakpoint location."
++    return
++}
++
++set testfile "i386-permbkpt"
++set srcfile ${testfile}.S
++set binfile ${objdir}/${subdir}/${testfile}
++
++# Some targets have leading underscores on assembly symbols.
++# TODO: detect this automatically
++set additional_flags ""
++if { [istarget "*-*-cygwin*"] || [istarget "*-*-mingw*"] } then {
++    set additional_flags "additional_flags=-DSYMBOL_PREFIX=_"
++}
++
++if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable [list debug $additional_flags]] != "" } {
++    untested i386-permbkpt.exp
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++gdb_test "break main" "" "First permanent break"
++gdb_test "break main" "" "Second permanent break"
 diff --git a/gdb/testsuite/gdb.arch/powerpc-power7.exp b/gdb/testsuite/gdb.arch/powerpc-power7.exp
 new file mode 100644
 index 0000000..d9c48f9
@@ -36654,7 +36880,7 @@ index 9dea7c2..326e44e 100644
  }
  
 diff --git a/gdb/top.c b/gdb/top.c
-index d676f02..83c54db 100644
+index d676f02..d6b17f0 100644
 --- a/gdb/top.c
 +++ b/gdb/top.c
 @@ -377,6 +377,7 @@ execute_command (char *p, int from_tty)
@@ -36665,6 +36891,16 @@ index d676f02..83c54db 100644
  
    /* Force cleanup of any alloca areas if using C alloca instead of
       a builtin alloca.  */
+@@ -1246,7 +1247,8 @@ quit_target (void *arg)
+   struct qt_args *qt = (struct qt_args *)arg;
+ 
+   /* Kill or detach all inferiors.  */
+-  iterate_over_inferiors (kill_or_detach, qt);
++  if (target_has_execution)
++    iterate_over_inferiors (kill_or_detach, qt);
+ 
+   /* Give all pushed targets a chance to do minimal cleanup, and pop
+      them all out.  */
 diff --git a/gdb/tracepoint.c b/gdb/tracepoint.c
 index 83df64e..003ef3a 100644
 --- a/gdb/tracepoint.c
