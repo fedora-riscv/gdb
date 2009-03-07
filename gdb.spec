@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 5%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -378,7 +378,8 @@ Patch352: gdb-6.8-bz457187-largefile.patch
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
-Requires: rpm-libs
+# dlopen() no longer makes rpm-libs a mandatory dependency.
+#Requires: rpm-libs
 BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
@@ -635,6 +636,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-expat					\
 	--enable-tui					\
 	--with-python					\
+	--with-rpm=librpm.so				\
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -838,6 +840,9 @@ fi
 %endif
 
 %changelog
+* Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-5
+- Improve `gdb-6.6-buildid-locate-rpm.patch' by dlopen() (+pkg-config compat.).
+
 * Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-4
 - Split `gdb-6.6-buildid-locate.patch' to `gdb-6.6-buildid-locate-rpm.patch'.
 
