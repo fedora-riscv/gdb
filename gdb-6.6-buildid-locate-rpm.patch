@@ -1,0 +1,429 @@
+--- ./gdb/Makefile.in	2009-03-07 01:45:51.000000000 +0100
++++ ./gdb/Makefile.in	2009-03-07 01:52:00.000000000 +0100
+@@ -396,7 +396,7 @@ CONFIG_UNINSTALL = @CONFIG_UNINSTALL@
+ # your system doesn't have fcntl.h in /usr/include (which is where it
+ # should be according to Posix).
+ DEFS = @DEFS@
+-GDB_CFLAGS = -I. -I$(srcdir) -I$(srcdir)/config -DLOCALEDIR="\"$(localedir)\"" $(DEFS)
++GDB_CFLAGS = -I. -I$(srcdir) -I$(srcdir)/config -I$(includedir)/rpm -DLOCALEDIR="\"$(localedir)\"" $(DEFS)
+ 
+ # MH_CFLAGS, if defined, has host-dependent CFLAGS from the config directory.
+ GLOBAL_CFLAGS = $(MH_CFLAGS)
+@@ -449,7 +449,7 @@ INSTALLED_LIBS=-lbfd -lreadline -lopcode
+ CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
+ 	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ \
+ 	$(LIBICONV) $(LIBEXPAT) \
+-	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU)
++	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU) -lrpm
+ CDEPS = $(XM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
+ 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
+ 
+--- ./gdb/event-top.c	2009-03-07 02:29:51.000000000 +0100
++++ ./gdb/event-top.c	2009-03-07 01:52:00.000000000 +0100
+@@ -33,6 +33,7 @@
+ #include "cli/cli-script.h"     /* for reset_command_nest_depth */
+ #include "main.h"
+ #include "gdbthread.h"
++#include "symfile.h"
+ 
+ /* For dont_repeat() */
+ #include "gdbcmd.h"
+@@ -193,6 +194,8 @@ cli_command_loop (void)
+       char *a_prompt;
+       char *gdb_prompt = get_prompt ();
+ 
++      debug_flush_missing ();
++
+       /* Tell readline what the prompt to display is and what function it
+          will need to call after a whole line is read. This also displays
+          the first prompt. */
+@@ -264,6 +267,8 @@ display_gdb_prompt (char *new_prompt)
+   /* Reset the nesting depth used when trace-commands is set.  */
+   reset_command_nest_depth ();
+ 
++  debug_flush_missing ();
++
+   /* Each interpreter has its own rules on displaying the command
+      prompt.  */
+   if (!current_interp_display_prompt_p ())
+--- ./gdb/symfile.c	2009-03-07 02:30:20.000000000 +0100
++++ ./gdb/symfile.c	2009-03-07 01:52:00.000000000 +0100
+@@ -55,6 +55,7 @@
+ #include "solib.h"
+ #include "remote.h"
+ #include "libbfd.h"
++#include "elf/external.h"
+ 
+ #include <sys/types.h>
+ #include <fcntl.h>
+@@ -63,6 +64,7 @@
+ #include <ctype.h>
+ #include <time.h>
+ #include <sys/time.h>
++#include <sys/param.h>
+ 
+ 
+ int (*deprecated_ui_load_progress_hook) (const char *section, unsigned long num);
+@@ -1684,6 +1686,269 @@ build_id_to_filename (struct build_id *b
+   return retval;
+ }
+ 
++#include <rpm/rpmlib.h>
++#include <rpm/rpmts.h>
++#include <rpm/rpmdb.h>
++#include <rpm/header.h>
++
++/* This MISSING_RPM_HASH tracker is used to collect all the missing rpm files
++   and avoid their duplicities during a single inferior run.  */
++
++static struct htab *missing_rpm_hash;
++
++/* This MISSING_RPM_LIST tracker is used to collect and print as a single line
++   all the rpms right before the nearest GDB prompt.  It gets cleared after
++   each such print (it is questionable if we should clear it after the print).
++   */
++
++struct missing_rpm
++  {
++    struct missing_rpm *next;
++    char rpm[1];
++  };
++static struct missing_rpm *missing_rpm_list;
++static int missing_rpm_list_entries;
++
++/* Returns the count of newly added rpms.  */
++
++static int
++missing_rpm_enlist (const char *filename)
++{
++  static int rpm_init_done = 0;
++  rpmts ts;
++  rpmdbMatchIterator mi;
++  int count = 0;
++
++  if (filename == NULL)
++    return 0;
++
++  if (!rpm_init_done)
++    {
++      if (rpmReadConfigFiles(NULL, NULL) != 0)
++	{
++	  warning (_("Error reading the rpm configuration files"));
++	  return 0;
++	}
++      rpm_init_done = 1;
++    }
++
++  ts = rpmtsCreate ();
++
++  mi = rpmtsInitIterator (ts, RPMTAG_BASENAMES, filename, 0);
++  if (mi != NULL)
++    {
++      for (;;)
++	{
++	  Header h;
++	  char *debuginfo, **slot, *s, *s2;
++	  errmsg_t err;
++	  size_t srcrpmlen = sizeof (".src.rpm") - 1;
++	  size_t debuginfolen = sizeof ("-debuginfo") - 1;
++	  rpmdbMatchIterator mi_debuginfo;
++
++	  h = rpmdbNextIterator (mi);
++	  if (h == NULL)
++	    break;
++
++	  /* Verify the debuginfo file is not already installed.  */
++ 
++	  debuginfo = headerFormat (h, "%{sourcerpm}-debuginfo.%{arch}", &err);
++	  if (!debuginfo)
++	    {
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               err);
++	      continue;
++	    }
++	  /* s = `.src.rpm-debuginfo.%{arch}' */
++	  s = strrchr (debuginfo, '-') - srcrpmlen;
++	  s2 = NULL;
++	  if (s > debuginfo && memcmp (s, ".src.rpm", srcrpmlen) == 0)
++	    {
++	      /* s2 = `-%{release}.src.rpm-debuginfo.%{arch}' */
++	      s2 = memrchr (debuginfo, '-', s - debuginfo);
++	    }
++	  if (s2)
++	    {
++	      /* s2 = `-%{version}-%{release}.src.rpm-debuginfo.%{arch}' */
++	      s2 = memrchr (debuginfo, '-', s2 - debuginfo);
++	    }
++	  if (!s2)
++	    {
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               debuginfo);
++	      xfree (debuginfo);
++	      continue;
++	    }
++	  /* s = `.src.rpm-debuginfo.%{arch}' */
++	  /* s2 = `-%{version}-%{release}.src.rpm-debuginfo.%{arch}' */
++	  memmove (s2 + debuginfolen, s2, s - s2);
++	  memcpy (s2, "-debuginfo", debuginfolen);
++	  /* s = `XXXX.%{arch}' */
++	  /* strlen ("XXXX") == srcrpmlen + debuginfolen */
++	  /* s2 = `-debuginfo-%{version}-%{release}XX.%{arch}' */
++	  /* strlen ("XX") == srcrpmlen */
++	  memmove (s + debuginfolen, s + srcrpmlen + debuginfolen,
++		   strlen (s + srcrpmlen + debuginfolen) + 1);
++	  /* s = `-debuginfo-%{version}-%{release}.%{arch}' */
++
++	  /* RPMDBI_PACKAGES requires keylen == sizeof (int).  */
++	  /* RPMDBI_LABEL is an interface for NVR-based dbiFindByLabel().  */
++	  mi_debuginfo = rpmtsInitIterator (ts, RPMDBI_LABEL, debuginfo, 0);
++	  xfree (debuginfo);
++	  if (mi_debuginfo)
++	    {
++	      rpmdbFreeIterator (mi_debuginfo);
++	      count = 0;
++	      break;
++	    }
++
++	  /* The allocated memory gets utilized below for MISSING_RPM_HASH.  */
++	  debuginfo = headerFormat (h,
++				    "%{name}-%{version}-%{release}.%{arch}",
++				    &err);
++	  if (!debuginfo)
++	    {
++	      warning (_("Error querying the rpm file `%s': %s"), filename,
++	               err);
++	      continue;
++	    }
++
++	  /* Base package name for `debuginfo-install'.  We do not use the
++	     `yum' command directly as the line
++		 yum --enablerepo='*-debuginfo' install NAME-debuginfo.ARCH
++	     would be more complicated than just:
++		 debuginfo-install NAME-VERSION-RELEASE.ARCH
++	     Do not supply the rpm base name (derived from .src.rpm name) as
++	     debuginfo-install is unable to install the debuginfo package if
++	     the base name PKG binary rpm is not installed while for example
++	     PKG-libs would be installed (RH Bug 467901).
++	     FUTURE: After multiple debuginfo versions simultaneously installed
++	     get supported the support for the VERSION-RELEASE tags handling
++	     may need an update.  */
++
++	  if (missing_rpm_hash == NULL)
++	    {
++	      /* DEL_F is passed NULL as MISSING_RPM_LIST's HTAB_DELETE
++		 should not deallocate the entries.  */
++
++	      missing_rpm_hash = htab_create_alloc (64, htab_hash_string,
++			       (int (*) (const void *, const void *)) streq,
++						    NULL, xcalloc, xfree);
++	    }
++	  slot = (char **) htab_find_slot (missing_rpm_hash, debuginfo, INSERT);
++	  /* XCALLOC never returns NULL.  */
++	  gdb_assert (slot != NULL);
++	  if (*slot == NULL)
++	    {
++	      struct missing_rpm *missing_rpm;
++
++	      *slot = debuginfo;
++
++	      missing_rpm = xmalloc (sizeof (*missing_rpm) + strlen (debuginfo));
++	      strcpy (missing_rpm->rpm, debuginfo);
++	      missing_rpm->next = missing_rpm_list;
++	      missing_rpm_list = missing_rpm;
++	      missing_rpm_list_entries++;
++	    }
++	  else
++	    xfree (debuginfo);
++	  count++;
++	}
++
++      rpmdbFreeIterator (mi);
++    }
++
++  rpmtsFree (ts);
++
++  return count;
++}
++
++static int
++missing_rpm_list_compar (const char *const *ap, const char *const *bp)
++{
++  return strcoll (*ap, *bp);
++}
++
++/* It returns a NULL-terminated array of strings needing to be FREEd.  It may
++   also return only NULL.  */
++
++static void
++missing_rpm_list_print (void)
++{
++  char **array, **array_iter;
++  struct missing_rpm *list_iter;
++  struct cleanup *cleanups;
++
++  if (missing_rpm_list_entries == 0)
++    return;
++
++  array = xmalloc (sizeof (*array) * missing_rpm_list_entries);
++  cleanups = make_cleanup (xfree, array);
++
++  array_iter = array;
++  for (list_iter = missing_rpm_list; list_iter != NULL;
++       list_iter = list_iter->next)
++    {
++      *array_iter++ = list_iter->rpm;
++    }
++  gdb_assert (array_iter == array + missing_rpm_list_entries);
++
++  qsort (array, missing_rpm_list_entries, sizeof (*array),
++	 (int (*) (const void *, const void *)) missing_rpm_list_compar);
++
++  printf_unfiltered (_("Missing separate debuginfos, use: %s"),
++		     "debuginfo-install");
++  for (array_iter = array; array_iter < array + missing_rpm_list_entries;
++       array_iter++)
++    {
++      putchar_unfiltered (' ');
++      puts_unfiltered (*array_iter);
++    }
++  putchar_unfiltered ('\n');
++
++  while (missing_rpm_list != NULL)
++    {
++      list_iter = missing_rpm_list;
++      missing_rpm_list = list_iter->next;
++      xfree (list_iter);
++    }
++  missing_rpm_list_entries = 0;
++
++  do_cleanups (cleanups);
++}
++
++static void
++missing_rpm_change (void)
++{
++  debug_flush_missing ();
++
++  gdb_assert (missing_rpm_list == NULL);
++  if (missing_rpm_hash != NULL)
++    {
++      htab_delete (missing_rpm_hash);
++      missing_rpm_hash = NULL;
++    }
++}
++
++enum missing_exec
++  {
++    /* Init state.  EXEC_BFD also still could be NULL.  */
++    MISSING_EXEC_NOT_TRIED,
++    /* We saw a non-NULL EXEC_BFD but RPM has no info about it.  */
++    MISSING_EXEC_NOT_FOUND,
++    /* We found EXEC_BFD by RPM and we either have its symbols (either embedded
++       or separate) or the main executable's RPM is now contained in
++       MISSING_RPM_HASH.  */
++    MISSING_EXEC_ENLISTED
++  };
++static enum missing_exec missing_exec = MISSING_EXEC_NOT_TRIED;
++
++void
++debug_flush_missing (void)
++{
++  missing_rpm_list_print ();
++}
++
+ /* This MISSING_FILEPAIR_HASH tracker is used only for the duplicite messages
+      yum --enablerepo='*-debuginfo' install ...
+    avoidance.  */
+@@ -1739,11 +2004,13 @@ missing_filepair_change (void)
+       /* All their memory came just from missing_filepair_OBSTACK.  */
+       missing_filepair_hash = NULL;
+     }
++  missing_exec = MISSING_EXEC_NOT_TRIED;
+ }
+ 
+ static void
+ debug_print_executable_changed (void)
+ {
++  missing_rpm_change ();
+   missing_filepair_change ();
+ }
+ 
+@@ -1802,14 +2069,31 @@ debug_print_missing (const char *binary,
+     }
+   *slot = missing_filepair;
+ 
+-  /* We do not collect and flush these messages as each such message
+-     already requires its own separate lines.  */
++  if (missing_exec == MISSING_EXEC_NOT_TRIED)
++    {
++      char *exec_filename;
+ 
+-  fprintf_unfiltered (gdb_stdlog,
+-		      _("Missing separate debuginfo for %s\n"), binary);
+-  if (debug != NULL)
+-    fprintf_unfiltered (gdb_stdlog, _("Try: %s %s\n"),
+-			"yum --enablerepo='*-debuginfo' install", debug);
++      exec_filename = get_exec_file (0);
++      if (exec_filename != NULL)
++	{
++	  if (missing_rpm_enlist (exec_filename) == 0)
++	    missing_exec = MISSING_EXEC_NOT_FOUND;
++	  else
++	    missing_exec = MISSING_EXEC_ENLISTED;
++	}
++    }
++  if (missing_exec != MISSING_EXEC_ENLISTED)
++    if (missing_rpm_enlist (binary) == 0 && missing_rpm_enlist (debug) == 0)
++      {
++	/* We do not collect and flush these messages as each such message
++	   already requires its own separate lines.  */
++
++	fprintf_unfiltered (gdb_stdlog,
++			    _("Missing separate debuginfo for %s\n"), binary);
++        if (debug != NULL)
++	  fprintf_unfiltered (gdb_stdlog, _("Try: %s %s\n"),
++			      "yum --enablerepo='*-debuginfo' install", debug);
++      }
+ }
+ 
+ static char *
+--- ./gdb/symfile.h	2009-03-07 02:16:18.000000000 +0100
++++ ./gdb/symfile.h	2009-03-07 01:52:00.000000000 +0100
+@@ -378,6 +378,7 @@ extern struct build_id *build_id_addr_ge
+ extern char *build_id_to_filename (struct build_id *build_id,
+ 				   char **link_return, int add_debug_suffix);
+ extern void debug_print_missing (const char *binary, const char *debug);
++extern void debug_flush_missing (void);
+ 
+ /* From dwarf2read.c */
+ 
+--- ./gdb/testsuite/lib/gdb.exp	2009-03-07 02:10:11.000000000 +0100
++++ ./gdb/testsuite/lib/gdb.exp	2009-03-07 01:52:00.000000000 +0100
+@@ -1230,7 +1230,7 @@ proc default_gdb_start { } {
+ 	    warning "Couldn't set the width to 0."
+ 	}
+     }
+-    # Turn off the missing warnings as the testsuite does not expect it.
++    # Turn off the missing RPMs warnings as the testsuite does not expect it.
+     send_gdb "set build-id-verbose 0\n"
+     gdb_expect 10 {
+ 	-re "$gdb_prompt $" {
+--- ./gdb/tui/tui-interp.c	2009-03-07 02:28:47.000000000 +0100
++++ ./gdb/tui/tui-interp.c	2009-03-07 01:52:00.000000000 +0100
+@@ -30,6 +30,7 @@
+ #include "tui/tui.h"
+ #include "tui/tui-io.h"
+ #include "exceptions.h"
++#include "symfile.h"
+ 
+ /* Set to 1 when the TUI mode must be activated when we first start
+    gdb.  */
+@@ -128,6 +129,8 @@ tui_command_loop (void *data)
+       char *a_prompt;
+       char *gdb_prompt = get_prompt ();
+ 
++      debug_flush_missing ();
++
+       /* Tell readline what the prompt to display is and what function
+          it will need to call after a whole line is read. This also
+          displays the first prompt.  */
