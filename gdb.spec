@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -384,6 +384,8 @@ BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
+# Temporarily before it gets moved to libstdc++.rpm
+BuildRequires: libstdc++
 
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
@@ -762,8 +764,17 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
-# A part of the libstdc++ rpm.
-rm -rf $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+# In the future:
+#%# A part of the libstdc++ rpm.
+#%rm -rf $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+# Temporarily now:
+for LIB in lib lib64;do
+  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
+  mkdir -p $LIBPATH
+  # basename is being run only for the native (non-biarch) file.
+  sed -e 's,@dir@,%{python_sitelib}/gdb,' <$RPM_BUILD_DIR/%{gdb_src}/gdb/python/lib/gdb/libstdcxx/v6/hook.in \
+      >$LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+done
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -840,6 +851,10 @@ fi
 %endif
 
 %changelog
+* Mon Mar  9 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-7
+- Archer update to the snapshot: ec29855686f2a78d90ebcc63765681249bbbe808
+- Temporarily place libstdc++ pretty printers in this gdb.rpm.
+
 * Sat Mar  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-6
 - Archer update to the snapshot: 543fb2154d3bd551344b990b911be5c6cc703504
  - Fixes [delayed-symfile] excessive `(no debugging symbols found)' messages.
