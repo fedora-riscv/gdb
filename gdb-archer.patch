@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit ec29855686f2a78d90ebcc63765681249bbbe808
+commit a99e30d08ade4a2df0f943b036cd653bcd12b04d
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -866,7 +866,7 @@ index 8f0140c..d451769 100644
  
  /* Set BLOCK's using member to USING; if needed, allocate memory via
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index b23b294..38a17a1 100644
+index b23b294..531c43d 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -191,6 +191,8 @@ static int is_hardware_watchpoint (struct breakpoint *bpt);
@@ -1344,7 +1344,65 @@ index b23b294..38a17a1 100644
  static int
  hw_breakpoint_used_count (void)
  {
-@@ -5310,8 +5604,6 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
+@@ -5188,7 +5482,6 @@ expand_line_sal_maybe (struct symtab_and_line sal)
+   struct symtabs_and_lines expanded;
+   CORE_ADDR original_pc = sal.pc;
+   char *original_function = NULL;
+-  int found;
+   int i;
+ 
+   /* If we have explicit pc, don't expand.
+@@ -5264,14 +5557,42 @@ expand_line_sal_maybe (struct symtab_and_line sal)
+ 
+   if (original_pc)
+     {
+-      found = 0;
++      /* Find all the other PCs for a line of code with multiple instances
++	 (locations).  If the instruction is in the middle of an instruction
++	 block for source line GDB cannot safely find the same instruction in
++	 the other compiled instances of the same source line because the other
++	 instances may have been compiled completely differently.
++
++	 The testcase gdb.cp/expand-sals.exp shows that breaking at the return
++	 address in a caller of the current frame works for the current
++	 instance but the breakpoint cannot catch the point (instruction) where
++	 the callee returns in the other compiled instances of this source line.
++
++	 The current implementation will place the breakpoint at the expected
++	 returning address of the current instance of the caller.  But the
++	 other instances will get the breakpoint at the first instruction of
++	 the source line - therefore before the call would be made.  Another
++	 possibility would be to place the breakpoint in the other instances at
++	 the start of the next source line.
++
++	 A possible heuristics would compare the instructions length of each of
++	 the instances of the current source line and if it matches it would
++	 place the breakpoint at the same offset.  Unfortunately a mistaken
++	 guess would possibly crash the inferior.  */
++
++      CORE_ADDR best = -1;
++
++      /* Find the nearest preceding PC and set it to ORIGINAL_PC.  */
+       for (i = 0; i < expanded.nelts; ++i)
+-	if (expanded.sals[i].pc == original_pc)
+-	  {
+-	    found = 1;
+-	    break;
+-	  }
+-      gdb_assert (found);
++	if (expanded.sals[i].pc <= original_pc
++	    && (best == -1 || expanded.sals[best].pc < expanded.sals[i].pc))
++	  best = i;
++
++      if (best == -1)
++	error (_("Cannot find the best address for %s out of the %d locations"),
++	       paddr (original_pc), expanded.nelts);
++
++      expanded.sals[best].pc = original_pc;
+     }
+ 
+   return expanded;
+@@ -5310,8 +5631,6 @@ create_breakpoints (struct symtabs_and_lines sals, char **addr_string,
  			 cond_string, type, disposition,
  			 thread, ignore_count, ops, from_tty, enabled);
      }
@@ -1353,7 +1411,7 @@ index b23b294..38a17a1 100644
  }
  
  /* Parse ARG which is assumed to be a SAL specification possibly
-@@ -5637,7 +5929,6 @@ break_command_really (char *arg, char *cond_string, int thread,
+@@ -5637,7 +5956,6 @@ break_command_really (char *arg, char *cond_string, int thread,
        b->ops = ops;
        b->enable_state = enabled ? bp_enabled : bp_disabled;
  
@@ -1361,7 +1419,7 @@ index b23b294..38a17a1 100644
        mention (b);
      }
    
-@@ -5649,6 +5940,11 @@ break_command_really (char *arg, char *cond_string, int thread,
+@@ -5649,6 +5967,11 @@ break_command_really (char *arg, char *cond_string, int thread,
    discard_cleanups (breakpoint_chain);
    /* But cleanup everything else. */
    do_cleanups (old_chain);
@@ -1373,7 +1431,7 @@ index b23b294..38a17a1 100644
  }
  
  /* Set a breakpoint. 
-@@ -6131,7 +6427,7 @@ can_use_hardware_watchpoint (struct value *v)
+@@ -6131,7 +6454,7 @@ can_use_hardware_watchpoint (struct value *v)
  		  || (TYPE_CODE (vtype) != TYPE_CODE_STRUCT
  		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
  		{
@@ -1382,7 +1440,7 @@ index b23b294..38a17a1 100644
  		  int       len   = TYPE_LENGTH (value_type (v));
  
  		  if (!TARGET_REGION_OK_FOR_HW_WATCHPOINT (vaddr, len))
-@@ -6668,6 +6964,122 @@ catch_ada_exception_command (char *arg, int from_tty,
+@@ -6668,6 +6991,122 @@ catch_ada_exception_command (char *arg, int from_tty,
                                     from_tty);
  }
  
@@ -1505,7 +1563,7 @@ index b23b294..38a17a1 100644
  /* Implement the "catch assert" command.  */
  
  static void
-@@ -7134,6 +7546,7 @@ delete_breakpoint (struct breakpoint *bpt)
+@@ -7134,6 +7573,7 @@ delete_breakpoint (struct breakpoint *bpt)
      xfree (bpt->source_file);
    if (bpt->exec_pathname != NULL)
      xfree (bpt->exec_pathname);
@@ -1513,7 +1571,7 @@ index b23b294..38a17a1 100644
  
    /* Be sure no bpstat's are pointing at it after it's been freed.  */
    /* FIXME, how can we find all bpstat's?
-@@ -8041,6 +8454,56 @@ single_step_breakpoint_inserted_here_p (CORE_ADDR pc)
+@@ -8041,6 +8481,56 @@ single_step_breakpoint_inserted_here_p (CORE_ADDR pc)
    return 0;
  }
  
@@ -1570,7 +1628,7 @@ index b23b294..38a17a1 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -8073,6 +8536,8 @@ static void
+@@ -8073,6 +8563,8 @@ static void
  add_catch_command (char *name, char *docstring,
  		   void (*sfunc) (char *args, int from_tty,
  				  struct cmd_list_element *command),
@@ -1579,7 +1637,7 @@ index b23b294..38a17a1 100644
  		   void *user_data_catch,
  		   void *user_data_tcatch)
  {
-@@ -8082,11 +8547,13 @@ add_catch_command (char *name, char *docstring,
+@@ -8082,11 +8574,13 @@ add_catch_command (char *name, char *docstring,
  		     &catch_cmdlist);
    set_cmd_sfunc (command, sfunc);
    set_cmd_context (command, user_data_catch);
@@ -1593,7 +1651,7 @@ index b23b294..38a17a1 100644
  }
  
  void
-@@ -8361,36 +8828,50 @@ Set temporary catchpoints to catch events."),
+@@ -8361,36 +8855,50 @@ Set temporary catchpoints to catch events."),
  Catch an exception, when caught.\n\
  With an argument, catch only exceptions with the given name."),
  		     catch_catch_command,
@@ -33471,6 +33529,171 @@ index 5e08768..8c8e038 100644
  }
  
  proc do_tests {} {
+diff --git a/gdb/testsuite/gdb.cp/expand-sals.cc b/gdb/testsuite/gdb.cp/expand-sals.cc
+new file mode 100644
+index 0000000..6169a05
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/expand-sals.cc
+@@ -0,0 +1,53 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright (C) 2009 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int
++func ()
++{
++  return 42;	/* func-line */
++}
++
++volatile int global_x;
++
++class A
++{
++public:
++  A ()
++    {
++      global_x = func ();	/* caller-line */
++    }
++};
++
++/* class B is here just to make the `func' calling line above having multiple
++   instances - multiple locations.  Template cannot be used as its instances
++   would have different function names which get discarded by GDB
++   expand_line_sal_maybe.  */
++
++class B : public A
++{
++};
++
++int
++main (void)
++{
++  A a;
++  B b;
++
++  return 0;	/* exit-line */
++}
+diff --git a/gdb/testsuite/gdb.cp/expand-sals.exp b/gdb/testsuite/gdb.cp/expand-sals.exp
+new file mode 100644
+index 0000000..a2631fb
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/expand-sals.exp
+@@ -0,0 +1,100 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if { [skip_cplus_tests] } { continue }
++
++set srcfile expand-sals.cc
++if { [prepare_for_testing expand-sals.exp expand-sals $srcfile {debug c++}] } {
++    return -1
++}
++if ![runto_main] {
++    return -1
++}
++
++gdb_breakpoint [gdb_get_line_number "exit-line"]
++
++gdb_breakpoint [gdb_get_line_number "func-line"]
++gdb_continue_to_breakpoint "func" ".*func-line.*"
++
++gdb_test "up" "caller-line.*"
++
++# PC should not be at the boundary of source lines to make the original bug
++# exploitable.
++
++set test "p/x \$pc"
++set pc {}
++gdb_test_multiple $test $test {
++    -re "\\$\[0-9\]+ = (0x\[0-9a-f\]+)\r\n$gdb_prompt $" {
++	set pc $expect_out(1,string)
++	pass $test
++    }
++}
++
++set test "info line"
++set end {}
++gdb_test_multiple $test $test {
++    -re "Line \[0-9\]+ of .* starts at address 0x\[0-9a-f\]+.* and ends at (0x\[0-9a-f\]+).*\\.\r\n$gdb_prompt $" {
++	set end $expect_out(1,string)
++	pass $test
++    }
++}
++
++set test "caller line has trailing code"
++if {$pc != $end} {
++    pass $test
++} else {
++    fail $test
++}
++
++# Original problem was an internal error here.  Still sanity multiple locations
++# were found at this code place as otherwise this test would not test anything.
++set test "break"
++gdb_test_multiple $test $test {
++    -re "Breakpoint \[0-9\]+ at .*, line \[0-9\]+\\. \\(\[2-9\] locations\\)\r\n$gdb_prompt $" {
++	pass $test
++    }
++    -re "Breakpoint \[0-9\]+ at .*, line \[0-9\]+\\.\r\n$gdb_prompt $" {
++	# It just could not be decided if GDB is OK by this testcase.
++	setup_xfail *-*-*
++	fail $test
++	return 0
++    }
++}
++
++gdb_continue_to_breakpoint "caller" ".*caller-line.*"
++
++# Test GDB caught this return call and not the next one through B::B()
++gdb_test "bt" \
++	 "#0 \[^\r\n\]* A \[^\r\n\]*\r\n#1 \[^\r\n\]* main \[^\r\n\]*" \
++	 "bt from A"
++
++gdb_continue_to_breakpoint "next caller instance" ".*caller-line.*"
++
++# Test that GDB caught now already A through B::B() in the other instance.
++# As discussed in GDB expand_line_sal_maybe it would more match the original
++# instance behavior to catch here the `func' breakpoint and catch the
++# multiple-locations breakpoint only during the call return.  This is not the
++# case, expecting here to catch the breakpoint before the call happens.
++
++gdb_test "bt" \
++	 "#0 \[^\r\n\]* A \[^\r\n\]*\r\n#1 \[^\r\n\]* B \[^\r\n\]*\r\n#2 \[^\r\n\]* main \[^\r\n\]*" \
++	 "bt from B before the call"
++
++gdb_continue_to_breakpoint "next caller func" ".*func-line.*"
++
++# Verify GDB really could not catch the originally intended point of the return
++# from func.
++
++gdb_continue_to_breakpoint "uncaught return" ".*exit-line.*"
 diff --git a/gdb/testsuite/gdb.cp/gdb1355.exp b/gdb/testsuite/gdb.cp/gdb1355.exp
 index 77687a6..66d16cf 100644
 --- a/gdb/testsuite/gdb.cp/gdb1355.exp

@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,10 @@ fi
 %endif
 
 %changelog
+* Mon Mar  9 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-8
+- Archer update to the snapshot: a99e30d08ade4a2df0f943b036cd653bcd12b04d
+- Fixes internal error on breaking at a multi-locations C++ caller (BZ 488572).
+
 * Mon Mar  9 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-7
 - Archer update to the snapshot: ec29855686f2a78d90ebcc63765681249bbbe808
 - Temporarily place libstdc++ pretty printers in this gdb.rpm.
