@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 9%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -370,6 +370,7 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
 # The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
 Patch349: gdb-archer.patch
+Patch354: gdb-archer-backport.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
@@ -461,6 +462,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 ###patch232 -p1
 %patch349 -p1
+%patch354 -p1
 %patch1 -p1
 %patch3 -p1
 %patch4 -p1
@@ -851,6 +853,10 @@ fi
 %endif
 
 %changelog
+* Thu Mar 12 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-9
+- Archer backport: aafe933b497eee8cfab736a10bae1a90d4bceb18
+  - [python] Remove duplicate target-wide-charset parameter
+
 * Mon Mar  9 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-8
 - Archer update to the snapshot: a99e30d08ade4a2df0f943b036cd653bcd12b04d
 - Fixes internal error on breaking at a multi-locations C++ caller (BZ 488572).

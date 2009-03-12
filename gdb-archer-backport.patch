@@ -1,0 +1,69 @@
+From aafe933b497eee8cfab736a10bae1a90d4bceb18 Mon Sep 17 00:00:00 2001
+From: Tom Tromey <tromey@redhat.com>
+Date: Thu, 12 Mar 2009 13:06:15 -0600
+Subject: [PATCH] Remove duplicate target-wide-charset parameter
+
+2009-03-11  Tom Tromey  <tromey@redhat.com>
+
+	* python/lib/gdb/libstdcxx/v6/printers.py (WideEncoding): Remove.
+	(target_wide_charset): Likewise.
+	(StdStringPrinter.to_string): Change encoding lookup.
+	(build_libstdcxx_dictionary): Update.
+---
+ gdb/python/lib/gdb/libstdcxx/v6/printers.py |   26 ++++----------------------
+ 1 files changed, 4 insertions(+), 22 deletions(-)
+
+diff --git a/gdb/python/lib/gdb/libstdcxx/v6/printers.py b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
+index c0dc987..2572731 100644
+--- a/gdb/python/lib/gdb/libstdcxx/v6/printers.py
++++ b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
+@@ -436,22 +436,6 @@ class StdDequeIteratorPrinter:
+     def to_string(self):
+         return self.val['_M_cur'].dereference()
+ 
+-class WideEncoding (gdb.Parameter):
+-    """The target wide character set is the encoding used for wchar_t."""
+-
+-    set_doc = "Set the target wide character set."
+-    show_doc = "Show the target wide character set."
+-
+-    # FIXME: needs a complete method -- but does Parameter support it?
+-    def __init__ (self):
+-        super (WideEncoding, self).__init__ ("target-wide-charset",
+-                                             gdb.COMMAND_SUPPORT,
+-                                             gdb.PARAM_STRING)
+-        # I think this is ok for most glibc locales.
+-        self.value = 'UTF-32'
+-
+-target_wide_charset = WideEncoding()
+-
+ class StdStringPrinter:
+     "Print a std::basic_string of some kind"
+ 
+@@ -462,10 +446,8 @@ class StdStringPrinter:
+     def to_string(self):
+         # Look up the target encoding as late as possible.
+         encoding = self.encoding
+-        if encoding is None:
+-            encoding = gdb.parameter('target-charset')
+-        elif isinstance(encoding, WideEncoding):
+-            encoding = encoding.value
++        if encoding[0] is '@':
++            encoding = gdb.parameter(encoding[1:])
+         return self.val['_M_dataplus']['_M_p'].string(encoding)
+ 
+     def display_hint (self):
+@@ -599,8 +581,8 @@ def build_libstdcxx_dictionary ():
+     # libstdc++ objects requiring pretty-printing.
+     # In order from:
+     # http://gcc.gnu.org/onlinedocs/libstdc++/latest-doxygen/a01847.html
+-    pretty_printers_dict[re.compile('^std::basic_string<char,.*>$')] = lambda val: StdStringPrinter(None, val)
+-    pretty_printers_dict[re.compile('^std::basic_string<wchar_t,.*>$')] = lambda val: StdStringPrinter(target_wide_charset, val)
++    pretty_printers_dict[re.compile('^std::basic_string<char,.*>$')] = lambda val: StdStringPrinter('@target-charset', val)
++    pretty_printers_dict[re.compile('^std::basic_string<wchar_t,.*>$')] = lambda val: StdStringPrinter('@target-wide-charset', val)
+     pretty_printers_dict[re.compile('^std::basic_string<char16_t,.*>$')] = lambda val: StdStringPrinter('UTF-16', val)
+     pretty_printers_dict[re.compile('^std::basic_string<char32_t,.*>$')] = lambda val: StdStringPrinter('UTF-32', val)
+     pretty_printers_dict[re.compile('^std::bitset<.*>$')] = StdBitsetPrinter
+-- 
+1.6.0.6
+
