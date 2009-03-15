@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit a99e30d08ade4a2df0f943b036cd653bcd12b04d
+commit 935f217d3367a642374bc56c6b146d376fc3edab
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -10784,7 +10784,7 @@ index 76577f1..bf46761 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 55868da..de93d08 100644
+index 55868da..a82286f 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1,8 +1,7 @@
@@ -11929,7 +11929,7 @@ index 55868da..de93d08 100644
 +  child_die = die->child;
 +  die_children = 0;
 +  while (child_die && child_die->tag)
-     {
++    {
 +      process_die (child_die, cu);
 +      child_die = sibling_die (child_die);
 +      die_children++;
@@ -11937,7 +11937,7 @@ index 55868da..de93d08 100644
 +
 +  attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
 +  if (attr)
-+    {
+     {
 +      /* For the list of CHILD_DIEs.  */
 +      unsigned *offsets;
 +      unsigned *offsets_end, *offsetp;
@@ -12977,7 +12977,7 @@ index 55868da..de93d08 100644
 +dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
 +			  struct obstack *obstack)
 +{
-+  if (cu->language == language_cplus)
++  if (name && cu->language == language_cplus)
 +    {
 +      char *canon_name = cp_canonicalize_string (name);
 +
@@ -20918,10 +20918,10 @@ index 0000000..fe7c072
 +register_libstdcxx_printers (gdb.current_objfile ())
 diff --git a/gdb/python/lib/gdb/libstdcxx/v6/printers.py b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
 new file mode 100644
-index 0000000..c0dc987
+index 0000000..2572731
 --- /dev/null
 +++ b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
-@@ -0,0 +1,647 @@
+@@ -0,0 +1,629 @@
 +# Pretty-printers for libstc++.
 +
 +# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -21360,22 +21360,6 @@ index 0000000..c0dc987
 +    def to_string(self):
 +        return self.val['_M_cur'].dereference()
 +
-+class WideEncoding (gdb.Parameter):
-+    """The target wide character set is the encoding used for wchar_t."""
-+
-+    set_doc = "Set the target wide character set."
-+    show_doc = "Show the target wide character set."
-+
-+    # FIXME: needs a complete method -- but does Parameter support it?
-+    def __init__ (self):
-+        super (WideEncoding, self).__init__ ("target-wide-charset",
-+                                             gdb.COMMAND_SUPPORT,
-+                                             gdb.PARAM_STRING)
-+        # I think this is ok for most glibc locales.
-+        self.value = 'UTF-32'
-+
-+target_wide_charset = WideEncoding()
-+
 +class StdStringPrinter:
 +    "Print a std::basic_string of some kind"
 +
@@ -21386,10 +21370,8 @@ index 0000000..c0dc987
 +    def to_string(self):
 +        # Look up the target encoding as late as possible.
 +        encoding = self.encoding
-+        if encoding is None:
-+            encoding = gdb.parameter('target-charset')
-+        elif isinstance(encoding, WideEncoding):
-+            encoding = encoding.value
++        if encoding[0] is '@':
++            encoding = gdb.parameter(encoding[1:])
 +        return self.val['_M_dataplus']['_M_p'].string(encoding)
 +
 +    def display_hint (self):
@@ -21523,8 +21505,8 @@ index 0000000..c0dc987
 +    # libstdc++ objects requiring pretty-printing.
 +    # In order from:
 +    # http://gcc.gnu.org/onlinedocs/libstdc++/latest-doxygen/a01847.html
-+    pretty_printers_dict[re.compile('^std::basic_string<char,.*>$')] = lambda val: StdStringPrinter(None, val)
-+    pretty_printers_dict[re.compile('^std::basic_string<wchar_t,.*>$')] = lambda val: StdStringPrinter(target_wide_charset, val)
++    pretty_printers_dict[re.compile('^std::basic_string<char,.*>$')] = lambda val: StdStringPrinter('@target-charset', val)
++    pretty_printers_dict[re.compile('^std::basic_string<wchar_t,.*>$')] = lambda val: StdStringPrinter('@target-wide-charset', val)
 +    pretty_printers_dict[re.compile('^std::basic_string<char16_t,.*>$')] = lambda val: StdStringPrinter('UTF-16', val)
 +    pretty_printers_dict[re.compile('^std::basic_string<char32_t,.*>$')] = lambda val: StdStringPrinter('UTF-32', val)
 +    pretty_printers_dict[re.compile('^std::bitset<.*>$')] = StdBitsetPrinter
@@ -34860,6 +34842,53 @@ index 0000000..1c6e84a
 +gdb_test "step" \
 +         "func.* \\(.*\\) at .*" \
 +         "step"
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-strp.S b/gdb/testsuite/gdb.dwarf2/dw2-strp.S
+index a1602a5..293cc1b 100644
+--- a/gdb/testsuite/gdb.dwarf2/dw2-strp.S
++++ b/gdb/testsuite/gdb.dwarf2/dw2-strp.S
+@@ -28,7 +28,8 @@
+ 	/* CU die */
+ 	.uleb128	1			/* Abbrev: DW_TAG_compile_unit */
+ 	.4byte		.Lproducer		/* DW_AT_producer */
+-	.byte		1			/* DW_AT_language (C) */
++	/* Use C++ to exploit a bug in parsing DW_AT_name "".  */
++	.byte		4			/* DW_AT_language (C++) -  */
+ 
+ .Larray_type:
+ 	.uleb128	2			/* Abbrev: DW_TAG_array_type */
+@@ -60,6 +61,10 @@
+ .Lconst_type:
+ 	.uleb128	6			/* Abbrev: DW_TAG_const_type */
+ 	.4byte		.Larray_type-.Lcu1_begin/* DW_AT_type */
++
++	.uleb128	7			/* Abbrev: DW_TAG_variable (name "") */
++	.4byte		.Lemptyname		/* DW_AT_name */
++
+ 	.byte		0			/* End of children of CU */
+ .Lcu1_end:
+ 
+@@ -126,6 +131,15 @@
+ 	.uleb128	0x13			/* DW_FORM_ref4 */
+ 	.byte		0x0			/* Terminator */
+ 	.byte		0x0			/* Terminator */
++
++	.uleb128	7			/* Abbrev code */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0x0			/* DW_children_no */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0xe			/* DW_FORM_strp */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
+ 	.byte		0x0			/* Terminator */
+ 
+ /* String table */
+@@ -140,3 +154,5 @@
+ 	.string		"a_string"
+ .Lvarcontents:
+ 	.string		"hello world!\n"
++.Lemptyname:
++	.string		""
 diff --git a/gdb/testsuite/gdb.fortran/common-block.exp b/gdb/testsuite/gdb.fortran/common-block.exp
 new file mode 100644
 index 0000000..888f6c3
