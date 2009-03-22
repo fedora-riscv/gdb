@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{?dist}
+Release: 11%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,11 @@ fi
 %endif
 
 %changelog
+* Sun Mar 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-11
+- Archer update to the snapshot: e734ed95d296a3342d4147873c4641cea6c4d7fe
+- Archer backport: 1e1d73cda98b1adda884b80e07c7b4929c175628
+  - Fixes [expr] compatibility with gcc-4.4 on gdb.cp/namespace-using.exp.
+
 * Sun Mar 15 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-10
 - Archer update to the snapshot: 935f217d3367a642374bc56c6b146d376fc3edab
 - Archer backport: 281278326412f9d6a3fabb8adc1d419fd7ddc7d7
