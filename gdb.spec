@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,14 @@ fi
 %endif
 
 %changelog
+* Fri Mar 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-12
+- Archer update to the snapshot: 837d9879980148af05eae540d92caeb7200f1813
+- Archer backport: 8340d06295c8db80c544503458305197891e0348
+  - Fixes [master] regression for Eclipse CDT testsuite.
+- Archer backport: 16328456d5740917ade0a49bcecc14c4564b9a99
+  - Fixes #2 [expr] compatibility with gcc-4.4 on gdb.cp/namespace-using.exp.
+- Rebase [expr] on the Keith Seitz's sync with FSF GDB fixing the former merge.
+
 * Sun Mar 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-11
 - Archer update to the snapshot: e734ed95d296a3342d4147873c4641cea6c4d7fe
 - Archer backport: 1e1d73cda98b1adda884b80e07c7b4929c175628
