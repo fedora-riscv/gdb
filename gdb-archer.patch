@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 837d9879980148af05eae540d92caeb7200f1813
+commit d144a3633454046aaeae3e2c369c271834431d36
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -14564,7 +14564,7 @@ index 76577f1..bf46761 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 55868da..04942ec 100644
+index 55868da..9c1b90d 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1,8 +1,7 @@
@@ -15483,7 +15483,7 @@ index 55868da..04942ec 100644
  }
  
 +/* read the given die's decl_line number. Return -1 if in case of an error */
-+static const int dwarf2_read_decl_line (struct die_info *die, struct dwarf2_cu *cu){
++static int dwarf2_read_decl_line (struct die_info *die, struct dwarf2_cu *cu){
 +  struct attribute *line_attr;
 +
 +  line_attr = dwarf2_attr (die, DW_AT_decl_line, cu);
@@ -16709,6 +16709,15 @@ index 55868da..04942ec 100644
  	      if (attr2 && (DW_UNSND (attr2) != 0))
  		add_symbol_to_list (sym, &global_symbols);
  	      else
+@@ -7656,7 +8356,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+ 		  && dwarf2_attr (die, DW_AT_type, cu) != NULL)
+ 		{
+ 		  SYMBOL_CLASS (sym) = LOC_UNRESOLVED;
+-		  add_symbol_to_list (sym, &global_symbols);
++		  add_symbol_to_list (sym, cu->list_in_scope);
+ 		}
+ 	    }
+ 	  break;
 @@ -7780,6 +8480,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
@@ -32852,7 +32861,7 @@ index d2ba1f3..c1c4459 100644
      struct partial_symbol **bound, **gbound, **sbound;
      int keep_going = 1;
 diff --git a/gdb/symtab.h b/gdb/symtab.h
-index 8b086f3..06bf7e8 100644
+index 8b086f3..801cd2b 100644
 --- a/gdb/symtab.h
 +++ b/gdb/symtab.h
 @@ -171,9 +171,6 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
@@ -32877,7 +32886,22 @@ index 8b086f3..06bf7e8 100644
  }
  domain_enum;
  
-@@ -1027,6 +1027,8 @@ extern void clear_pc_function_cache (void);
+@@ -472,7 +472,13 @@ enum address_class
+      in another object file or runtime common storage.
+      The linker might even remove the minimal symbol if the global
+      symbol is never referenced, in which case the symbol remains
+-     unresolved.  */
++     unresolved.
++     
++     GDB would normally find the symbol in the minimal symbol table if it will
++     not find it in the full symbol table.  But a reference to an external
++     symbol in a local block shadowing other definition requires full symbol
++     without possibly having its address available for LOC_STATIC.  Testcase
++     is provided as `gdb.dwarf2/dw2-unresolved.exp'.  */
+ 
+   LOC_UNRESOLVED,
+ 
+@@ -1027,6 +1033,8 @@ extern void clear_pc_function_cache (void);
  
  /* from symtab.c: */
  
@@ -34122,10 +34146,10 @@ index 0000000..f1930e5
 +gdb_test "break main" "" "Second permanent break"
 diff --git a/gdb/testsuite/gdb.arch/powerpc-power7.exp b/gdb/testsuite/gdb.arch/powerpc-power7.exp
 new file mode 100644
-index 0000000..d9c48f9
+index 0000000..ae301db
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/powerpc-power7.exp
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,175 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -34175,14 +34199,23 @@ index 0000000..d9c48f9
 +    }
 +}
 +
-+proc func_check {offset instr} {
++proc instr_to_patt {offset instr} {
++    # 0x0000000000000018 <func+24>:	stxvd2x vs43,r4,r5
++    return ".*\r\n[string map {0x 0x0*} $offset] <func\\+?\[0-9\]*>:\[ \t\]*[string map [list { } "\[ \t\]+" . {\.}] $instr]\[ \t\]*\r\n.*"
++}
++
++# KFAIL strings would not exist if -Many would print the same as -Mpower7.
++# That means the power7 form should be the preferred one.
++# http://sourceware.org/ml/gdb-patches/2009-03/threads.html#00020
++
++proc func_check {offset instr {kfail ""}} {
 +    global func
 +
-+    # 0x0000000000000018 <func+24>:	stxvd2x vs43,r4,r5
-+    set patt ".*\r\n[string map {0x 0x0*} $offset] <func\\+?\[0-9\]*>:\[ \t\]*[string map [list { } "\[ \t\]+" . {\.}] $instr]\[ \t\]*\r\n.*"
 +    set test "Found $offset: $instr"
-+    if [regexp -nocase -line $patt $func] {
++    if [regexp -nocase -line [instr_to_patt $offset $instr] $func] {
 +	pass $test
++    } elseif {$kfail != "" && [regexp -nocase -line [instr_to_patt $offset $kfail] $func]} {
++	kfail gdb/NNNN $test
 +    } else {
 +	fail $test
 +    }
@@ -34226,8 +34259,8 @@ index 0000000..d9c48f9
 +func_check  0x8c "rvwinkle"
 +func_check  0x90 "prtyw   r3,r4"
 +func_check  0x94 "prtyd   r13,r14"
-+func_check  0x98 "mfcfar  r10"
-+func_check  0x9c "mtcfar  r11"
++func_check  0x98 "mfcfar  r10"           "mfspr   r10,28"
++func_check  0x9c "mtcfar  r11"           "mtspr   28,r11"
 +func_check  0xa0 "cmpb    r3,r4,r5"
 +func_check  0xa4 "lwzcix  r10,r11,r12"
 +func_check  0xa8 "dadd    f16,f17,f18"
@@ -34271,8 +34304,8 @@ index 0000000..d9c48f9
 +func_check 0x140 "ftdiv   cr7,f10,f11"
 +func_check 0x144 "ftsqrt  cr0,f10"
 +func_check 0x148 "ftsqrt  cr7,f10"
-+func_check 0x14c "dcbtt   r8,r9"
-+func_check 0x150 "dcbtstt r8,r9"
++func_check 0x14c "dcbtt   r8,r9"         "dcbt    16,r8,r9"
++func_check 0x150 "dcbtstt r8,r9"         "dcbtst  16,r8,r9"
 +func_check 0x154 "dcffix  f10,f12"
 +func_check 0x158 "dcffix. f20,f22"
 +func_check 0x15c "lbarx   r10,r11,r12"
@@ -38866,6 +38899,282 @@ index a1602a5..293cc1b 100644
  	.string		"hello world!\n"
 +.Lemptyname:
 +	.string		""
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-unresolved-main.c b/gdb/testsuite/gdb.dwarf2/dw2-unresolved-main.c
+new file mode 100644
+index 0000000..c24eb96
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-unresolved-main.c
+@@ -0,0 +1,46 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <stdlib.h>
++
++asm (".globl cu_text_start");
++asm ("cu_text_start:");
++
++int
++main (void)
++{
++  unsigned char var = 1;
++
++  if (var != 1)
++    abort ();
++  {
++    extern unsigned char var;
++
++    /* Do not rely on the `extern' DIE output by GCC (GCC PR debug/39563).  */
++asm (".globl extern_block_start");
++asm ("extern_block_start:");
++    if (var != 2)
++      abort ();
++asm (".globl extern_block_end");
++asm ("extern_block_end:");
++  }
++
++  return 0;
++}
++
++asm (".globl cu_text_end");
++asm ("cu_text_end:");
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-unresolved.S b/gdb/testsuite/gdb.dwarf2/dw2-unresolved.S
+new file mode 100644
+index 0000000..4c098f3
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-unresolved.S
+@@ -0,0 +1,171 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2007, 2008, 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++	.data
++
++/* VAR1 is wrong here, in the real inferior it is located on stack.  As both
++   places are never modified and they are initialized to the same value it
++   makes no difference.  Ensure the name clash for "var".  */
++var1:	.byte	1
++
++	.globl	var
++var:	.byte	2
++
++/* Debug information */
++
++	.section .debug_info
++.Lcu1_begin:
++	/* CU header */
++	.4byte	.Lcu1_end - .Lcu1_start		/* Length of Compilation Unit */
++.Lcu1_start:
++	.2byte	2				/* DWARF Version */
++	.4byte	.Labbrev1_begin			/* Offset into abbrev section */
++	.byte	4				/* Pointer size */
++
++	/* CU die */
++	.uleb128 1				/* Abbrev: DW_TAG_compile_unit */
++	.4byte	cu_text_end			/* DW_AT_high_pc */
++	.4byte	cu_text_start			/* DW_AT_low_pc */
++	.ascii	"dw2-unresolved-main.c\0"	/* DW_AT_name */
++	.ascii	"GNU C 4.3.2\0"			/* DW_AT_producer */
++	.byte	1				/* DW_AT_language (C) */
++
++.Ltype_uchar:
++	.uleb128	2			/* Abbrev: DW_TAG_base_type */
++	.ascii		"unsigned char\0"	/* DW_AT_name */
++	.byte		1			/* DW_AT_byte_size */
++	.byte		7			/* DW_AT_encoding */
++
++	/* main */
++	.uleb128	3			/* Abbrev: DW_TAG_subprogram */
++	.byte		1			/* DW_AT_decl_file */
++	.byte		2			/* DW_AT_decl_line */
++	.ascii		"main\0"		/* DW_AT_name */
++	.4byte		.Ltype_uchar-.Lcu1_begin	/* DW_AT_type */
++	.4byte		cu_text_start		/* DW_AT_low_pc */
++	.4byte		cu_text_end		/* DW_AT_high_pc */
++
++	.uleb128	4			/* Abbrev: DW_TAG_variable (location) */
++	.ascii		"var\0"			/* DW_AT_name */
++	.byte		2f - 1f			/* DW_AT_location */
++1:	.byte		3			/*   DW_OP_addr */
++/* See VAR1 definition why this DIE is not correct.  */
++	.4byte		var1			/*   <addr> */
++2:	.4byte		.Ltype_uchar-.Lcu1_begin	/* DW_AT_type */
++
++	.uleb128	6			/* Abbrev: DW_TAG_lexical_block */
++	.4byte		extern_block_start	/* DW_AT_low_pc */
++	.4byte		extern_block_end	/* DW_AT_high_pc */
++
++	.uleb128	5			/* Abbrev: DW_TAG_variable (extern) */
++	.ascii		"var\0"			/* DW_AT_name */
++	.4byte		.Ltype_uchar-.Lcu1_begin	/* DW_AT_type */
++	.byte		1			/* DW_AT_external */
++
++	.byte		0			/* End of children of the lexical block */
++
++	.byte		0			/* End of children of main */
++
++	.byte		0			/* End of children of CU */
++
++.Lcu1_end:
++
++/* Abbrev table */
++	.section .debug_abbrev
++.Labbrev1_begin:
++	.uleb128	1			/* Abbrev code */
++	.uleb128	0x11			/* DW_TAG_compile_unit */
++	.byte		1			/* has_children */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x25			/* DW_AT_producer */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x13			/* DW_AT_language */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	2			/* Abbrev code */
++	.uleb128	0x24			/* DW_TAG_base_type */
++	.byte		0			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0xb			/* DW_AT_byte_size */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x3e			/* DW_AT_encoding */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	3			/* Abbrev code */
++	.uleb128	0x2e			/* DW_TAG_subprogram */
++	.byte		1			/* has_children */
++	.uleb128	0x3a			/* DW_AT_decl_file */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x3b			/* DW_AT_decl_line */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	4			/* Abbrev code (location) */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x2			/* DW_AT_location */
++	.uleb128	0xa			/* DW_FORM_block1 */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	5			/* Abbrev code (extern) */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x3f			/* DW_AT_external */
++	.uleb128	0xc			/* DW_FORM_flag */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	6			/* Abbrev code */
++	.uleb128	0x0b			/* DW_TAG_lexical_block */
++	.byte		1			/* has_children */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-unresolved.exp b/gdb/testsuite/gdb.dwarf2/dw2-unresolved.exp
+new file mode 100644
+index 0000000..b955da9
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-unresolved.exp
+@@ -0,0 +1,41 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This test can only be run on targets which support DWARF-2 and use gas.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0  
++}
++
++if { [prepare_for_testing dw2-unresolved.exp "dw2-unresolved" {dw2-unresolved-main.c dw2-unresolved.S} {nodebug}] } {
++    return -1
++}
++
++if ![runto_main] {
++    return -1
++}
++
++# This testcase tests LOC_UNRESOLVED works right.
++
++gdb_breakpoint "*extern_block_start"
++gdb_continue_to_breakpoint "*extern_block_start"
++
++# Expect the inner value 2.  Value 1 from the outer local block is shadowed.
++gdb_test "print var" "= 2( '.*')?"
 diff --git a/gdb/testsuite/gdb.fortran/common-block.exp b/gdb/testsuite/gdb.fortran/common-block.exp
 new file mode 100644
 index 0000000..888f6c3

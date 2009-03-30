@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,15 @@ fi
 %endif
 
 %changelog
+* Mon Mar 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-13
+- Archer update to the snapshot: d144a3633454046aaeae3e2c369c271834431d36
+- Archer backport: a2c49b7640ebe7ce1376902d48d5bbbee600996b
+  - Fixup compilation older GCCs.
+- Archer backport: fe48224ce1bd22f37a7fa6d111d54c1a340392bf
+  - KFAIL 4 cases of: gdb.arch/powerpc-power7.exp
+- Archer backport: d144a3633454046aaeae3e2c369c271834431d36
+  - Fix C local extern variables (requires gcc-4.4.0-0.30).
+
 * Fri Mar 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-12
 - Archer update to the snapshot: 837d9879980148af05eae540d92caeb7200f1813
 - Archer backport: 8340d06295c8db80c544503458305197891e0348
