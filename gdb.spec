@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{?dist}
+Release: 14%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,11 @@ fi
 %endif
 
 %changelog
+* Sun Apr  5 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-14
+- Archer update to the snapshot: f6273d446ff87e50976600ba3f71b88d61043e20
+- Archer backport: f6273d446ff87e50976600ba3f71b88d61043e20
+  - Use pretty-printers to print base classes inside a derived class.
+
 * Mon Mar 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-13
 - Archer update to the snapshot: d144a3633454046aaeae3e2c369c271834431d36
 - Archer backport: a2c49b7640ebe7ce1376902d48d5bbbee600996b
