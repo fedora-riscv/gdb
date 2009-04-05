@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?_with_upstream:.upstream}%{?dist}
+Release: 15%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,11 @@ fi
 %endif
 
 %changelog
+* Sun Apr  5 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-15
+- Archer update to the snapshot: 7c7c77576669d17ad5072daa47ea3a4fd954483d
+- Archer backport: 7c7c77576669d17ad5072daa47ea3a4fd954483d (Peter Bergner)
+  - Disassemble Power7 instructions right in the default/only -Many GDB mode.
+
 * Sun Apr  5 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-14
 - Archer update to the snapshot: f6273d446ff87e50976600ba3f71b88d61043e20
 - Archer backport: f6273d446ff87e50976600ba3f71b88d61043e20

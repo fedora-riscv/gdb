@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit f6273d446ff87e50976600ba3f71b88d61043e20
+commit 7c7c77576669d17ad5072daa47ea3a4fd954483d
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -34188,10 +34188,10 @@ index 0000000..f1930e5
 +gdb_test "break main" "" "Second permanent break"
 diff --git a/gdb/testsuite/gdb.arch/powerpc-power7.exp b/gdb/testsuite/gdb.arch/powerpc-power7.exp
 new file mode 100644
-index 0000000..ae301db
+index 0000000..d9c48f9
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/powerpc-power7.exp
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,166 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -34241,23 +34241,14 @@ index 0000000..ae301db
 +    }
 +}
 +
-+proc instr_to_patt {offset instr} {
-+    # 0x0000000000000018 <func+24>:	stxvd2x vs43,r4,r5
-+    return ".*\r\n[string map {0x 0x0*} $offset] <func\\+?\[0-9\]*>:\[ \t\]*[string map [list { } "\[ \t\]+" . {\.}] $instr]\[ \t\]*\r\n.*"
-+}
-+
-+# KFAIL strings would not exist if -Many would print the same as -Mpower7.
-+# That means the power7 form should be the preferred one.
-+# http://sourceware.org/ml/gdb-patches/2009-03/threads.html#00020
-+
-+proc func_check {offset instr {kfail ""}} {
++proc func_check {offset instr} {
 +    global func
 +
++    # 0x0000000000000018 <func+24>:	stxvd2x vs43,r4,r5
++    set patt ".*\r\n[string map {0x 0x0*} $offset] <func\\+?\[0-9\]*>:\[ \t\]*[string map [list { } "\[ \t\]+" . {\.}] $instr]\[ \t\]*\r\n.*"
 +    set test "Found $offset: $instr"
-+    if [regexp -nocase -line [instr_to_patt $offset $instr] $func] {
++    if [regexp -nocase -line $patt $func] {
 +	pass $test
-+    } elseif {$kfail != "" && [regexp -nocase -line [instr_to_patt $offset $kfail] $func]} {
-+	kfail gdb/NNNN $test
 +    } else {
 +	fail $test
 +    }
@@ -34301,8 +34292,8 @@ index 0000000..ae301db
 +func_check  0x8c "rvwinkle"
 +func_check  0x90 "prtyw   r3,r4"
 +func_check  0x94 "prtyd   r13,r14"
-+func_check  0x98 "mfcfar  r10"           "mfspr   r10,28"
-+func_check  0x9c "mtcfar  r11"           "mtspr   28,r11"
++func_check  0x98 "mfcfar  r10"
++func_check  0x9c "mtcfar  r11"
 +func_check  0xa0 "cmpb    r3,r4,r5"
 +func_check  0xa4 "lwzcix  r10,r11,r12"
 +func_check  0xa8 "dadd    f16,f17,f18"
@@ -34346,8 +34337,8 @@ index 0000000..ae301db
 +func_check 0x140 "ftdiv   cr7,f10,f11"
 +func_check 0x144 "ftsqrt  cr0,f10"
 +func_check 0x148 "ftsqrt  cr7,f10"
-+func_check 0x14c "dcbtt   r8,r9"         "dcbt    16,r8,r9"
-+func_check 0x150 "dcbtstt r8,r9"         "dcbtst  16,r8,r9"
++func_check 0x14c "dcbtt   r8,r9"
++func_check 0x150 "dcbtstt r8,r9"
 +func_check 0x154 "dcffix  f10,f12"
 +func_check 0x158 "dcffix. f20,f22"
 +func_check 0x15c "lbarx   r10,r11,r12"
@@ -44807,6 +44798,25 @@ index 3ba44d9..764141e 100644
  #define AT_EXECFN	31		/* Filename of executable.  */
  /* Pointer to the global system page used for system calls and other
     nice things.  */
+diff --git a/include/opcode/ppc.h b/include/opcode/ppc.h
+index e45fc58..dc9a7ba 100644
+--- a/include/opcode/ppc.h
++++ b/include/opcode/ppc.h
+@@ -1,6 +1,6 @@
+ /* ppc.h -- Header file for PowerPC opcode table
+    Copyright 1994, 1995, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
+-   2007 Free Software Foundation, Inc.
++   2007, 2008, 2009 Free Software Foundation, Inc.
+    Written by Ian Lance Taylor, Cygnus Support
+ 
+ This file is part of GDB, GAS, and the GNU binutils.
+@@ -351,4 +351,6 @@ struct powerpc_macro
+ extern const struct powerpc_macro powerpc_macros[];
+ extern const int powerpc_num_macros;
+ 
++extern ppc_cpu_t ppc_parse_cpu (ppc_cpu_t, const char *);
++
+ #endif /* PPC_H */
 diff --git a/opcodes/po/es.po b/opcodes/po/es.po
 index 873be13..40bea5c 100644
 --- a/opcodes/po/es.po
@@ -46719,10 +46729,453 @@ index 3edf294..0f6c063 100644
 +
 +#~ msgid "ignoring least significant bits in branch offset"
 +#~ msgstr "mengabaikan least significant bit dalam offset cabang"
+diff --git a/opcodes/ppc-dis.c b/opcodes/ppc-dis.c
+index 9a28338..8511345 100644
+--- a/opcodes/ppc-dis.c
++++ b/opcodes/ppc-dis.c
+@@ -1,6 +1,6 @@
+ /* ppc-dis.c -- Disassemble PowerPC instructions
+    Copyright 1994, 1995, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+-   2008 Free Software Foundation, Inc.
++   2008, 2009 Free Software Foundation, Inc.
+    Written by Ian Lance Taylor, Cygnus Support
+ 
+    This file is part of the GNU opcodes library.
+@@ -23,6 +23,7 @@
+ #include <stdio.h>
+ #include "sysdep.h"
+ #include "dis-asm.h"
++#include "opintl.h"
+ #include "opcode/ppc.h"
+ 
+ /* This file provides several disassembler functions, all of which use
+@@ -42,94 +43,198 @@ struct dis_private
+ #define POWERPC_DIALECT(INFO) \
+   (((struct dis_private *) ((INFO)->private_data))->dialect)
+ 
+-/* Determine which set of machines to disassemble for.  PPC403/601 or
+-   BookE.  For convenience, also disassemble instructions supported
+-   by the AltiVec vector unit.  */
++struct ppc_mopt {
++  const char *opt;
++  ppc_cpu_t cpu;
++  ppc_cpu_t sticky;
++};
++
++struct ppc_mopt ppc_opts[] = {
++  { "403",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_403
++		| PPC_OPCODE_32),
++    0 },
++  { "405",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_403
++		| PPC_OPCODE_405 | PPC_OPCODE_32),
++    0 },
++  { "440",     (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_32
++		| PPC_OPCODE_440 | PPC_OPCODE_ISEL | PPC_OPCODE_RFMCI),
++    0 },
++  { "464",     (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_32
++		| PPC_OPCODE_440 | PPC_OPCODE_ISEL | PPC_OPCODE_RFMCI),
++    0 },
++  { "601",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_601
++		| PPC_OPCODE_32),
++    0 },
++  { "603",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_32),
++    0 },
++  { "604",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_32),
++    0 },
++  { "620",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64),
++    0 },
++  { "7400",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ALTIVEC
++		| PPC_OPCODE_32),
++    0 },
++  { "7410",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ALTIVEC
++		| PPC_OPCODE_32),
++    0 },
++  { "7450",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ALTIVEC
++		| PPC_OPCODE_32),
++    0 },
++  { "7455",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ALTIVEC
++		| PPC_OPCODE_32),
++    0 },
++  { "750cl",   (PPC_OPCODE_PPC | PPC_OPCODE_PPCPS)
++    , 0 },
++  { "altivec", (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC),
++    PPC_OPCODE_ALTIVEC },
++  { "any",     0,
++    PPC_OPCODE_ANY },
++  { "booke",   (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_32),
++    0 },
++  { "booke32", (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_32),
++    0 },
++  { "cell",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64
++		| PPC_OPCODE_POWER4 | PPC_OPCODE_CELL | PPC_OPCODE_ALTIVEC),
++    0 },
++  { "com",     (PPC_OPCODE_COMMON | PPC_OPCODE_32),
++    0 },
++  { "e300",    (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_32
++		| PPC_OPCODE_E300),
++    0 },
++  { "e500",    (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_SPE
++		| PPC_OPCODE_ISEL | PPC_OPCODE_EFS | PPC_OPCODE_BRLOCK
++		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
++		| PPC_OPCODE_E500MC),
++    0 },
++  { "e500mc",  (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_ISEL
++		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
++		| PPC_OPCODE_E500MC),
++    0 },
++  { "e500x2",  (PPC_OPCODE_PPC | PPC_OPCODE_BOOKE | PPC_OPCODE_SPE
++		| PPC_OPCODE_ISEL | PPC_OPCODE_EFS | PPC_OPCODE_BRLOCK
++		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK | PPC_OPCODE_RFMCI
++		| PPC_OPCODE_E500MC),
++    0 },
++  { "efs",     (PPC_OPCODE_PPC | PPC_OPCODE_EFS),
++    0 },
++  { "power4",  (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64
++		| PPC_OPCODE_POWER4),
++    0 },
++  { "power5",  (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64
++		| PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5),
++    0 },
++  { "power6",  (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64
++		| PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5 | PPC_OPCODE_POWER6
++		| PPC_OPCODE_ALTIVEC),
++    0 },
++  { "power7",  (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_ISEL
++		| PPC_OPCODE_64 | PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5
++		| PPC_OPCODE_POWER6 | PPC_OPCODE_POWER7 | PPC_OPCODE_ALTIVEC
++		| PPC_OPCODE_VSX),
++    0 },
++  { "ppc",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_32),
++    0 },
++  { "ppc32",   (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_32),
++    0 },
++  { "ppc64",   (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64),
++    0 },
++  { "ppc64bridge", (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC | PPC_OPCODE_64_BRIDGE
++		    | PPC_OPCODE_64),
++    0 },
++  { "ppcps",   (PPC_OPCODE_PPC | PPC_OPCODE_PPCPS),
++    0 },
++  { "pwr",     (PPC_OPCODE_POWER | PPC_OPCODE_32),
++    0 },
++  { "pwr2",    (PPC_OPCODE_POWER | PPC_OPCODE_POWER2 | PPC_OPCODE_32),
++    0 },
++  { "pwrx",    (PPC_OPCODE_POWER | PPC_OPCODE_POWER2 | PPC_OPCODE_32),
++    0 },
++  { "spe",     (PPC_OPCODE_PPC | PPC_OPCODE_EFS),
++    PPC_OPCODE_SPE },
++  { "vsx",     (PPC_OPCODE_PPC | PPC_OPCODE_CLASSIC),
++    PPC_OPCODE_VSX },
++};
++
++/* Handle -m and -M options that set cpu type, and .machine arg.  */
++
++ppc_cpu_t
++ppc_parse_cpu (ppc_cpu_t ppc_cpu, const char *arg)
++{
++  /* Sticky bits.  */
++  ppc_cpu_t retain_flags = ppc_cpu & (PPC_OPCODE_ALTIVEC | PPC_OPCODE_VSX
++				      | PPC_OPCODE_SPE | PPC_OPCODE_ANY);
++  unsigned int i;
++
++  for (i = 0; i < sizeof (ppc_opts) / sizeof (ppc_opts[0]); i++)
++    if (strcmp (ppc_opts[i].opt, arg) == 0)
++      {
++	if (ppc_opts[i].sticky)
++	  {
++	    retain_flags |= ppc_opts[i].sticky;
++	    if ((ppc_cpu & ~(PPC_OPCODE_ALTIVEC | PPC_OPCODE_VSX
++			     | PPC_OPCODE_SPE | PPC_OPCODE_ANY)) != 0)
++	      break;
++	  }
++	ppc_cpu = ppc_opts[i].cpu;
++	break;
++      }
++  if (i >= sizeof (ppc_opts) / sizeof (ppc_opts[0]))
++    return 0;
++
++  ppc_cpu |= retain_flags;
++  return ppc_cpu;
++}
++
++/* Determine which set of machines to disassemble for.  */
+ 
+ static int
+ powerpc_init_dialect (struct disassemble_info *info)
+ {
+-  ppc_cpu_t dialect = PPC_OPCODE_PPC;
++  ppc_cpu_t dialect = 0;
++  char *arg;
+   struct dis_private *priv = calloc (sizeof (*priv), 1);
+ 
+   if (priv == NULL)
+     return FALSE;
+ 
+-  if (BFD_DEFAULT_TARGET_SIZE == 64)
+-    dialect |= PPC_OPCODE_64;
+-
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "ppcps") != NULL)
+-    dialect |= PPC_OPCODE_PPCPS;
+-  else if (info->disassembler_options
+-      && strstr (info->disassembler_options, "booke") != NULL)
+-    dialect |= PPC_OPCODE_BOOKE;
+-  else if ((info->mach == bfd_mach_ppc_e500mc)
+-	   || (info->disassembler_options
+-	       && strstr (info->disassembler_options, "e500mc") != NULL))
+-    dialect |= (PPC_OPCODE_BOOKE | PPC_OPCODE_ISEL
+-		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK
+-		| PPC_OPCODE_RFMCI | PPC_OPCODE_E500MC);
+-  else if ((info->mach == bfd_mach_ppc_e500)
+-	   || (info->disassembler_options
+-	       && strstr (info->disassembler_options, "e500") != NULL))
+-    dialect |= (PPC_OPCODE_BOOKE
+-		| PPC_OPCODE_SPE | PPC_OPCODE_ISEL
+-		| PPC_OPCODE_EFS | PPC_OPCODE_BRLOCK
+-		| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK
+-		| PPC_OPCODE_RFMCI | PPC_OPCODE_E500MC);
+-  else if (info->disassembler_options
+-	   && strstr (info->disassembler_options, "efs") != NULL)
+-    dialect |= PPC_OPCODE_EFS;
+-  else if (info->disassembler_options
+-	   && strstr (info->disassembler_options, "e300") != NULL)
+-    dialect |= PPC_OPCODE_E300 | PPC_OPCODE_CLASSIC | PPC_OPCODE_COMMON;
+-  else if (info->disassembler_options
+-	   && (strstr (info->disassembler_options, "440") != NULL
+-	       || strstr (info->disassembler_options, "464") != NULL))
+-    dialect |= PPC_OPCODE_BOOKE | PPC_OPCODE_32
+-      | PPC_OPCODE_440 | PPC_OPCODE_ISEL | PPC_OPCODE_RFMCI;
+-  else
+-    dialect |= (PPC_OPCODE_403 | PPC_OPCODE_601 | PPC_OPCODE_CLASSIC
+-		| PPC_OPCODE_COMMON | PPC_OPCODE_ALTIVEC);
+-
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "power4") != NULL)
+-    dialect |= PPC_OPCODE_POWER4;
+-
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "power5") != NULL)
+-    dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5;
+-
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "cell") != NULL)
+-    dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_CELL | PPC_OPCODE_ALTIVEC;
+-
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "power6") != NULL)
+-    dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5 | PPC_OPCODE_POWER6
+-	       | PPC_OPCODE_ALTIVEC;
++  arg = info->disassembler_options;
++  while (arg != NULL)
++    {
++      ppc_cpu_t new_cpu = 0;
++      char *end = strchr (arg, ',');
+ 
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "power7") != NULL)
+-    dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_POWER5
+-	       | PPC_OPCODE_POWER6 | PPC_OPCODE_POWER7
+-	       | PPC_OPCODE_ISEL | PPC_OPCODE_ALTIVEC | PPC_OPCODE_VSX;
++      if (end != NULL)
++	*end = 0;
+ 
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "vsx") != NULL)
+-    dialect |= PPC_OPCODE_VSX;
++      if ((new_cpu = ppc_parse_cpu (dialect, arg)) != 0)
++	dialect = new_cpu;
++      else if (strcmp (arg, "32") == 0)
++	{
++	  dialect &= ~PPC_OPCODE_64;
++	  dialect |= PPC_OPCODE_32;
++	}
++      else if (strcmp (arg, "64") == 0)
++	{
++	  dialect |= PPC_OPCODE_64;
++	  dialect &= ~PPC_OPCODE_32;
++	}
++      else
++	fprintf (stderr, _("warning: ignoring unknown -M%s option\n"), arg);
+ 
+-  if (info->disassembler_options
+-      && strstr (info->disassembler_options, "any") != NULL)
+-    dialect |= PPC_OPCODE_ANY;
++      if (end != NULL)
++	*end++ = ',';
++      arg = end;
++    }
+ 
+-  if (info->disassembler_options)
++  if ((dialect & ~(PPC_OPCODE_32 | PPC_OPCODE_64)) == 0)
+     {
+-      if (strstr (info->disassembler_options, "32") != NULL)
+-	dialect &= ~PPC_OPCODE_64;
+-      else if (strstr (info->disassembler_options, "64") != NULL)
++      if (info->mach == bfd_mach_ppc64)
+ 	dialect |= PPC_OPCODE_64;
++      else
++	dialect |= PPC_OPCODE_32;
++      /* Choose a reasonable default.  */
++      dialect |= (PPC_OPCODE_PPC | PPC_OPCODE_COMMON | PPC_OPCODE_CLASSIC
++		  | PPC_OPCODE_601 | PPC_OPCODE_ALTIVEC);
+     }
+ 
+   info->private_data = priv;
+@@ -230,6 +335,7 @@ print_insn_powerpc (bfd_vma memaddr,
+   const struct powerpc_opcode *opcode;
+   const struct powerpc_opcode *opcode_end;
+   unsigned long op;
++  ppc_cpu_t dialect_orig = dialect;
+ 
+   status = (*info->read_memory_func) (memaddr, buffer, 4, info);
+   if (status != 0)
+@@ -268,7 +374,7 @@ print_insn_powerpc (bfd_vma memaddr,
+ 
+       if ((insn & opcode->mask) != opcode->opcode
+ 	  || (opcode->flags & dialect) == 0
+-	  || (opcode->deprecated & dialect) != 0)
++	  || (opcode->deprecated & dialect_orig) != 0)
+ 	continue;
+ 
+       /* Make two passes over the operands.  First see if any of them
+@@ -339,16 +445,14 @@ print_insn_powerpc (bfd_vma memaddr,
+ 	    (*info->print_address_func) (memaddr + value, info);
+ 	  else if ((operand->flags & PPC_OPERAND_ABSOLUTE) != 0)
+ 	    (*info->print_address_func) ((bfd_vma) value & 0xffffffff, info);
+-	  else if ((operand->flags & PPC_OPERAND_CR) == 0
+-		   || (dialect & PPC_OPCODE_PPC) == 0)
+-	    (*info->fprintf_func) (info->stream, "%ld", value);
+ 	  else if ((operand->flags & PPC_OPERAND_FSL) != 0) 
+ 	    (*info->fprintf_func) (info->stream, "fsl%ld", value);
+ 	  else if ((operand->flags & PPC_OPERAND_FCR) != 0)
+ 	    (*info->fprintf_func) (info->stream, "fcr%ld", value);
+ 	  else if ((operand->flags & PPC_OPERAND_UDI) != 0)
+ 	    (*info->fprintf_func) (info->stream, "%ld", value);
+-	  else
++	  else if ((operand->flags & PPC_OPERAND_CR) != 0
++		   && (dialect & PPC_OPCODE_PPC) != 0)
+ 	    {
+ 	      if (operand->bitm == 7)
+ 		(*info->fprintf_func) (info->stream, "cr%ld", value);
+@@ -365,6 +469,8 @@ print_insn_powerpc (bfd_vma memaddr,
+ 		  (*info->fprintf_func) (info->stream, "%s", cbnames[cc]);
+ 		}
+ 	    }
++	  else
++	    (*info->fprintf_func) (info->stream, "%ld", value);
+ 
+ 	  if (need_paren)
+ 	    {
+@@ -400,23 +506,20 @@ print_insn_powerpc (bfd_vma memaddr,
+ void
+ print_ppc_disassembler_options (FILE *stream)
+ {
+-  fprintf (stream, "\n\
++  unsigned int i, col;
++
++  fprintf (stream, _("\n\
+ The following PPC specific disassembler options are supported for use with\n\
+-the -M switch:\n");
+-
+-  fprintf (stream, "  booke                    Disassemble the BookE instructions\n");
+-  fprintf (stream, "  e300                     Disassemble the e300 instructions\n");
+-  fprintf (stream, "  e500|e500x2              Disassemble the e500 instructions\n");
+-  fprintf (stream, "  e500mc                   Disassemble the e500mc instructions\n");
+-  fprintf (stream, "  440                      Disassemble the 440 instructions\n");
+-  fprintf (stream, "  464                      Disassemble the 464 instructions\n");
+-  fprintf (stream, "  efs                      Disassemble the EFS instructions\n");
+-  fprintf (stream, "  ppcps                    Disassemble the PowerPC paired singles instructions\n");
+-  fprintf (stream, "  power4                   Disassemble the Power4 instructions\n");
+-  fprintf (stream, "  power5                   Disassemble the Power5 instructions\n");
+-  fprintf (stream, "  power6                   Disassemble the Power6 instructions\n");
+-  fprintf (stream, "  power7                   Disassemble the Power7 instructions\n");
+-  fprintf (stream, "  vsx                      Disassemble the Vector-Scalar (VSX) instructions\n");
+-  fprintf (stream, "  32                       Do not disassemble 64-bit instructions\n");
+-  fprintf (stream, "  64                       Allow disassembly of 64-bit instructions\n");
++the -M switch:\n"));
++
++  for (col = 0, i = 0; i < sizeof (ppc_opts) / sizeof (ppc_opts[0]); i++)
++    {
++      col += fprintf (stream, " %s,", ppc_opts[i].opt);
++      if (col > 66)
++	{
++	  fprintf (stream, "\n");
++	  col = 0;
++	}
++    }
++  fprintf (stream, " 32, 64\n");
+ }
 diff --git a/opcodes/ppc-opc.c b/opcodes/ppc-opc.c
-index c872db5..5e70395 100644
+index c872db5..9fac147 100644
 --- a/opcodes/ppc-opc.c
 +++ b/opcodes/ppc-opc.c
+@@ -3464,8 +3464,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ 
+ {"isellt",	X(31,15),	X_MASK,      PPCISEL,	PPCNONE,	{RT, RA, RB}},
+ 
+-{"mfcr",	XFXM(31,19,0,0), XRARB_MASK, COM,	POWER4,		{RT}},
+ {"mfcr",	XFXM(31,19,0,0), XFXFXM_MASK, POWER4,	PPCNONE,	{RT, FXM4}},
++{"mfcr",	XFXM(31,19,0,0), XRARB_MASK, COM,	POWER4,		{RT}},
+ {"mfocrf",	XFXM(31,19,0,1), XFXFXM_MASK, COM,	PPCNONE,	{RT, FXM}},
+ 
+ {"lwarx",	X(31,20),	XEH_MASK,    PPC,	PPCNONE,	{RT, RA0, RB, EH}},
+@@ -3726,14 +3726,14 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"mullw.",	XO(31,235,0,1),	XO_MASK,     PPCCOM,	PPCNONE,	{RT, RA, RB}},
+ {"muls.",	XO(31,235,0,1),	XO_MASK,     PWRCOM,	PPCNONE,	{RT, RA, RB}},
+ 
++{"icblce",	X(31,238),	X_MASK,      PPCCHLK,	E500MC,		{CT, RA, RB}},
+ {"msgclr",	XRTRA(31,238,0,0),XRTRA_MASK,E500MC,	PPCNONE,	{RB}},
+-{"icblce",	X(31,238),	X_MASK,      PPCCHLK,	PPCNONE,	{CT, RA, RB}},
+ {"mtsrin",	X(31,242),	XRA_MASK,    PPC32,	PPCNONE,	{RS, RB}},
+ {"mtsri",	X(31,242),	XRA_MASK,    POWER32,	PPCNONE,	{RS, RB}},
+ 
+ {"dcbtstt",	XRT(31,246,0x10), XRT_MASK,  POWER7,	PPCNONE,	{RA, RB}},
+-{"dcbtst",	X(31,246),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+ {"dcbtst",	X(31,246),	X_MASK,      POWER4,	PPCNONE,	{RA, RB, CT}},
++{"dcbtst",	X(31,246),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+ 
+ {"stbux",	X(31,247),	X_MASK,      COM,	PPCNONE,	{RS, RAS, RB}},
+ 
+@@ -3767,8 +3767,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"lscbx.",	XRC(31,277,1),	X_MASK,      M601,	PPCNONE,	{RT, RA, RB}},
+ 
+ {"dcbtt",	XRT(31,278,0x10), XRT_MASK,  POWER7,	PPCNONE,	{RA, RB}},
+-{"dcbt",	X(31,278),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+ {"dcbt",	X(31,278),	X_MASK,      POWER4,	PPCNONE,	{RA, RB, CT}},
++{"dcbt",	X(31,278),	X_MASK,      PPC,	POWER4,		{CT, RA, RB}},
+ 
+ {"lhzx",	X(31,279),	X_MASK,      COM,	PPCNONE,	{RT, RA0, RB}},
+ 
+@@ -4399,16 +4399,16 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"lswi",	X(31,597),	X_MASK,      PPCCOM,	PPCNONE,	{RT, RA0, NB}},
+ {"lsi",		X(31,597),	X_MASK,      PWRCOM,	PPCNONE,	{RT, RA0, NB}},
+ 
+-{"msync",	X(31,598),	0xffffffff,  BOOKE,	PPCNONE,	{0}},
+ {"lwsync",	XSYNC(31,598,1), 0xffffffff, PPC,	PPCNONE,	{0}},
+ {"ptesync",	XSYNC(31,598,2), 0xffffffff, PPC64,	PPCNONE,	{0}},
+-{"sync",	X(31,598),	XSYNC_MASK,  PPCCOM,	PPCNONE,	{LS}},
++{"sync",	X(31,598),	XSYNC_MASK,  PPCCOM,	BOOKE,		{LS}},
++{"msync",	X(31,598),	0xffffffff,  BOOKE,	PPCNONE,	{0}},
+ {"dcs",		X(31,598),	0xffffffff,  PWRCOM,	PPCNONE,	{0}},
+ 
+ {"lfdx",	X(31,599),	X_MASK,      COM,	PPCNONE,	{FRT, RA0, RB}},
+ 
+-{"lfdepx",	X(31,607),	X_MASK,      E500MC,	PPCNONE,	{FRT, RA, RB}},
+ {"mffgpr",	XRC(31,607,0),	XRA_MASK,    POWER6,	POWER7,		{FRT, RB}},
++{"lfdepx",	X(31,607),	X_MASK,      E500MC,	PPCNONE,	{FRT, RA, RB}},
+ 
+ {"lddx",	X(31,611),	X_MASK,      E500MC,	PPCNONE,	{RT, RA, RB}},
+ 
+@@ -4502,8 +4502,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"sreq",	XRC(31,729,0),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
+ {"sreq.",	XRC(31,729,1),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
+ 
+-{"stfdepx",	X(31,735),	X_MASK,      E500MC,	PPCNONE,	{FRS, RA, RB}},
+ {"mftgpr",	XRC(31,735,0),	XRA_MASK,    POWER6,	POWER7,		{RT, FRB}},
++{"stfdepx",	X(31,735),	X_MASK,      E500MC,	PPCNONE,	{FRS, RA, RB}},
+ 
+ {"stddx",	X(31,739),	X_MASK,      E500MC,	PPCNONE,	{RS, RA, RB}},
+ 
 @@ -4560,8 +4560,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
  
  {"lhbrx",	X(31,790),	X_MASK,      COM,	PPCNONE,	{RT, RA0, RB}},
@@ -46733,6 +47186,16 @@ index c872db5..5e70395 100644
  
  {"sraw",	XRC(31,792,0),	X_MASK,      PPCCOM,	PPCNONE,	{RA, RS, RB}},
  {"sra",		XRC(31,792,0),	X_MASK,      PWRCOM,	PPCNONE,	{RA, RS, RB}},
+@@ -4602,8 +4602,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ 
+ {"lbzcix",	X(31,853),	X_MASK,      POWER6,	PPCNONE,	{RT, RA0, RB}},
+ 
++{"eieio",	X(31,854),	0xffffffff,  PPC,	BOOKE,		{0}},
+ {"mbar",	X(31,854),	X_MASK,      BOOKE,	PPCNONE,	{MO}},
+-{"eieio",	X(31,854),	0xffffffff,  PPC,	PPCNONE,	{0}},
+ 
+ {"lfiwax",	X(31,855),	X_MASK,      POWER6,	PPCNONE,	{FRT, RA0, RB}},
+ 
 @@ -4638,8 +4638,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
  
  {"sthbrx",	X(31,918),	X_MASK,      COM,	PPCNONE,	{RS, RA0, RB}},
@@ -46743,22 +47206,62 @@ index c872db5..5e70395 100644
  
  {"sraq",	XRC(31,920,0),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
  {"sraq.",	XRC(31,920,1),	X_MASK,      M601,	PPCNONE,	{RA, RS, RB}},
-@@ -4801,12 +4801,12 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+@@ -4687,10 +4687,10 @@ const struct powerpc_opcode powerpc_opcodes[] = {
  
- {"psq_l",	OP(56),		OP_MASK,     PPCPS,	PPCNONE,	{FRT,PSD,RA,PSW,PSQ}},
+ {"stxvd2x",	X(31,972),	XX1_MASK,    PPCVSX,	PPCNONE,	{XS6, RA, RB}},
  
-+{"lfdp",	OP(57),		OP_MASK,     POWER6,	POWER7,		{FRT, D, RA0}},
-+
- {"lfqu",	OP(57),		OP_MASK,     POWER2,	PPCNONE,	{FRT, D, RA0}},
++{"tlbld",	X(31,978),	XRTRA_MASK,  PPC,	PPC403|BOOKE,	{RB}},
+ {"tlbwehi",	XTLB(31,978,0),	XTLB_MASK,   PPC403,	PPCNONE,	{RT, RA}},
+ {"tlbwelo",	XTLB(31,978,1),	XTLB_MASK,   PPC403,	PPCNONE,	{RT, RA}},
+ {"tlbwe",	X(31,978),	X_MASK,   PPC403|BOOKE,	PPCNONE,	{RSO, RAOPT, SHO}},
+-{"tlbld",	X(31,978),	XRTRA_MASK,  PPC,	PPCNONE,	{RB}},
  
- {"psq_lu",	OP(57),		OP_MASK,     PPCPS,	PPCNONE,	{FRT,PSD,RA,PSW,PSQ}},
+ {"stbcix",	X(31,981),	X_MASK,      POWER6,	PPCNONE,	{RS, RA0, RB}},
  
--{"lfdp",	OP(57),		OP_MASK,     POWER6,	POWER7,		{FRT, D, RA0}},
+@@ -4796,16 +4796,12 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"stfdu",	OP(55),		OP_MASK,     COM,	PPCNONE,	{FRS, D, RAS}},
+ 
+ {"lq",		OP(56),		OP_MASK,     POWER4,	PPCNONE,	{RTQ, DQ, RAQ}},
 -
+-{"lfq",		OP(56),		OP_MASK,     POWER2,	PPCNONE,	{FRT, D, RA0}},
+-
+ {"psq_l",	OP(56),		OP_MASK,     PPCPS,	PPCNONE,	{FRT,PSD,RA,PSW,PSQ}},
+-
+-{"lfqu",	OP(57),		OP_MASK,     POWER2,	PPCNONE,	{FRT, D, RA0}},
+-
+-{"psq_lu",	OP(57),		OP_MASK,     PPCPS,	PPCNONE,	{FRT,PSD,RA,PSW,PSQ}},
++{"lfq",		OP(56),		OP_MASK,     POWER2,	PPCNONE,	{FRT, D, RA0}},
+ 
+ {"lfdp",	OP(57),		OP_MASK,     POWER6,	POWER7,		{FRT, D, RA0}},
++{"psq_lu",	OP(57),		OP_MASK,     PPCPS,	PPCNONE,	{FRT,PSD,RA,PSW,PSQ}},
++{"lfqu",	OP(57),		OP_MASK,     POWER2,	PPCNONE,	{FRT, D, RA0}},
+ 
  {"ld",		DSO(58,0),	DS_MASK,     PPC64,	PPCNONE,	{RT, DS, RA0}},
  {"ldu",		DSO(58,1),	DS_MASK,     PPC64,	PPCNONE,	{RT, DS, RAL}},
- {"lwa",		DSO(58,2),	DS_MASK,     PPC64,	PPCNONE,	{RT, DS, RA0}},
-@@ -4921,10 +4921,6 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+@@ -4829,18 +4825,18 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"fsqrts",	A(59,22,0),    AFRAFRC_MASK, PPC,	PPCNONE,	{FRT, FRB}},
+ {"fsqrts.",	A(59,22,1),    AFRAFRC_MASK, PPC,	PPCNONE,	{FRT, FRB}},
+ 
+-{"fres",	A(59,24,0),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+-{"fres.",	A(59,24,1),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ {"fres",	A(59,24,0),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"fres",	A(59,24,0),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ {"fres.",	A(59,24,1),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"fres.",	A(59,24,1),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ 
+ {"fmuls",	A(59,25,0),	AFRB_MASK,   PPC,	PPCNONE,	{FRT, FRA, FRC}},
+ {"fmuls.",	A(59,25,1),	AFRB_MASK,   PPC,	PPCNONE,	{FRT, FRA, FRC}},
+ 
+-{"frsqrtes",	A(59,26,0),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+-{"frsqrtes.",	A(59,26,1),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ {"frsqrtes",	A(59,26,0),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"frsqrtes",	A(59,26,0),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ {"frsqrtes.",	A(59,26,1),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"frsqrtes.",	A(59,26,1),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ 
+ {"fmsubs",	A(59,28,0),	A_MASK,      PPC,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+ {"fmsubs.",	A(59,28,1),	A_MASK,      PPC,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+@@ -4921,10 +4917,6 @@ const struct powerpc_opcode powerpc_opcodes[] = {
  {"fcfidus",	XRC(59,974,0),	XRA_MASK,    POWER7,	PPCNONE,	{FRT, FRB}},
  {"fcfidus.",	XRC(59,974,1),	XRA_MASK,    POWER7,	PPCNONE,	{FRT, FRB}},
  
@@ -46769,22 +47272,70 @@ index c872db5..5e70395 100644
  {"xxsldwi",	XX3(60,2),	XX3SHW_MASK, PPCVSX,	PPCNONE,	{XT6, XA6, XB6, SHW}},
  {"xxsel",	XX4(60,3),	XX4_MASK,    PPCVSX,	PPCNONE,	{XT6, XA6, XB6, XC6}},
  {"xxspltd",	XX3(60,10),	XX3DM_MASK,  PPCVSX,	PPCNONE,	{XT6, XA6, XB6S, DMEX}},
-@@ -5067,12 +5063,16 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+@@ -5067,11 +5059,12 @@ const struct powerpc_opcode powerpc_opcodes[] = {
  {"xvcvsxddp",	XX2(60,504),	XX2_MASK,    PPCVSX,	PPCNONE,	{XT6, XB6}},
  {"xvnegdp",	XX2(60,505),	XX2_MASK,    PPCVSX,	PPCNONE,	{XT6, XB6}},
  
 -{"psq_stu",	OP(61),		OP_MASK,     PPCPS,	PPCNONE,	{FRS,PSD,RA,PSW,PSQ}},
-+{"stfq",	OP(60),		OP_MASK,     POWER2,	PPCNONE,	{FRS, D, RA}},
- 
+-
 -{"stfqu",	OP(61),		OP_MASK,     POWER2,	PPCNONE,	{FRS, D, RA}},
 +{"psq_st",	OP(60),		OP_MASK,     PPCPS,	PPCNONE,	{FRS,PSD,RA,PSW,PSQ}},
++{"stfq",	OP(60),		OP_MASK,     POWER2,	PPCNONE,	{FRS, D, RA}},
  
  {"stfdp",	OP(61),		OP_MASK,     POWER6,	PPCNONE,	{FRT, D, RA0}},
- 
-+{"stfqu",	OP(61),		OP_MASK,     POWER2,	PPCNONE,	{FRS, D, RA}},
-+
 +{"psq_stu",	OP(61),		OP_MASK,     PPCPS,	PPCNONE,	{FRS,PSD,RA,PSW,PSQ}},
-+
++{"stfqu",	OP(61),		OP_MASK,     POWER2,	PPCNONE,	{FRS, D, RA}},
+ 
  {"std",		DSO(62,0),	DS_MASK,     PPC64,	PPCNONE,	{RS, DS, RA0}},
  {"stdu",	DSO(62,1),	DS_MASK,     PPC64,	PPCNONE,	{RS, DS, RAS}},
- {"stq",		DSO(62,2),	DS_MASK,     POWER4,	PPCNONE,	{RSQ, DS, RA0}},
+@@ -5122,20 +5115,20 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ {"fsel",	A(63,23,0),	A_MASK,      PPC,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+ {"fsel.",	A(63,23,1),	A_MASK,      PPC,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+ 
+-{"fre",		A(63,24,0),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+-{"fre.",	A(63,24,1),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ {"fre",		A(63,24,0),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"fre",		A(63,24,0),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ {"fre.",	A(63,24,1),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"fre.",	A(63,24,1),   AFRALFRC_MASK, POWER5,	POWER7,		{FRT, FRB, A_L}},
+ 
+ {"fmul",	A(63,25,0),	AFRB_MASK,   PPCCOM,	PPCNONE,	{FRT, FRA, FRC}},
+ {"fm",		A(63,25,0),	AFRB_MASK,   PWRCOM,	PPCNONE,	{FRT, FRA, FRC}},
+ {"fmul.",	A(63,25,1),	AFRB_MASK,   PPCCOM,	PPCNONE,	{FRT, FRA, FRC}},
+ {"fm.",		A(63,25,1),	AFRB_MASK,   PWRCOM,	PPCNONE,	{FRT, FRA, FRC}},
+ 
+-{"frsqrte",	A(63,26,0),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+-{"frsqrte.",	A(63,26,1),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ {"frsqrte",	A(63,26,0),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"frsqrte",	A(63,26,0),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ {"frsqrte.",	A(63,26,1),   AFRAFRC_MASK,  POWER7,	PPCNONE,	{FRT, FRB}},
++{"frsqrte.",	A(63,26,1),   AFRALFRC_MASK, PPC,	POWER7,		{FRT, FRB, A_L}},
+ 
+ {"fmsub",	A(63,28,0),	A_MASK,      PPCCOM,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+ {"fms",		A(63,28,0),	A_MASK,      PWRCOM,	PPCNONE,	{FRT, FRA, FRC, FRB}},
+@@ -5195,10 +5188,10 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ 
+ {"dcmpoq",	X(63,130),	X_MASK,      POWER6,	PPCNONE,	{BF, FRA, FRB}},
+ 
+-{"mtfsfi",  XRC(63,134,0), XRA_MASK|(3<<21)|(1<<11), COM, POWER6,	{BFF, U}},
+ {"mtfsfi",  XRC(63,134,0), XWRA_MASK|(3<<21)|(1<<11), POWER6, PPCNONE,	{BFF, U, W}},
+-{"mtfsfi.", XRC(63,134,1), XRA_MASK|(3<<21)|(1<<11), COM, POWER6,	{BFF, U}},
++{"mtfsfi",  XRC(63,134,0), XRA_MASK|(3<<21)|(1<<11), COM, POWER6,	{BFF, U}},
+ {"mtfsfi.", XRC(63,134,1), XWRA_MASK|(3<<21)|(1<<11), POWER6, PPCNONE,	{BFF, U, W}},
++{"mtfsfi.", XRC(63,134,1), XRA_MASK|(3<<21)|(1<<11), COM, POWER6,	{BFF, U}},
+ 
+ {"fnabs",	XRC(63,136,0),	XRA_MASK,    COM,	PPCNONE,	{FRT, FRB}},
+ {"fnabs.",	XRC(63,136,1),	XRA_MASK,    COM,	PPCNONE,	{FRT, FRB}},
+@@ -5254,10 +5247,10 @@ const struct powerpc_opcode powerpc_opcodes[] = {
+ 
+ {"dtstsfq",	X(63,674),	X_MASK,      POWER6,	PPCNONE,	{BF, FRA, FRB}},
+ 
+-{"mtfsf",	XFL(63,711,0),	XFL_MASK,    COM,	POWER6,		{FLM, FRB}},
+ {"mtfsf",	XFL(63,711,0),	XFL_MASK,    POWER6,	PPCNONE,	{FLM, FRB, XFL_L, W}},
+-{"mtfsf.",	XFL(63,711,1),	XFL_MASK,    COM,	POWER6,		{FLM, FRB}},
++{"mtfsf",	XFL(63,711,0),	XFL_MASK,    COM,	POWER6,		{FLM, FRB}},
+ {"mtfsf.",	XFL(63,711,1),	XFL_MASK,    POWER6,	PPCNONE,	{FLM, FRB, XFL_L, W}},
++{"mtfsf.",	XFL(63,711,1),	XFL_MASK,    COM,	POWER6,		{FLM, FRB}},
+ 
+ {"drdpq",	XRC(63,770,0),	X_MASK,      POWER6,	PPCNONE,	{FRT, FRB}},
+ {"drdpq.",	XRC(63,770,1),	X_MASK,      POWER6,	PPCNONE,	{FRT, FRB}},
