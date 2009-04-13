@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?_with_upstream:.upstream}%{?dist}
+Release: 17%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,19 @@ fi
 %endif
 
 %changelog
+* Mon Apr 13 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-17
+- Archer update to the snapshot: 7c250ce99c90cf6097e2ec55ea0f205830979cee
+- Archer backport: c14d9ab7eef43281b2052c885f89d2db96fb5f8e
+  - Revert a change regressing: gdb.objc/basicclass.exp
+- Archer backport: ebd649b96e61a1fb481801b65d827bca998c6633
+                 + 1f080e897996d60ab7fde20423e2947512115667
+		 + 1948198702b51b31d79793fc49434b529b4e245f
+		 + e107fb9687bb1e7f74170aa3d19c4a8f6edbb10f
+		 + 1e012c996e121cb35053d239a46bd5dc65b0ce60
+  - Update the Python API from upstream.
+- Archer backport: d3c83ad5ec9f7672b87af9ad29279f459e53da11
+  - Fix a Python branch crash.
+
 * Mon Apr 13 2009 Dennis Gilmore <dennis@ausil.us> - 6.8.50.20090302-16
 - enable gdbserver package on sparc64
 

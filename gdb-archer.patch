@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 7c7c77576669d17ad5072daa47ea3a4fd954483d
+commit 7c250ce99c90cf6097e2ec55ea0f205830979cee
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -12560,7 +12560,7 @@ index 845b320..ad6e7d7 100644
  
  extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index 10e7388..e959189 100644
+index 10e7388..c4ab391 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -955,8 +955,10 @@ Connect to process ID @var{number}, as with the @code{attach} command.
@@ -12997,7 +12997,7 @@ index 10e7388..e959189 100644
 -* Values From Inferior::
 +* Auto-loading::                Automatically loading Python code.
 +* Values From Inferior::	Python representation of values.
-+* Types From Inferior::		Python representation of types.
++* Types In Python::		Python representation of types.
 +* Pretty Printing::		Pretty-printing values.
 +* Threads In Python::           Accessing inferior threads from Python.
  * Commands In Python::          Implementing new commands in Python.
@@ -13185,21 +13185,36 @@ index 10e7388..e959189 100644
  @node Values From Inferior
  @subsubsection Values From Inferior
  @cindex values from inferior, with Python
-@@ -18258,8 +18605,21 @@ bar = some_val['foo']
+@@ -18258,8 +18605,36 @@ bar = some_val['foo']
  
  Again, @code{bar} will also be a @code{gdb.Value} object.
  
 -For pointer data types, @code{gdb.Value} provides a method for
 -dereferencing the pointer to obtain the object it points to.
++The following attributes are provided:
++
++@table @code
++@defivar Value address
++If this object is addressable, this read-only attribute holds a
++@code{gdb.Value} object representing the address.  Otherwise,
++this attribute holds @code{None}.
++@end defivar
++
++@cindex optimized out value in Python
++@defivar Value is_optimized_out
++This read-only boolean attribute is true if the compiler optimized out
++this value, thus it is not available for fetching from the inferior.
++@end defivar
++
++@defivar Value type
++The type of this @code{gdb.Value}.  The result is a @code{gdb.Type}
++object.
++@end defivar
++@end table
++
 +The following methods are provided:
 +
 +@table @code
-+@defmethod Value address
-+If the @code{gdb.Value} object is addressable, this will return a new
-+@code{gdb.Value} object representing the address.  Otherwise, this
-+will throw an exception.
-+@end defmethod
-+
 +@defmethod Value cast type
 +Cast the @code{gdb.Value} to the type represented by @var{type}, and
 +return a new @code{gdb.Value}.  @var{type} must be a @code{gdb.Type}
@@ -13209,7 +13224,7 @@ index 10e7388..e959189 100644
  
  @defmethod Value dereference
  This method returns a new @code{gdb.Value} object whose contents is
-@@ -18282,7 +18642,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
+@@ -18282,7 +18657,7 @@ The result @code{bar} will be a @code{gdb.Value} object holding the
  value pointed to by @code{foo}.
  @end defmethod
  
@@ -13218,54 +13233,75 @@ index 10e7388..e959189 100644
  If this @code{gdb.Value} represents a string, then this method
  converts the contents to a Python string.  Otherwise, this method will
  throw an exception.
-@@ -18309,6 +18669,469 @@ The optional @var{errors} argument is the same as the corresponding
+@@ -18308,6 +18683,465 @@ will be used, if the current language is able to supply one.
+ The optional @var{errors} argument is the same as the corresponding
  argument to Python's @code{string.decode} method.
  @end defmethod
- 
-+@defmethod Value type
-+Return the type of this @code{gdb.Value}.  The result is a
-+@code{gdb.Type} object.
-+@end defmethod
 +@end table
 +
-+@node Types From Inferior
-+@subsubsection Types From Inferior
++@node Types In Python
++@subsubsection Types In Python
++@cindex types in Python
++@cindex Python, working with types
 +
-+@cindex gdb.Type
++@tindex gdb.Type
 +@value{GDBN} represents types from the inferior using the class
 +@code{gdb.Type}.
++
++The following type-related functions are available in the @code{gdb}
++module:
++
++@findex gdb.lookup_type
++@defun lookup_type name [block]
++This function looks up a type by name.  @var{name} is the name of the
++type to look up.  It must be a string.
++
++If @var{block} is given, then @var{name} is looked up in that scope.
++Otherwise, it is searched for globally.
++
++Ordinarily, this function will return an instance of @code{gdb.Type}.
++If the named type cannot be found, it will throw an exception.
++@end defun
++
++An instance of @code{Type} has the following attributes:
++
++@table @code
++@defivar Type code
++The type code for this type.  The type code will be one of the
++@code{TYPE_CODE_} constants defined below.
++@end defivar
++
++@defivar Type sizeof
++The size of this type, in target @code{char} units.  Usually, a
++target's @code{char} type will be an 8-bit byte.  However, on some
++unusual platforms, this type may have a different size.
++@end defivar
++
++@defivar Type tag
++The tag name for this type.  The tag name is the name after
++@code{struct}, @code{union}, or @code{enum} in C and C@t{++}; not all
++languages have this concept.  If this type has no tag name, then
++@code{None} is returned.
++@end defivar
++@end table
 +
 +The following methods are provided:
 +
 +@table @code
-+@defmethod Type Type [name [block]]
-+Construct a new instance of @code{gdb.Type}.
-+
-+If @var{name} is given, it specifies the name of a type to look up in
-+the inferior.
-+
-+If @var{block} is given, then @var{name} is looked up in that scope.
-+Otherwise, it is searched for globally.
-+@end defmethod
-+
-+@defmethod Type code
-+Return the type code for this type.  The type code will be one of the
-+@code{TYPE_CODE_} constants defined below.
-+@end defmethod
-+
 +@defmethod Type fields
 +For structure and union types, this method returns the fields.  Range
 +types have two fields, the minimum and maximum values.  Enum types
 +have one field per enum constant.  Function and method types have one
-+field per parameter.  The base types of C++ classes are also
++field per parameter.  The base types of C@t{++} classes are also
 +represented as fields.  If the type has no fields, or does not fit
 +into one of these categories, an empty sequence will be returned.
 +
 +Each field is an object, with some pre-defined attributes:
 +@table @code
 +@item bitpos
-+This attribute is not available for @code{static} fields.  For
-+non-@code{static} fields, the value is the bit position of the field.
++This attribute is not available for @code{static} fields (as in
++C@t{++} or Java).  For non-@code{static} fields, the value is the bit
++position of the field.
 +
 +@item name
 +The name of the field, or @code{None} for anonymous fields.
@@ -13307,22 +13343,9 @@ index 10e7388..e959189 100644
 +type.
 +@end defmethod
 +
-+@defmethod Type sizeof
-+Return the size of this type, in target @code{char} units.  Usually, a
-+target's @code{char} type will be an 8-bit byte.  However, on some
-+unusual platforms, this type may have a different size.
-+@end defmethod
-+
 +@defmethod Type strip_typedefs
 +Return a new @code{gdb.Type} that represents the real type,
 +after removing all layers of typedefs.
-+@end defmethod
-+
-+@defmethod Type tag
-+Return the tag name for this type.  The tag name is the name after
-+@code{struct}, @code{union}, or @code{enum} in C; not all languages
-+have this concept.  If this type has no tag name, then @code{None} is
-+returned.
 +@end defmethod
 +
 +@defmethod Type target
@@ -13330,20 +13353,23 @@ index 10e7388..e959189 100644
 +of this type.
 +
 +For a pointer type, the target type is the type of the pointed-to
-+object.  For an array type, the target type is the type of the
-+elements of the array.  For a function type, the target type is the
-+type of the return value.  For a complex type, the target type is the
-+type of the elements.  For a typedef, the target type is the aliased
-+type.
++object.  For an array type (meaning C-like arrays), the target type is
++the type of the elements of the array.  For a function or method type,
++the target type is the type of the return value.  For a complex type,
++the target type is the type of the elements.  For a typedef, the
++target type is the aliased type.
++
++If the type does not have a target, this method will throw an
++exception.
 +@end defmethod
 +
 +@defmethod Type template_argument n [block]
-+If this @code{gdb.Type} is a template type, this will return a new
-+@code{gdb.Type} which represents the type of the @var{n}th template
-+argument.
++If this @code{gdb.Type} is an instantiation of a template, this will
++return a new @code{gdb.Type} which represents the type of the
++@var{n}th template argument.
 +
 +If this @code{gdb.Type} is not a template type, this will throw an
-+exception.
++exception.  Ordinarily, only C@t{++} code will have template types.
 +
 +If @var{block} is given, then @var{name} is looked up in that scope.
 +Otherwise, it is searched for globally.
@@ -13384,8 +13410,7 @@ index 10e7388..e959189 100644
 +@findex TYPE_CODE_FLAGS
 +@findex gdb.TYPE_CODE_FLAGS
 +@item TYPE_CODE_FLAGS
-+A bit flags type.
-+@c FIXME: what is this?
++A bit flags type, used for things such as status registers.
 +
 +@findex TYPE_CODE_FUNC
 +@findex gdb.TYPE_CODE_FUNC
@@ -13436,7 +13461,7 @@ index 10e7388..e959189 100644
 +@findex TYPE_CODE_METHOD
 +@findex gdb.TYPE_CODE_METHOD
 +@item TYPE_CODE_METHOD
-+A C++ method type.
++A method type, as found in C++ or Java.
 +
 +@findex TYPE_CODE_METHODPTR
 +@findex gdb.TYPE_CODE_METHODPTR
@@ -13472,19 +13497,6 @@ index 10e7388..e959189 100644
 +@findex gdb.TYPE_CODE_TYPEDEF
 +@item TYPE_CODE_TYPEDEF
 +A typedef to some other type.
-+
-+@findex TYPE_CODE_TEMPLATE
-+@findex gdb.TYPE_CODE_TEMPLATE
-+@item TYPE_CODE_TEMPLATE
-+A C++ template type.  Note that this is not used for a template
-+instantiation; those appear as ordinary struct types.
-+@c FIXME I hope that is true
-+
-+@findex TYPE_CODE_TEMPLATE_ARG
-+@findex gdb.TYPE_CODE_TEMPLATE_ARG
-+@item TYPE_CODE_TEMPLATE_ARG
-+A C++ template argument.
-+@c FIXME: is this ever used?
 +
 +@findex TYPE_CODE_NAMESPACE
 +@findex gdb.TYPE_CODE_NAMESPACE
@@ -13620,7 +13632,7 @@ index 10e7388..e959189 100644
 +@smallexample
 +def str_lookup_function (val):
 +
-+    lookup_tag = val.type ().tag ()
++    lookup_tag = val.type.tag
 +    regex = re.compile ("^std::basic_string<char,.*>$")
 +    if lookup_tag == None:
 +        return None
@@ -13684,11 +13696,10 @@ index 10e7388..e959189 100644
 +@code{threads}.  If @var{id} is invalid, this function throws an
 +exception.
 +@end defun
-+
+ 
  @node Commands In Python
  @subsubsection Commands In Python
- 
-@@ -18320,7 +19143,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
+@@ -18320,7 +19154,7 @@ You can implement new @value{GDBN} CLI commands in Python.  A CLI
  command is implemented using an instance of the @code{gdb.Command}
  class, most commonly using a subclass.
  
@@ -13697,7 +13708,7 @@ index 10e7388..e959189 100644
  The object initializer for @code{Command} registers the new command
  with @value{GDBN}.  This initializer is normally invoked from the
  subclass' own @code{__init__} method.
-@@ -18332,11 +19155,11 @@ an exception is raised.
+@@ -18332,11 +19166,11 @@ an exception is raised.
  
  There is no support for multi-line commands.
  
@@ -13711,7 +13722,7 @@ index 10e7388..e959189 100644
  one of the @samp{COMPLETE_} constants defined below.  This argument
  tells @value{GDBN} how to perform completion for this command.  If not
  given, @value{GDBN} will attempt to complete using the object's
-@@ -18563,6 +19386,374 @@ registration of the command with @value{GDBN}.  Depending on how the
+@@ -18563,6 +19397,374 @@ registration of the command with @value{GDBN}.  Depending on how the
  Python code is read into @value{GDBN}, you may need to import the
  @code{gdb} module explicitly.
  
@@ -14086,7 +14097,7 @@ index 10e7388..e959189 100644
  @node Interpreters
  @chapter Command Interpreters
  @cindex command interpreters
-@@ -22273,6 +23464,103 @@ Unfreezing a variable does not update it, only subsequent
+@@ -22273,6 +23475,103 @@ Unfreezing a variable does not update it, only subsequent
  (gdb)
  @end smallexample
  
@@ -14190,7 +14201,7 @@ index 10e7388..e959189 100644
  
  @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  @node GDB/MI Data Manipulation
-@@ -23832,6 +25120,10 @@ as possible presense of the @code{frozen} field in the output
+@@ -23832,6 +25131,10 @@ as possible presense of the @code{frozen} field in the output
  of @code{-varobj-create}.
  @item pending-breakpoints
  Indicates presence of the @option{-f} option to the @code{-break-insert} command.
@@ -14201,7 +14212,7 @@ index 10e7388..e959189 100644
  @item thread-info
  Indicates presence of the @code{-thread-info} command.
  
-@@ -25402,28 +26694,6 @@ data in a @file{gmon.out} file, be sure to move it to a safe location.
+@@ -25402,28 +26705,6 @@ data in a @file{gmon.out} file, be sure to move it to a safe location.
  Configuring with @samp{--enable-profiling} arranges for @value{GDBN} to be
  compiled with the @samp{-pg} compiler option.
  
@@ -24359,13 +24370,13 @@ index 0000000..6fa48ff
 +IgnoreErrorsCommand ()
 diff --git a/gdb/python/lib/gdb/command/pahole.py b/gdb/python/lib/gdb/command/pahole.py
 new file mode 100644
-index 0000000..569b816
+index 0000000..21a0bf0
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/pahole.py
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,75 @@
 +# pahole command for gdb
 +
-+# Copyright (C) 2008 Free Software Foundation, Inc.
++# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -24391,16 +24402,10 @@ index 0000000..569b816
 +        super (Pahole, self).__init__ ("pahole", gdb.COMMAND_NONE,
 +                                       gdb.COMPLETE_SYMBOL)
 +
-+    @staticmethod
-+    def strip (type):
-+        while type.code () == gdb.TYPE_CODE_TYPEDEF:
-+            type = type.target ()
-+        return type
-+
 +    def pahole (self, type, level, name):
 +        if name is None:
 +            name = ''
-+        tag = type.tag ()
++        tag = type.tag
 +        if tag is None:
 +            tag = ''
 +        print '%sstruct %s {' % (' ' * (2 * level), tag)
@@ -24410,7 +24415,7 @@ index 0000000..569b816
 +            if not hasattr (field, ('bitpos')):
 +                continue
 +
-+            ftype = self.strip (field.type)
++            ftype = field.type.strip_typedefs()
 +
 +            if bitpos != field.bitpos:
 +                hole = field.bitpos - bitpos
@@ -24420,13 +24425,13 @@ index 0000000..569b816
 +                fieldsize = field.bitsize
 +            else:
 +                # TARGET_CHAR_BIT here...
-+                fieldsize = 8 * ftype.sizeof ()
++                fieldsize = 8 * ftype.sizeof
 +
 +            # TARGET_CHAR_BIT
 +            print ' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)),
 +            bitpos = bitpos + fieldsize
 +
-+            if ftype.code () == gdb.TYPE_CODE_STRUCT:
++            if ftype.code == gdb.TYPE_CODE_STRUCT:
 +                self.pahole (ftype, level + 1, field.name)
 +            else:
 +                print ' ' * (2 + 2 * level),
@@ -24436,9 +24441,9 @@ index 0000000..569b816
 +        print '} %s' % name
 +
 +    def invoke (self, arg, from_tty):
-+        type = gdb.Type (arg)
-+        type = self.strip (type)
-+        if type.code () != gdb.TYPE_CODE_STRUCT:
++        type = gdb.lookup_type (arg)
++        type = type.strip_typedefs ()
++        if type.code != gdb.TYPE_CODE_STRUCT:
 +            raise TypeError, '%s is not a struct type' % arg
 +        print ' ' * 14,
 +        self.pahole (type, 0, '')
@@ -24751,7 +24756,7 @@ index 0000000..fe7c072
 +register_libstdcxx_printers (gdb.current_objfile ())
 diff --git a/gdb/python/lib/gdb/libstdcxx/v6/printers.py b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
 new file mode 100644
-index 0000000..2572731
+index 0000000..58fd91c
 --- /dev/null
 +++ b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
 @@ -0,0 +1,629 @@
@@ -24804,7 +24809,7 @@ index 0000000..2572731
 +        def __init__(self, nodetype, head):
 +            self.nodetype = nodetype
 +            self.base = head['_M_next']
-+            self.head = head.address()
++            self.head = head.address
 +            self.count = 0
 +
 +        def __iter__(self):
@@ -24823,12 +24828,12 @@ index 0000000..2572731
 +        self.val = val
 +
 +    def children(self):
-+        itype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('std::_List_node<%s>' % itype).pointer()
++        itype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('std::_List_node<%s>' % itype).pointer()
 +        return self._iterator(nodetype, self.val['_M_impl']['_M_node'])
 +
 +    def to_string(self):
-+        if self.val['_M_impl']['_M_node'].address() == self.val['_M_impl']['_M_node']['_M_next']:
++        if self.val['_M_impl']['_M_node'].address == self.val['_M_impl']['_M_node']['_M_next']:
 +            return 'empty std::list'
 +        return 'std::list'
 +
@@ -24839,8 +24844,8 @@ index 0000000..2572731
 +        self.val = val
 +
 +    def to_string(self):
-+        itype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('std::_List_node<%s>' % itype).pointer()
++        itype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('std::_List_node<%s>' % itype).pointer()
 +        return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
 +
 +class StdSlistPrinter:
@@ -24868,8 +24873,8 @@ index 0000000..2572731
 +        self.val = val
 +
 +    def children(self):
-+        itype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
++        itype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
 +        return self._iterator(nodetype, self.val)
 +
 +    def to_string(self):
@@ -24884,8 +24889,8 @@ index 0000000..2572731
 +        self.val = val
 +
 +    def to_string(self):
-+        itype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
++        itype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('__gnu_cxx::_Slist_node<%s>' % itype).pointer()
 +        return self.val['_M_node'].cast(nodetype).dereference()['_M_data']
 +
 +class StdVectorPrinter:
@@ -24998,8 +25003,8 @@ index 0000000..2572731
 +        self.val = val
 +
 +    def to_string (self):
-+        valuetype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('std::_Rb_tree_node < %s >' % valuetype)
++        valuetype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('std::_Rb_tree_node < %s >' % valuetype)
 +        nodetype = nodetype.pointer()
 +        return self.val.cast(nodetype).dereference()['_M_value_field']
 +
@@ -25038,9 +25043,9 @@ index 0000000..2572731
 +        return '%s with %d elements' % (self.typename, len (self.iter))
 +
 +    def children (self):
-+        keytype = self.val.type().template_argument(0).const()
-+        valuetype = self.val.type().template_argument(1)
-+        nodetype = gdb.Type('std::_Rb_tree_node< std::pair< %s, %s > >' % (keytype, valuetype))
++        keytype = self.val.type.template_argument(0).const()
++        valuetype = self.val.type.template_argument(1)
++        nodetype = gdb.lookup_type('std::_Rb_tree_node< std::pair< %s, %s > >' % (keytype, valuetype))
 +        nodetype = nodetype.pointer()
 +        return self._iter (self.iter, nodetype)
 +
@@ -25078,8 +25083,8 @@ index 0000000..2572731
 +        return '%s with %d elements' % (self.typename, len (self.iter))
 +
 +    def children (self):
-+        keytype = self.val.type().template_argument(0)
-+        nodetype = gdb.Type('std::_Rb_tree_node< %s >' % keytype).pointer()
++        keytype = self.val.type.template_argument(0)
++        nodetype = gdb.lookup_type('std::_Rb_tree_node< %s >' % keytype).pointer()
 +        return self._iter (self.iter, nodetype)
 +
 +class StdBitsetPrinter:
@@ -25095,18 +25100,18 @@ index 0000000..2572731
 +
 +    def children (self):
 +        words = self.val['_M_w']
-+        wtype = words.type()
++        wtype = words.type
 +
 +        # The _M_w member can be either an unsigned long, or an
 +        # array.  This depends on the template specialization used.
 +        # If it is a single long, convert to a single element list.
-+        if wtype.code () == gdb.TYPE_CODE_ARRAY:
-+            tsize = wtype.target ().sizeof ()
++        if wtype.code == gdb.TYPE_CODE_ARRAY:
++            tsize = wtype.target ().sizeof
 +        else:
 +            words = [words]
-+            tsize = wtype.sizeof () 
++            tsize = wtype.sizeof 
 +
-+        nwords = wtype.sizeof() / tsize
++        nwords = wtype.sizeof / tsize
 +        result = []
 +        byte = 0
 +        while byte < nwords:
@@ -25156,8 +25161,8 @@ index 0000000..2572731
 +
 +    def __init__(self, val):
 +        self.val = val
-+        self.elttype = val.type().template_argument(0)
-+        size = self.elttype.sizeof ()
++        self.elttype = val.type.template_argument(0)
++        size = self.elttype.sizeof
 +        if size < 512:
 +            self.buffer_size = int (512 / size)
 +        else:
@@ -25310,17 +25315,17 @@ index 0000000..2572731
 +    "Look-up and return a pretty-printer that can print val."
 +
 +    # Get the type.
-+    type = val.type ();
++    type = val.type;
 +
 +    # If it points to a reference, get the reference.
-+    if type.code () == gdb.TYPE_CODE_REF:
++    if type.code == gdb.TYPE_CODE_REF:
 +        type = type.target ()
 +
 +    # Get the unqualified type, stripped of typedefs.
 +    type = type.unqualified ().strip_typedefs ()
 +
 +    # Get the type name.    
-+    typename = type.tag ()
++    typename = type.tag
 +    if typename == None:
 +        return None
 +
@@ -27373,7 +27378,7 @@ index 0000000..a3140bc
 +  return result;
 +}
 diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
-index 02dbfc4..4aae0aa 100644
+index 02dbfc4..5e43267 100644
 --- a/gdb/python/python-internal.h
 +++ b/gdb/python/python-internal.h
 @@ -33,6 +33,7 @@
@@ -27395,7 +27400,7 @@ index 02dbfc4..4aae0aa 100644
  #else
  #error "Unable to find usable Python.h"
  #endif
-@@ -58,23 +61,69 @@ typedef int Py_ssize_t;
+@@ -58,23 +61,70 @@ typedef int Py_ssize_t;
  #define PyEval_ReleaseLock() 0
  #endif
  
@@ -27422,6 +27427,7 @@ index 02dbfc4..4aae0aa 100644
 +PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
 +PyObject *gdbpy_read_memory (PyObject *self, PyObject *args);
 +PyObject *gdbpy_write_memory (PyObject *self, PyObject *args);
++PyObject *gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw);
 +
 +PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 +PyObject *symtab_to_symtab_object (struct symtab *symtab);
@@ -27466,7 +27472,7 @@ index 02dbfc4..4aae0aa 100644
  /* Use this after a TRY_EXCEPT to throw the appropriate Python
     exception.  */
  #define GDB_PY_HANDLE_EXCEPTION(Exception)				\
-@@ -85,6 +134,19 @@ struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
+@@ -85,6 +135,19 @@ struct cleanup *make_cleanup_py_restore_gil (PyGILState_STATE *state);
  			     "%s", Exception.message);			\
      } while (0)
  
@@ -27486,7 +27492,7 @@ index 02dbfc4..4aae0aa 100644
  
  void gdbpy_print_stack (void);
  
-@@ -95,6 +157,21 @@ char *python_string_to_host_string (PyObject *obj);
+@@ -95,6 +158,21 @@ char *python_string_to_host_string (PyObject *obj);
  PyObject *target_string_to_unicode (const gdb_byte *str, int length);
  int gdbpy_is_string (PyObject *obj);
  
@@ -27759,10 +27765,10 @@ index 0000000..a4c7d74
 +}
 diff --git a/gdb/python/python-objfile.c b/gdb/python/python-objfile.c
 new file mode 100644
-index 0000000..e97d3a2
+index 0000000..f5db084
 --- /dev/null
 +++ b/gdb/python/python-objfile.c
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,225 @@
 +/* Python interface to objfiles.
 +
 +   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -27881,9 +27887,13 @@ index 0000000..e97d3a2
 +static void
 +clean_up_objfile (struct objfile *objfile, void *datum)
 +{
++  PyGILState_STATE state;
 +  objfile_object *object = datum;
++
++  state = PyGILState_Ensure ();
 +  object->objfile = NULL;
 +  Py_DECREF ((PyObject *) object);
++  PyGILState_Release (state);
 +}
 +
 +/* Return the Python object of type Objfile representing OBJFILE.  If
@@ -29258,10 +29268,10 @@ index 0000000..a48c38c
 +};
 diff --git a/gdb/python/python-type.c b/gdb/python/python-type.c
 new file mode 100644
-index 0000000..c851cdb
+index 0000000..fcf6b82
 --- /dev/null
 +++ b/gdb/python/python-type.c
-@@ -0,0 +1,828 @@
+@@ -0,0 +1,836 @@
 +/* Python interface to types.
 +
 +   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -29353,8 +29363,6 @@ index 0000000..c851cdb
 +  ENTRY (TYPE_CODE_BOOL),
 +  ENTRY (TYPE_CODE_COMPLEX),
 +  ENTRY (TYPE_CODE_TYPEDEF),
-+  ENTRY (TYPE_CODE_TEMPLATE),
-+  ENTRY (TYPE_CODE_TEMPLATE_ARG),
 +  ENTRY (TYPE_CODE_NAMESPACE),
 +  ENTRY (TYPE_CODE_DECFLOAT),
 +  ENTRY (TYPE_CODE_INTERNAL_FUNCTION),
@@ -29368,6 +29376,7 @@ index 0000000..c851cdb
 +{
 +  field_object *f = (field_object *) obj;
 +  Py_XDECREF (f->dict);
++  f->ob_type->tp_free (obj);
 +}
 +
 +static PyObject *
@@ -29390,7 +29399,7 @@ index 0000000..c851cdb
 +
 +/* Return the code for this type.  */
 +static PyObject *
-+typy_code (PyObject *self, PyObject *args)
++typy_get_code (PyObject *self, void *closure)
 +{
 +  struct type *type = ((type_object *) self)->type;
 +  return PyInt_FromLong (TYPE_CODE (type));
@@ -29497,7 +29506,7 @@ index 0000000..c851cdb
 +
 +/* Return the type's tag, or None.  */
 +static PyObject *
-+typy_tag (PyObject *self, PyObject *args)
++typy_get_tag (PyObject *self, void *closure)
 +{
 +  struct type *type = ((type_object *) self)->type;
 +  if (!TYPE_TAG_NAME (type))
@@ -29611,16 +29620,16 @@ index 0000000..c851cdb
 +
 +/* Return the size of the type represented by SELF, in bytes.  */
 +static PyObject *
-+typy_sizeof (PyObject *self, PyObject *args)
++typy_get_sizeof (PyObject *self, void *closure)
 +{
 +  struct type *type = ((type_object *) self)->type;
 +  volatile struct gdb_exception except;
 +
 +  TRY_CATCH (except, RETURN_MASK_ALL)
 +    {
-+      CHECK_TYPEDEF (type);
++      check_typedef (type);
 +    }
-+  GDB_PY_HANDLE_EXCEPTION (except);
++  /* Ignore exceptions.  */
 +
 +  return PyLong_FromLong (TYPE_LENGTH (type));
 +}
@@ -29861,47 +29870,6 @@ index 0000000..c851cdb
 +    obj->next = NULL;
 +}
 +
-+static PyObject *
-+typy_new (PyTypeObject *subtype, PyObject *args, PyObject *kwargs)
-+{
-+  char *type_name = NULL;
-+  struct type *type = NULL;
-+  type_object *result;
-+  PyObject *block_obj = NULL;
-+  struct block *block = NULL;
-+
-+  /* FIXME: it is strange to allow a Type with no name, but we need
-+     this for type_to_type_object.  */
-+  if (! PyArg_ParseTuple (args, "|sO", &type_name, &block_obj))
-+    return NULL;
-+
-+  if (block_obj)
-+    {
-+      block = block_object_to_block (block_obj);
-+      if (! block)
-+	{
-+	  PyErr_SetString (PyExc_RuntimeError,
-+			   "second argument must be block");
-+	  return NULL;
-+	}
-+    }
-+
-+  if (type_name)
-+    {
-+      type = typy_lookup_typename (type_name, block);
-+      if (! type)
-+	return NULL;
-+    }
-+
-+  result = (type_object *) subtype->tp_alloc (subtype, 1);
-+  if (! result)
-+    return NULL;
-+
-+  set_type (result, type);
-+
-+  return (PyObject *) result;
-+}
-+
 +static void
 +typy_dealloc (PyObject *obj)
 +{
@@ -29948,6 +29916,38 @@ index 0000000..c851cdb
 +
 +
 +
++/* Implementation of gdb.lookup_type.  */
++PyObject *
++gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw)
++{
++  static char *keywords[] = { "name", "block", NULL };
++  char *type_name = NULL;
++  struct type *type = NULL;
++  PyObject *block_obj = NULL;
++  struct block *block = NULL;
++
++  if (! PyArg_ParseTupleAndKeywords (args, kw, "s|O", keywords,
++				     &type_name, &block_obj))
++    return NULL;
++
++  if (block_obj)
++    {
++      block = block_object_to_block (block_obj);
++      if (! block)
++	{
++	  PyErr_SetString (PyExc_RuntimeError,
++			   "'block' argument must be a Block");
++	  return NULL;
++	}
++    }
++
++  type = typy_lookup_typename (type_name, block);
++  if (! type)
++    return NULL;
++
++  return (PyObject *) type_to_type_object (type);
++}
++
 +void
 +gdbpy_initialize_types (void)
 +{
@@ -29979,29 +29979,47 @@ index 0000000..c851cdb
 +
 +
 +
++static PyGetSetDef type_object_getset[] =
++{
++  { "code", typy_get_code, NULL,
++    "The code for this type.", NULL },
++  { "sizeof", typy_get_sizeof, NULL,
++    "The size of this type, in bytes.", NULL },
++  { "tag", typy_get_tag, NULL,
++    "The tag name for this type, or None.", NULL },
++  { NULL }
++};
++
 +static PyMethodDef type_object_methods[] =
 +{
-+  { "code", typy_code, METH_NOARGS, "Return the code for this type" },
-+  { "const", typy_const, METH_NOARGS, "Return a const variant of this type" },
++  { "const", typy_const, METH_NOARGS,
++    "const () -> Type\n\
++Return a const variant of this type." },
 +  { "fields", typy_fields, METH_NOARGS,
-+    "Return a sequence holding all the fields of this type.\n\
++    "field () -> list\n\
++Return a sequence holding all the fields of this type.\n\
 +Each field is a dictionary." },
-+  { "pointer", typy_pointer, METH_NOARGS, "Return pointer to this type" },
-+  { "reference", typy_reference, METH_NOARGS, "Return reference to this type" },
-+  { "sizeof", typy_sizeof, METH_NOARGS,
-+    "Return the size of this type, in bytes" },
-+  { "tag", typy_tag, METH_NOARGS,
-+    "Return the tag name for this type, or None." },
++  { "pointer", typy_pointer, METH_NOARGS,
++    "pointer () -> Type\n\
++Return a type of pointer to this type." },
++  { "reference", typy_reference, METH_NOARGS,
++    "reference () -> Type\n\
++Return a type of reference to this type." },
 +  { "strip_typedefs", typy_strip_typedefs, METH_NOARGS,
-+    "Return a type stripped of typedefs"},
++    "strip_typedefs () -> Type\n\
++Return a type formed by stripping this type of all typedefs."},
 +  { "target", typy_target, METH_NOARGS,
-+    "Return the target type of this type" },
++    "target () -> Type\n\
++Return the target type of this type." },
 +  { "template_argument", typy_template_argument, METH_VARARGS,
-+    "Return a single template argument type" },
++    "template_argument (arg) -> Type\n\
++Return the type of a template argument." },
 +  { "unqualified", typy_unqualified, METH_NOARGS,
-+    "Return a variant of this type without const or volatile attributes" },
++    "unqualified () -> Type\n\
++Return a variant of this type without const or volatile attributes." },
 +  { "volatile", typy_volatile, METH_NOARGS,
-+    "Return a volatile variant of this type" },
++    "volatile () -> Type\n\
++Return a volatile variant of this type" },
 +  { NULL }
 +};
 +
@@ -30037,7 +30055,7 @@ index 0000000..c851cdb
 +  0,				  /* tp_iternext */
 +  type_object_methods,		  /* tp_methods */
 +  0,				  /* tp_members */
-+  0,				  /* tp_getset */
++  type_object_getset,		  /* tp_getset */
 +  0,				  /* tp_base */
 +  0,				  /* tp_dict */
 +  0,				  /* tp_descr_get */
@@ -30045,7 +30063,7 @@ index 0000000..c851cdb
 +  0,				  /* tp_dictoffset */
 +  0,				  /* tp_init */
 +  0,				  /* tp_alloc */
-+  typy_new,			  /* tp_new */
++  0,				  /* tp_new */
 +};
 +
 +static PyTypeObject field_object_type =
@@ -30163,7 +30181,7 @@ index ddac2f5..f9c9486 100644
 +  return 1;
 +}
 diff --git a/gdb/python/python-value.c b/gdb/python/python-value.c
-index bc077b6..2507fcd 100644
+index bc077b6..e26880a 100644
 --- a/gdb/python/python-value.c
 +++ b/gdb/python/python-value.c
 @@ -52,6 +52,10 @@ struct value *values_in_python = NULL;
@@ -30177,30 +30195,108 @@ index bc077b6..2507fcd 100644
  #define builtin_type_pybool \
    language_bool_type (current_language, current_gdbarch)
  
-@@ -143,10 +147,19 @@ valpy_address (PyObject *self, PyObject *args)
-   return value_to_value_object (res_val);
+@@ -59,6 +63,8 @@ typedef struct {
+   PyObject_HEAD
+   struct value *value;
+   int owned_by_gdb;
++  PyObject *address;
++  PyObject *type;
+ } value_object;
+ 
+ /* Called by the Python interpreter when deallocating a value object.  */
+@@ -71,6 +77,18 @@ valpy_dealloc (PyObject *obj)
+ 
+   if (!self->owned_by_gdb)
+     value_free (self->value);
++
++  if (self->address)
++    /* Use braces to appease gcc warning.  *sigh*  */
++    {
++      Py_DECREF (self->address);
++    }
++
++  if (self->type)
++    {
++      Py_DECREF (self->type);
++    }
++
+   self->ob_type->tp_free (self);
+ }
+ 
+@@ -105,6 +123,8 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
+ 
+   value_obj->value = value;
+   value_obj->owned_by_gdb = 0;
++  value_obj->address = NULL;
++  value_obj->type = NULL;
+   release_value (value);
+   value_prepend_to_list (&values_in_python, value);
+ 
+@@ -129,24 +149,55 @@ valpy_dereference (PyObject *self, PyObject *args)
+ 
+ /* Return "&value".  */
+ static PyObject *
+-valpy_address (PyObject *self, PyObject *args)
++valpy_get_address (PyObject *self, void *closure)
+ {
+   struct value *res_val = NULL;	  /* Initialize to appease gcc warning.  */
++  value_object *val_obj = (value_object *) self;
+   volatile struct gdb_exception except;
+ 
+-  TRY_CATCH (except, RETURN_MASK_ALL)
++  if (!val_obj->address)
+     {
+-      res_val = value_addr (((value_object *) self)->value);
++      TRY_CATCH (except, RETURN_MASK_ALL)
++	{
++	  res_val = value_addr (val_obj->value);
++	}
++      if (except.reason < 0)
++	{
++	  val_obj->address = Py_None;
++	  Py_INCREF (Py_None);
++	}
++      else
++	val_obj->address = value_to_value_object (res_val);
+     }
+-  GDB_PY_HANDLE_EXCEPTION (except);
+ 
+-  return value_to_value_object (res_val);
++  Py_INCREF (val_obj->address);
++
++  return val_obj->address;
  }
  
 -/* Return Unicode string with value contents (assumed to be encoded in the
 -   target's charset).  */
 +/* Return type of the value.  */
-+static PyObject *
-+valpy_type (PyObject *self, PyObject *args)
+ static PyObject *
+-valpy_string (PyObject *self, PyObject *args)
++valpy_get_type (PyObject *self, void *closure)
 +{
-+  struct value *value = ((value_object *) self)->value;
-+  return type_to_type_object (value_type (value));
++  value_object *obj = (value_object *) self;
++  if (!obj->type)
++    {
++      obj->type = type_to_type_object (value_type (obj->value));
++      if (!obj->type)
++	{
++	  obj->type = Py_None;
++	  Py_INCREF (obj->type);
++	}
++    }
++  Py_INCREF (obj->type);
++  return obj->type;
 +}
 +
 +/* Implementation of gdb.Value.string ([encoding] [, errors]) -> string
 +   Return Unicode string with value contents.  If ENCODING is not given,
 +   the string is assumed to be encoded in the target's charset.  */
- static PyObject *
--valpy_string (PyObject *self, PyObject *args)
++static PyObject *
 +valpy_string (PyObject *self, PyObject *args, PyObject *kw)
  {
    int length, ret = 0;
    gdb_byte *buffer;
-@@ -157,8 +170,10 @@ valpy_string (PyObject *self, PyObject *args)
+@@ -157,8 +208,10 @@ valpy_string (PyObject *self, PyObject *args)
    const char *errors = NULL;
    const char *user_encoding = NULL;
    const char *la_encoding = NULL;
@@ -30212,7 +30308,7 @@ index bc077b6..2507fcd 100644
      return NULL;
  
    TRY_CATCH (except, RETURN_MASK_ALL)
-@@ -174,6 +189,34 @@ valpy_string (PyObject *self, PyObject *args)
+@@ -174,6 +227,34 @@ valpy_string (PyObject *self, PyObject *args)
    return unicode;
  }
  
@@ -30247,7 +30343,26 @@ index bc077b6..2507fcd 100644
  static Py_ssize_t
  valpy_length (PyObject *self)
  {
-@@ -306,11 +349,11 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
+@@ -269,6 +350,18 @@ valpy_str (PyObject *self)
+   return result;
+ }
+ 
++/* Implements gdb.Value.is_optimized_out.  */
++static PyObject *
++valpy_get_is_optimized_out (PyObject *self, void *closure)
++{
++  struct value *value = ((value_object *) self)->value;
++
++  if (value_optimized_out (value))
++    Py_RETURN_TRUE;
++
++  Py_RETURN_FALSE;
++}
++
+ enum valpy_opcode
+ {
+   VALPY_ADD,
+@@ -306,11 +399,11 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
  	 a gdb.Value object and need to convert it from python as well.  */
        arg1 = convert_value_from_python (self);
        if (arg1 == NULL)
@@ -30261,7 +30376,7 @@ index bc077b6..2507fcd 100644
  
        switch (opcode)
  	{
-@@ -387,7 +430,7 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
+@@ -387,7 +480,7 @@ valpy_binop (enum valpy_opcode opcode, PyObject *self, PyObject *other)
      }
    GDB_PY_HANDLE_EXCEPTION (except);
  
@@ -30270,7 +30385,16 @@ index bc077b6..2507fcd 100644
  }
  
  static PyObject *
-@@ -718,6 +761,17 @@ value_to_value_object (struct value *val)
+@@ -711,6 +804,8 @@ value_to_value_object (struct value *val)
+     {
+       val_obj->value = val;
+       val_obj->owned_by_gdb = 0;
++      val_obj->address = NULL;
++      val_obj->type = NULL;
+       release_value (val);
+       value_prepend_to_list (&values_in_python, val);
+     }
+@@ -718,6 +813,17 @@ value_to_value_object (struct value *val)
    return (PyObject *) val_obj;
  }
  
@@ -30288,7 +30412,7 @@ index bc077b6..2507fcd 100644
  /* Try to convert a Python value to a gdb value.  If the value cannot
     be converted, set a Python exception and return NULL.  */
  
-@@ -751,7 +805,34 @@ convert_value_from_python (PyObject *obj)
+@@ -751,7 +857,34 @@ convert_value_from_python (PyObject *obj)
  	{
  	  LONGEST l = PyLong_AsLongLong (obj);
  
@@ -30324,7 +30448,7 @@ index bc077b6..2507fcd 100644
  	    value = value_from_longest (builtin_type_pylong, l);
  	}
        else if (PyFloat_Check (obj))
-@@ -774,7 +855,7 @@ convert_value_from_python (PyObject *obj)
+@@ -774,7 +907,7 @@ convert_value_from_python (PyObject *obj)
  	    }
  	}
        else if (PyObject_TypeCheck (obj, &value_object_type))
@@ -30333,7 +30457,7 @@ index bc077b6..2507fcd 100644
        else
  	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
  		      PyString_AsString (PyObject_Str (obj)));
-@@ -810,6 +891,14 @@ gdbpy_history (PyObject *self, PyObject *args)
+@@ -810,6 +943,14 @@ gdbpy_history (PyObject *self, PyObject *args)
    return value_to_value_object (res_val);
  }
  
@@ -30348,27 +30472,45 @@ index bc077b6..2507fcd 100644
  void
  gdbpy_initialize_values (void)
  {
-@@ -822,11 +911,16 @@ gdbpy_initialize_values (void)
+@@ -822,11 +963,24 @@ gdbpy_initialize_values (void)
    values_in_python = NULL;
  }
  
 +
 +
++static PyGetSetDef value_object_getset[] = {
++  { "address", valpy_get_address, NULL, "The address of the value.",
++    NULL },
++  { "is_optimized_out", valpy_get_is_optimized_out, NULL,
++    "Boolean telling whether the value is optimized out (i.e., not available).",
++    NULL },
++  { "type", valpy_get_type, NULL, "Type of the value.", NULL },
++  {NULL}  /* Sentinel */
++};
++
  static PyMethodDef value_object_methods[] = {
-   { "address", valpy_address, METH_NOARGS, "Return the address of the value." },
+-  { "address", valpy_address, METH_NOARGS, "Return the address of the value." },
 +  { "cast", valpy_cast, METH_VARARGS, "Cast the value to the supplied type." },
    { "dereference", valpy_dereference, METH_NOARGS, "Dereferences the value." },
 -  { "string", valpy_string, METH_VARARGS,
 -    "Return Unicode string representation of the value." },
-+  { "type", valpy_type, METH_NOARGS, "Return type of the value." },
 +  { "string", (PyCFunction) valpy_string, METH_VARARGS | METH_KEYWORDS,
 +    "string ([encoding] [, errors]) -> string\n\
 +Return Unicode string representation of the value." },
    {NULL}  /* Sentinel */
  };
  
+@@ -893,7 +1047,7 @@ PyTypeObject value_object_type = {
+   0,				  /* tp_iternext */
+   value_object_methods,		  /* tp_methods */
+   0,				  /* tp_members */
+-  0,				  /* tp_getset */
++  value_object_getset,		  /* tp_getset */
+   0,				  /* tp_base */
+   0,				  /* tp_dict */
+   0,				  /* tp_descr_get */
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index b3a27d6..2b06748 100644
+index b3a27d6..995835b 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
 @@ -22,6 +22,12 @@
@@ -31969,7 +32111,7 @@ index b3a27d6..2b06748 100644
  ");
  
    /* Release the GIL while gdb runs.  */
-@@ -461,9 +1868,79 @@ static PyMethodDef GdbMethods[] =
+@@ -461,9 +1868,84 @@ static PyMethodDef GdbMethods[] =
      "Get a value from history" },
    { "execute", execute_gdb_command, METH_VARARGS,
      "Execute a gdb command" },
@@ -32002,6 +32144,11 @@ index b3a27d6..2b06748 100644
 +  { "frame_stop_reason_string", gdbpy_frame_stop_reason_string, METH_VARARGS,
 +    "stop_reason_string (Integer) -> String.\n\
 +Return a string explaining unwind stop reason." },
++
++  { "lookup_type", (PyCFunction) gdbpy_lookup_type,
++    METH_VARARGS | METH_KEYWORDS,
++    "lookup_type (name [, block]) -> type\n\
++Return a Type corresponding to the given name." },
 +
 +  { "lookup_symbol", (PyCFunction) gdbpy_lookup_symbol,
 +    METH_VARARGS | METH_KEYWORDS,
@@ -32579,7 +32726,7 @@ index 88f8326..50671c1 100644
  extern void dwarf2_build_frame_info (struct objfile *);
  
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index d2ba1f3..c1c4459 100644
+index d2ba1f3..f9d27b2 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -42,6 +42,7 @@
@@ -32598,18 +32745,7 @@ index d2ba1f3..c1c4459 100644
  #include "observer.h"
  #include "gdb_assert.h"
  #include "solist.h"
-@@ -94,7 +96,9 @@ static
- struct symbol *lookup_symbol_aux_local (const char *name,
- 					const char *linkage_name,
- 					const struct block *block,
--					const domain_enum domain);
-+					const domain_enum domain,
-+					enum language lang,
-+					int *is_a_field_of_this);
- 
- static
- struct symbol *lookup_symbol_aux_symtabs (int block_index,
-@@ -273,7 +277,7 @@ lookup_partial_symtab (const char *name)
+@@ -273,7 +275,7 @@ lookup_partial_symtab (const char *name)
        make_cleanup (xfree, real_path);
      }
  
@@ -32618,7 +32754,7 @@ index d2ba1f3..c1c4459 100644
    {
      if (FILENAME_CMP (name, pst->filename) == 0)
        {
-@@ -870,7 +874,13 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
+@@ -870,7 +872,13 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
       than the later used TEXTLOW/TEXTHIGH one.  */
  
    ALL_OBJFILES (objfile)
@@ -32633,7 +32769,7 @@ index d2ba1f3..c1c4459 100644
        {
  	struct partial_symtab *pst;
  
-@@ -903,6 +913,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
+@@ -903,6 +911,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
  	    return pst;
  	  }
        }
@@ -32641,7 +32777,7 @@ index d2ba1f3..c1c4459 100644
  
    /* Existing PSYMTABS_ADDRMAP mapping is present even for PARTIAL_SYMTABs
       which still have no corresponding full SYMTABs read.  But it is not
-@@ -1170,6 +1181,22 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
+@@ -1170,6 +1179,22 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
    return psym;
  }
  
@@ -32664,7 +32800,7 @@ index d2ba1f3..c1c4459 100644
  /* Find the definition for a specified symbol name NAME
     in domain DOMAIN, visible from lexical block BLOCK.
     Returns the struct symbol pointer, or zero if no symbol is found.
-@@ -1200,6 +1227,11 @@ lookup_symbol_in_language (const char *name, const struct block *block,
+@@ -1200,6 +1225,11 @@ lookup_symbol_in_language (const char *name, const struct block *block,
    int needtofreename = 0;
    struct symbol *returnval;
  
@@ -32676,7 +32812,7 @@ index d2ba1f3..c1c4459 100644
    modified_name = name;
  
    /* If we are using C++ or Java, demangle the name before doing a lookup, so
-@@ -1213,6 +1245,17 @@ lookup_symbol_in_language (const char *name, const struct block *block,
+@@ -1213,6 +1243,17 @@ lookup_symbol_in_language (const char *name, const struct block *block,
  	  modified_name = demangled_name;
  	  needtofreename = 1;
  	}
@@ -32694,79 +32830,37 @@ index d2ba1f3..c1c4459 100644
      }
    else if (lang == language_java)
      {
-@@ -1283,8 +1326,8 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
-   /* Search specified block and its superiors.  Don't search
-      STATIC_BLOCK or GLOBAL_BLOCK.  */
- 
--  sym = lookup_symbol_aux_local (name, linkage_name, block, domain);
--  if (sym != NULL)
-+  sym = lookup_symbol_aux_local (name, linkage_name, block, domain, language, is_a_field_of_this);
-+  if (sym != NULL || (is_a_field_of_this && *is_a_field_of_this))
-     return sym;
- 
-   /* If requested to do so by the caller and if appropriate for LANGUAGE,
-@@ -1292,41 +1335,6 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
- 
-   langdef = language_def (language);
- 
--  if (langdef->la_name_of_this != NULL && is_a_field_of_this != NULL
--      && block != NULL)
--    {
--      struct symbol *sym = NULL;
--      /* 'this' is only defined in the function's block, so find the
--	 enclosing function block.  */
+@@ -1296,13 +1337,15 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+       && block != NULL)
+     {
+       struct symbol *sym = NULL;
++      const struct block *function_block = block;
++
+       /* 'this' is only defined in the function's block, so find the
+ 	 enclosing function block.  */
 -      for (; block && !BLOCK_FUNCTION (block); 
 -	   block = BLOCK_SUPERBLOCK (block));
--
++      for (; function_block && !BLOCK_FUNCTION (function_block);
++	   function_block = BLOCK_SUPERBLOCK (function_block));
+ 
 -      if (block && !dict_empty (BLOCK_DICT (block)))
 -	sym = lookup_block_symbol (block, langdef->la_name_of_this,
--				   NULL, VAR_DOMAIN);
--      if (sym)
--	{
--	  struct type *t = sym->type;
--	  
--	  /* I'm not really sure that type of this can ever
--	     be typedefed; just be safe.  */
--	  CHECK_TYPEDEF (t);
--	  if (TYPE_CODE (t) == TYPE_CODE_PTR
--	      || TYPE_CODE (t) == TYPE_CODE_REF)
--	    t = TYPE_TARGET_TYPE (t);
--	  
--	  if (TYPE_CODE (t) != TYPE_CODE_STRUCT
--	      && TYPE_CODE (t) != TYPE_CODE_UNION)
--	    error (_("Internal error: `%s' is not an aggregate"), 
--		   langdef->la_name_of_this);
--	  
--	  if (check_field (t, name))
--	    {
--	      *is_a_field_of_this = 1;
--	      return NULL;
--	    }
--	}
--    }
- 
-   /* Now do whatever is appropriate for LANGUAGE to look
-      up static and global variables.  */
-@@ -1358,25 +1366,70 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
- static struct symbol *
- lookup_symbol_aux_local (const char *name, const char *linkage_name,
- 			 const struct block *block,
--			 const domain_enum domain)
-+			 const domain_enum domain,
-+			 enum language language,
-+			 int *is_a_field_of_this)
++      if (function_block && !dict_empty (BLOCK_DICT (function_block)))
++	sym = lookup_block_symbol (function_block, langdef->la_name_of_this,
+ 				   NULL, VAR_DOMAIN);
+       if (sym)
+ 	{
+@@ -1361,22 +1404,24 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
+ 			 const domain_enum domain)
  {
    struct symbol *sym;
 -  const struct block *static_block = block_static_block (block);
 +  const struct block *global_block = block_global_block (block);
 +  const struct block *block_iterator = block;
-+  const struct language_defn *langdef;
  
--  /* Check if either no block is specified or it's a global block.  */
-+  langdef = language_def (language);
+   /* Check if either no block is specified or it's a global block.  */
  
 -  if (static_block == NULL)
-+  /* Check if either no block is specified or it's a global block.  */
 +  if (global_block == NULL)
      return NULL;
  
@@ -32774,50 +32868,11 @@ index d2ba1f3..c1c4459 100644
 +  while (block_iterator != global_block)
      {
 -      sym = lookup_symbol_aux_block (name, linkage_name, block, domain);
-+      /* First check the local lexical level */
 +      sym = lookup_symbol_aux_block (name, linkage_name, block_iterator, domain);
        if (sym != NULL)
  	return sym;
 -      block = BLOCK_SUPERBLOCK (block);
 +    
-+      if (language == language_cplus)
-+        {
-+          /* Check class scope, if we have reach the function block */
-+          if(BLOCK_FUNCTION (block_iterator)){
-+
-+          if (block_iterator && !dict_empty (BLOCK_DICT (block_iterator)))
-+            sym = lookup_block_symbol (block_iterator, langdef->la_name_of_this,
-+                                       NULL, VAR_DOMAIN);
-+          if (sym)
-+            {
-+              struct type *t = sym->type;
-+
-+              /* I'm not really sure that type of this can ever
-+                 be typedefed; just be safe.  */
-+              CHECK_TYPEDEF (t);
-+              if (TYPE_CODE (t) == TYPE_CODE_PTR
-+                  || TYPE_CODE (t) == TYPE_CODE_REF)
-+                t = TYPE_TARGET_TYPE (t);
-+
-+              if (TYPE_CODE (t) != TYPE_CODE_STRUCT
-+                  && TYPE_CODE (t) != TYPE_CODE_UNION)
-+                error (_("Internal error: `%s' is not an aggregate"),
-+                       langdef->la_name_of_this);
-+
-+              if (check_field (t, name))
-+                {
-+                  *is_a_field_of_this = 1;
-+                  return NULL;
-+                }
-+            }
-+          }
-+
-+          /* Check the namespace scope */
-+          sym = langdef->la_lookup_symbol_nonlocal (name, linkage_name, block, domain);
-+          if (sym != NULL)
-+            return sym;
-+        }
-+
 +      block_iterator = BLOCK_SUPERBLOCK (block_iterator);
      }
  
@@ -32826,7 +32881,7 @@ index d2ba1f3..c1c4459 100644
  
    return NULL;
  }
-@@ -1450,6 +1503,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
+@@ -1450,6 +1495,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
    }
  
    /* Now go through psymtabs.  */
@@ -32834,7 +32889,7 @@ index d2ba1f3..c1c4459 100644
    ALL_OBJFILE_PSYMTABS (objfile, ps)
    {
      if (!ps->readin
-@@ -1520,7 +1574,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1520,7 +1566,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
    struct symtab *s;
    const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
  
@@ -32843,7 +32898,7 @@ index d2ba1f3..c1c4459 100644
    {
      if (!ps->readin
  	&& lookup_partial_symbol (ps, name, linkage_name,
-@@ -1805,7 +1859,11 @@ basic_lookup_transparent_type (const char *name)
+@@ -1805,7 +1851,11 @@ basic_lookup_transparent_type (const char *name)
        }
    }
  
@@ -32856,7 +32911,7 @@ index d2ba1f3..c1c4459 100644
    {
      if (!ps->readin && lookup_partial_symbol (ps, name, NULL,
  					      1, STRUCT_DOMAIN))
-@@ -1853,7 +1911,12 @@ basic_lookup_transparent_type (const char *name)
+@@ -1853,7 +1903,12 @@ basic_lookup_transparent_type (const char *name)
        }
    }
  
@@ -32870,7 +32925,7 @@ index d2ba1f3..c1c4459 100644
    {
      if (!ps->readin && lookup_partial_symbol (ps, name, NULL, 0, STRUCT_DOMAIN))
        {
-@@ -1894,7 +1957,21 @@ find_main_psymtab (void)
+@@ -1894,7 +1949,21 @@ find_main_psymtab (void)
    struct partial_symtab *pst;
    struct objfile *objfile;
  
@@ -32893,7 +32948,7 @@ index d2ba1f3..c1c4459 100644
    {
      if (lookup_partial_symbol (pst, main_name (), NULL, 1, VAR_DOMAIN))
        {
-@@ -3085,7 +3162,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
+@@ -3085,7 +3154,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
       matching the regexp.  That way we don't have to reproduce all of
       the machinery below. */
  
@@ -40135,7 +40190,7 @@ index 0000000..35ddd8c
 +}
 diff --git a/gdb/testsuite/gdb.python/find.exp b/gdb/testsuite/gdb.python/find.exp
 new file mode 100644
-index 0000000..dd9aabc
+index 0000000..defc31c
 --- /dev/null
 +++ b/gdb/testsuite/gdb.python/find.exp
 @@ -0,0 +1,203 @@
@@ -40232,8 +40287,8 @@ index 0000000..dd9aabc
 +
 +gdb_test "set *(int32_t*) &int8_search_buf\[10\] = 0x61616161" "" ""
 +gdb_test "py search_buf = gdb.selected_frame ().read_var ('int8_search_buf')" "" ""
-+gdb_test "py start_addr = search_buf.address ()" "" ""
-+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
++gdb_test "py start_addr = search_buf.address" "" ""
++gdb_test "py length = search_buf.type.sizeof" "" ""
 +
 +gdb_test "py print gdb.search_memory (start_addr, length, 'aaa')" \
 +  "${two_patterns_found}" "find string pattern"
@@ -40270,8 +40325,8 @@ index 0000000..dd9aabc
 +
 +gdb_test "set int16_search_buf\[10\] = 0x1234" "" ""
 +gdb_test "py search_buf = gdb.selected_frame ().read_var ('int16_search_buf')" "" ""
-+gdb_test "py start_addr = search_buf.address ()" "" ""
-+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
++gdb_test "py start_addr = search_buf.address" "" ""
++gdb_test "py length = search_buf.type.sizeof" "" ""
 +gdb_test "py pattern = gdb.parse_and_eval ('(int16_t) 0x1234')" "" ""
 +
 +gdb_test "py print gdb.search_memory (start_addr, length, 0x1234, 2)" \
@@ -40284,8 +40339,8 @@ index 0000000..dd9aabc
 +
 +gdb_test "set int32_search_buf\[10\] = 0x12345678" "" ""
 +gdb_test "py search_buf = gdb.selected_frame ().read_var ('int32_search_buf')" "" ""
-+gdb_test "py start_addr = search_buf.address ()" "" ""
-+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
++gdb_test "py start_addr = search_buf.address" "" ""
++gdb_test "py length = search_buf.type.sizeof" "" ""
 +gdb_test "py pattern = gdb.parse_and_eval ('(int32_t) 0x12345678')" "" ""
 +
 +gdb_test "py print gdb.search_memory (start_addr, length, 0x12345678, 4)" \
@@ -40297,8 +40352,8 @@ index 0000000..dd9aabc
 +
 +gdb_test "set int64_search_buf\[10\] = 0xfedcba9876543210LL" "" ""
 +gdb_test "py search_buf = gdb.selected_frame ().read_var ('int64_search_buf')" "" ""
-+gdb_test "py start_addr = search_buf.address ()" "" ""
-+gdb_test "py length = search_buf.type ().sizeof ()" "" ""
++gdb_test "py start_addr = search_buf.address" "" ""
++gdb_test "py length = search_buf.type.sizeof" "" ""
 +gdb_test "py pattern = gdb.parse_and_eval ('(int64_t) 0xfedcba9876543210LL')" "" ""
 +
 +gdb_test "py print gdb.search_memory (start_addr, length, 0xfedcba9876543210, 8)" \
@@ -40312,7 +40367,7 @@ index 0000000..dd9aabc
 +gdb_test "set *(int16_t*) &search_buf\[11\] = 0x6363" "" ""
 +gdb_test "set *(int32_t*) &search_buf\[13\] = 0x64646464" "" ""
 +gdb_test "py search_buf = gdb.selected_frame ().read_var ('search_buf')" "" ""
-+gdb_test "py start_addr = search_buf\[0\].address ()" "" ""
++gdb_test "py start_addr = search_buf\[0\].address" "" ""
 +gdb_test "py pattern1 = gdb.parse_and_eval ('(int8_t) 0x62')" "" ""
 +gdb_test "py pattern2 = gdb.parse_and_eval ('(int16_t) 0x6363')" "" ""
 +gdb_test "py pattern3 = gdb.parse_and_eval ('(int32_t) 0x64646464')" "" ""
@@ -41009,7 +41064,7 @@ index 0000000..f83b1cd
 +run_lang_tests "c++"
 diff --git a/gdb/testsuite/gdb.python/python-prettyprint.py b/gdb/testsuite/gdb.python/python-prettyprint.py
 new file mode 100644
-index 0000000..8379ecf
+index 0000000..a53e412
 --- /dev/null
 +++ b/gdb/testsuite/gdb.python/python-prettyprint.py
 @@ -0,0 +1,151 @@
@@ -41075,8 +41130,8 @@ index 0000000..8379ecf
 +    def to_string(self):
 +        a = self.val["a"]
 +        b = self.val["b"]
-+        if a.address() != b:
-+            raise Exception("&a(%s) != b(%s)" % (str(a.address()), str(b)))
++        if a.address != b:
++            raise Exception("&a(%s) != b(%s)" % (str(a.address), str(b)))
 +        return " a=<" + str(self.val["a"]) + "> b=<" + str(self.val["b"]) + ">"
 +
 +class pp_ss:
@@ -41105,23 +41160,23 @@ index 0000000..8379ecf
 +        self.val = val
 +
 +    def to_string (self):
-+        return "pp class name: " + self.val.type ().tag ()
++        return "pp class name: " + self.val.type.tag
 +
 +def lookup_function (val):
 +    "Look-up and return a pretty-printer that can print val."
 +
 +    # Get the type.
-+    type = val.type ();
++    type = val.type
 +
 +    # If it points to a reference, get the reference.
-+    if type.code () == gdb.TYPE_CODE_REF:
++    if type.code == gdb.TYPE_CODE_REF:
 +        type = type.target ()
 +
 +    # Get the unqualified type, stripped of typedefs.
 +    type = type.unqualified ().strip_typedefs ()
 +
 +    # Get the type name.    
-+    typename = type.tag ()
++    typename = type.tag
 +
 +    if typename == None:
 +        return None
@@ -41202,11 +41257,11 @@ index 0000000..bd6a212
 +}
 diff --git a/gdb/testsuite/gdb.python/python-template.exp b/gdb/testsuite/gdb.python/python-template.exp
 new file mode 100644
-index 0000000..561ff73
+index 0000000..1ace5d6
 --- /dev/null
 +++ b/gdb/testsuite/gdb.python/python-template.exp
 @@ -0,0 +1,75 @@
-+# Copyright (C) 2008 Free Software Foundation, Inc.
++# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -41270,7 +41325,7 @@ index 0000000..561ff73
 +
 +    # Replace '*' with '\*' in regex.
 +    regsub -all {\*} $type {\*} t
-+    gdb_test "python print foo.type().template_argument(0)" $t $type
++    gdb_test "python print foo.type.template_argument(0)" $t $type
 +}
 +
 +test_template_arg "const int"
@@ -41304,16 +41359,34 @@ index 17e5c62..9637fe9 100644
    s.a = 3;
    s.b = 5;
 diff --git a/gdb/testsuite/gdb.python/python-value.exp b/gdb/testsuite/gdb.python/python-value.exp
-index 8f5e0ab..9ca9593 100644
+index 8f5e0ab..c1a051c 100644
 --- a/gdb/testsuite/gdb.python/python-value.exp
 +++ b/gdb/testsuite/gdb.python/python-value.exp
-@@ -227,6 +227,37 @@ proc test_value_in_inferior {} {
-   gdb_test "python print arg0" "0x.*$testfile\"" "verify dereferenced value"
+@@ -70,6 +70,9 @@ proc test_value_creation {} {
+   gdb_py_test_silent_cmd "python a = gdb.Value (u'unicode test')" "create unicode value" 1
+   gdb_test "python print a" "\"unicode test\"" "print Unicode string"
+   gdb_test "python print a.__class__" "<type 'gdb.Value'>" "verify type of unicode string"
++
++  # Test address attribute is None in a non-addressable value
++  gdb_test "python print 'result =', i.address" "= None" "Test address attribute in non-addressable value"
  }
  
+ proc test_value_numeric_ops {} {
+@@ -225,6 +228,43 @@ proc test_value_in_inferior {} {
+ 
+   # Check that the dereferenced value is sane
+   gdb_test "python print arg0" "0x.*$testfile\"" "verify dereferenced value"
++
++  # Smoke-test is_optimized_out attribute
++  gdb_test "python print 'result =', arg0.is_optimized_out" "= False" "Test is_optimized_out attribute"
++
++  # Test address attribute
++  gdb_test "python print 'result =', arg0.address" "= 0x\[\[:xdigit:\]\]+" "Test address attribute"
++}
++
 +proc test_value_after_death {} {
 +  # Construct a type while the inferior is still running.
-+  gdb_py_test_silent_cmd "python ptrtype = gdb.Type('PTR')" \
++  gdb_py_test_silent_cmd "python ptrtype = gdb.lookup_type('PTR')" \
 +    "create PTR type" 1
 +
 +  # Check the type has the expected name.
@@ -41338,14 +41411,12 @@ index 8f5e0ab..9ca9593 100644
 +    "delete PTR type" 1
 +
 +  # Now see if the value's type is still valid.
-+  gdb_test "python print castval.type()" "PTR \\*" \
++  gdb_test "python print castval.type" "PTR \\*" \
 +    "print value's type"
-+}
-+
+ }
  
- # Start with a fresh gdb.
  
-@@ -256,3 +287,4 @@ if ![runto_main] then {
+@@ -256,3 +296,4 @@ if ![runto_main] then {
  }
  
  test_value_in_inferior
