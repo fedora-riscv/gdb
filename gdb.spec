@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{?dist}
+Release: 16%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -844,13 +844,16 @@ fi
 
 # don't include the files in include, they are part of binutils
 
-%ifnarch sparcv9 sparc64
+%ifnarch sparcv9 
 %files gdbserver
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
 %endif
 
 %changelog
+* Mon Apr 13 2009 Dennis Gilmore <dennis@ausil.us> - 6.8.50.20090302-16
+- enable gdbserver package on sparc64
+
 * Sun Apr  5 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-15
 - Archer update to the snapshot: 7c7c77576669d17ad5072daa47ea3a4fd954483d
 - Archer backport: 7c7c77576669d17ad5072daa47ea3a4fd954483d (Peter Bergner)
