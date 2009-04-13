@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?_with_upstream:.upstream}%{?dist}
+Release: 18%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -851,6 +851,11 @@ fi
 %endif
 
 %changelog
+* Mon Apr 13 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-18
+- Archer update to the snapshot: d1fee5066408a09423621d1ebc64e6d3e248ed08
+- Archer backport: 4854339f75bdaf4b228fc35579bddbb2a1fecdc1
+  - Fix Python FrameIterator.
+
 * Mon Apr 13 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-17
 - Archer update to the snapshot: 7c250ce99c90cf6097e2ec55ea0f205830979cee
 - Archer backport: c14d9ab7eef43281b2052c885f89d2db96fb5f8e

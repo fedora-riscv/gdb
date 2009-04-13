@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 7c250ce99c90cf6097e2ec55ea0f205830979cee
+commit d1fee5066408a09423621d1ebc64e6d3e248ed08
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -23940,13 +23940,13 @@ index 375f82e..8c3f476 100644
  	      struct type *type = value_type (val_args[i]);
 diff --git a/gdb/python/lib/gdb/FrameIterator.py b/gdb/python/lib/gdb/FrameIterator.py
 new file mode 100644
-index 0000000..87fb074
+index 0000000..5654546
 --- /dev/null
 +++ b/gdb/python/lib/gdb/FrameIterator.py
 @@ -0,0 +1,33 @@
 +# Iterator over frames.
 +
-+# Copyright (C) 2008 Free Software Foundation, Inc.
++# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -23973,7 +23973,7 @@ index 0000000..87fb074
 +
 +    def next (self):
 +        result = self.frame
-+        if result == None:
++        if result is None:
 +            raise StopIteration
 +        self.frame = result.older ()
 +        return result
@@ -26445,10 +26445,10 @@ index 36cde34..e6e3ac0 100644
  
 diff --git a/gdb/python/python-frame.c b/gdb/python/python-frame.c
 new file mode 100644
-index 0000000..c257ac3
+index 0000000..dafe69a
 --- /dev/null
 +++ b/gdb/python/python-frame.c
-@@ -0,0 +1,686 @@
+@@ -0,0 +1,713 @@
 +/* Python interface to stack frames
 +
 +   Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -27027,6 +27027,33 @@ index 0000000..c257ac3
 +
 +  str = frame_stop_reason_string (reason);
 +  return PyUnicode_Decode (str, strlen (str), host_charset (), NULL);
++}
++
++/* Implements the equality comparison for Frame objects.
++   All other comparison operators will throw a TypeError Python exception,
++   as they aren't valid for frames.  */
++
++static PyObject *
++frapy_richcompare (PyObject *self, PyObject *other, int op)
++{
++  int result;
++
++  if (!PyObject_TypeCheck (other, &frame_object_type)
++      || (op != Py_EQ && op != Py_NE))
++    {
++      Py_INCREF (Py_NotImplemented);
++      return Py_NotImplemented;
++    }
++
++  if (frame_id_eq (((frame_object *) self)->frame_id,
++		   ((frame_object *) other)->frame_id))
++    result = Py_EQ;
++  else
++    result = Py_NE;
++
++  if (op == result)
++    Py_RETURN_TRUE;
++  Py_RETURN_FALSE;
 +}
 +
 +/* Sets up the Frame API in the gdb module.  */
