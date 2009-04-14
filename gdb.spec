@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{?dist}
+Release: 19%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -375,6 +375,9 @@ Patch349: gdb-archer.patch
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
 Patch352: gdb-6.8-bz457187-largefile.patch
 
+# Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
+Patch357: gdb-c_get_string-xfree.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -569,6 +572,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch343 -p1
 %patch348 -p1
 %patch352 -p1
+%patch357 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -851,6 +855,9 @@ fi
 %endif
 
 %changelog
+* Wed Apr 15 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-19
+- Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
+
 * Mon Apr 13 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-18
 - Archer update to the snapshot: d1fee5066408a09423621d1ebc64e6d3e248ed08
 - Archer backport: 4854339f75bdaf4b228fc35579bddbb2a1fecdc1
