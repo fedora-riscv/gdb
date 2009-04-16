@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?_with_upstream:.upstream}%{?dist}
+Release: 20%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -378,6 +378,9 @@ Patch352: gdb-6.8-bz457187-largefile.patch
 # Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
 Patch357: gdb-c_get_string-xfree.patch
 
+# Fix crash in the charset support.
+Patch359: gdb-charset-crash.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -573,6 +576,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch348 -p1
 %patch352 -p1
 %patch357 -p1
+%patch359 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -855,6 +859,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr 16 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-20
+- Fix crash in the charset support.
+
 * Wed Apr 15 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-19
 - Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
 
