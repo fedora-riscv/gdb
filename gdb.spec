@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{?dist}
+Release: 21%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -374,6 +374,7 @@ Patch349: gdb-archer.patch
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
 Patch352: gdb-6.8-bz457187-largefile.patch
+Patch360: gdb-6.8-bz457187-largefile-test.patch
 
 # Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
 Patch357: gdb-c_get_string-xfree.patch
@@ -577,6 +578,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch357 -p1
 %patch359 -p1
+%patch360 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -859,6 +861,9 @@ fi
 %endif
 
 %changelog
+* Sun Apr 19 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-21
+- New test for parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
+
 * Thu Apr 16 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-20
 - Fix crash in the charset support.
 
