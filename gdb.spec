@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{?dist}
+Release: 23%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -390,7 +390,7 @@ BuildRequires: readline-devel
 BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
-BuildRequires: python-devel
+BuildRequires: python python-devel
 # Temporarily before it gets moved to libstdc++.rpm
 BuildRequires: libstdc++
 
@@ -861,6 +861,9 @@ fi
 %endif
 
 %changelog
+* Mon Apr 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-23
+- Fix BuildRequires for new Koji.
+
 * Mon Apr 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-22
 - Fix pstack/gstack cutting very long lines (BZ 497849).
 
