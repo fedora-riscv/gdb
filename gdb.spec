@@ -393,9 +393,9 @@ BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
-%endif	# 0%{!?_without_python:1}
 # Temporarily before it gets moved to libstdc++.rpm
 BuildRequires: libstdc++
+%endif	# 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
