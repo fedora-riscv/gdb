@@ -14,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?_with_upstream:.upstream}%{?dist}
+Release: 27%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -62,7 +62,6 @@ Patch2: gdb-6.3-rh-testversion-20041202.patch
 
 # Check that libunwind works - new test then fix
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
-Patch4: gdb-6.3-rh-testlibunwind1fix-20041202.patch
 
 # Use convert_from_func_ptr_addr on the solib breakpoint address;
 # simplifies and makes more consistent the logic.
@@ -473,7 +472,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
-%patch4 -p1
 
 %patch104 -p1
 %patch105 -p1
@@ -872,6 +870,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-27
+- Fix race in the ia64 testcase `gdb-6.3-rh-testlibunwind-20041202.patch'.
+
 * Mon Apr 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-26
 - Support a new rpmbuild option: --without python
 
