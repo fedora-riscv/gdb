@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{?dist}
+Release: 23%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -381,6 +381,10 @@ Patch357: gdb-c_get_string-xfree.patch
 # Fix crash in the charset support.
 Patch359: gdb-charset-crash.patch
 
+# Fix crashes due to (missing) varobj revalidation, for VLA (for BZ 377541).
+Patch369: gdb-varobj-revalidate-prep.patch
+Patch370: gdb-varobj-revalidate-core.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -577,6 +581,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch357 -p1
 %patch359 -p1
+%patch369 -p1
+%patch370 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -859,6 +865,9 @@ fi
 %endif
 
 %changelog
+* Mon May 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-23
+- Fix crashes due to (missing) varobj revalidation, for VLA (for BZ 377541).
+
 * Sun May 10 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-22
 - Archer update to the snapshot: e2812eadef2c15baeccd003e11fdf3fbc0b90dc2
 - Archer backport: 58dcda94ac5d6398f47382505e9d3d9d866d79bf
