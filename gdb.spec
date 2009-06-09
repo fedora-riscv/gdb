@@ -1,5 +1,6 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
+# --with parallel: Run the testsuite in maximum parallel mode.
 # --with debug: Build without optimizations and without splitting the debuginfo.
 # --with upstream: No Fedora specific patches get applied.
 
@@ -13,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?_with_upstream:.upstream}%{?dist}
+Release: 24%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -740,10 +741,20 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
+%if 0%{?_with_parallel:1}
+  for CURRENT in $CHECK
+  do
+    ./orphanripper make -k $CURRENT &
+  done
+  echo >&2 "Waiting for parallel testsuite runs to finish..."
+  wait
+  echo >&2 "Parallel testsuite runs finished."
+%else	# 0%{?_with_parallel:1}
   for CURRENT in $CHECK
   do
     ./orphanripper make -k $CURRENT || :
   done
+%endif	# 0%{?_with_parallel:1}
 )
 for t in sum log
 do
@@ -865,6 +876,20 @@ fi
 %endif
 
 %changelog
+* Tue Jun  9 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-24
+- Archer update to the snapshot: 000db8b7bfef8581ef099ccca8689cfddfea1be8
+- Archer backport: b8d3bea36b137effc929e02c4dadf73716cb330b
+  - Ignore explicit die representing global scope '::' (gcc 4.1 bug).
+- Archer backport: c2d5c4a39b10994d86d8f2f90dfed769e8f216f3
+  - Fix parsing DW_AT_const_value using DW_FORM_string
+- Archer backport: 8d9ab68fc0955c9de6320bec2821a21e3244600d
+                 + db41e11ae0a3aec7120ad6ce86450d838af74dd6
+  - Fix Fortran modules/namespaces parsing (but no change was visible in F11).
+- Archer backport: 000db8b7bfef8581ef099ccca8689cfddfea1be8
+  - Fix "some Python error when displaying some C++ objects" (BZ 504356).
+- testsuite: Support new rpmbuild option: --with parallel
+- testsuite: gdb-orphanripper.c: Fix uninitialized `termios.c_line'.
+
 * Mon May 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-23
 - Fix crashes due to (missing) varobj revalidation, for VLA (for BZ 377541).
 
