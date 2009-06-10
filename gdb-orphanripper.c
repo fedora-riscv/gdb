@@ -90,6 +90,7 @@ static int spawn (char **argv)
   termios.c_oflag = 0;
   termios.c_cflag = CS8 | CREAD | CLOCAL | HUPCL | B9600;
   termios.c_lflag = IEXTEN | NOFLSH;
+  termios.c_line = 0;
   memset (termios.c_cc, _POSIX_VDISABLE, sizeof (termios.c_cc));
   termios.c_cc[VTIME] = 0;
   termios.c_cc[VMIN ] = 1;

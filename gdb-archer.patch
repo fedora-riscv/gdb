@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit d1fee5066408a09423621d1ebc64e6d3e248ed08
+commit 000db8b7bfef8581ef099ccca8689cfddfea1be8
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-merge-expr
@@ -4530,7 +4530,7 @@ index 5007cd0..3a51ec5 100644
  	  }
  	  break;
 diff --git a/gdb/block.c b/gdb/block.c
-index 8f0140c..d451769 100644
+index 8f0140c..511c1a4 100644
 --- a/gdb/block.c
 +++ b/gdb/block.c
 @@ -207,24 +207,16 @@ block_set_scope (struct block *block, const char *scope,
@@ -4562,6 +4562,42 @@ index 8f0140c..d451769 100644
  }
  
  /* Set BLOCK's using member to USING; if needed, allocate memory via
+@@ -306,6 +298,7 @@ allocate_block (struct obstack *obstack)
+   BLOCK_SUPERBLOCK (bl) = NULL;
+   BLOCK_DICT (bl) = NULL;
+   BLOCK_NAMESPACE (bl) = NULL;
++  BLOCK_FORTRAN_USE (bl) = NULL;
+ 
+   return bl;
+ }
+diff --git a/gdb/block.h b/gdb/block.h
+index 9b43144..20d32ae 100644
+--- a/gdb/block.h
++++ b/gdb/block.h
+@@ -96,6 +96,15 @@ struct block
+     cplus_specific;
+   }
+   language_specific;
++
++  /* FIXME: It should be in the LANGUAGE_SPECIFIC region but the
++     BLOCK_NAMESPACE accessor is not protected by the C language check.  */
++
++  struct
++    {
++      struct fortran_using *use;
++    }
++  fortran_specific;
+ };
+ 
+ #define BLOCK_START(bl)		(bl)->startaddr
+@@ -104,6 +113,7 @@ struct block
+ #define BLOCK_SUPERBLOCK(bl)	(bl)->superblock
+ #define BLOCK_DICT(bl)		(bl)->dict
+ #define BLOCK_NAMESPACE(bl)   (bl)->language_specific.cplus_specific.namespace
++#define BLOCK_FORTRAN_USE(bl)	(bl)->fortran_specific.use
+ 
+ /* Macro to loop through all symbols in a block BL, in no particular
+    order.  ITER helps keep track of the iteration, and should be a
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
 index b23b294..567f574 100644
 --- a/gdb/breakpoint.c
@@ -14617,7 +14653,7 @@ index 76577f1..bf46761 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 55868da..9c1b90d 100644
+index 55868da..b4720e8 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1,8 +1,7 @@
@@ -14630,17 +14666,18 @@ index 55868da..9c1b90d 100644
  
     Adapted by Gary Funck (gary@intrepid.com), Intrepid Technology,
     Inc.  with support from Florida State University (under contract
-@@ -47,6 +46,9 @@
+@@ -47,6 +46,10 @@
  #include "command.h"
  #include "gdbcmd.h"
  #include "addrmap.h"
 +#include "f-lang.h"
 +#include "c-lang.h"
 +#include "typeprint.h"
++#include "block.h"
  
  #include <fcntl.h>
  #include "gdb_string.h"
-@@ -103,7 +105,7 @@ typedef struct pubnames_header
+@@ -103,7 +106,7 @@ typedef struct pubnames_header
  _PUBNAMES_HEADER;
  #define _ACTUAL_PUBNAMES_HEADER_SIZE 13
  
@@ -14649,7 +14686,7 @@ index 55868da..9c1b90d 100644
     Because of alignment constraints, this structure has padding and cannot
     be mapped directly onto the beginning of the .debug_info section.  */
  typedef struct aranges_header
-@@ -299,9 +301,6 @@ struct dwarf2_cu
+@@ -299,9 +302,6 @@ struct dwarf2_cu
    /* Hash table holding all the loaded partial DIEs.  */
    htab_t partial_dies;
  
@@ -14659,17 +14696,28 @@ index 55868da..9c1b90d 100644
    /* Storage for things with the same lifetime as this read-in compilation
       unit, including partial DIEs.  */
    struct obstack comp_unit_obstack;
-@@ -349,9 +348,6 @@ struct dwarf2_cu
-      DIEs for namespaces, we don't need to try to infer them
+@@ -350,8 +350,18 @@ struct dwarf2_cu
       from mangled names.  */
    unsigned int has_namespace_info : 1;
--
+ 
 -  /* Field `ranges_offset' is filled in; flag as the value may be zero.  */
 -  unsigned int has_ranges_offset : 1;
++  /* Fields are valid according to the LANGUAGE field.  */
++  union
++    {
++      /* language_fortran */
++      struct
++        {
++	  /* Module names imported to the block being currently read in.  */
++	  struct fortran_using *use;
++	}
++      fortran;
++    }
++  language_specific;
  };
  
  /* Persistent data held for a compilation unit, even when not
-@@ -451,17 +447,12 @@ struct partial_die_info
+@@ -451,17 +461,12 @@ struct partial_die_info
      /* DWARF-2 tag for this DIE.  */
      ENUM_BITFIELD(dwarf_tag) tag : 16;
  
@@ -14687,7 +14735,7 @@ index 55868da..9c1b90d 100644
      unsigned int has_pc_info : 1;
  
      /* Flag set if the SCOPE field of this structure has been
-@@ -472,10 +463,12 @@ struct partial_die_info
+@@ -472,10 +477,12 @@ struct partial_die_info
      unsigned int has_byte_size : 1;
  
      /* The name of this DIE.  Normally the value of DW_AT_name, but
@@ -14703,7 +14751,7 @@ index 55868da..9c1b90d 100644
  
      /* The scope to prepend to our children.  This is generally
         allocated on the comp_unit_obstack, so will disappear
-@@ -498,9 +491,6 @@ struct partial_die_info
+@@ -498,9 +505,6 @@ struct partial_die_info
         DW_AT_extension).  */
      unsigned int spec_offset;
  
@@ -14713,7 +14761,7 @@ index 55868da..9c1b90d 100644
      /* Pointers to this DIE's parent, first child, and next sibling,
         if any.  */
      struct partial_die_info *die_parent, *die_child, *die_sibling;
-@@ -523,6 +513,15 @@ struct attr_abbrev
+@@ -523,6 +527,15 @@ struct attr_abbrev
      ENUM_BITFIELD(dwarf_form) form : 16;
    };
  
@@ -14729,7 +14777,7 @@ index 55868da..9c1b90d 100644
  /* Attributes have a name and a value */
  struct attribute
    {
-@@ -756,7 +755,7 @@ static void dwarf2_create_include_psymtab (char *, struct partial_symtab *,
+@@ -756,7 +769,7 @@ static void dwarf2_create_include_psymtab (char *, struct partial_symtab *,
                                             struct objfile *);
  
  static void dwarf2_build_include_psymtabs (struct dwarf2_cu *,
@@ -14738,7 +14786,7 @@ index 55868da..9c1b90d 100644
                                             struct partial_symtab *);
  
  static void dwarf2_build_psymtabs_hard (struct objfile *, int);
-@@ -768,6 +767,9 @@ static void scan_partial_symbols (struct partial_die_info *,
+@@ -768,6 +781,9 @@ static void scan_partial_symbols (struct partial_die_info *,
  static void add_partial_symbol (struct partial_die_info *,
  				struct dwarf2_cu *);
  
@@ -14748,7 +14796,7 @@ index 55868da..9c1b90d 100644
  static int pdi_needs_namespace (enum dwarf_tag tag);
  
  static void add_partial_namespace (struct partial_die_info *pdi,
-@@ -794,6 +796,10 @@ static void dwarf2_psymtab_to_symtab (struct partial_symtab *);
+@@ -794,6 +810,10 @@ static void dwarf2_psymtab_to_symtab (struct partial_symtab *);
  
  static void psymtab_to_symtab_1 (struct partial_symtab *);
  
@@ -14759,7 +14807,7 @@ index 55868da..9c1b90d 100644
  gdb_byte *dwarf2_read_section (struct objfile *, asection *);
  
  static void dwarf2_read_abbrevs (bfd *abfd, struct dwarf2_cu *cu);
-@@ -929,7 +935,8 @@ static int dwarf2_ranges_read (unsigned, CORE_ADDR *, CORE_ADDR *,
+@@ -929,7 +949,8 @@ static int dwarf2_ranges_read (unsigned, CORE_ADDR *, CORE_ADDR *,
  			       struct dwarf2_cu *, struct partial_symtab *);
  
  static int dwarf2_get_pc_bounds (struct die_info *,
@@ -14769,7 +14817,7 @@ index 55868da..9c1b90d 100644
  
  static void get_scope_pc_bounds (struct die_info *,
  				 CORE_ADDR *, CORE_ADDR *,
-@@ -960,6 +967,8 @@ static void read_common_block (struct die_info *, struct dwarf2_cu *);
+@@ -960,8 +981,19 @@ static void read_common_block (struct die_info *, struct dwarf2_cu *);
  
  static void read_namespace (struct die_info *die, struct dwarf2_cu *);
  
@@ -14777,18 +14825,32 @@ index 55868da..9c1b90d 100644
 +
  static void read_module (struct die_info *die, struct dwarf2_cu *cu);
  
++static struct type *read_module_type (struct die_info *die,
++				      struct dwarf2_cu *cu);
++
++static void read_fortran_imported_module (struct die_info *die,
++					  struct dwarf2_cu *cu);
++
++static void read_fortran_imported_declaration (struct die_info *die,
++					       struct dwarf2_cu *cu);
++
  static const char *namespace_name (struct die_info *die,
-@@ -993,6 +1002,9 @@ static void process_die (struct die_info *, struct dwarf2_cu *);
+ 				   int *is_anonymous, struct dwarf2_cu *);
+ 
+@@ -993,6 +1025,12 @@ static void process_die (struct die_info *, struct dwarf2_cu *);
  
  static char *dwarf2_linkage_name (struct die_info *, struct dwarf2_cu *);
  
++static char *fortran_module_linkage_name (struct die_info *die,
++					  struct dwarf2_cu *cu);
++
 +static char *dwarf2_canonicalize_name (char *, struct dwarf2_cu *,
 +				       struct obstack *);
 +
  static char *dwarf2_name (struct die_info *die, struct dwarf2_cu *);
  
  static struct die_info *dwarf2_extension (struct die_info *die,
-@@ -1030,7 +1042,14 @@ static void store_in_ref_table (struct die_info *,
+@@ -1030,7 +1068,14 @@ static void store_in_ref_table (struct die_info *,
  
  static unsigned int dwarf2_get_ref_die_offset (struct attribute *);
  
@@ -14804,7 +14866,7 @@ index 55868da..9c1b90d 100644
  
  static struct die_info *follow_die_ref (struct die_info *,
  					struct attribute *,
-@@ -1085,6 +1104,9 @@ static void age_cached_comp_units (void);
+@@ -1085,6 +1130,9 @@ static void age_cached_comp_units (void);
  
  static void free_one_cached_comp_unit (void *);
  
@@ -14814,7 +14876,7 @@ index 55868da..9c1b90d 100644
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1104,19 +1126,28 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
+@@ -1104,19 +1152,28 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -14848,7 +14910,7 @@ index 55868da..9c1b90d 100644
  
    dwarf_info_section = 0;
    dwarf_abbrev_section = 0;
-@@ -1127,8 +1158,9 @@ dwarf2_has_info (struct objfile *objfile)
+@@ -1127,8 +1184,9 @@ dwarf2_has_info (struct objfile *objfile)
    dwarf_eh_frame_section = 0;
    dwarf_ranges_section = 0;
    dwarf_loc_section = 0;
@@ -14859,7 +14921,7 @@ index 55868da..9c1b90d 100644
    return (dwarf_info_section != NULL && dwarf_abbrev_section != NULL);
  }
  
-@@ -1149,51 +1181,61 @@ section_is_p (asection *sectp, const char *name)
+@@ -1149,51 +1207,61 @@ section_is_p (asection *sectp, const char *name)
     in.  */
  
  static void
@@ -14931,7 +14993,7 @@ index 55868da..9c1b90d 100644
        dwarf_frame_section = sectp;
      }
    else if (section_is_p (sectp, EH_FRAME_SECTION))
-@@ -1201,13 +1243,15 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
+@@ -1201,13 +1269,15 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
        flagword aflag = bfd_get_section_flags (ignore_abfd, sectp);
        if (aflag & SEC_HAS_CONTENTS)
          {
@@ -14949,7 +15011,7 @@ index 55868da..9c1b90d 100644
        dwarf_ranges_section = sectp;
      }
    
-@@ -1250,6 +1294,86 @@ dwarf2_resize_section (asection *sectp, bfd_size_type new_size)
+@@ -1250,6 +1320,86 @@ dwarf2_resize_section (asection *sectp, bfd_size_type new_size)
                      sectp->name);
  }
  
@@ -15036,7 +15098,7 @@ index 55868da..9c1b90d 100644
  /* Build a partial symbol table.  */
  
  void
-@@ -1453,22 +1577,24 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
+@@ -1453,22 +1603,24 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
  
  /* Read the Line Number Program data and extract the list of files
     included by the source file represented by PST.  Build an include
@@ -15069,7 +15131,7 @@ index 55868da..9c1b90d 100644
    if (lh == NULL)
      return;  /* No linetable, so no includes.  */
  
-@@ -1477,6 +1603,36 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
+@@ -1477,6 +1629,36 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
    free_line_header (lh);
  }
  
@@ -15106,7 +15168,7 @@ index 55868da..9c1b90d 100644
  
  /* Build the partial symbol table by doing a quick pass through the
     .debug_info and .debug_abbrev sections.  */
-@@ -1489,7 +1645,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1489,7 +1671,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
    bfd *abfd = objfile->obfd;
    gdb_byte *info_ptr;
    gdb_byte *beg_of_comp_unit;
@@ -15115,7 +15177,7 @@ index 55868da..9c1b90d 100644
    struct partial_symtab *pst;
    struct cleanup *back_to;
    CORE_ADDR baseaddr;
-@@ -1523,9 +1679,12 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1523,9 +1705,12 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
      {
        struct cleanup *back_to_inner;
        struct dwarf2_cu cu;
@@ -15129,7 +15191,7 @@ index 55868da..9c1b90d 100644
  
        beg_of_comp_unit = info_ptr;
  
-@@ -1551,11 +1710,10 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1551,11 +1736,10 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
        this_cu = dwarf2_find_comp_unit (cu.header.offset, objfile);
  
        /* Read the compilation unit die */
@@ -15144,7 +15206,7 @@ index 55868da..9c1b90d 100644
  	{
  	  info_ptr = (beg_of_comp_unit + cu.header.length
  		      + cu.header.initial_length_size);
-@@ -1564,20 +1722,27 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1564,20 +1748,27 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
  	}
  
        /* Set the language we're debugging */
@@ -15179,7 +15241,7 @@ index 55868da..9c1b90d 100644
  
        pst->read_symtab_private = (char *) this_cu;
  
-@@ -1607,24 +1772,17 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1607,24 +1798,17 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
  
        /* Possibly set the default values of LOWPC and HIGHPC from
           `DW_AT_ranges'.  */
@@ -15211,7 +15273,7 @@ index 55868da..9c1b90d 100644
  	{
  	  struct partial_die_info *first_die;
  	  CORE_ADDR lowpc, highpc;
-@@ -1635,7 +1793,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1635,7 +1819,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
  	  first_die = load_partial_dies (abfd, info_ptr, 1, &cu);
  
  	  scan_partial_symbols (first_die, &lowpc, &highpc,
@@ -15220,7 +15282,7 @@ index 55868da..9c1b90d 100644
  
  	  /* If we didn't find a lowpc, set it to highpc to avoid
  	     complaints from `maint check'.  */
-@@ -1644,14 +1802,21 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1644,14 +1828,21 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
  
  	  /* If the compilation unit didn't have an explicit address range,
  	     then use the information extracted from its child dies.  */
@@ -15247,7 +15309,7 @@ index 55868da..9c1b90d 100644
  
        pst->n_global_syms = objfile->global_psymbols.next -
  	(objfile->global_psymbols.list + pst->globals_offset);
-@@ -1667,12 +1832,9 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
+@@ -1667,12 +1858,9 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile, int mainline)
        info_ptr = beg_of_comp_unit + cu.header.length
                                    + cu.header.initial_length_size;
  
@@ -15263,7 +15325,7 @@ index 55868da..9c1b90d 100644
  
        do_cleanups (back_to_inner);
      }
-@@ -1690,11 +1852,12 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
+@@ -1690,11 +1878,12 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
  {
    bfd *abfd = objfile->obfd;
    gdb_byte *info_ptr, *beg_of_comp_unit;
@@ -15278,7 +15340,7 @@ index 55868da..9c1b90d 100644
  
    info_ptr = dwarf2_per_objfile->info_buffer + this_cu->offset;
    beg_of_comp_unit = info_ptr;
-@@ -1716,12 +1879,15 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
+@@ -1716,12 +1905,15 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
    back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
  
    /* Read the compilation unit die.  */
@@ -15298,7 +15360,7 @@ index 55868da..9c1b90d 100644
  
    /* Link this compilation unit into the compilation unit tree.  */
    this_cu->cu = cu;
-@@ -1731,7 +1897,7 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
+@@ -1731,7 +1923,7 @@ load_comp_unit (struct dwarf2_per_cu_data *this_cu, struct objfile *objfile)
    /* Check if comp unit has_children.
       If so, read the rest of the partial symbols from this comp unit.
       If not, there's no more debug_info for this comp unit. */
@@ -15307,7 +15369,7 @@ index 55868da..9c1b90d 100644
      load_partial_dies (abfd, info_ptr, 0, cu);
  
    do_cleanups (back_to);
-@@ -1948,7 +2114,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+@@ -1948,7 +2140,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
  	 ignoring them.  */
        complaint (&symfile_complaints,
  		 _("unhandled containing DIE tag %d for DIE at %d"),
@@ -15316,7 +15378,7 @@ index 55868da..9c1b90d 100644
        parent->scope = grandparent_scope;
      }
  
-@@ -1963,12 +2129,37 @@ partial_die_full_name (struct partial_die_info *pdi,
+@@ -1963,12 +2155,37 @@ partial_die_full_name (struct partial_die_info *pdi,
  		       struct dwarf2_cu *cu)
  {
    char *parent_scope;
@@ -15358,7 +15420,7 @@ index 55868da..9c1b90d 100644
  }
  
  static void
-@@ -1984,7 +2175,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -1984,7 +2201,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -15369,7 +15431,20 @@ index 55868da..9c1b90d 100644
      {
        actual_name = partial_die_full_name (pdi, cu);
        if (actual_name)
-@@ -2133,9 +2326,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2080,6 +2299,12 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+ 			   &objfile->global_psymbols,
+ 			   0, (CORE_ADDR) 0, cu->language, objfile);
+       break;
++    case DW_TAG_module:
++      add_psymbol_to_list (actual_name, strlen (actual_name),
++			   MODULE_DOMAIN, LOC_STATIC,
++			   &objfile->global_psymbols,
++			   0, (CORE_ADDR) 0, cu->language, objfile);
++      break;
+     case DW_TAG_class_type:
+     case DW_TAG_interface_type:
+     case DW_TAG_structure_type:
+@@ -2133,9 +2358,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
    if (cu->language == language_cplus
        && cu->has_namespace_info == 0
        && psym != NULL
@@ -15381,7 +15456,7 @@ index 55868da..9c1b90d 100644
  
    if (built_actual_name)
      xfree (actual_name);
-@@ -2158,6 +2350,14 @@ pdi_needs_namespace (enum dwarf_tag tag)
+@@ -2158,6 +2382,14 @@ pdi_needs_namespace (enum dwarf_tag tag)
      case DW_TAG_union_type:
      case DW_TAG_enumeration_type:
      case DW_TAG_enumerator:
@@ -15396,7 +15471,24 @@ index 55868da..9c1b90d 100644
        return 1;
      default:
        return 0;
-@@ -2290,11 +2490,11 @@ guess_structure_name (struct partial_die_info *struct_pdi,
+@@ -2191,12 +2423,12 @@ static void
+ add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
+ 		    CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
+ {
+-  /* Now scan partial symbols in that module.
++  /* Add a symbol for the module.  */
+ 
+-     FIXME: Support the separate Fortran module namespaces.  */
++  add_partial_symbol (pdi, cu);
+ 
+-  if (pdi->has_children)
+-    scan_partial_symbols (pdi->die_child, lowpc, highpc, need_pc, cu);
++  /* Partial symbols in that module are not scanned as they are never globally
++     visible.  They get imported to the specific scopes on the full read.  */
+ }
+ 
+ /* Read a partial die corresponding to a subprogram and create a partial
+@@ -2290,11 +2522,11 @@ guess_structure_name (struct partial_die_info *struct_pdi,
  
        while (child_pdi != NULL)
  	{
@@ -15410,7 +15502,7 @@ index 55868da..9c1b90d 100644
  	      if (actual_class_name != NULL)
  		{
  		  struct_pdi->name
-@@ -2741,7 +2941,6 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -2741,7 +2973,6 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
    CORE_ADDR lowpc, highpc;
    struct symtab *symtab;
    struct cleanup *back_to;
@@ -15418,7 +15510,7 @@ index 55868da..9c1b90d 100644
    CORE_ADDR baseaddr;
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
-@@ -2751,30 +2950,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -2751,30 +2982,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
  
    cu->list_in_scope = &file_symbols;
  
@@ -15450,7 +15542,7 @@ index 55868da..9c1b90d 100644
  
    /* Do line number decoding in read_file_scope () */
    process_die (cu->dies, cu);
-@@ -2805,6 +2981,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -2805,6 +3013,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
  static void
  process_die (struct die_info *die, struct dwarf2_cu *cu)
  {
@@ -15458,7 +15550,7 @@ index 55868da..9c1b90d 100644
    switch (die->tag)
      {
      case DW_TAG_padding:
-@@ -2849,6 +3026,7 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -2849,6 +3058,7 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
  
      case DW_TAG_base_type:
      case DW_TAG_subrange_type:
@@ -15466,18 +15558,33 @@ index 55868da..9c1b90d 100644
        /* Add a typedef symbol for the type definition, if it has a
           DW_AT_name.  */
        new_symbol (die, read_type_die (die, cu), cu);
-@@ -2867,14 +3045,12 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -2865,16 +3075,26 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+     case DW_TAG_module:
+       read_module (die, cu);
        break;
-     case DW_TAG_imported_declaration:
+-    case DW_TAG_imported_declaration:
      case DW_TAG_imported_module:
 -      /* FIXME: carlton/2002-10-16: Eventually, we should use the
 -	 information contained in these.  DW_TAG_imported_declaration
 -	 dies shouldn't have children; DW_TAG_imported_module dies
 -	 shouldn't in the C++ case, but conceivably could in the
 -	 Fortran case.  */
++      if (cu->language == language_fortran)
++	{
++	  read_fortran_imported_module (die, cu);
++	  break;
++	}
++      /* PASSTHRU */
++    case DW_TAG_imported_declaration:
        processing_has_namespace_info = 1;
 -      complaint (&symfile_complaints, _("unsupported tag: '%s'"),
 -		 dwarf_tag_name (die->tag));
++      if (cu->language == language_fortran
++	  && die->tag == DW_TAG_imported_declaration)
++	{
++	  read_fortran_imported_declaration (die, cu);
++	  break;
++	}
 +      if (die->child != NULL && (die->tag == DW_TAG_imported_declaration
 +				 || cu->language != language_fortran))
 +	complaint (&symfile_complaints, _("Tag '%s' has unexpected children"),
@@ -15486,7 +15593,7 @@ index 55868da..9c1b90d 100644
        break;
      default:
        new_symbol (die, NULL, cu);
-@@ -2904,22 +3080,130 @@ dwarf2_full_name (struct die_info *die, struct dwarf2_cu *cu)
+@@ -2904,22 +3124,130 @@ dwarf2_full_name (struct die_info *die, struct dwarf2_cu *cu)
      return name;
  
    /* If no prefix is necessary for this type of DIE, return the
@@ -15625,7 +15732,7 @@ index 55868da..9c1b90d 100644
  static void
  initialize_cu_func_list (struct dwarf2_cu *cu)
  {
-@@ -3076,6 +3360,103 @@ add_to_cu_func_list (const char *name, CORE_ADDR lowpc, CORE_ADDR highpc,
+@@ -3076,6 +3404,103 @@ add_to_cu_func_list (const char *name, CORE_ADDR lowpc, CORE_ADDR highpc,
    cu->last_fn = thisfn;
  }
  
@@ -15729,7 +15836,7 @@ index 55868da..9c1b90d 100644
  static void
  read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  {
-@@ -3088,15 +3469,27 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3088,15 +3513,27 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
    char *name;
    CORE_ADDR baseaddr;
    struct block *block;
@@ -15759,11 +15866,18 @@ index 55868da..9c1b90d 100644
  
    lowpc += baseaddr;
    highpc += baseaddr;
-@@ -3124,14 +3517,87 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3124,14 +3561,94 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    cu->list_in_scope = &local_symbols;
  
 -  if (die->child != NULL)
++  switch (cu->language)
++    {
++    case language_fortran:
++      cu->language_specific.fortran.use = NULL;
++      break;
++    }
++
 +  child_die = die->child;
 +  die_children = 0;
 +  while (child_die && child_die->tag)
@@ -15849,7 +15963,21 @@ index 55868da..9c1b90d 100644
      }
  
    new = pop_context ();
-@@ -3154,6 +3620,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3145,6 +3662,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+ 			determine_prefix (die, cu),
+ 			processing_has_namespace_info);
+ 
++  switch (cu->language)
++    {
++    case language_fortran:
++      BLOCK_FORTRAN_USE (block) = cu->language_specific.fortran.use;
++      break;
++    }
++
+   /* If we have address ranges, record them.  */
+   dwarf2_record_block_ranges (die, block, baseaddr, cu);
+   
+@@ -3154,6 +3678,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
       back to building a containing block's symbol lists.  */
    local_symbols = new->locals;
    param_symbols = new->params;
@@ -15857,7 +15985,7 @@ index 55868da..9c1b90d 100644
  
    /* If we've finished processing a top-level function, subsequent
       symbols go in the file symbol list.  */
-@@ -3180,7 +3647,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3180,7 +3705,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
       as multiple lexical blocks?  Handling children in a sane way would
       be nasty.  Might be easier to properly extend generic blocks to 
       describe ranges.  */
@@ -15866,7 +15994,7 @@ index 55868da..9c1b90d 100644
      return;
    lowpc += baseaddr;
    highpc += baseaddr;
-@@ -3197,7 +3664,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3197,7 +3722,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
      }
    new = pop_context ();
  
@@ -15875,7 +16003,7 @@ index 55868da..9c1b90d 100644
      {
        struct block *block
          = finish_block (0, &local_symbols, new->old_blocks, new->start_addr,
-@@ -3216,6 +3683,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3216,6 +3741,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
        dwarf2_record_block_ranges (die, block, baseaddr, cu);
      }
    local_symbols = new->locals;
@@ -15883,7 +16011,7 @@ index 55868da..9c1b90d 100644
  }
  
  /* Get low and high pc attributes from DW_AT_ranges attribute value OFFSET.
-@@ -3351,7 +3819,8 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
+@@ -3351,7 +3877,8 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
     discontinuous, i.e. derived from DW_AT_ranges information.  */
  static int
  dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
@@ -15893,7 +16021,7 @@ index 55868da..9c1b90d 100644
  {
    struct attribute *attr;
    CORE_ADDR low = 0;
-@@ -3379,7 +3848,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
+@@ -3379,7 +3906,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
  	{
  	  /* Value of the DW_AT_ranges attribute is the offset in the
  	     .debug_ranges section.  */
@@ -15902,7 +16030,7 @@ index 55868da..9c1b90d 100644
  	    return 0;
  	  /* Found discontinuous range of addresses.  */
  	  ret = -1;
-@@ -3418,7 +3887,7 @@ dwarf2_get_subprogram_pc_bounds (struct die_info *die,
+@@ -3418,7 +3945,7 @@ dwarf2_get_subprogram_pc_bounds (struct die_info *die,
    CORE_ADDR low, high;
    struct die_info *child = die->child;
  
@@ -15911,7 +16039,7 @@ index 55868da..9c1b90d 100644
      {
        *lowpc = min (*lowpc, low);
        *highpc = max (*highpc, high);
-@@ -3455,7 +3924,7 @@ get_scope_pc_bounds (struct die_info *die,
+@@ -3455,7 +3982,7 @@ get_scope_pc_bounds (struct die_info *die,
    CORE_ADDR best_high = (CORE_ADDR) 0;
    CORE_ADDR current_low, current_high;
  
@@ -15920,7 +16048,7 @@ index 55868da..9c1b90d 100644
      {
        best_low = current_low;
        best_high = current_high;
-@@ -3750,8 +4219,14 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
+@@ -3750,8 +4277,14 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
        if (fieldname == NULL)
  	return;
  
@@ -15936,7 +16064,7 @@ index 55868da..9c1b90d 100644
  
        /* The name is already allocated along with this objfile, so we don't
  	 need to duplicate it for the type.  */
-@@ -3881,8 +4356,14 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -3881,8 +4414,14 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
    if (fieldname == NULL)
      return;
  
@@ -15952,7 +16080,7 @@ index 55868da..9c1b90d 100644
  
    /* Look up member function name in fieldlist.  */
    for (i = 0; i < fip->nfnfields; i++)
-@@ -3926,7 +4407,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -3926,7 +4465,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
    /* The name is already allocated along with this objfile, so we don't
       need to duplicate it for the type.  */
    fnp->physname = physname ? physname : "";
@@ -15961,7 +16089,7 @@ index 55868da..9c1b90d 100644
    this_type = read_type_die (die, cu);
    if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
      {
-@@ -4110,7 +4591,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4110,7 +4649,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
      return NULL;
  
    domain_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (pfn_type, 0));
@@ -15970,7 +16098,7 @@ index 55868da..9c1b90d 100644
    smash_to_method_type (type, domain_type, TYPE_TARGET_TYPE (pfn_type),
  			TYPE_FIELDS (pfn_type), TYPE_NFIELDS (pfn_type),
  			TYPE_VARARGS (pfn_type));
-@@ -4147,7 +4628,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4147,7 +4686,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
    if (type)
      return type;
  
@@ -15979,7 +16107,7 @@ index 55868da..9c1b90d 100644
    INIT_CPLUS_SPECIFIC (type);
    name = dwarf2_name (die, cu);
    if (name != NULL)
-@@ -4360,7 +4841,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4360,7 +4899,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
    struct attribute *attr;
    const char *name;
  
@@ -15988,7 +16116,7 @@ index 55868da..9c1b90d 100644
  
    TYPE_CODE (type) = TYPE_CODE_ENUM;
    name = dwarf2_full_name (die, cu);
-@@ -4410,10 +4891,15 @@ determine_class_name (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4410,10 +4949,15 @@ determine_class_name (struct die_info *die, struct dwarf2_cu *cu)
  	{
  	  if (child->tag == DW_TAG_subprogram)
  	    {
@@ -16007,7 +16135,7 @@ index 55868da..9c1b90d 100644
  
  	      if (phys_prefix != NULL)
  		{
-@@ -4510,6 +4996,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4510,6 +5054,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -16037,7 +16165,7 @@ index 55868da..9c1b90d 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -4523,7 +5032,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4523,7 +5090,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -16046,7 +16174,7 @@ index 55868da..9c1b90d 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -4570,16 +5079,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4570,16 +5137,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -16068,7 +16196,7 @@ index 55868da..9c1b90d 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -4646,12 +5150,14 @@ read_set_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4646,12 +5208,14 @@ read_set_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, set_type, cu);
  }
  
@@ -16085,7 +16213,7 @@ index 55868da..9c1b90d 100644
    struct attribute *attr;
    struct symbol *sym;
    CORE_ADDR base = (CORE_ADDR) 0;
-@@ -4676,10 +5182,40 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4676,10 +5240,40 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
      }
    if (die->child != NULL)
      {
@@ -16101,9 +16229,9 @@ index 55868da..9c1b90d 100644
 +      /* Artificial type to be used only by `info common'.  */
 +      TYPE_NAME (type) = "<common>";
 +
-       child_die = die->child;
-       while (child_die && child_die->tag)
- 	{
++      child_die = die->child;
++      while (child_die && child_die->tag)
++	{
 +	  TYPE_NFIELDS (type)++;
 +	  child_die = sibling_die (child_die);
 +	}
@@ -16115,9 +16243,9 @@ index 55868da..9c1b90d 100644
 +				     * TYPE_NFIELDS (type));
 +      
 +      field = TYPE_FIELDS (type);
-+      child_die = die->child;
-+      while (child_die && child_die->tag)
-+	{
+       child_die = die->child;
+       while (child_die && child_die->tag)
+ 	{
 +	  /* Create the symbol in the DW_TAG_common_block block in the current
 +	     symbol scope.  */
  	  sym = new_symbol (child_die, NULL, cu);
@@ -16126,7 +16254,7 @@ index 55868da..9c1b90d 100644
  	  attr = dwarf2_attr (child_die, DW_AT_data_member_location, cu);
  	  if (attr)
  	    {
-@@ -4687,8 +5223,25 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4687,8 +5281,25 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
  		base + decode_locdesc (DW_BLOCK (attr), cu);
  	      add_symbol_to_list (sym, &global_symbols);
  	    }
@@ -16152,7 +16280,7 @@ index 55868da..9c1b90d 100644
      }
  }
  
-@@ -4756,9 +5309,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4756,9 +5367,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
        if (is_anonymous)
  	{
  	  const char *previous_prefix = determine_prefix (die, cu);
@@ -16163,7 +16291,166 @@ index 55868da..9c1b90d 100644
  	}
      }
  
-@@ -4951,29 +5502,95 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4774,20 +5383,155 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+     }
+ }
+ 
+-/* Read a Fortran module.  */
++/* Read a Fortran module as global symbol which can be later looked up by
++   f_lookup_symbol_nonlocal.  */
+ 
+ static void
+ read_module (struct die_info *die, struct dwarf2_cu *cu)
+ {
+-  struct die_info *child_die = die->child;
++  struct type *type;
++
++  type = read_module_type (die, cu);
++
++  if (type)
++    new_symbol (die, type, cu);
++}
++
++/* Read a Fortran module as type.
++
++   Modules present only as declarations - being used only for DW_AT_import of
++   DW_TAG_imported_module - are ignored here.  They are read in only in form of
++   the module name by read_fortran_imported_module.  */
++
++static struct type *
++read_module_type (struct die_info *die, struct dwarf2_cu *cu)
++{
++  struct objfile *objfile = cu->objfile;
++  struct die_info *child_die;
++  struct type *type;
++  char *module_name;
++  struct context_stack *new;
++  struct pending *save_file_symbols;
++  struct pending *save_global_symbols;
++  struct pending **save_list_in_scope;
++
++  if (die_is_declaration (die, cu))
++    return NULL;
++
++  module_name = dwarf2_name (die, cu);
++  if (!module_name)
++    complaint (&symfile_complaints, _("DW_TAG_module has no name, offset 0x%x"),
++               die->offset);
++  type = init_type (TYPE_CODE_MODULE, 0, 0, module_name, objfile);
+ 
+-  /* FIXME: Support the separate Fortran module namespaces.  */
++  /* Create a context for reading the module variables.  */
+ 
++  new = push_context (0, 0);
++
++  save_file_symbols = file_symbols;
++  file_symbols = NULL;
++  save_global_symbols = global_symbols;
++  global_symbols = NULL;
++  save_list_in_scope = cu->list_in_scope;
++
++  /* Process the child DIEs.  */
++
++  child_die = die->child;
+   while (child_die && child_die->tag)
+     {
++      /* Any DW_TAG_subprogram will reset LIST_IN_SCOPE to LOCAL_SYMBOLS.  */
++      cu->list_in_scope = &global_symbols;
++
+       process_die (child_die, cu);
+       child_die = sibling_die (child_die);
+     }
++
++  /* Finish this module and restore the context.  */
++
++  TYPE_MODULE_BLOCK (type) = finish_block (NULL, &global_symbols,
++                                           new->old_blocks, 0, 0, objfile);
++
++  if (file_symbols)
++    complaint (&symfile_complaints, _("DW_TAG_module contains static symbols"));
++  if (local_symbols)
++    complaint (&symfile_complaints, _("DW_TAG_module contains local symbols"));
++  if (param_symbols)
++    complaint (&symfile_complaints, _("DW_TAG_module contains function "
++				      "parameters"));
++
++  file_symbols = save_file_symbols;
++  global_symbols = save_global_symbols;
++  cu->list_in_scope = save_list_in_scope;
++
++  pop_context ();
++
++  set_die_type (die, type, cu);
++
++  return type;
++}
++
++/* Import a Fortran module.  Only store the module name for its later lookup by
++   f_lookup_symbol_nonlocal.  */
++
++static void
++read_fortran_imported_module (struct die_info *die, struct dwarf2_cu *cu)
++{
++  struct objfile *objfile = cu->objfile;
++  struct attribute *attr;
++  struct die_info *module_die;
++  char *module_name;
++  struct fortran_using *use;
++
++  attr = dwarf2_attr (die, DW_AT_import, cu);
++  if (attr == NULL)
++    return;
++
++  module_die = follow_die_ref (die, attr, &cu);
++  module_name = dwarf2_name (module_die, cu);
++  if (module_name == NULL)
++    {
++      complaint (&symfile_complaints,
++		 _("Imported DIE at offset 0x%x has no name"), die->offset);
++      return;
++    }
++
++  /* Fortran does not allow any duplicity between local and any of the imported
++     symbols.  Therefore the order of the USE statements is not portant.
++     gfortran prints:
++     Error: Name 'X' at (1) is an ambiguous reference to 'X' from module 'Y'  */
++
++  use = obstack_alloc (&objfile->objfile_obstack, sizeof (*use)
++						  + strlen (module_name));
++  strcpy (use->module_name, module_name);
++  gdb_assert (cu->language == language_fortran);
++  use->next = cu->language_specific.fortran.use;
++  cu->language_specific.fortran.use = use;
++}
++
++/* Import a single Fortran declaration and possibly rename it.  */
++
++static void
++read_fortran_imported_declaration (struct die_info *die, struct dwarf2_cu *cu)
++{
++  struct attribute *attr;
++  struct die_info *imported_die;
++  struct symbol *sym;
++  char *rename = dwarf2_name (die, cu);
++
++  attr = dwarf2_attr (die, DW_AT_import, cu);
++  if (attr == NULL)
++    {
++      complaint (&symfile_complaints,
++		 _("Fortran DW_TAG_imported_declaration is missing "
++		   "DW_AT_import at offset 0x%x"), die->offset);
++      return;
++    }
++  imported_die = follow_die_ref (die, attr, &cu);
++
++  sym = new_symbol (imported_die, NULL, cu);
++
++  if (sym && rename)
++    sym->ginfo.language_specific.cplus_specific.demangled_name = rename;
+ }
+ 
+ /* Return the name of the namespace represented by DIE.  Set
+@@ -4951,29 +5695,95 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct objfile *objfile = cu->objfile;
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -16277,7 +16564,7 @@ index 55868da..9c1b90d 100644
    type = create_string_type (NULL, range_type);
  
    return set_die_type (die, type, cu);
-@@ -5067,7 +5684,6 @@ static struct type *
+@@ -5067,7 +5877,6 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -16285,7 +16572,7 @@ index 55868da..9c1b90d 100644
    const char *name = NULL;
    struct type *this_type;
  
-@@ -5175,8 +5791,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5175,8 +5984,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -16296,7 +16583,7 @@ index 55868da..9c1b90d 100644
    char *name;
    
    base_type = die_type (die, cu);
-@@ -5189,42 +5805,90 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5189,42 +5998,90 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -16417,7 +16704,7 @@ index 55868da..9c1b90d 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -5386,10 +6050,13 @@ read_die_and_siblings (gdb_byte *info_ptr, bfd *abfd,
+@@ -5386,10 +6243,13 @@ read_die_and_siblings (gdb_byte *info_ptr, bfd *abfd,
  }
  
  /* Decompress a section that was compressed using zlib.  Store the
@@ -16433,7 +16720,7 @@ index 55868da..9c1b90d 100644
                           gdb_byte **outbuf, bfd_size_type *outsize)
  {
    bfd *abfd = objfile->obfd;
-@@ -5405,6 +6072,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -5405,6 +6265,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
    z_stream strm;
    int rc;
    int header_size = 12;
@@ -16441,7 +16728,7 @@ index 55868da..9c1b90d 100644
  
    if (bfd_seek (abfd, sectp->filepos, SEEK_SET) != 0
        || bfd_bread (compressed_buffer, compressed_size, abfd) != compressed_size)
-@@ -5434,8 +6102,13 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -5434,8 +6295,13 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
    strm.avail_in = compressed_size - header_size;
    strm.next_in = (Bytef*) compressed_buffer + header_size;
    strm.avail_out = uncompressed_size;
@@ -16457,7 +16744,7 @@ index 55868da..9c1b90d 100644
    rc = inflateInit (&strm);
    while (strm.avail_in > 0)
      {
-@@ -5456,6 +6129,8 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -5456,6 +6322,8 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
      error (_("Dwarf Error: concluding DWARF uncompression in '%s': %d"),
             bfd_get_filename (abfd), rc);
  
@@ -16466,7 +16753,7 @@ index 55868da..9c1b90d 100644
    xfree (compressed_buffer);
    *outbuf = uncompressed_buffer;
    *outsize = uncompressed_size;
-@@ -5463,17 +6138,20 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -5463,17 +6331,20 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
  }
  
  
@@ -16492,7 +16779,7 @@ index 55868da..9c1b90d 100644
  
    if (size == 0)
      return NULL;
-@@ -5486,30 +6164,49 @@ dwarf2_read_section (struct objfile *objfile, asection *sectp)
+@@ -5486,30 +6357,49 @@ dwarf2_read_section (struct objfile *objfile, asection *sectp)
        /* Upon decompression, update the buffer and its size.  */
        if (strncmp (header, "ZLIB", sizeof (header)) == 0)
          {
@@ -16545,7 +16832,15 @@ index 55868da..9c1b90d 100644
  /* In DWARF version 2, the description of the debugging information is
     stored in a separate .debug_abbrev section.  Before we read any
     dies from a section we read in all abbreviations and install them
-@@ -5914,15 +6611,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -5749,6 +6639,7 @@ load_partial_dies (bfd *abfd, gdb_byte *info_ptr, int building_psymtab,
+ 	  && abbrev->tag != DW_TAG_lexical_block
+ 	  && abbrev->tag != DW_TAG_variable
+ 	  && abbrev->tag != DW_TAG_namespace
++	  && abbrev->tag != DW_TAG_module
+ 	  && abbrev->tag != DW_TAG_member)
+ 	{
+ 	  /* Otherwise we skip to the next sibling, if any.  */
+@@ -5914,15 +6805,6 @@ read_partial_die (struct partial_die_info *part_die,
    struct attribute attr;
    int has_low_pc_attr = 0;
    int has_high_pc_attr = 0;
@@ -16561,7 +16856,7 @@ index 55868da..9c1b90d 100644
  
    memset (part_die, 0, sizeof (struct partial_die_info));
  
-@@ -5945,47 +6633,35 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -5945,47 +6827,35 @@ read_partial_die (struct partial_die_info *part_die,
        switch (attr.name)
  	{
  	case DW_AT_name:
@@ -16627,7 +16922,7 @@ index 55868da..9c1b90d 100644
  	case DW_AT_location:
            /* Support the .debug_loc offsets */
            if (attr_form_is_block (&attr))
-@@ -6002,9 +6678,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6002,9 +6872,6 @@ read_partial_die (struct partial_die_info *part_die,
  						     "partial symbol information");
              }
  	  break;
@@ -16637,7 +16932,7 @@ index 55868da..9c1b90d 100644
  	case DW_AT_external:
  	  part_die->is_external = DW_UNSND (&attr);
  	  break;
-@@ -6029,10 +6702,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6029,10 +6896,6 @@ read_partial_die (struct partial_die_info *part_die,
  	    part_die->sibling = dwarf2_per_objfile->info_buffer
  	      + dwarf2_get_ref_die_offset (&attr);
  	  break;
@@ -16648,7 +16943,7 @@ index 55868da..9c1b90d 100644
          case DW_AT_byte_size:
            part_die->has_byte_size = 1;
            break;
-@@ -6074,13 +6743,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6074,13 +6937,6 @@ read_partial_die (struct partial_die_info *part_die,
  	  || dwarf2_per_objfile->has_section_at_zero))
      part_die->has_pc_info = 1;
  
@@ -16662,7 +16957,7 @@ index 55868da..9c1b90d 100644
    return info_ptr;
  }
  
-@@ -6173,7 +6835,9 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6173,7 +7029,9 @@ fixup_partial_die (struct partial_die_info *part_die,
    /* If we found a reference attribute and the DIE has no name, try
       to find a name in the referred to DIE.  */
  
@@ -16673,7 +16968,7 @@ index 55868da..9c1b90d 100644
      {
        struct partial_die_info *spec_die;
  
-@@ -6189,6 +6853,9 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6189,6 +7047,9 @@ fixup_partial_die (struct partial_die_info *part_die,
  	  if (spec_die->is_external)
  	    part_die->is_external = spec_die->is_external;
  	}
@@ -16683,7 +16978,7 @@ index 55868da..9c1b90d 100644
      }
  
    /* Set default names for some unnamed DIEs.  */
-@@ -7512,10 +8179,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -7512,10 +8373,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -16698,7 +16993,7 @@ index 55868da..9c1b90d 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -7538,20 +8207,43 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -7538,20 +8401,49 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
    if (die->tag != DW_TAG_namespace)
@@ -16742,27 +17037,46 @@ index 55868da..9c1b90d 100644
 +	     if there is one.  */
 +	  SYMBOL_SET_LINKAGE_NAME (sym, (char *) linkagename);
 +	}
++      if (cu->language == language_fortran)
++	{
++	  sym->ginfo.language_specific.cplus_specific.demangled_name
++	    = SYMBOL_LINKAGE_NAME (sym);
++	  SYMBOL_LINKAGE_NAME (sym) = fortran_module_linkage_name (die, cu);
++	}
  
        /* Default assumptions.
           Use the passed type or decode it from the die.  */
-@@ -7637,7 +8329,15 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -7637,9 +8529,28 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  if (attr)
  	    {
  	      var_decode_location (attr, sym, cu);
--	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
++
+ 	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
 +
 +	      /* Fortran explicitely imports any global symbols to the local
-+		 scope by DW_TAG_common_block.  DW_AT_external means for
-+		 Fortran the variable is importable versus it is automatically
-+		 imported.  */
-+	      if (cu->language == language_fortran)
-+	      	attr2 = NULL;
-+	      else
-+		attr2 = dwarf2_attr (die, DW_AT_external, cu);
++		 scope by DW_TAG_common_block.  */
++	      if (cu->language == language_fortran && die->parent
++		  && die->parent->tag == DW_TAG_common_block)
++		attr2 = NULL;
++
  	      if (attr2 && (DW_UNSND (attr2) != 0))
- 		add_symbol_to_list (sym, &global_symbols);
+-		add_symbol_to_list (sym, &global_symbols);
++		{
++		  /* Workaround gfortran PR debug/40040 - it uses
++		     DW_AT_location for variables in -fPIC libraries which may
++		     get overriden by other libraries/executable and get
++		     a different address.  Resolve it by .dynsym instead.  */
++
++		  if (cu->language == language_fortran && die->parent
++		      && die->parent->tag == DW_TAG_module)
++		    SYMBOL_CLASS (sym) = LOC_UNRESOLVED;
++
++		  add_symbol_to_list (sym, &global_symbols);
++		}
  	      else
-@@ -7656,7 +8356,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+ 		add_symbol_to_list (sym, cu->list_in_scope);
+ 	    }
+@@ -7656,7 +8567,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  		  && dwarf2_attr (die, DW_AT_type, cu) != NULL)
  		{
  		  SYMBOL_CLASS (sym) = LOC_UNRESOLVED;
@@ -16771,7 +17085,7 @@ index 55868da..9c1b90d 100644
  		}
  	    }
  	  break;
-@@ -7780,6 +8480,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -7780,6 +8691,16 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
  	  break;
@@ -16780,10 +17094,32 @@ index 55868da..9c1b90d 100644
 +	  SYMBOL_DOMAIN (sym) = COMMON_BLOCK_DOMAIN;
 +	  add_symbol_to_list (sym, cu->list_in_scope);
 +	  break;
++	case DW_TAG_module:
++	  SYMBOL_CLASS (sym) = LOC_STATIC;
++	  SYMBOL_DOMAIN (sym) = MODULE_DOMAIN;
++	  add_symbol_to_list (sym, &global_symbols);
++	  break;
  	default:
  	  /* Not a tag we recognize.  Hopefully we aren't processing
  	     trash data, but since we must specifically ignore things
-@@ -8048,6 +8753,9 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7826,6 +8747,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
+ 			      DW_ADDR (attr));
+       SYMBOL_CLASS (sym) = LOC_CONST_BYTES;
+       break;
++    case DW_FORM_string:
+     case DW_FORM_strp:
+       /* DW_STRING is already allocated on the obstack, point directly
+ 	 to it.  */
+@@ -8042,12 +8964,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+     case DW_TAG_namespace:
+       this_type = read_namespace_type (die, cu);
+       break;
++    case DW_TAG_module:
++      this_type = read_module_type (die, cu);
++      break;
+     default:
+       complaint (&symfile_complaints, _("unexpected tag in read_type_die: '%s'"),
+ 		 dwarf_tag_name (die->tag));
        break;
      }
  
@@ -16793,7 +17129,29 @@ index 55868da..9c1b90d 100644
    return this_type;
  }
  
-@@ -8128,6 +8836,19 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8113,9 +9041,18 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+     switch (parent->tag)
+       {
+       case DW_TAG_namespace:
+-	parent_type = read_type_die (parent, cu);
+-	/* We give a name to even anonymous namespaces.  */
+-	return TYPE_TAG_NAME (parent_type);
++        {
++          char *prefix;
++          parent_type = read_type_die (parent, cu);
++          /* We give a name to even anonymous namespaces.  */
++          prefix = TYPE_TAG_NAME (parent_type);
++          /* Special hack for bogus global namespace that is emitted as an
++             explicit namespace with the name '::' in g++ 4.1, for
++             some decls.  */
++          if (strcmp(prefix, "::")==0)
++            return "";
++          return prefix;
++        }
+       case DW_TAG_class_type:
+       case DW_TAG_interface_type:
+       case DW_TAG_structure_type:
+@@ -8128,6 +9065,19 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
  	     members; no typedefs, no member functions, et cetera.
  	     So it does not need a prefix.  */
  	  return "";
@@ -16813,7 +17171,7 @@ index 55868da..9c1b90d 100644
        default:
  	return determine_prefix (parent, cu);
        }
-@@ -8192,23 +8913,62 @@ dwarf2_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8192,12 +9142,64 @@ dwarf2_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
    attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
    if (attr && DW_STRING (attr))
      return DW_STRING (attr);
@@ -16823,9 +17181,42 @@ index 55868da..9c1b90d 100644
    return NULL;
  }
  
- /* Get name of a die, return NULL if not found.  */
- 
- static char *
++/* Return the fully qualified .symtab name for symbols contained in Fortran
++   modules.  Return DWARF2_NAME otherwise.  */
++
++static char *
++fortran_module_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
++{
++  char *name;
++
++  gdb_assert (cu->language == language_fortran);
++
++  name = dwarf2_name (die, cu);
++
++  if (name && die->parent && die->parent->tag == DW_TAG_module)
++    {
++      char *module_name = dwarf2_name (die->parent, cu);
++
++      if (module_name)
++	{
++	  char *retval;
++
++	  /* `__modulename_MOD_variablename0'.  */
++	  retval = obstack_alloc (&cu->objfile->objfile_obstack,
++				  2 + strlen (module_name) + 5 + strlen (name)
++				  + 1);
++	  sprintf (retval, "__%s_MOD_%s", module_name, name);
++
++	  return retval;
++	}
++    }
++
++  return name;
++}
++
++/* Get name of a die, return NULL if not found.  */
++
++static char *
 +dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
 +			  struct obstack *obstack)
 +{
@@ -16845,11 +17236,10 @@ index 55868da..9c1b90d 100644
 +  return name;
 +}
 +
-+/* Get name of a die, return NULL if not found.  */
-+
-+static char *
- dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
- {
+ /* Get name of a die, return NULL if not found.  */
+ 
+ static char *
+@@ -8206,9 +9208,29 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
    struct attribute *attr;
  
    attr = dwarf2_attr (die, DW_AT_name, cu);
@@ -16882,7 +17272,7 @@ index 55868da..9c1b90d 100644
  }
  
  /* Return the die that this die in an extension of, or NULL if there
-@@ -8703,6 +9463,8 @@ dwarf_form_name (unsigned form)
+@@ -8703,6 +9725,8 @@ dwarf_form_name (unsigned form)
        return "DW_FORM_ref_udata";
      case DW_FORM_indirect:
        return "DW_FORM_indirect";
@@ -16891,7 +17281,7 @@ index 55868da..9c1b90d 100644
      default:
        return "DW_FORM_<unknown>";
      }
-@@ -9353,26 +10115,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
+@@ -9353,26 +10377,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
    return result;
  }
  
@@ -16921,7 +17311,7 @@ index 55868da..9c1b90d 100644
 -      return default_value;
 +      *val_return = DW_SND (attr);
 +      return dwarf2_attr_const;
-     }
++    }
 +  if (attr->form == DW_FORM_udata
 +      || attr->form == DW_FORM_data1
 +      || attr->form == DW_FORM_data2
@@ -16930,7 +17320,7 @@ index 55868da..9c1b90d 100644
 +    {
 +      *val_return = DW_UNSND (attr);
 +      return dwarf2_attr_const;
-+    }
+     }
 +  if (attr->form == DW_FORM_block
 +      || attr->form == DW_FORM_block1
 +      || attr->form == DW_FORM_block2
@@ -16942,7 +17332,7 @@ index 55868da..9c1b90d 100644
  }
  
  /* THIS_CU has a reference to PER_CU.  If necessary, load the new compilation
-@@ -9963,6 +10734,17 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -9963,6 +10996,17 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
  {
    gdb_byte *mac_ptr, *mac_end;
    struct macro_source_file *current_file = 0;
@@ -16960,7 +17350,7 @@ index 55868da..9c1b90d 100644
  
    if (dwarf2_per_objfile->macinfo_buffer == NULL)
      {
-@@ -9970,19 +10752,24 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -9970,19 +11014,24 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
        return;
      }
  
@@ -16989,7 +17379,7 @@ index 55868da..9c1b90d 100644
          }
  
        macinfo_type = read_1_byte (abfd, mac_ptr);
-@@ -9993,7 +10780,81 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -9993,7 +11042,81 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            /* A zero macinfo type indicates the end of the macro
               information.  */
          case 0:
@@ -17072,7 +17462,7 @@ index 55868da..9c1b90d 100644
  
          case DW_MACINFO_define:
          case DW_MACINFO_undef:
-@@ -10008,19 +10869,31 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10008,19 +11131,31 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              mac_ptr += bytes_read;
  
              if (! current_file)
@@ -17115,7 +17505,7 @@ index 55868da..9c1b90d 100644
            }
            break;
  
-@@ -10034,9 +10907,22 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10034,9 +11169,22 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              file = read_unsigned_leb128 (abfd, mac_ptr, &bytes_read);
              mac_ptr += bytes_read;
  
@@ -17141,7 +17531,7 @@ index 55868da..9c1b90d 100644
            }
            break;
  
-@@ -10090,7 +10976,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10090,7 +11238,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            }
            break;
          }
@@ -17150,7 +17540,7 @@ index 55868da..9c1b90d 100644
  }
  
  /* Check if the attribute's form is a DW_FORM_block*
-@@ -10150,6 +11036,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -10150,6 +11298,34 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -17185,7 +17575,7 @@ index 55868da..9c1b90d 100644
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -10179,35 +11093,24 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+@@ -10179,35 +11355,24 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
        SYMBOL_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
@@ -17235,7 +17625,7 @@ index 55868da..9c1b90d 100644
      }
  }
  
-@@ -10482,6 +11385,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -10482,6 +11647,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -17267,7 +17657,7 @@ index 55868da..9c1b90d 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -10490,6 +11418,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -10490,6 +11680,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -17810,10 +18200,19 @@ index d91c413..c984e85 100644
    { "integer", INT_KEYWORD, BINOP_END },
    { "logical", LOGICAL_KEYWORD, BINOP_END },
 diff --git a/gdb/f-lang.c b/gdb/f-lang.c
-index 6359841..1754c44 100644
+index 6359841..00921c4 100644
 --- a/gdb/f-lang.c
 +++ b/gdb/f-lang.c
-@@ -55,23 +55,10 @@ typedef struct saved_bf_symnum SAVED_BF, *SAVED_BF_PTR;
+@@ -31,6 +31,8 @@
+ #include "f-lang.h"
+ #include "valprint.h"
+ #include "value.h"
++#include "block.h"
++#include "gdb_assert.h"
+ 
+ 
+ /* Following is dubious stuff that had been in the xcoff reader. */
+@@ -55,23 +57,10 @@ typedef struct saved_bf_symnum SAVED_BF, *SAVED_BF_PTR;
  /* Local functions */
  
  extern void _initialize_f_language (void);
@@ -17841,7 +18240,7 @@ index 6359841..1754c44 100644
  
  /* Print the character C on STREAM as part of the contents of a literal
     string whose delimiter is QUOTER.  Note that that format for printing
-@@ -80,7 +67,7 @@ static void f_emit_char (int c, struct ui_file * stream, int quoter);
+@@ -80,7 +69,7 @@ static void f_emit_char (int c, struct ui_file * stream, int quoter);
     be replaced with a true F77 version.  */
  
  static void
@@ -17850,7 +18249,7 @@ index 6359841..1754c44 100644
  {
    c &= 0xFF;			/* Avoid sign bit follies */
  
-@@ -126,10 +113,10 @@ f_emit_char (int c, struct ui_file *stream, int quoter)
+@@ -126,10 +115,10 @@ f_emit_char (int c, struct ui_file *stream, int quoter)
     be replaced with a true F77version. */
  
  static void
@@ -17863,7 +18262,7 @@ index 6359841..1754c44 100644
    fputs_filtered ("'", stream);
  }
  
-@@ -141,14 +128,15 @@ f_printchar (int c, struct ui_file *stream)
+@@ -141,14 +130,15 @@ f_printchar (int c, struct ui_file *stream)
     be replaced with a true F77 version. */
  
  static void
@@ -17881,7 +18280,7 @@ index 6359841..1754c44 100644
  
    if (length == 0)
      {
-@@ -190,7 +178,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
+@@ -190,7 +180,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
  		fputs_filtered ("', ", stream);
  	      in_quotes = 0;
  	    }
@@ -17890,7 +18289,7 @@ index 6359841..1754c44 100644
  	  fprintf_filtered (stream, " <repeats %u times>", reps);
  	  i = rep1 - 1;
  	  things_printed += options->repeat_count_threshold;
-@@ -206,7 +194,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
+@@ -206,7 +196,7 @@ f_printstr (struct ui_file *stream, const gdb_byte *string,
  		fputs_filtered ("'", stream);
  	      in_quotes = 1;
  	    }
@@ -17899,7 +18298,7 @@ index 6359841..1754c44 100644
  	  ++things_printed;
  	}
      }
-@@ -257,6 +245,7 @@ enum f_primitive_types {
+@@ -257,6 +247,7 @@ enum f_primitive_types {
    f_primitive_type_logical,
    f_primitive_type_logical_s1,
    f_primitive_type_logical_s2,
@@ -17907,7 +18306,7 @@ index 6359841..1754c44 100644
    f_primitive_type_integer,
    f_primitive_type_integer_s2,
    f_primitive_type_real,
-@@ -287,6 +276,8 @@ f_language_arch_info (struct gdbarch *gdbarch,
+@@ -287,6 +278,8 @@ f_language_arch_info (struct gdbarch *gdbarch,
      = builtin->builtin_logical_s1;
    lai->primitive_type_vector [f_primitive_type_logical_s2]
      = builtin->builtin_logical_s2;
@@ -17916,7 +18315,65 @@ index 6359841..1754c44 100644
    lai->primitive_type_vector [f_primitive_type_real]
      = builtin->builtin_real;
    lai->primitive_type_vector [f_primitive_type_real_s8]
-@@ -378,6 +369,11 @@ build_fortran_types (struct gdbarch *gdbarch)
+@@ -304,6 +297,48 @@ f_language_arch_info (struct gdbarch *gdbarch,
+   lai->bool_type_default = builtin->builtin_logical_s2;
+ }
+ 
++/* Find if NAME is not contained in any of the Fortran modules imported by the
++   Fortran USE statement.
++
++   As Fortran has no nested blocks such lookup can be processed from
++   lookup_symbol_nonlocal - when no local blocks could satisfy the lookup.  */
++
++static struct symbol *
++f_lookup_symbol_nonlocal (const char *name,
++			  const char *linkage_name,
++			  const struct block *block,
++			  const domain_enum domain)
++{
++  struct fortran_using *use;
++
++  if (!block)
++    return NULL;
++
++  for (use = BLOCK_FORTRAN_USE (block); use; use = use->next)
++    {
++      struct symbol *sym;
++      struct type *type;
++      struct symbol *retval;
++
++      sym = lookup_symbol_global (use->module_name, NULL, block, MODULE_DOMAIN);
++
++      /* Module name lookup should not fail with correct debug info.  */
++      if (sym == NULL)
++	continue;
++
++      type = SYMBOL_TYPE (sym);
++      gdb_assert (TYPE_CODE (type) == TYPE_CODE_MODULE);
++      gdb_assert (TYPE_MODULE_BLOCK (type) != NULL);
++
++      retval = lookup_block_symbol (TYPE_MODULE_BLOCK (type), name,
++				    linkage_name, domain);
++      if (retval)
++	return retval;
++    }
++
++  return basic_lookup_symbol_nonlocal (name, linkage_name, block, domain);
++}
++
+ /* This is declared in c-lang.h but it is silly to import that file for what
+    is already just a hack. */
+ extern int c_value_print (struct value *, struct ui_file *,
+@@ -331,7 +366,7 @@ const struct language_defn f_language_defn =
+   c_value_print,		/* FIXME */
+   NULL,				/* Language specific skip_trampoline */
+   NULL,                    	/* name_of_this */
+-  basic_lookup_symbol_nonlocal,	/* lookup_symbol_nonlocal */
++  f_lookup_symbol_nonlocal,	/* lookup_symbol_nonlocal */
+   basic_lookup_transparent_type,/* lookup_transparent_type */
+   NULL,				/* Language specific symbol demangler */
+   NULL,				/* Language specific class_name_from_physname */
+@@ -378,6 +413,11 @@ build_fortran_types (struct gdbarch *gdbarch)
  	       gdbarch_short_bit (gdbarch) / TARGET_CHAR_BIT,
  	       TYPE_FLAG_UNSIGNED, "logical*2", (struct objfile *) NULL);
  
@@ -17928,7 +18385,7 @@ index 6359841..1754c44 100644
    builtin_f_type->builtin_integer =
      init_type (TYPE_CODE_INT, 
  	       gdbarch_int_bit (gdbarch) / TARGET_CHAR_BIT,
-@@ -451,395 +447,3 @@ _initialize_f_language (void)
+@@ -451,395 +491,3 @@ _initialize_f_language (void)
  
    add_language (&f_language_defn);
  }
@@ -18325,7 +18782,7 @@ index 6359841..1754c44 100644
 -}
 -#endif
 diff --git a/gdb/f-lang.h b/gdb/f-lang.h
-index 711bdba..cd2f804 100644
+index 711bdba..9d7d92b 100644
 --- a/gdb/f-lang.h
 +++ b/gdb/f-lang.h
 @@ -28,6 +28,10 @@ extern void f_error (char *);	/* Defined in f-exp.y */
@@ -18389,6 +18846,17 @@ index 711bdba..cd2f804 100644
    struct type *builtin_real;
    struct type *builtin_real_s8;
    struct type *builtin_real_s16;
+@@ -125,3 +97,10 @@ struct builtin_f_type
+ /* Return the Fortran type table for the specified architecture.  */
+ extern const struct builtin_f_type *builtin_f_type (struct gdbarch *gdbarch);
+ 
++/* List of module names being imported by a block though BLOCK_FORTRAN_USE.  */
++
++struct fortran_using
++  {
++    struct fortran_using *next;
++    char module_name[1];
++  };
 diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
 index 6c9668f..852b9a8 100644
 --- a/gdb/f-typeprint.c
@@ -20904,22 +21372,24 @@ index 8102321..012485c 100644
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
  Set debugging of C++ overloading."), _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index c90b6d7..077b89c 100644
+index c90b6d7..63b5389 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
-@@ -134,7 +134,10 @@ enum type_code
+@@ -134,7 +134,12 @@ enum type_code
  
      TYPE_CODE_NAMESPACE,	/* C++ namespace.  */
  
 -    TYPE_CODE_DECFLOAT		/* Decimal floating point.  */
 +    TYPE_CODE_DECFLOAT,		/* Decimal floating point.  */
 +
++    TYPE_CODE_MODULE,		/* Fortran module.  */
++
 +    /* Internal function type.  */
 +    TYPE_CODE_INTERNAL_FUNCTION
    };
  
  /* For now allow source to use TYPE_CODE_CLASS for C++ classes, as an
-@@ -209,6 +212,11 @@ enum type_instance_flag_value
+@@ -209,6 +214,11 @@ enum type_instance_flag_value
  
  #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
  
@@ -20931,7 +21401,7 @@ index c90b6d7..077b89c 100644
  /* Static type.  If this is set, the corresponding type had 
   * a static modifier.
   * Note: This may be unnecessary, since static data members
-@@ -266,6 +274,36 @@ enum type_instance_flag_value
+@@ -266,6 +276,36 @@ enum type_instance_flag_value
  
  #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
  
@@ -20968,7 +21438,7 @@ index c90b6d7..077b89c 100644
  /* Constant type.  If this is set, the corresponding type has a
   * const modifier.
   */
-@@ -352,6 +390,11 @@ struct main_type
+@@ -352,6 +392,11 @@ struct main_type
    unsigned int flag_stub_supported : 1;
    unsigned int flag_nottext : 1;
    unsigned int flag_fixed_instance : 1;
@@ -20980,7 +21450,7 @@ index c90b6d7..077b89c 100644
  
    /* Number of fields described for this type.  This field appears at
       this location because it packs nicely here.  */
-@@ -414,6 +457,20 @@ struct main_type
+@@ -414,6 +459,20 @@ struct main_type
  
    struct type *target_type;
  
@@ -21001,7 +21471,17 @@ index c90b6d7..077b89c 100644
    /* For structure and union types, a description of each field.
       For set and pascal array types, there is one "field",
       whose type is the domain type of the set or array.
-@@ -795,9 +852,9 @@ extern void allocate_cplus_struct_type (struct type *);
+@@ -521,6 +580,9 @@ struct main_type
+        supporting multiple ABIs.  Right now this is only fetched from
+        the Dwarf-2 DW_AT_calling_convention attribute.  */
+     unsigned calling_convention;
++
++    /* For TYPE_CODE_MODULE, the list of symbols contained in the module.  */
++    struct block *module_block;
+   } type_specific;
+ };
+ 
+@@ -795,9 +857,9 @@ extern void allocate_cplus_struct_type (struct type *);
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -21014,7 +21494,7 @@ index c90b6d7..077b89c 100644
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  #define TYPE_OBJFILE(thistype) TYPE_MAIN_TYPE(thistype)->objfile
-@@ -807,23 +864,44 @@ extern void allocate_cplus_struct_type (struct type *);
+@@ -807,23 +869,44 @@ extern void allocate_cplus_struct_type (struct type *);
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->fields
  #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
@@ -21069,7 +21549,15 @@ index c90b6d7..077b89c 100644
  
  /* C++ */
  
-@@ -1078,6 +1156,16 @@ extern struct type *builtin_type_error;
+@@ -839,6 +922,7 @@ extern void allocate_cplus_struct_type (struct type *);
+ #define TYPE_CPLUS_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.cplus_stuff
+ #define TYPE_FLOATFORMAT(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.floatformat
+ #define TYPE_CALLING_CONVENTION(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.calling_convention
++#define TYPE_MODULE_BLOCK(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.module_block
+ #define TYPE_BASECLASS(thistype,index) TYPE_MAIN_TYPE(thistype)->fields[index].type
+ #define TYPE_N_BASECLASSES(thistype) TYPE_CPLUS_SPECIFIC(thistype)->n_baseclasses
+ #define TYPE_BASECLASS_NAME(thistype,index) TYPE_MAIN_TYPE(thistype)->fields[index].name
+@@ -1078,6 +1162,16 @@ extern struct type *builtin_type_error;
     (TYPE_UNSIGNED(t) ? UMIN_OF_SIZE(TYPE_LENGTH(t)) \
      : MIN_OF_SIZE(TYPE_LENGTH(t)))
  
@@ -21086,7 +21574,7 @@ index c90b6d7..077b89c 100644
  /* Allocate space for storing data associated with a particular type.
     We ensure that the space is allocated using the same mechanism that
     was used to allocate the space for the type structure itself.  I.E.
-@@ -1087,18 +1175,18 @@ extern struct type *builtin_type_error;
+@@ -1087,18 +1181,18 @@ extern struct type *builtin_type_error;
     builtin types), then the data space will be allocated with xmalloc,
     the same as for the type structure. */
  
@@ -21115,7 +21603,7 @@ index c90b6d7..077b89c 100644
  
  extern struct type *init_type (enum type_code, int, int, char *,
  			       struct objfile *);
-@@ -1172,6 +1260,18 @@ extern struct type *create_range_type (struct type *, struct type *, int,
+@@ -1172,6 +1266,18 @@ extern struct type *create_range_type (struct type *, struct type *, int,
  extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  
@@ -21134,7 +21622,7 @@ index c90b6d7..077b89c 100644
  extern struct type *create_string_type (struct type *, struct type *);
  
  extern struct type *create_set_type (struct type *, struct type *);
-@@ -1263,10 +1363,15 @@ extern void maintenance_print_type (char *, int);
+@@ -1263,10 +1369,15 @@ extern void maintenance_print_type (char *, int);
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -24756,10 +25244,10 @@ index 0000000..fe7c072
 +register_libstdcxx_printers (gdb.current_objfile ())
 diff --git a/gdb/python/lib/gdb/libstdcxx/v6/printers.py b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
 new file mode 100644
-index 0000000..58fd91c
+index 0000000..8c0efc5
 --- /dev/null
 +++ b/gdb/python/lib/gdb/libstdcxx/v6/printers.py
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,631 @@
 +# Pretty-printers for libstc++.
 +
 +# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
@@ -24789,9 +25277,11 @@ index 0000000..58fd91c
 +        self.val = val
 +
 +    def to_string (self):
++        if self.val['_M_refcount']['_M_pi'] == 0:
++            return '%s (empty) %s' % (self.typename, self.val['_M_ptr'])
 +        return '%s (count %d) %s' % (self.typename,
-+        self.val['_M_refcount']['_M_pi']['_M_use_count'],
-+        self.val['_M_ptr'])
++                                     self.val['_M_refcount']['_M_pi']['_M_use_count'],
++                                     self.val['_M_ptr'])
 +
 +class UniquePointerPrinter:
 +    "Print a unique_ptr"
@@ -32753,7 +33243,7 @@ index 88f8326..50671c1 100644
  extern void dwarf2_build_frame_info (struct objfile *);
  
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index d2ba1f3..f9d27b2 100644
+index d2ba1f3..44c9a58 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -42,6 +42,7 @@
@@ -32781,7 +33271,33 @@ index d2ba1f3..f9d27b2 100644
    {
      if (FILENAME_CMP (name, pst->filename) == 0)
        {
-@@ -870,7 +872,13 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
+@@ -416,7 +418,8 @@ symbol_init_language_specific (struct general_symbol_info *gsymbol,
+   gsymbol->language = language;
+   if (gsymbol->language == language_cplus
+       || gsymbol->language == language_java
+-      || gsymbol->language == language_objc)
++      || gsymbol->language == language_objc
++      || gsymbol->language == language_fortran)
+     {
+       gsymbol->language_specific.cplus_specific.demangled_name = NULL;
+     }
+@@ -635,6 +638,7 @@ symbol_natural_name (const struct general_symbol_info *gsymbol)
+     case language_cplus:
+     case language_java:
+     case language_objc:
++    case language_fortran:
+       if (gsymbol->language_specific.cplus_specific.demangled_name != NULL)
+ 	return gsymbol->language_specific.cplus_specific.demangled_name;
+       break;
+@@ -660,6 +664,7 @@ symbol_demangled_name (const struct general_symbol_info *gsymbol)
+     case language_cplus:
+     case language_java:
+     case language_objc:
++    case language_fortran:
+       if (gsymbol->language_specific.cplus_specific.demangled_name != NULL)
+ 	return gsymbol->language_specific.cplus_specific.demangled_name;
+       break;
+@@ -870,7 +875,13 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
       than the later used TEXTLOW/TEXTHIGH one.  */
  
    ALL_OBJFILES (objfile)
@@ -32796,7 +33312,7 @@ index d2ba1f3..f9d27b2 100644
        {
  	struct partial_symtab *pst;
  
-@@ -903,6 +911,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
+@@ -903,6 +914,7 @@ find_pc_sect_psymtab (CORE_ADDR pc, struct obj_section *section)
  	    return pst;
  	  }
        }
@@ -32804,7 +33320,7 @@ index d2ba1f3..f9d27b2 100644
  
    /* Existing PSYMTABS_ADDRMAP mapping is present even for PARTIAL_SYMTABs
       which still have no corresponding full SYMTABs read.  But it is not
-@@ -1170,6 +1179,22 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
+@@ -1170,6 +1182,22 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
    return psym;
  }
  
@@ -32827,7 +33343,7 @@ index d2ba1f3..f9d27b2 100644
  /* Find the definition for a specified symbol name NAME
     in domain DOMAIN, visible from lexical block BLOCK.
     Returns the struct symbol pointer, or zero if no symbol is found.
-@@ -1200,6 +1225,11 @@ lookup_symbol_in_language (const char *name, const struct block *block,
+@@ -1200,6 +1228,11 @@ lookup_symbol_in_language (const char *name, const struct block *block,
    int needtofreename = 0;
    struct symbol *returnval;
  
@@ -32839,7 +33355,7 @@ index d2ba1f3..f9d27b2 100644
    modified_name = name;
  
    /* If we are using C++ or Java, demangle the name before doing a lookup, so
-@@ -1213,6 +1243,17 @@ lookup_symbol_in_language (const char *name, const struct block *block,
+@@ -1213,6 +1246,17 @@ lookup_symbol_in_language (const char *name, const struct block *block,
  	  modified_name = demangled_name;
  	  needtofreename = 1;
  	}
@@ -32857,7 +33373,7 @@ index d2ba1f3..f9d27b2 100644
      }
    else if (lang == language_java)
      {
-@@ -1296,13 +1337,15 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+@@ -1296,13 +1340,15 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
        && block != NULL)
      {
        struct symbol *sym = NULL;
@@ -32877,7 +33393,7 @@ index d2ba1f3..f9d27b2 100644
  				   NULL, VAR_DOMAIN);
        if (sym)
  	{
-@@ -1361,22 +1404,24 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
+@@ -1361,22 +1407,24 @@ lookup_symbol_aux_local (const char *name, const char *linkage_name,
  			 const domain_enum domain)
  {
    struct symbol *sym;
@@ -32908,7 +33424,7 @@ index d2ba1f3..f9d27b2 100644
  
    return NULL;
  }
-@@ -1450,6 +1495,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
+@@ -1450,6 +1498,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
    }
  
    /* Now go through psymtabs.  */
@@ -32916,7 +33432,7 @@ index d2ba1f3..f9d27b2 100644
    ALL_OBJFILE_PSYMTABS (objfile, ps)
    {
      if (!ps->readin
-@@ -1520,7 +1566,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1520,7 +1569,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
    struct symtab *s;
    const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
  
@@ -32925,7 +33441,7 @@ index d2ba1f3..f9d27b2 100644
    {
      if (!ps->readin
  	&& lookup_partial_symbol (ps, name, linkage_name,
-@@ -1805,7 +1851,11 @@ basic_lookup_transparent_type (const char *name)
+@@ -1805,7 +1854,11 @@ basic_lookup_transparent_type (const char *name)
        }
    }
  
@@ -32938,7 +33454,7 @@ index d2ba1f3..f9d27b2 100644
    {
      if (!ps->readin && lookup_partial_symbol (ps, name, NULL,
  					      1, STRUCT_DOMAIN))
-@@ -1853,7 +1903,12 @@ basic_lookup_transparent_type (const char *name)
+@@ -1853,7 +1906,12 @@ basic_lookup_transparent_type (const char *name)
        }
    }
  
@@ -32952,7 +33468,7 @@ index d2ba1f3..f9d27b2 100644
    {
      if (!ps->readin && lookup_partial_symbol (ps, name, NULL, 0, STRUCT_DOMAIN))
        {
-@@ -1894,7 +1949,21 @@ find_main_psymtab (void)
+@@ -1894,7 +1952,21 @@ find_main_psymtab (void)
    struct partial_symtab *pst;
    struct objfile *objfile;
  
@@ -32975,7 +33491,7 @@ index d2ba1f3..f9d27b2 100644
    {
      if (lookup_partial_symbol (pst, main_name (), NULL, 1, VAR_DOMAIN))
        {
-@@ -3085,7 +3154,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
+@@ -3085,7 +3157,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
       matching the regexp.  That way we don't have to reproduce all of
       the machinery below. */
  
@@ -32985,7 +33501,7 @@ index d2ba1f3..f9d27b2 100644
      struct partial_symbol **bound, **gbound, **sbound;
      int keep_going = 1;
 diff --git a/gdb/symtab.h b/gdb/symtab.h
-index 8b086f3..801cd2b 100644
+index 8b086f3..6ad6179 100644
 --- a/gdb/symtab.h
 +++ b/gdb/symtab.h
 @@ -171,9 +171,6 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
@@ -32998,7 +33514,7 @@ index 8b086f3..801cd2b 100644
  /* Initializes the language dependent portion of a symbol
     depending upon the language for the symbol. */
  #define SYMBOL_INIT_LANGUAGE_SPECIFIC(symbol,language) \
-@@ -394,7 +391,10 @@ typedef enum domain_enum_tag
+@@ -394,7 +391,13 @@ typedef enum domain_enum_tag
    FUNCTIONS_DOMAIN,
  
    /* All defined types */
@@ -33006,11 +33522,14 @@ index 8b086f3..801cd2b 100644
 +  TYPES_DOMAIN,
 +
 +  /* Fortran common blocks.  Their naming must be separate from VAR_DOMAIN.  */
-+  COMMON_BLOCK_DOMAIN
++  COMMON_BLOCK_DOMAIN,
++
++  /* Fortran module.  Their naming must be separate.  */
++  MODULE_DOMAIN
  }
  domain_enum;
  
-@@ -472,7 +472,13 @@ enum address_class
+@@ -472,7 +475,13 @@ enum address_class
       in another object file or runtime common storage.
       The linker might even remove the minimal symbol if the global
       symbol is never referenced, in which case the symbol remains
@@ -33025,7 +33544,7 @@ index 8b086f3..801cd2b 100644
  
    LOC_UNRESOLVED,
  
-@@ -1027,6 +1033,8 @@ extern void clear_pc_function_cache (void);
+@@ -1027,6 +1036,8 @@ extern void clear_pc_function_cache (void);
  
  /* from symtab.c: */
  
@@ -38968,7 +39487,7 @@ index 0000000..1c6e84a
 +         "func.* \\(.*\\) at .*" \
 +         "step"
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-strp.S b/gdb/testsuite/gdb.dwarf2/dw2-strp.S
-index a1602a5..293cc1b 100644
+index a1602a5..4dbb761 100644
 --- a/gdb/testsuite/gdb.dwarf2/dw2-strp.S
 +++ b/gdb/testsuite/gdb.dwarf2/dw2-strp.S
 @@ -28,7 +28,8 @@
@@ -38981,23 +39500,60 @@ index a1602a5..293cc1b 100644
  
  .Larray_type:
  	.uleb128	2			/* Abbrev: DW_TAG_array_type */
-@@ -60,6 +61,10 @@
+@@ -51,15 +52,25 @@
+ 	.byte		1			/* DW_AT_byte_size */
+ 	.byte		6			/* DW_AT_encoding */
+ 
+-	.uleb128	5			/* Abbrev: DW_TAG_variable */
++	.uleb128	5			/* Abbrev: DW_TAG_variable DW_FORM_strp */
+ 	.4byte		.Lvarname		/* DW_AT_name */
+ 	.4byte		.Lconst_type-.Lcu1_begin/* DW_AT_type */
+ 	.4byte		.Lvarcontents		/* DW_AT_const_value */
+ 	.byte		1			/* DW_AT_external */
+ 
++	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
++	.string		"a_string2"		/* DW_AT_name */
++	.4byte		.Lconst_type-.Lcu1_begin/* DW_AT_type */
++	.string		"hello world2\n"	/* DW_AT_const_value */
++	.byte		1			/* DW_AT_external */
++
  .Lconst_type:
- 	.uleb128	6			/* Abbrev: DW_TAG_const_type */
+-	.uleb128	6			/* Abbrev: DW_TAG_const_type */
++	.uleb128	7			/* Abbrev: DW_TAG_const_type */
  	.4byte		.Larray_type-.Lcu1_begin/* DW_AT_type */
 +
-+	.uleb128	7			/* Abbrev: DW_TAG_variable (name "") */
++	.uleb128	8			/* Abbrev: DW_TAG_variable (name "") */
 +	.4byte		.Lemptyname		/* DW_AT_name */
 +
  	.byte		0			/* End of children of CU */
  .Lcu1_end:
  
-@@ -126,6 +131,15 @@
+@@ -120,12 +131,35 @@
+ 	.byte		0x0			/* Terminator */
+ 
+ 	.uleb128	6			/* Abbrev code */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0x0			/* no_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x1c			/* DW_AT_const_value */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x3f			/* DW_AT_external */
++	.uleb128	0xc			/* DW_FORM_flag */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	7			/* Abbrev code */
+ 	.uleb128	0x26			/* DW_TAG_const_type */
+ 	.byte		0x0			/* DW_children_no */
+ 	.uleb128	0x49			/* DW_AT_type */
  	.uleb128	0x13			/* DW_FORM_ref4 */
  	.byte		0x0			/* Terminator */
  	.byte		0x0			/* Terminator */
 +
-+	.uleb128	7			/* Abbrev code */
++	.uleb128	8			/* Abbrev code */
 +	.uleb128	0x34			/* DW_TAG_variable */
 +	.byte		0x0			/* DW_children_no */
 +	.uleb128	0x3			/* DW_AT_name */
@@ -39008,12 +39564,26 @@ index a1602a5..293cc1b 100644
  	.byte		0x0			/* Terminator */
  
  /* String table */
-@@ -140,3 +154,5 @@
+@@ -140,3 +174,5 @@
  	.string		"a_string"
  .Lvarcontents:
  	.string		"hello world!\n"
 +.Lemptyname:
 +	.string		""
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-strp.exp b/gdb/testsuite/gdb.dwarf2/dw2-strp.exp
+index 2201d30..41620a4 100644
+--- a/gdb/testsuite/gdb.dwarf2/dw2-strp.exp
++++ b/gdb/testsuite/gdb.dwarf2/dw2-strp.exp
+@@ -48,5 +48,8 @@ gdb_start
+ gdb_reinitialize_dir $srcdir/$subdir
+ gdb_load ${binfile}
+ 
+-gdb_test "p a_string" "\\\$1 = \"hello world!\\\\n\""
++gdb_test "p a_string" " = \"hello world!\\\\n\""
+ gdb_test "ptype a_string" "type = char \\\[14\\\]"
++
++gdb_test "p a_string2" " = \"hello world2\\\\n\""
++gdb_test "ptype a_string2" "type = char \\\[14\\\]"
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-unresolved-main.c b/gdb/testsuite/gdb.dwarf2/dw2-unresolved-main.c
 new file mode 100644
 index 0000000..c24eb96
@@ -39736,6 +40306,128 @@ index 0000000..0f43564
 +  if (x (1, 1) .ne. 8 .or. x (2, 2) .ne. 9 .or. x (1, 2) .ne. 4) call abort
 +  if (x (3, 1) .ne. 10) call abort
 +end
+diff --git a/gdb/testsuite/gdb.fortran/library-module-lib.f90 b/gdb/testsuite/gdb.fortran/library-module-lib.f90
+new file mode 100644
+index 0000000..6369d34
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/library-module-lib.f90
+@@ -0,0 +1,28 @@
++! Copyright 2009 Free Software Foundation, Inc.
++! 
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 3 of the License, or
++! (at your option) any later version.
++! 
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++! 
++! You should have received a copy of the GNU General Public License
++! along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++module lib
++        integer :: var_i = 1
++contains
++        subroutine lib_func
++        if (var_i .ne. 1) call abort
++        var_i = 2
++        end subroutine lib_func
++end module lib
++
++module libmany
++        integer :: var_j = 3
++        integer :: var_k = 4
++end module libmany
+diff --git a/gdb/testsuite/gdb.fortran/library-module-main.f90 b/gdb/testsuite/gdb.fortran/library-module-main.f90
+new file mode 100644
+index 0000000..de63a65
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/library-module-main.f90
+@@ -0,0 +1,23 @@
++! Copyright 2009 Free Software Foundation, Inc.
++! 
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 3 of the License, or
++! (at your option) any later version.
++! 
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++! 
++! You should have received a copy of the GNU General Public License
++! along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++        use lib
++	use libmany, only: var_j
++        if (var_i .ne. 1) call abort
++	call lib_func
++        if (var_i .ne. 2) call abort
++        if (var_j .ne. 3) call abort
++        var_i = var_i                 ! i-is-2
++end
+diff --git a/gdb/testsuite/gdb.fortran/library-module.exp b/gdb/testsuite/gdb.fortran/library-module.exp
+new file mode 100644
+index 0000000..4b4ea4c
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/library-module.exp
+@@ -0,0 +1,53 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++set testfile "library-module"
++set srcfile ${testfile}-main.f90
++set srclibfile ${testfile}-lib.f90
++set libfile ${testfile}-lib.so
++set binfile ${testfile}
++
++# Required for -fPIC by gdb_compile_shlib.
++if [get_compiler_info not-used] {
++   warning "Could not get compiler info"
++   return -1
++}
++
++if  { [gdb_compile_shlib "${srcdir}/${subdir}/${srclibfile}" $objdir/$subdir/$libfile {debug f77}] != "" } {
++    untested "Couldn't compile ${srclibfile}"
++    return -1
++}
++
++# prepare_for_testing cannot be used as linking with $libfile cannot be passed
++# just for the linking phase (and not the source compilation phase).  And any
++# warnings on ignored $libfile abort the process.
++
++if  { [gdb_compile [list $srcdir/$subdir/$srcfile $objdir/$subdir/$libfile] $objdir/$subdir/$binfile executable {debug f77}] != "" } {
++    untested "Couldn't compile ${srcfile}"
++    return -1
++}
++
++clean_restart $binfile
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++gdb_breakpoint [gdb_get_line_number "i-is-2"]
++gdb_continue_to_breakpoint "i-is-2" ".*i-is-2.*"
++gdb_test "print var_i" " = 2"
++gdb_test "print var_j" " = 3"
++gdb_test "print var_k" "No symbol \"var_k\" in current context\\."
 diff --git a/gdb/testsuite/gdb.fortran/logical.exp b/gdb/testsuite/gdb.fortran/logical.exp
 new file mode 100644
 index 0000000..ef76f43
@@ -39825,6 +40517,98 @@ index 0000000..4229304
 +  l8 = .TRUE.
 +  l = .FALSE.					! stop-here
 +end
+diff --git a/gdb/testsuite/gdb.fortran/module.exp b/gdb/testsuite/gdb.fortran/module.exp
+index 342ccee..c836c3c 100644
+--- a/gdb/testsuite/gdb.fortran/module.exp
++++ b/gdb/testsuite/gdb.fortran/module.exp
+@@ -15,21 +15,31 @@
+ 
+ set testfile "module"
+ set srcfile ${testfile}.f90
+-set binfile ${objdir}/${subdir}/${testfile}
+ 
+-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f77 quiet}] != "" } {
+-    untested "Couldn't compile ${srcfile}"
++if { [prepare_for_testing $testfile.exp $testfile $srcfile {debug f77}] } {
+     return -1
+ }
+ 
+-gdb_exit
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-gdb_load ${binfile}
+-
+ if ![runto MAIN__] then {
+     perror "couldn't run to breakpoint MAIN__"
+     continue
+ }
+ 
+-gdb_test "print i" " = 42"
++# Do not use simple single-letter names as GDB would pick up for expectedly
++# nonexisting symbols some static variables from system libraries debuginfos.
++
++gdb_breakpoint [gdb_get_line_number "i-is-1"]
++gdb_continue_to_breakpoint "i-is-1" ".*i-is-1.*"
++gdb_test "print var_i" " = 1" "print var_i value 1"
++
++gdb_breakpoint [gdb_get_line_number "i-is-2"]
++gdb_continue_to_breakpoint "i-is-2" ".*i-is-2.*"
++gdb_test "print var_i" " = 2" "print var_i value 2"
++
++gdb_breakpoint [gdb_get_line_number "a-b-c-d"]
++gdb_continue_to_breakpoint "a-b-c-d" ".*a-b-c-d.*"
++gdb_test "print var_a" "No symbol \"var_a\" in current context\\."
++gdb_test "print var_b" " = 11"
++gdb_test "print var_c" "No symbol \"var_c\" in current context\\."
++gdb_test "print var_d" " = 12"
++gdb_test "print var_i" " = 14" "print var_i value 14"
+diff --git a/gdb/testsuite/gdb.fortran/module.f90 b/gdb/testsuite/gdb.fortran/module.f90
+index 501ccc8..118931d 100644
+--- a/gdb/testsuite/gdb.fortran/module.f90
++++ b/gdb/testsuite/gdb.fortran/module.f90
+@@ -13,10 +13,37 @@
+ ! You should have received a copy of the GNU General Public License
+ ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-module mod
+-        integer :: i = 42
+-end module mod
++module mod1
++        integer :: var_i = 1
++end module mod1
+ 
+-        use mod
+-        print *, i
++module mod2
++        integer :: var_i = 2
++end module mod2
++
++module modmany
++        integer :: var_a = 10, var_b = 11, var_c = 12, var_i = 14
++end module modmany
++
++        subroutine sub1
++        use mod1
++        if (var_i .ne. 1) call abort
++        var_i = var_i                         ! i-is-1
++        end
++
++        subroutine sub2
++        use mod2
++        if (var_i .ne. 2) call abort
++        var_i = var_i                         ! i-is-2
++        end
++
++        use modmany, only: var_b, var_d => var_c, var_i
++
++        call sub1
++        call sub2
++
++        if (var_b .ne. 11) call abort
++        if (var_d .ne. 12) call abort
++        if (var_i .ne. 14) call abort
++        var_b = var_b                         ! a-b-c-d
+ end
 diff --git a/gdb/testsuite/gdb.fortran/string.exp b/gdb/testsuite/gdb.fortran/string.exp
 new file mode 100644
 index 0000000..ab72206
