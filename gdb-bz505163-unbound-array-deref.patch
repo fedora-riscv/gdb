@@ -1,0 +1,72 @@
+From 30c13da4efe18f43ee34aa4b29bc86e1a53de548 Mon Sep 17 00:00:00 2001
+From: Jan Kratochvil <jkratoch@host1.dyn.jankratochvil.net>
+Date: Thu, 11 Jun 2009 00:23:54 +0200
+Subject: [PATCH] cherry-pick: Fix dereferencing unbound C arrays (RHBZ#505163).
+
+gdb/
+	* gdbtypes.c (get_discrete_bounds): Remove the VLA-introduced check for
+	TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED and
+	TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED.
+
+gdb/testsuite/
+	* gdb.base/arrayidx.c (unbound): New variable.
+	* gdb.base/arrayidx.exp (p unbound.a == &unbound.a[0]): New test.
+---
+ gdb/gdbtypes.c                      |    3 ---
+ gdb/testsuite/gdb.base/arrayidx.c   |    7 +++++++
+ gdb/testsuite/gdb.base/arrayidx.exp |   10 +++++++++-
+ 3 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
+index 012485c..9899727 100644
+--- a/gdb/gdbtypes.c
++++ b/gdb/gdbtypes.c
+@@ -769,9 +769,6 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
+   switch (TYPE_CODE (type))
+     {
+     case TYPE_CODE_RANGE:
+-      if (TYPE_RANGE_UPPER_BOUND_IS_UNDEFINED (type) 
+-	  || TYPE_RANGE_LOWER_BOUND_IS_UNDEFINED (type))
+-	return -1;
+       *lowp = TYPE_LOW_BOUND (type);
+       *highp = TYPE_HIGH_BOUND (type);
+       return 1;
+diff --git a/gdb/testsuite/gdb.base/arrayidx.c b/gdb/testsuite/gdb.base/arrayidx.c
+index 98d4d35..f98a656 100644
+--- a/gdb/testsuite/gdb.base/arrayidx.c
++++ b/gdb/testsuite/gdb.base/arrayidx.c
+@@ -17,6 +17,13 @@
+ 
+ int array[] = {1, 2, 3, 4};
+ 
++#ifdef __GNUC__
++struct
++  {
++    int a[0];
++  } unbound;
++#endif
++
+ int
+ main (void)
+ {
+diff --git a/gdb/testsuite/gdb.base/arrayidx.exp b/gdb/testsuite/gdb.base/arrayidx.exp
+index 71ce4aa..af0e5f8 100644
+--- a/gdb/testsuite/gdb.base/arrayidx.exp
++++ b/gdb/testsuite/gdb.base/arrayidx.exp
+@@ -59,4 +59,12 @@ gdb_test "print array" \
+          "\\{\\\[0\\\] = 1, \\\[1\\\] = 2, \\\[2\\\] = 3, \\\[3\\\] = 4\\}" \
+          "Print array with array-indexes on"
+ 
+-
++set test "p unbound.a == &unbound.a\[0\]"
++gdb_test_multiple $test $test {
++    -re " = 1\r\n$gdb_prompt $" {
++	pass $test
++    }
++    -re "No symbol \"unbound\" in current context.\r\n$gdb_prompt $" {
++	unsupported "$test (no GCC)"
++    }
++}
+-- 
+1.6.0.6
+
