@@ -15,7 +15,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{?dist}
+Release: 29%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -887,6 +887,11 @@ fi
 %endif
 
 %changelog
+* Thu Jun 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-29
+- Archer update to the snapshot: 30c13da4efe18f43ee34aa4b29bc86e1a53de548
+- Archer backport: 30c13da4efe18f43ee34aa4b29bc86e1a53de548
+  - Fix dereferencing unbound C arrays (BZ 505163).
+
 * Wed Jun 10 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-28
 - Archer update to the snapshot: 000db8b7bfef8581ef099ccca8689cfddfea1be8
 - Archer backport: b8d3bea36b137effc929e02c4dadf73716cb330b
