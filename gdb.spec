@@ -14,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{?dist}
+Release: 26%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -876,6 +876,9 @@ fi
 %endif
 
 %changelog
+* Fri Jun 12 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-26
+- Fix an occasional crash during printing of missing debuginfo rpms (BZ 505401).
+
 * Thu Jun 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-25
 - Archer update to the snapshot: 30c13da4efe18f43ee34aa4b29bc86e1a53de548
 - Archer backport: 30c13da4efe18f43ee34aa4b29bc86e1a53de548
