@@ -13,7 +13,7 @@ Version: 6.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?_with_upstream:.upstream}%{?dist}
+Release: 31%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -896,6 +896,9 @@ fi
 %endif
 
 %changelog
+* Sat Jun 13 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-31
+- Fix an occasional crash during printing of missing debuginfo rpms (BZ 505401).
+
 * Thu Jun 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8-30
 - Fix dereferencing unbound C arrays (BZ 505163).
 
