@@ -782,7 +782,7 @@
  
    if (retval != NULL && !build_id_verify (retval, build_id))
      {
-@@ -1314,9 +1714,438 @@ build_id_to_debug_filename (struct build
+@@ -1314,9 +1714,446 @@ build_id_to_debug_filename (struct build
        retval = NULL;
      }
  
@@ -1113,8 +1113,8 @@
 +		       const struct missing_filepair *elem2)
 +{
 +  return strcmp (elem1->binary, elem2->binary) == 0
-+         && ((elem1->debug == NULL && elem2->debug == NULL)
-+	     || strcmp (elem1->debug, elem2->debug) == 0);
++         && ((elem1->debug == NULL) == (elem2->debug == NULL))
++         && (elem1->debug == NULL || strcmp (elem1->debug, elem2->debug) == 0);
 +}
 +
 +static void
@@ -1147,6 +1147,7 @@
 +{
 +  size_t binary_len0 = strlen (binary) + 1;
 +  size_t debug_len0 = debug ? strlen (debug) + 1 : 0;
++  struct missing_filepair missing_filepair_find;
 +  struct missing_filepair *missing_filepair;
 +  struct missing_filepair **slot;
 +
@@ -1162,6 +1163,27 @@
 +	missing_filepair_xcalloc, NULL);
 +    }
 +
++  /* Use MISSING_FILEPAIR_FIND first instead of calling obstack_alloc with
++     obstack_free in the case of a (rare) match.  The problem is ALLOC_F for
++     MISSING_FILEPAIR_HASH allocates from MISSING_FILEPAIR_OBSTACK maintenance
++     structures for MISSING_FILEPAIR_HASH.  Calling obstack_free would possibly
++     not to free only MISSING_FILEPAIR but also some such structures (allocated
++     during the htab_find_slot call).  */
++
++  missing_filepair_find.binary = (char *) binary;
++  missing_filepair_find.debug = (char *) debug;
++  slot = (struct missing_filepair **) htab_find_slot (missing_filepair_hash,
++						      &missing_filepair_find,
++						      INSERT);
++
++  /* While it may be still printed duplicitely with the missing debuginfo file
++   * it is due to once printing about the binary file build-id link and once
++   * about the .debug file build-id link as both the build-id symlinks are
++   * located in the debuginfo package.  */
++
++  if (*slot != NULL)
++    return;
++
 +  missing_filepair = obstack_alloc (&missing_filepair_obstack,
 +				      sizeof (*missing_filepair) - 1
 +				      + binary_len0 + debug_len0);
@@ -1175,20 +1197,6 @@
 +  else
 +    missing_filepair->debug = NULL;
 +
-+  slot = (struct missing_filepair **) htab_find_slot (missing_filepair_hash,
-+							missing_filepair,
-+							INSERT);
-+
-+  /* While it may be still printed duplicitely with the missing debuginfo file
-+   * it is due to once printing about the binary file build-id link and once
-+   * about the .debug file build-id link as both the build-id symlinks are
-+   * located in the debuginfo package.  */
-+
-+  if (*slot != NULL)
-+    {
-+      obstack_free (&missing_filepair_obstack, missing_filepair);
-+      return;
-+    }
 +  *slot = missing_filepair;
 +
 +  if (missing_exec == MISSING_EXEC_NOT_TRIED)
