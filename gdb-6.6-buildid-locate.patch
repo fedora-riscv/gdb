@@ -13,7 +13,7 @@ Index: gdb-6.8.50.20090302/gdb/corelow.c
  
  
  #ifndef O_LARGEFILE
-@@ -267,6 +271,56 @@ add_to_thread_list (bfd *abfd, asection 
+@@ -267,6 +271,50 @@ add_to_thread_list (bfd *abfd, asection 
      inferior_ptid = ptid;			 /* Yes, make it current */
  }
  
@@ -26,6 +26,7 @@ Index: gdb-6.8.50.20090302/gdb/corelow.c
 +  struct build_id *build_id;
 +  char *exec_filename, *debug_filename;
 +  char *build_id_filename;
++  struct cleanup *back_to;
 +
 +  if (exec_bfd != NULL)
 +    return;
@@ -37,32 +38,25 @@ Index: gdb-6.8.50.20090302/gdb/corelow.c
 +  if (build_id == NULL)
 +    return;
 +
++  /* SYMFILE_OBJFILE should refer to the main executable (not only to its
++     separate debug info file).  gcc44+ keeps .eh_frame only in the main
++     executable without its duplicate .debug_frame in the separate debug info
++     file - such .eh_frame would not be found if SYMFILE_OBJFILE would refer
++     directly to the separate debug info file.  */
++
 +  exec_filename = build_id_to_filename (build_id, &build_id_filename, 0);
++  back_to = make_cleanup (xfree, build_id_filename);
++
 +  if (exec_filename != NULL)
-+    exec_file_attach (exec_filename, from_tty);
++    {
++      make_cleanup (xfree, exec_filename);
++      exec_file_attach (exec_filename, from_tty);
++      symbol_file_add_main (exec_filename, from_tty);
++    }
 +  else
 +    debug_print_missing (_("the main executable file"), build_id_filename);
-+  xfree (build_id_filename);
 +
-+  /* `.note.gnu.build-id' section exists even for files without a separate
-+     debuginfo.  */
-+  debug_filename = build_id_to_filename (build_id, &build_id_filename, 1);
-+  if (debug_filename != NULL)
-+    {
-+      symbol_file_add_main (debug_filename, from_tty);
-+      xfree (debug_filename);
-+    }
-+  else
-+    {
-+      if (exec_filename != NULL)
-+	symbol_file_add_main (exec_filename, from_tty);
-+      /* For EXEC_FILENAME NULL we were already complaining above.  */
-+      if (symfile_objfile == NULL && exec_filename != NULL)
-+	debug_print_missing (exec_filename, build_id_filename);
-+    }
-+  xfree (build_id_filename);
-+
-+  xfree (exec_filename);
++  do_cleanups (back_to);
 +
 +  /* No automatic SOLIB_ADD as the libraries would get read twice.  */
 +}
