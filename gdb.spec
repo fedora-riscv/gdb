@@ -15,7 +15,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{?dist}
+Release: 34%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -891,6 +891,10 @@ fi
 %endif
 
 %changelog
+* Mon Jun 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-34
+- Fix backtraces from core files with the executable found+loaded via build-id.
+  - Due to F-11 GCC no longer needlessly duplicating .eh_frame as .debug_frame.
+
 * Tue Jun 16 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-33
 - Archer update to the snapshot: 05c402a02716177c4ddd272a6e312cbd2908ed68
 - Archer backport: 05c402a02716177c4ddd272a6e312cbd2908ed68
