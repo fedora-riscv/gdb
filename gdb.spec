@@ -15,7 +15,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?_with_upstream:.upstream}%{?dist}
+Release: 35%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -390,6 +390,9 @@ Patch370: gdb-varobj-revalidate-core.patch
 # Implement DW_OP_call_frame_cfa (for recent GCC).
 Patch373: gdb-DW_OP_call_frame_cfa.patch
 
+# Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
+patch374: gdb-bz507267-block-sort-fast.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -591,6 +594,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch369 -p1
 %patch370 -p1
 %patch373 -p1
+%patch374 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -891,6 +895,9 @@ fi
 %endif
 
 %changelog
+* Mon Jun 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-35
+- Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
+
 * Mon Jun 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-34
 - Fix backtraces from core files with the executable found+loaded via build-id.
   - Due to F-11 GCC no longer needlessly duplicating .eh_frame as .debug_frame.
