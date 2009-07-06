@@ -1,6 +1,5 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
-# --with parallel: Run the testsuite in maximum parallel mode.
 # --with debug: Build without optimizations and without splitting the debuginfo.
 # --with upstream: No Fedora specific patches get applied.
 
@@ -14,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{?dist}
+Release: 34%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -745,20 +744,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
-%if 0%{?_with_parallel:1}
-  for CURRENT in $CHECK
-  do
-    ./orphanripper make -k $CURRENT &
-  done
-  echo >&2 "Waiting for parallel testsuite runs to finish..."
-  wait
-  echo >&2 "Parallel testsuite runs finished."
-%else	# 0%{?_with_parallel:1}
-  for CURRENT in $CHECK
-  do
-    ./orphanripper make -k $CURRENT || :
-  done
-%endif	# 0%{?_with_parallel:1}
+  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
 )
 for t in sum log
 do
@@ -880,6 +866,11 @@ fi
 %endif
 
 %changelog
+* Mon Jul  6 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-34
+- testsuite: Fix multiple runs in parallel on a single host.
+- testsuite: Remove the rpmbuild option: --with parallel
+- testsuite: Run the testsuite with default rpm _smp_mflags.
+
 * Mon Jul  6 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-33
 - Archer update to the snapshot: 17bfc0488f54aeeb7a9e20ef3caa7e31e8e985fb
 - Archer backport: de9c5190034b84b0a5fb4b98b05b304cda187700

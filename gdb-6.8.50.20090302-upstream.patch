@@ -614,3 +614,134 @@ gdb/testsuite/
 +
 +gdb_breakpoint "fn_return"
 +gdb_continue_to_breakpoint "fn_return" ".*at-fn_return.*"
+
+
+
+[patch] testsuite: Fix multiple runs in parallel on a single host
+
+http://sourceware.org/ml/gdb-patches/2009-07/msg00008.html
+http://sourceware.org/ml/gdb-cvs/2009-07/msg00051.html
+
+2009-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdbserver-support.exp (gdbserver_start): Loop spawning
+	gdbserver increasing $portnum if "Can't bind address" has been seen.
+
+--- src/gdb/testsuite/lib/gdbserver-support.exp	2009/01/03 05:58:08	1.14
++++ src/gdb/testsuite/lib/gdbserver-support.exp	2009/07/06 18:51:10	1.15
+@@ -209,26 +209,39 @@
+ 
+     set gdbserver [find_gdbserver]
+ 
+-    # Export the host:port pair.
+-    set gdbport $debughost$portnum
+-
+-    # Fire off the debug agent.
+-    set gdbserver_command "$gdbserver"
+-    if { $options != "" } {
+-	append gdbserver_command " $options"
+-    }
+-    append gdbserver_command " :$portnum"
+-    if { $arguments != "" } {
+-	append gdbserver_command " $arguments"
+-    }
++    # Loop till we find a free port.
++    while 1 {
++	# Export the host:port pair.
++	set gdbport $debughost$portnum
++
++	# Fire off the debug agent.
++	set gdbserver_command "$gdbserver"
++	if { $options != "" } {
++	    append gdbserver_command " $options"
++	}
++	append gdbserver_command " :$portnum"
++	if { $arguments != "" } {
++	    append gdbserver_command " $arguments"
++	}
+ 
+-    set server_spawn_id [remote_spawn target $gdbserver_command]
++	set server_spawn_id [remote_spawn target $gdbserver_command]
+ 
+-    # Wait for the server to open its TCP socket, so that GDB can connect.
+-    expect {
+-	-i $server_spawn_id
+-	-notransfer
+-	-re "Listening on" { }
++	# Wait for the server to open its TCP socket, so that GDB can connect.
++	expect {
++	    -i $server_spawn_id
++	    -notransfer
++	    -re "Listening on" { }
++	    -re "Can't bind address: Address already in use\\.\r\n" {
++		verbose -log "Port $portnum is already in use."
++		if ![target_info exists gdb,socketport] {
++		    # Bump the port number to avoid the conflict.
++		    wait -i $expect_out(spawn_id)
++		    incr portnum
++		    continue
++		}
++	    }
++	}
++	break
+     }
+ 
+     # We can't just call close, because if gdbserver is local then that means
+
+
+
+http://sourceware.org/ml/gdb-cvs/2009-06/msg00203.html
+
+2009-06-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Remove racy FAILs relying just on the timeouts.
+	* gdb.base/setshow.exp (set annotate 2, show annotate (2))
+	(annotation_level 2): Remove racy FAILs.
+
+--- src/gdb/testsuite/gdb.base/setshow.exp	2009/01/03 05:58:03	1.10
++++ src/gdb/testsuite/gdb.base/setshow.exp	2009/06/30 18:28:12	1.11
+@@ -60,7 +60,6 @@
+ gdb_expect {
+ 	-re ".*\032\032pre-prompt.*$gdb_prompt .*\032\032prompt.*$" \
+ 				{ pass "set annotate 2" }
+- 	-re ".*$gdb_prompt $"	{ fail "set annotate 2" }
+ 	timeout			{ fail "(timeout) set annotate 2" }
+     }
+ 
+@@ -68,7 +67,6 @@
+ gdb_expect {
+ 	-re ".*\032\032post-prompt.*Annotation_level is 2..*\032\032pre-prompt.*$gdb_prompt .*\032\032prompt.*$" \
+ 				{ pass "show annotate (2)" }
+- 	-re ".*$gdb_prompt $"	{ fail "show annotate (2)" }
+ 	timeout			{ fail "(timeout) show annotate (2)" }
+     }
+ 
+@@ -77,7 +75,6 @@
+ gdb_expect {
+ 	-re ".*\032\032post-prompt.*Line 1 of .* is at address .* but contains no code.*:1:0:beg:0x.*\032\032pre-prompt.*$gdb_prompt .*\032\032prompt.*$" \
+ 				{ pass "annotation_level 2" }
+-	-re ".*$gdb_prompt $"	{ fail "annotation_level 2" }
+ 	timeout			{ fail "(timeout) annotation_level 2" }
+     }
+ 
+
+
+
+http://sourceware.org/ml/gdb-cvs/2009-06/msg00204.html
+
+2009-06-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/mi-support.exp (mi_check_thread_states): Permit any output before
+	the expected result record.
+
+--- src/gdb/testsuite/lib/mi-support.exp	2009/05/28 01:09:20	1.84
++++ src/gdb/testsuite/lib/mi-support.exp	2009/06/30 20:23:05	1.85
+@@ -1808,7 +1808,7 @@
+ proc mi_check_thread_states { xstates test } {
+     global expect_out
+     set states [mi_reverse_list $xstates]
+-    set pattern "\\^done,threads=\\\["
++    set pattern ".*\\^done,threads=\\\["
+     foreach s $states {
+ 	set pattern "${pattern}(.*)state=\"$s\""
+     }
