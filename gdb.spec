@@ -14,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?_with_upstream:.upstream}%{?dist}
+Release: 33%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -387,7 +387,7 @@ Patch369: gdb-varobj-revalidate-prep.patch
 Patch370: gdb-varobj-revalidate-core.patch
 
 # Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
-patch374: gdb-bz507267-block-sort-fast.patch
+Patch374: gdb-bz507267-block-sort-fast.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -880,6 +880,11 @@ fi
 %endif
 
 %changelog
+* Mon Jul  6 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-33
+- Archer update to the snapshot: 17bfc0488f54aeeb7a9e20ef3caa7e31e8e985fb
+- Archer backport: de9c5190034b84b0a5fb4b98b05b304cda187700
+  - [vla] Fix a crash regression on constant DW_AT_data_member_location.
+
 * Mon Jun 29 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-32
 - Replace the fix of cloned-TIDs with no pthread from upstream (BZ 471819).
 - Fix a parallel testsuite runs incompatibility in gdb.base/gcore-shmid0.exp.
