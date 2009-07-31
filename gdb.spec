@@ -14,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?_with_upstream:.upstream}%{?dist}
+Release: 41%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -392,6 +392,9 @@ Patch373: gdb-DW_OP_call_frame_cfa.patch
 # Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
 Patch374: gdb-bz507267-block-sort-fast.patch
 
+# Fix compatibility of --with-system-readline and readline-6.0+.
+Patch375: gdb-readline-6.0.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -594,6 +597,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch370 -p1
 %patch373 -p1
 %patch374 -p1
+%patch375 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -755,7 +759,8 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
-  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
+  # FIXME: Temporary F12 disable: ./orphanripper
+  make %{?_smp_mflags} -k $CHECK || :
 )
 for t in sum log
 do
@@ -881,6 +886,10 @@ fi
 %endif
 
 %changelog
+* Fri Jul 31 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-41
+- Fix compatibility of --with-system-readline and readline-6.0+.
+- Temporarily disabled orphanripper on Fedora 12.
+
 * Fri Jul 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 6.8.50.20090302-40
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_12_Mass_Rebuild
 

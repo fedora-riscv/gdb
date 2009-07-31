@@ -46,43 +46,83 @@
 
 static const char *progname;
 
-static volatile int signal_child_hit = 0;
+static volatile int signal_chld_hit = 0;
 
-/* We use it to race-safely emulate ppoll(2) by poll(2).  */
-static int pipefd[2];
-
-static void signal_child (int signo)
+static void signal_chld (int signo)
 {
-  int i;
+  signal_chld_hit = 1;
+}
 
-  signal_child_hit = 1;
+static volatile int signal_alrm_hit = 0;
 
-  assert (pipefd[1] != -1);
-  i = close (pipefd[1]);
-  assert (i == 0);
-  pipefd[1] = -1;
+static void signal_alrm (int signo)
+{
+  signal_alrm_hit = 1;
 }
 
 static char childptyname[LINE_MAX];
 static pid_t child;
 
-static int spawn (char **argv)
+static void print_child_error (const char *reason, char **argv)
+{
+  char **sp;
+
+  fprintf (stderr, "%s: %d %s:", progname, (int) child, reason);
+  for (sp = argv; *sp != NULL; sp++)
+    {
+      fputc (' ', stderr);
+      fputs (*sp, stderr);
+    }
+  fputc ('\n', stderr);
+}
+
+static int read_out (int amaster)
+{
+  char buf[LINE_MAX];
+  ssize_t buf_got;
+
+  buf_got = read (amaster, buf, sizeof buf);
+  if (buf_got == 0)
+    return 0;
+  /* Weird but at least after POLLHUP we get EIO instead of just EOF.  */
+  if (buf_got == -1 && errno == EIO)
+    return 0;
+  if (buf_got < 0)
+    {
+      perror ("read (amaster)");
+      exit (EXIT_FAILURE);
+    }
+  if (write (STDOUT_FILENO, buf, buf_got) != buf_got)
+    {
+      perror ("write(2)");
+      exit (EXIT_FAILURE);
+    }
+  return 1;
+}
+
+static int spawn (char **argv, int timeout)
 {
   pid_t child_got;
-  int status, amaster, i;
+  int status, amaster, i, rc;
   struct sigaction act;
+  sigset_t set;
   struct termios termios;
+  unsigned alarm_orig;
 
-  i = pipe (pipefd);
-  assert (i == 0);
-
-  /* We do not use signal(2) to be sure we have SA_RESTART set.  */
+  /* We do not use signal(2) to be sure we do not have SA_RESTART.  */
   memset (&act, 0, sizeof (act));
-  act.sa_handler = signal_child;
+  act.sa_handler = signal_chld;
   i = sigemptyset (&act.sa_mask);
   assert (i == 0);
-  act.sa_flags = SA_RESTART;
+  act.sa_flags = 0;	/* !SA_RESTART */
   i = sigaction (SIGCHLD, &act, NULL);
+  assert (i == 0);
+
+  i = sigemptyset (&set);
+  assert (i == 0);
+  i = sigaddset (&set, SIGCHLD);
+  assert (i == 0);
+  i = sigprocmask (SIG_SETMASK, &set, NULL);
   assert (i == 0);
 
   /* With TERMP passed as NULL we get "\n" -> "\r\n".  */
@@ -90,7 +130,6 @@ static int spawn (char **argv)
   termios.c_oflag = 0;
   termios.c_cflag = CS8 | CREAD | CLOCAL | HUPCL | B9600;
   termios.c_lflag = IEXTEN | NOFLSH;
-  termios.c_line = 0;
   memset (termios.c_cc, _POSIX_VDISABLE, sizeof (termios.c_cc));
   termios.c_cc[VTIME] = 0;
   termios.c_cc[VMIN ] = 1;
@@ -106,11 +145,6 @@ static int spawn (char **argv)
 	perror ("forkpty(3)");
 	exit (EXIT_FAILURE);
       case 0:
-	i = close (pipefd[0]);
-	assert (i == 0);
-	i = close (pipefd[1]);
-	assert (i == 0);
-
 	/* Do not replace STDIN as inferiors query its termios.  */
 #if 0
 	i = close (STDIN_FILENO);
@@ -135,7 +169,7 @@ static int spawn (char **argv)
 	    perror ("getpgrp(2)");
 	    exit (EXIT_FAILURE);
 	  }
-	execvp (argv[1], argv + 1);
+	execvp (argv[0], argv);
 	perror ("execvp(2)");
 	exit (EXIT_FAILURE);
       default:
@@ -147,51 +181,58 @@ static int spawn (char **argv)
       perror ("fcntl (amaster, F_SETFL, O_NONBLOCK)");
       exit (EXIT_FAILURE);
     }
-  for (;;)
-    {
-      struct pollfd pollfd[2];
-      char buf[LINE_MAX];
-      ssize_t buf_got;
 
-      pollfd[0].fd = amaster;
-      pollfd[0].events = POLLIN;
-      pollfd[1].fd = pipefd[0];
-      pollfd[1].events = POLLIN;
-      i = poll (pollfd, LENGTH (pollfd), -1);
-      if (i == -1 && errno == EINTR)
-        {
-	  /* Weird but SA_RESTART sometimes does not work.  */
-	  continue;
-	}
-      assert (i >= 1);
+  /* We do not use signal(2) to be sure we do not have SA_RESTART.  */
+  act.sa_handler = signal_alrm;
+  i = sigaction (SIGALRM, &act, NULL);
+  assert (i == 0);
+
+  alarm_orig = alarm (timeout);
+  assert (alarm_orig == 0);
+
+  i = sigemptyset (&set);
+  assert (i == 0);
+
+  while (!signal_alrm_hit)
+    {
+      struct pollfd pollfd;
+
+      pollfd.fd = amaster;
+      pollfd.events = POLLIN;
+      i = ppoll (&pollfd, 1, NULL, &set);
+      if (i == -1 && errno == EINTR && signal_chld_hit)
+	break;
+      assert (i == 1);
       /* Data available?  Process it first.  */
-      if (pollfd[0].revents & POLLIN)
+      if (pollfd.revents & POLLIN)
 	{
-	  buf_got = read (amaster, buf, sizeof buf);
-	  if (buf_got <= 0)
+	  if (!read_out (amaster))
 	    {
-	      perror ("read (amaster)");
-	      exit (EXIT_FAILURE);
-	    }
-	  if (write (STDOUT_FILENO, buf, buf_got) != buf_got)
-	    {
-	      perror ("write(2)");
+	      fprintf (stderr, "%s: Unexpected EOF\n", progname);
 	      exit (EXIT_FAILURE);
 	    }
 	}
-      if (pollfd[0].revents & POLLHUP)
+      if (pollfd.revents & POLLHUP)
         break;
-      if ((pollfd[0].revents &= ~POLLIN) != 0)
+      if ((pollfd.revents &= ~POLLIN) != 0)
 	{
 	  fprintf (stderr, "%s: ppoll(2): revents 0x%x\n", progname,
-		   (unsigned) pollfd[0].revents);
+		   (unsigned) pollfd.revents);
 	  exit (EXIT_FAILURE);
 	}
       /* Child exited?  */
-      if (pollfd[1].revents & POLLHUP)
+      if (signal_chld_hit)
 	break;
-      assert (pollfd[1].revents == 0);
     }
+
+  if (signal_alrm_hit)
+    {
+      i = kill (child, SIGKILL);
+      assert (i == 0);
+    }
+  else
+    alarm (0);
+
   /* WNOHANG still could fail.  */
   child_got = waitpid (child, &status, 0);
   if (child != child_got)
@@ -199,16 +240,50 @@ static int spawn (char **argv)
       fprintf (stderr, "waitpid (%d) = %d: %m\n", (int) child, (int) child_got);
       exit (EXIT_FAILURE);
     }
-  if (!WIFEXITED (status))
+  if (signal_alrm_hit)
+    {
+      char *buf;
+
+      if (asprintf (&buf, "Timed out after %d seconds", timeout) != -1)
+	{
+	  print_child_error (buf, argv);
+	  free (buf);
+	}
+      rc = 128 + SIGALRM;
+    }
+  else if (WIFEXITED (status))
+    rc = WEXITSTATUS (status);
+  else if (WIFSIGNALED (status))
+    {
+      print_child_error (strsignal (WTERMSIG (status)), argv);
+      rc = 128 + WTERMSIG (status);
+    }
+  else if (WIFSTOPPED (status))
+    {
+      fprintf (stderr, "waitpid (%d): WIFSTOPPED - WSTOPSIG is %d\n",
+	       (int) child, WSTOPSIG (status));
+      exit (EXIT_FAILURE);
+    }
+  else
     {
       fprintf (stderr, "waitpid (%d): !WIFEXITED (%d)\n", (int) child, status);
       exit (EXIT_FAILURE);
     }
 
-  assert (signal_child_hit != 0);
-  assert (pipefd[1] == -1);
-  i = close (pipefd[0]);
+  /* In the POLLHUP case we may not have seen SIGCHLD so far.  */
+  i = sigprocmask (SIG_SETMASK, &set, NULL);
   assert (i == 0);
+
+  assert (signal_chld_hit != 0);
+
+  i = fcntl (amaster, F_SETFL, O_RDONLY /* !O_NONBLOCK */);
+  if (i != 0)
+    {
+      perror ("fcntl (amaster, F_SETFL, O_RDONLY /* !O_NONBLOCK */)");
+      exit (EXIT_FAILURE);
+    }
+
+  while (read_out (amaster));
 
   /* Do not close the master FD as the child would have `/dev/pts/23 (deleted)'
      entries which are not expected (and expecting ` (deleted)' would be
@@ -222,7 +297,7 @@ static int spawn (char **argv)
     }
 #endif
 
-  return WEXITSTATUS (status);
+  return rc;
 }
 
 /* Detected commandline may look weird due to a race:
@@ -297,7 +372,7 @@ static int dir_scan (const char *dirname,
 
       pathname_len = snprintf (pathname, sizeof pathname, "%s/%s",
 				 dirname, dirent->d_name);
-      if (pathname_len <= 0 || pathname_len >= sizeof pathname)
+      if (pathname_len <= 0 || pathname_len >= (int) sizeof pathname)
 	{
 	  fprintf (stderr, "entry file name too long: `%s' / `%s'\n",
 		   dirname, dirent->d_name);
@@ -373,7 +448,7 @@ static int fd_fs_scan (pid_t pid, int (*func) (pid_t pid, const char *link))
     if (dirent->d_type == DT_DIR)
       return 0;
     buf_len = readlink (pathname, buf, sizeof buf - 1);
-    if (buf_len <= 0 || buf_len >= sizeof buf - 1)
+    if (buf_len <= 0 || buf_len >= (ssize_t) sizeof buf - 1)
       {
 	if (errno != ENOENT && errno != EACCES)
 	  fprintf (stderr, "Error reading link \"%s\": %m\n", pathname);
@@ -583,16 +658,44 @@ static void rip (void)
 
 int main (int argc, char **argv)
 {
+  int timeout = 0;
   int rc;
 
-  if (argc < 2 || strcmp (argv[1], "-h") == 0
-      || strcmp (argv[1], "--help") == 0)
+  progname = *argv++;
+  argc--;
+
+  if (argc < 1 || strcmp (*argv, "-h") == 0
+      || strcmp (*argv, "--help") == 0)
     {
-      fputs ("Syntax: orphanripper <execvp(3) commandline>\n", stdout);
+      puts ("Syntax: orphanripper [-t <seconds>] <execvp(3) commandline>");
       exit (EXIT_FAILURE);
     }
-  progname = argv[0];
-  rc = spawn (argv);
+  if ((*argv)[0] == '-' && (*argv)[1] == 't')
+    {
+      char *timeout_s = NULL;
+
+      if ((*argv)[2] == 0)
+	timeout_s = *++argv;
+      else if (isdigit ((*argv)[2]))
+	timeout_s = (*argv) + 2;
+      if (timeout_s != NULL)
+	{
+	  long l;
+	  char *endptr;
+
+	  argv++;
+	  l = strtol (timeout_s, &endptr, 0);
+	  timeout = l;
+	  if ((endptr != NULL && *endptr != 0) || timeout < 0 || timeout != l)
+	    {
+	      fprintf (stderr, "%s: Invalid timeout value: %s\n", progname,
+		       timeout_s);
+	      exit (EXIT_FAILURE);
+	    }
+	}
+    }
+
+  rc = spawn (argv, timeout);
   rip ();
   return rc;
 }
