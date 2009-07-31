@@ -14,7 +14,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?_with_upstream:.upstream}%{?dist}
+Release: 42%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -886,6 +886,9 @@ fi
 %endif
 
 %changelog
+* Fri Jul 31 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-42
+- Release bump only.
+
 * Fri Jul 31 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-41
 - Fix compatibility of --with-system-readline and readline-6.0+.
 - Temporarily disabled orphanripper on Fedora 12.
