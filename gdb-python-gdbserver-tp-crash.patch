@@ -1,0 +1,41 @@
+commit f19ba6e3238e359f2c147d080f7364fd667d202d
+Author: Jan Kratochvil <jkratoch@host1.dyn.jankratochvil.net>
+Date:   Sat Aug 1 14:52:19 2009 +0200
+
+    Fix crash with archer-tromey-python vs. FSF GDB HEAD.
+    
+    Crashing at least on gdb.server/server-run.exp .
+    
+    +  /* FIXME: Workaround archer-tromey-python crash in
+    +     add_inferior_object->get_current_arch on FSF GDB update:
+    +     is_thread_state would assertion check here as
+    +     remote_start_remote->add_inferior_silent->observer_notify_new_inferior is
+    +     before remote_start_remote->add_thread_silent.  */
+    
+    	* frame.c (has_stack_frames): Safely return 0 if INFERIOR_PTID
+    	currently has no associated thread.
+
+Running ../../../gdb/testsuite/gdb.mi/mi-file-transfer.exp ...
+Executing on host: gcc ../../../gdb/testsuite/gdb.mi/basics.c  -g  -lm   -m32 -o /home/jkratoch/hammock/20090802Build-fedora11/fedora-11-x86_64/build/gdb-6.8.50.20090302/build-x86_64-redhat-linux-gnu/gdb/testsuite.unix.-m32/gdb.mi/basics    (timeout = 300)
+
+~"../../gdb/thread.c:78: internal-error: inferior_thread: Assertion `tp' failed.\nA problem internal to GDB has been detected,\nfurther debugging may prove unreliable.\nQuit this debugging session? "
+
+[ Backport for gdb-6.8.50.20090302.  ]
+
+--- gdb-6.8.50.20090302/gdb/frame.c.orig	2009-08-02 05:15:28.000000000 +0200
++++ gdb-6.8.50.20090302/gdb/frame.c	2009-08-02 05:16:59.000000000 +0200
+@@ -1086,6 +1086,14 @@ has_stack_frames (void)
+   if (!target_has_registers || !target_has_stack || !target_has_memory)
+     return 0;
+ 
++   /* FIXME: Workaround archer-tromey-python crash in
++      add_inferior_object->get_current_arch on FSF GDB update:
++      is_thread_state would assertion check here as
++      remote_start_remote->add_inferior_silent->observer_notify_new_inferior is
++      before remote_start_remote->add_thread_silent.  */
++   if (find_thread_ptid (inferior_ptid) == NULL)
++     return 0;
++ 
+   /* If the current thread is executing, don't try to read from
+      it.  */
+   if (is_executing (inferior_ptid))

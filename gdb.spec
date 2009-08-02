@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?_with_upstream:.upstream}%{?dist}
+Release: 35%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -388,6 +388,9 @@ Patch370: gdb-varobj-revalidate-core.patch
 # Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
 Patch374: gdb-bz507267-block-sort-fast.patch
 
+# Fix crash running gdbserver (incompatibility with python).
+Patch376: gdb-python-gdbserver-tp-crash.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -587,6 +590,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch369 -p1
 %patch370 -p1
 %patch374 -p1
+%patch376 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -866,6 +870,9 @@ fi
 %endif
 
 %changelog
+* Sun Aug  2 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-35
+- Fix crash running gdbserver (incompatibility with python).
+
 * Mon Jul  6 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-34
 - testsuite: Fix multiple runs in parallel on a single host.
 - testsuite: Remove the rpmbuild option: --with parallel
