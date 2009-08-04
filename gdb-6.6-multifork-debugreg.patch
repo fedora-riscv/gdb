@@ -28,12 +28,12 @@ http://sourceware.org/ml/gdb-patches/2008-01/msg00042.html
 	* s390-nat.c (s390_fix_watch_points): Fix its compilation failure
 	- rename it to S390_FIX_WATCH_POINTS_LIST.
 
-Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
+Index: gdb-6.8.50.20090803/gdb/amd64-linux-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/amd64-linux-nat.c	2009-02-09 16:02:27.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/amd64-linux-nat.c	2009-02-09 16:03:30.000000000 +0100
-@@ -408,25 +408,43 @@ amd64_linux_dr_set (ptid_t ptid, int reg
- void
+--- gdb-6.8.50.20090803.orig/gdb/amd64-linux-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/amd64-linux-nat.c	2009-08-04 07:17:58.000000000 +0200
+@@ -411,25 +411,43 @@ amd64_linux_dr_set (ptid_t ptid, int reg
+ static void
  amd64_linux_dr_set_control (unsigned long control)
  {
 -  struct lwp_info *lp;
@@ -58,7 +58,7 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
 +    }
  }
  
- void
+ static void
  amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr)
  {
 -  struct lwp_info *lp;
@@ -85,8 +85,8 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
 +    }
  }
  
- void
-@@ -451,6 +469,41 @@ amd64_linux_new_thread (ptid_t ptid)
+ static void
+@@ -454,6 +472,42 @@ amd64_linux_new_thread (ptid_t ptid)
  
    amd64_linux_dr_set (ptid, DR_CONTROL, amd64_linux_dr[DR_CONTROL]);
  }
@@ -108,7 +108,7 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
 +  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
 +  amd64_linux_detach_breakpoints_pid = 0;
 +
-+  return i386_remove_watchpoint (addr, len, type);
++  return target_remove_watchpoint (addr, len, type);
 +}
 +
 +static void
@@ -116,6 +116,7 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
 +{
 +  struct cleanup *old_chain = save_inferior_ptid ();
 +  int i;
++  extern void i386_detach_breakpoints (int detached_pid);
 +
 +  amd64_linux_detach_breakpoints_pid = detached_pid;
 +  /* Depend on `!is_lwp (inferior_ptid)' for the I386_* macros.  */
@@ -128,7 +129,7 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
  
  
  /* This function is called by libthread_db as part of its handling of
-@@ -755,6 +808,42 @@ amd64_linux_siginfo_fixup (struct siginf
+@@ -767,6 +821,42 @@ amd64_linux_siginfo_fixup (struct siginf
      return 0;
  }
  
@@ -171,7 +172,7 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
  /* Provide a prototype to silence -Wmissing-prototypes.  */
  void _initialize_amd64_linux_nat (void);
  
-@@ -791,6 +880,9 @@ _initialize_amd64_linux_nat (void)
+@@ -809,6 +899,9 @@ _initialize_amd64_linux_nat (void)
    linux_elfcore_write_prstatus = amd64_linux_elfcore_write_prstatus;
    linux_elfcore_write_prfpreg = amd64_linux_elfcore_write_prfpreg;
  
@@ -181,24 +182,11 @@ Index: gdb-6.8.50.20090209/gdb/amd64-linux-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, amd64_linux_new_thread);
-Index: gdb-6.8.50.20090209/gdb/config/i386/nm-i386.h
+Index: gdb-6.8.50.20090803/gdb/i386-linux-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/config/i386/nm-i386.h	2009-01-03 06:57:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/config/i386/nm-i386.h	2009-02-09 16:02:42.000000000 +0100
-@@ -120,6 +120,8 @@ extern int i386_stopped_by_watchpoint (v
- 
- #endif /* I386_WATCHPOINTS_IN_TARGET_VECTOR */
- 
-+extern void i386_detach_breakpoints (int detached_pid);
-+
- #endif /* I386_USE_GENERIC_WATCHPOINTS */
- 
- #endif /* NM_I386_H */
-Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
-===================================================================
---- gdb-6.8.50.20090209.orig/gdb/i386-linux-nat.c	2009-01-03 06:57:51.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/i386-linux-nat.c	2009-02-09 16:02:42.000000000 +0100
-@@ -634,21 +634,42 @@ i386_linux_dr_set_control (unsigned long
+--- gdb-6.8.50.20090803.orig/gdb/i386-linux-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/i386-linux-nat.c	2009-08-04 07:26:43.000000000 +0200
+@@ -637,21 +637,42 @@ i386_linux_dr_set_control (unsigned long
    ptid_t ptid;
  
    i386_linux_dr[DR_CONTROL] = control;
@@ -220,7 +208,7 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
 +    }
  }
  
- void
+ static void
  i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
  {
 -  struct lwp_info *lp;
@@ -247,8 +235,8 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
 +    }
  }
  
- void
-@@ -673,6 +694,41 @@ i386_linux_new_thread (ptid_t ptid)
+ static void
+@@ -676,6 +697,42 @@ i386_linux_new_thread (ptid_t ptid)
  
    i386_linux_dr_set (ptid, DR_CONTROL, i386_linux_dr[DR_CONTROL]);
  }
@@ -270,7 +258,7 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
 +  /* FOLLOW-FORK-MODE CHILD runs later the CHILD with no restrictions.  */
 +  i386_linux_detach_breakpoints_pid = 0;
 +
-+  return i386_remove_watchpoint (addr, len, type);
++  return target_remove_watchpoint (addr, len, type);
 +}
 +
 +static void
@@ -278,6 +266,7 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
 +{
 +  struct cleanup *old_chain = save_inferior_ptid ();
 +  int i;
++  extern void i386_detach_breakpoints (int detached_pid);
 +
 +  i386_linux_detach_breakpoints_pid = detached_pid;
 +  /* Depend on `!is_lwp (inferior_ptid)' for the I386_* macros.  */
@@ -290,7 +279,7 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
  
  
  /* Called by libthread_db.  Returns a pointer to the thread local
-@@ -812,6 +868,40 @@ i386_linux_child_post_startup_inferior (
+@@ -818,6 +875,40 @@ i386_linux_child_post_startup_inferior (
    super_post_startup_inferior (ptid);
  }
  
@@ -331,7 +320,7 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
  void
  _initialize_i386_linux_nat (void)
  {
-@@ -833,6 +923,9 @@ _initialize_i386_linux_nat (void)
+@@ -845,6 +936,9 @@ _initialize_i386_linux_nat (void)
    t->to_fetch_registers = i386_linux_fetch_inferior_registers;
    t->to_store_registers = i386_linux_store_inferior_registers;
  
@@ -341,11 +330,11 @@ Index: gdb-6.8.50.20090209/gdb/i386-linux-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, i386_linux_new_thread);
-Index: gdb-6.8.50.20090209/gdb/i386-nat.c
+Index: gdb-6.8.50.20090803/gdb/i386-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/i386-nat.c	2009-01-03 06:57:51.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/i386-nat.c	2009-02-09 16:02:42.000000000 +0100
-@@ -546,6 +546,17 @@ i386_remove_watchpoint (CORE_ADDR addr, 
+--- gdb-6.8.50.20090803.orig/gdb/i386-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/i386-nat.c	2009-08-04 07:17:58.000000000 +0200
+@@ -520,6 +520,18 @@ i386_remove_watchpoint (CORE_ADDR addr, 
    return retval;
  }
  
@@ -355,18 +344,19 @@ Index: gdb-6.8.50.20090209/gdb/i386-nat.c
 +  int i;
 +
 +  /* Do not touch any DR_MIRROR or DR_CONTROL_MIRROR mirrors here.  */
-+  I386_DR_LOW_SET_CONTROL (0);
-+  ALL_DEBUG_REGISTERS(i)
-+    I386_DR_LOW_RESET_ADDR (i);
++  i386_dr_low.set_control (0);
++  if (i386_dr_low.reset_addr)
++    ALL_DEBUG_REGISTERS(i)
++      i386_dr_low.reset_addr (i);
 +}
 +
  /* Return non-zero if we can watch a memory region that starts at
     address ADDR and whose length is LEN bytes.  */
  
-Index: gdb-6.8.50.20090209/gdb/ia64-linux-nat.c
+Index: gdb-6.8.50.20090803/gdb/ia64-linux-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/ia64-linux-nat.c	2009-02-09 15:48:43.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/ia64-linux-nat.c	2009-02-09 16:02:42.000000000 +0100
+--- gdb-6.8.50.20090803.orig/gdb/ia64-linux-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/ia64-linux-nat.c	2009-08-04 07:17:58.000000000 +0200
 @@ -583,6 +583,12 @@ ia64_linux_insert_watchpoint (CORE_ADDR 
    return 0;
  }
@@ -415,7 +405,7 @@ Index: gdb-6.8.50.20090209/gdb/ia64-linux-nat.c
  ia64_linux_new_thread (ptid_t ptid)
  {
    int i, any;
-@@ -805,6 +832,40 @@ ia64_linux_xfer_partial (struct target_o
+@@ -807,6 +834,40 @@ ia64_linux_xfer_partial (struct target_o
  			     offset, len);
  }
  
@@ -456,7 +446,7 @@ Index: gdb-6.8.50.20090209/gdb/ia64-linux-nat.c
  void _initialize_ia64_linux_nat (void);
  
  /*
-@@ -899,6 +960,9 @@ _initialize_ia64_linux_nat (void)
+@@ -901,6 +962,9 @@ _initialize_ia64_linux_nat (void)
    t->to_insert_watchpoint = ia64_linux_insert_watchpoint;
    t->to_remove_watchpoint = ia64_linux_remove_watchpoint;
  
@@ -466,11 +456,11 @@ Index: gdb-6.8.50.20090209/gdb/ia64-linux-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, ia64_linux_new_thread);
-Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
+Index: gdb-6.8.50.20090803/gdb/ppc-linux-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/ppc-linux-nat.c	2009-01-03 06:57:52.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/ppc-linux-nat.c	2009-02-09 16:02:42.000000000 +0100
-@@ -1118,6 +1118,12 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
+--- gdb-6.8.50.20090803.orig/gdb/ppc-linux-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/ppc-linux-nat.c	2009-08-04 07:17:58.000000000 +0200
+@@ -1377,6 +1377,12 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
    return 0;
  }
  
@@ -483,7 +473,7 @@ Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
  static int
  ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw)
  {
-@@ -1125,6 +1131,11 @@ ppc_linux_remove_watchpoint (CORE_ADDR a
+@@ -1384,6 +1390,11 @@ ppc_linux_remove_watchpoint (CORE_ADDR a
    ptid_t ptid;
    long dabr_value = 0;
  
@@ -495,7 +485,7 @@ Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
    saved_dabr_value = 0;
    ALL_LWPS (lp, ptid)
      if (ptrace (PTRACE_SET_DEBUGREG, TIDGET (ptid), 0, saved_dabr_value) < 0)
-@@ -1138,6 +1149,15 @@ ppc_linux_new_thread (ptid_t ptid)
+@@ -1397,6 +1408,15 @@ ppc_linux_new_thread (ptid_t ptid)
    ptrace (PTRACE_SET_DEBUGREG, TIDGET (ptid), 0, saved_dabr_value);
  }
  
@@ -511,7 +501,7 @@ Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
  static int
  ppc_linux_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
  {
-@@ -1318,6 +1338,40 @@ ppc_linux_read_description (struct targe
+@@ -1629,6 +1649,40 @@ ppc_linux_read_description (struct targe
    return isa205? tdesc_powerpc_isa205_32l : tdesc_powerpc_32l;
  }
  
@@ -552,9 +542,9 @@ Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
  void _initialize_ppc_linux_nat (void);
  
  void
-@@ -1343,6 +1397,9 @@ _initialize_ppc_linux_nat (void)
- 
+@@ -1655,6 +1709,9 @@ _initialize_ppc_linux_nat (void)
    t->to_read_description = ppc_linux_read_description;
+   t->to_auxv_parse = ppc_linux_auxv_parse;
  
 +  ppc_linux_super_follow_fork = t->to_follow_fork;
 +  t->to_follow_fork = ppc_linux_follow_fork;
@@ -562,11 +552,11 @@ Index: gdb-6.8.50.20090209/gdb/ppc-linux-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, ppc_linux_new_thread);
-Index: gdb-6.8.50.20090209/gdb/s390-nat.c
+Index: gdb-6.8.50.20090803/gdb/s390-nat.c
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/s390-nat.c	2007-11-07 07:36:57.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/s390-nat.c	2009-02-09 16:02:42.000000000 +0100
-@@ -283,21 +283,15 @@ s390_stopped_by_watchpoint (void)
+--- gdb-6.8.50.20090803.orig/gdb/s390-nat.c	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/s390-nat.c	2009-08-04 07:17:58.000000000 +0200
+@@ -285,21 +285,15 @@ s390_stopped_by_watchpoint (void)
  }
  
  static void
@@ -590,7 +580,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
      {
        watch_lo_addr = min (watch_lo_addr, area->lo_addr);
        watch_hi_addr = max (watch_hi_addr, area->hi_addr);
-@@ -309,7 +303,7 @@ s390_fix_watch_points (ptid_t ptid)
+@@ -311,7 +305,7 @@ s390_fix_watch_points (ptid_t ptid)
    if (ptrace (PTRACE_PEEKUSR_AREA, tid, &parea) < 0)
      perror_with_name (_("Couldn't retrieve watchpoint status"));
  
@@ -599,7 +589,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
      {
        per_info.control_regs.bits.em_storage_alteration = 1;
        per_info.control_regs.bits.storage_alt_space_ctl = 1;
-@@ -326,6 +320,18 @@ s390_fix_watch_points (ptid_t ptid)
+@@ -328,6 +322,18 @@ s390_fix_watch_points (ptid_t ptid)
      perror_with_name (_("Couldn't modify watchpoint status"));
  }
  
@@ -618,7 +608,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
  static int
  s390_insert_watchpoint (CORE_ADDR addr, int len, int type)
  {
-@@ -347,6 +353,12 @@ s390_insert_watchpoint (CORE_ADDR addr, 
+@@ -349,6 +355,12 @@ s390_insert_watchpoint (CORE_ADDR addr, 
    return 0;
  }
  
@@ -631,7 +621,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
  static int
  s390_remove_watchpoint (CORE_ADDR addr, int len, int type)
  {
-@@ -354,6 +366,11 @@ s390_remove_watchpoint (CORE_ADDR addr, 
+@@ -356,6 +368,11 @@ s390_remove_watchpoint (CORE_ADDR addr, 
    ptid_t ptid;
    struct watch_area *area, **parea;
  
@@ -643,7 +633,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
    for (parea = &watch_base; *parea; parea = &(*parea)->next)
      if ((*parea)->lo_addr == addr
  	&& (*parea)->hi_addr == addr + len - 1)
-@@ -361,8 +378,10 @@ s390_remove_watchpoint (CORE_ADDR addr, 
+@@ -363,8 +380,10 @@ s390_remove_watchpoint (CORE_ADDR addr, 
  
    if (!*parea)
      {
@@ -654,7 +644,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
        return -1;
      }
  
-@@ -375,6 +394,15 @@ s390_remove_watchpoint (CORE_ADDR addr, 
+@@ -377,6 +396,15 @@ s390_remove_watchpoint (CORE_ADDR addr, 
    return 0;
  }
  
@@ -670,7 +660,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
  static int
  s390_can_use_hw_breakpoint (int type, int cnt, int othertype)
  {
-@@ -387,6 +415,39 @@ s390_region_ok_for_hw_watchpoint (CORE_A
+@@ -389,6 +417,39 @@ s390_region_ok_for_hw_watchpoint (CORE_A
    return 1;
  }
  
@@ -710,7 +700,7 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
  
  void _initialize_s390_nat (void);
  
-@@ -410,6 +471,9 @@ _initialize_s390_nat (void)
+@@ -412,6 +473,9 @@ _initialize_s390_nat (void)
    t->to_insert_watchpoint = s390_insert_watchpoint;
    t->to_remove_watchpoint = s390_remove_watchpoint;
  
@@ -720,10 +710,10 @@ Index: gdb-6.8.50.20090209/gdb/s390-nat.c
    /* Register the target.  */
    linux_nat_add_target (t);
    linux_nat_set_new_thread (t, s390_fix_watch_points);
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
+Index: gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c	2009-02-09 16:02:42.000000000 +0100
++++ gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c	2009-08-04 07:17:58.000000000 +0200
 @@ -0,0 +1,172 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -897,10 +887,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
 +#else
 +# error "!FOLLOW_PARENT && !FOLLOW_CHILD"
 +#endif
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
+Index: gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	2009-02-09 16:02:42.000000000 +0100
++++ gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	2009-08-04 07:17:58.000000000 +0200
 @@ -0,0 +1,154 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -1056,10 +1046,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
 +
 +  return 0;
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.c
+Index: gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.c	2009-02-09 16:02:42.000000000 +0100
++++ gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork.c	2009-08-04 07:17:58.000000000 +0200
 @@ -0,0 +1,56 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -1117,10 +1107,10 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.c
 +
 +  return 0;
 +}
-Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.exp
+Index: gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.exp	2009-02-09 16:02:42.000000000 +0100
++++ gdb-6.8.50.20090803/gdb/testsuite/gdb.threads/watchpoint-fork.exp	2009-08-04 07:17:58.000000000 +0200
 @@ -0,0 +1,140 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -1262,11 +1252,11 @@ Index: gdb-6.8.50.20090209/gdb/testsuite/gdb.threads/watchpoint-fork.exp
 +if {[istarget "*-*-linux*"]} {
 +    test child FOLLOW_CHILD
 +}
-Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
+Index: gdb-6.8.50.20090803/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/doc/gdb.texinfo	2009-02-09 16:02:35.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/doc/gdb.texinfo	2009-02-09 16:02:42.000000000 +0100
-@@ -3588,6 +3588,14 @@ confident that no other thread can becom
+--- gdb-6.8.50.20090803.orig/gdb/doc/gdb.texinfo	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/doc/gdb.texinfo	2009-08-04 07:17:58.000000000 +0200
+@@ -3625,6 +3625,14 @@ confident that no other thread can becom
  software watchpoints as usual.  However, @value{GDBN} may not notice
  when a non-current thread's activity changes the expression.  (Hardware
  watchpoints, in contrast, watch an expression in all threads.)
@@ -1281,15 +1271,14 @@ Index: gdb-6.8.50.20090209/gdb/doc/gdb.texinfo
  @end quotation
  
  @xref{set remote hardware-watchpoint-limit}.
-Index: gdb-6.8.50.20090209/gdb/config/i386/nm-linux.h
+Index: gdb-6.8.50.20090803/gdb/config/i386/nm-linux.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/config/i386/nm-linux.h	2009-01-03 06:57:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/config/i386/nm-linux.h	2009-02-09 16:02:42.000000000 +0100
-@@ -46,6 +46,16 @@ extern void i386_linux_dr_reset_addr (in
- extern unsigned long i386_linux_dr_get_status (void);
- #define I386_DR_LOW_GET_STATUS() \
-   i386_linux_dr_get_status ()
-+
+--- gdb-6.8.50.20090803.orig/gdb/config/i386/nm-linux.h	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/config/i386/nm-linux.h	2009-08-04 07:17:58.000000000 +0200
+@@ -29,4 +29,14 @@
+ #define FILL_FPXREGSET
+ #endif
+ 
 +/* Remove a watchpoint that watched the memory region which starts at
 + *    address ADDR, whose length is LEN bytes, and for accesses of the
 + *       type TYPE.  Return 0 on success, -1 on failure.  */
@@ -1299,13 +1288,12 @@ Index: gdb-6.8.50.20090209/gdb/config/i386/nm-linux.h
 +   insertion/removal to support threads.  */
 +#define target_remove_watchpoint(addr, len, type) \
 +  i386_linux_remove_watchpoint (addr, len, type)
- 
- 
- #ifdef HAVE_PTRACE_GETFPXREGS
-Index: gdb-6.8.50.20090209/gdb/config/i386/nm-linux64.h
++
+ #endif /* nm-linux.h */
+Index: gdb-6.8.50.20090803/gdb/config/i386/nm-linux64.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/config/i386/nm-linux64.h	2009-01-03 06:57:54.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/config/i386/nm-linux64.h	2009-02-09 16:02:42.000000000 +0100
+--- gdb-6.8.50.20090803.orig/gdb/config/i386/nm-linux64.h	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/config/i386/nm-linux64.h	2009-08-04 07:17:58.000000000 +0200
 @@ -51,4 +51,14 @@ extern unsigned long amd64_linux_dr_get_
  #define I386_DR_LOW_GET_STATUS() \
    amd64_linux_dr_get_status ()
@@ -1321,12 +1309,15 @@ Index: gdb-6.8.50.20090209/gdb/config/i386/nm-linux64.h
 +  amd64_linux_remove_watchpoint (addr, len, type)
 +
  #endif /* nm-linux64.h */
-Index: gdb-6.8.50.20090209/gdb/target.h
+Index: gdb-6.8.50.20090803/gdb/target.h
 ===================================================================
---- gdb-6.8.50.20090209.orig/gdb/target.h	2009-02-09 15:49:25.000000000 +0100
-+++ gdb-6.8.50.20090209/gdb/target.h	2009-02-09 16:02:42.000000000 +0100
-@@ -1113,7 +1113,9 @@ extern char *normal_pid_to_str (ptid_t p
- #ifndef target_insert_watchpoint
+--- gdb-6.8.50.20090803.orig/gdb/target.h	2009-08-04 07:17:19.000000000 +0200
++++ gdb-6.8.50.20090803/gdb/target.h	2009-08-04 07:35:13.000000000 +0200
+@@ -1114,11 +1114,15 @@ extern char *normal_pid_to_str (ptid_t p
+    for write, 1 for read, and 2 for read/write accesses.  Returns 0 for
+    success, non-zero for failure.  */
+ 
++#ifndef target_insert_watchpoint
  #define	target_insert_watchpoint(addr, len, type)	\
       (*current_target.to_insert_watchpoint) (addr, len, type)
 +#endif
@@ -1334,4 +1325,7 @@ Index: gdb-6.8.50.20090209/gdb/target.h
 +#ifndef target_remove_watchpoint
  #define	target_remove_watchpoint(addr, len, type)	\
       (*current_target.to_remove_watchpoint) (addr, len, type)
- #endif
++#endif
+ 
+ #define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
+      (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt)

@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090302
+Version: 6.8.50.20090803
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -82,12 +82,6 @@ Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 # Make upstream `set scheduler-locking step' as default.
 Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
 
-# Fix to display base constructors from list and breakpoint commands
-Patch116: gdb-6.3-linespec-20041213.patch
-
-# Continue removing breakpoints even when failure occurs.
-Patch117: gdb-6.3-removebp-20041130.patch
-
 # Add a wrapper script to GDB that implements pstack using the
 # --readnever option.
 Patch118: gdb-6.3-gstack-20050411.patch
@@ -102,9 +96,8 @@ Patch125: gdb-6.3-test-self-20050110.patch
 # Fix for non-threaded watchpoints.
 Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 
-# Fix to support multiple destructors just like multiple constructors
+# Test support of multiple destructors just like multiple constructors
 Patch133: gdb-6.3-test-dtorfix-20050121.patch
-Patch134: gdb-6.3-dtorfix-20050121.patch
 
 # Fix to support executable moving
 Patch136: gdb-6.3-test-movedir-20050125.patch
@@ -116,7 +109,6 @@ Patch136: gdb-6.3-test-movedir-20050125.patch
 Patch140: gdb-6.3-gcore-thread-20050204.patch
 
 # Stop while intentionally stepping and the thread exit is met.
-Patch141: gdb-6.6-step-thread-exit.patch
 Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Prevent gdb from being pushed into background
@@ -193,9 +185,6 @@ Patch196: gdb-6.5-sharedlibrary-path.patch
 # FIXME: It could be autodetected.
 Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch
 
-# Fix dereferencing registers for 32bit inferiors on 64bit hosts (BZ 181390).
-Patch200: gdb-6.5-bz181390-memory-address-width.patch
-
 # Fix `gcore' command for 32bit inferiors on 64bit hosts.
 Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
@@ -228,8 +217,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.8.50.20090302 snapshot fixups.
-Patch232: gdb-6.8.50.20090302-upstream.patch
+# Backported post gdb-6.8.50.20090803 snapshot fixups.
+#Patch232: gdb-6.8.50.20090803-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -340,7 +329,6 @@ Patch324: gdb-6.8-glibc-headers-compat.patch
 Patch326: gdb-6.8-tui-singlebinary.patch
 
 # Support transparent debugging of inlined functions for an optimized code.
-Patch327: gdb-6.8-inlining.patch
 Patch350: gdb-6.8-inlining-addon.patch
 Patch328: gdb-6.8-inlining-by-name.patch
 
@@ -355,9 +343,6 @@ Patch331: gdb-6.8-quit-never-aborts.patch
 
 # Support DW_TAG_constant for Fortran in recent Fedora/RH GCCs.
 Patch332: gdb-6.8-fortran-tag-constant.patch
-
-# bare names of constructors and destructors should be unique for GDB-6.8+.
-Patch334: gdb-6.8-ctors-dtors-unique.patch
 
 # Fix attaching to stopped processes and/or pending signals.
 Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
@@ -375,22 +360,6 @@ Patch349: gdb-archer.patch
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
 Patch352: gdb-6.8-bz457187-largefile.patch
 Patch360: gdb-6.8-bz457187-largefile-test.patch
-
-# Fix crash on pretty-printer reading uninitialized std::string (BZ 495781).
-Patch357: gdb-c_get_string-xfree.patch
-
-# Fix crash in the charset support.
-Patch359: gdb-charset-crash.patch
-
-# Fix crashes due to (missing) varobj revalidation, for VLA (for BZ 377541).
-Patch369: gdb-varobj-revalidate-prep.patch
-Patch370: gdb-varobj-revalidate-core.patch
-
-# Implement DW_OP_call_frame_cfa (for recent GCC).
-Patch373: gdb-DW_OP_call_frame_cfa.patch
-
-# Accelerate sorting blocks on reading a file (found on WebKit) (BZ 507267).
-Patch374: gdb-bz507267-block-sort-fast.patch
 
 # Fix compatibility of --with-system-readline and readline-6.0+.
 Patch375: gdb-readline-6.0.patch
@@ -481,7 +450,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -491,17 +460,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch106 -p1
 %patch111 -p1
 %patch112 -p1
-%patch116 -p1
-%patch117 -p1
 %patch118 -p1
 %patch122 -p1
 %patch125 -p1
 %patch128 -p1
 %patch133 -p1
-%patch134 -p1
 %patch136 -p1
 %patch140 -p1
-%patch141 -p1
 %patch259 -p1
 %patch142 -p1
 %patch145 -p1
@@ -527,7 +492,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch195 -p1
 %patch196 -p1
 %patch199 -p1
-%patch200 -p1
 %patch201 -p1
 %patch208 -p1
 %patch209 -p1
@@ -578,25 +542,17 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch322 -p1
 %patch324 -p1
 %patch326 -p1
-%patch327 -p1
 %patch350 -p1
 %patch328 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
 %patch332 -p1
-%patch334 -p1
 %patch337 -p1
 %patch343 -p1
 %patch348 -p1
 %patch352 -p1
-%patch357 -p1
-%patch359 -p1
 %patch360 -p1
-%patch369 -p1
-%patch370 -p1
-%patch373 -p1
-%patch374 -p1
 %patch375 -p1
 %patch124 -p1
 
@@ -886,6 +842,10 @@ fi
 %endif
 
 %changelog
+* Tue Aug  4 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090803-1
+- Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090803
+- archer-jankratochvil-fedora12 commit: 0222cb1f4ddd1eda32965e464cb60b1e44e110b2
+
 * Fri Jul 31 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-42
 - Release bump only.
 
