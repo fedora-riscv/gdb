@@ -14,7 +14,7 @@ Version: 6.8.50.20090803
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -374,8 +374,6 @@ BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
-# Temporarily before it gets moved to libstdc++.rpm
-BuildRequires: libstdc++
 %endif	# 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
@@ -751,20 +749,6 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
-%if 0%{!?_without_python:1}
-# In the future:
-#%# A part of the libstdc++ rpm.
-#%rm -rf $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
-# Temporarily now:
-for LIB in lib lib64;do
-  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
-  mkdir -p $LIBPATH
-  # basename is being run only for the native (non-biarch) file.
-  sed -e 's,@dir@,%{python_sitelib}/gdb,' <$RPM_BUILD_DIR/%{gdb_src}/gdb/python/lib/gdb/libstdcxx/v6/hook.in \
-      >$LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
-done
-%endif	# 0%{!?_without_python:1}
-
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -826,7 +810,6 @@ fi
 %if 0%{!?_without_python:1}
 %{python_sitelib}/gdb
 %endif	# 0%{!?_without_python:1}
-%{_datadir}/gdb
 %endif	# 0%{!?_with_upstream:1}
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
@@ -842,6 +825,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug  4 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090803-2
+- Drop the bundled libstdc++ python - it should be packaged on its own now.
+
 * Tue Aug  4 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090803-1
 - Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090803
 - archer-jankratochvil-fedora12 commit: 0222cb1f4ddd1eda32965e464cb60b1e44e110b2
