@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 0222cb1f4ddd1eda32965e464cb60b1e44e110b2
+commit 93ec16e6f5000dd64d433d86674e820ed0f35b72
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -10,12 +10,289 @@ archer-tromey-delayed-symfile
 archer-tromey-dw-op-value
 archer-jankratochvil-vla
 archer-jankratochvil-misc
-archer-jankratochvil-expr-cumulative
-	archer-keiths-expr-cumulative
-archer-jankratochvil-python
-	archer-tromey-python
+archer-keiths-expr-cumulative
+archer-tromey-python
 
 
+diff --git a/bfd/coff-stgo32.c b/bfd/coff-stgo32.c
+index b8928be..8bf7667 100644
+--- a/bfd/coff-stgo32.c
++++ b/bfd/coff-stgo32.c
+@@ -102,9 +102,6 @@ static bfd_boolean
+ 
+ #include "coff-i386.c"
+ 
+-/* I hold in the usrdata the stub.  */
+-#define bfd_coff_go32stub bfd_usrdata
+-
+ /* This macro is used, because I cannot assume the endianess of the
+    host system.  */
+ #define _H(index) (H_GET_16 (abfd, (header+index*2)))
+@@ -112,7 +109,7 @@ static bfd_boolean
+ /* These bytes are a 2048-byte DOS executable, which loads the COFF
+    image into memory and then runs it. It is called 'stub'.  */
+ 
+-static const unsigned char stub_bytes[STUBSIZE] =
++static const unsigned char stub_bytes[GO32_STUBSIZE] =
+ {
+ #include "go32stub.h"
+ };
+@@ -120,7 +117,7 @@ static const unsigned char stub_bytes[STUBSIZE] =
+ /*
+    I have not commented each swap function below, because the
+    technique is in any function the same. For the ...in function,
+-   all the pointers are adjusted by adding STUBSIZE and for the
++   all the pointers are adjusted by adding GO32_STUBSIZE and for the
+    ...out function, it is subtracted first and after calling the
+    standard swap function it is reset to the old value.  */
+ 
+@@ -132,25 +129,20 @@ static const unsigned char stub_bytes[STUBSIZE] =
+ 
+ static void
+ adjust_filehdr_in_post  (abfd, src, dst)
+-     bfd *abfd;
++     bfd *abfd ATTRIBUTE_UNUSED;
+      PTR src;
+      PTR dst;
+ {
+   FILHDR *filehdr_src = (FILHDR *) src;
+   struct internal_filehdr *filehdr_dst = (struct internal_filehdr *) dst;
+ 
+-  ADJUST_VAL (filehdr_dst->f_symptr, STUBSIZE);
++  ADJUST_VAL (filehdr_dst->f_symptr, GO32_STUBSIZE);
+ 
+-  /* Save now the stub to be used later.  */
+-  bfd_coff_go32stub (abfd) = (PTR) bfd_alloc (abfd, (bfd_size_type) STUBSIZE);
+-
+-  /* Since this function returns no status, I do not set here
+-     any bfd_error_...
+-     That means, before the use of bfd_coff_go32stub (), this value
+-     should be checked if it is != NULL.  */
+-  if (bfd_coff_go32stub (abfd) == NULL)
+-    return;
+-  memcpy (bfd_coff_go32stub (abfd), filehdr_src->stub, STUBSIZE);
++  /* Save now the stub to be used later.  Put the stub data to FILEHDR_DST
++     first as coff_data (abfd) still does not exist.  It may not even be ever
++     created as we are just checking the file format of ABFD.  */
++  memcpy (filehdr_dst->go32stub, filehdr_src->stub, GO32_STUBSIZE);
++  filehdr_dst->f_flags |= F_GO32STUB;
+ }
+ 
+ static void
+@@ -166,13 +158,13 @@ adjust_filehdr_out_pre  (abfd, in, out)
+   create_go32_stub (abfd);
+ 
+   /* Copy the stub to the file header.  */
+-  if (bfd_coff_go32stub (abfd) != NULL)
+-    memcpy (filehdr_out->stub, bfd_coff_go32stub (abfd), STUBSIZE);
++  if (coff_data (abfd)->go32stub != NULL)
++    memcpy (filehdr_out->stub, coff_data (abfd)->go32stub, GO32_STUBSIZE);
+   else
+     /* Use the default.  */
+-    memcpy (filehdr_out->stub, stub_bytes, STUBSIZE);
++    memcpy (filehdr_out->stub, stub_bytes, GO32_STUBSIZE);
+ 
+-  ADJUST_VAL (filehdr_in->f_symptr, -STUBSIZE);
++  ADJUST_VAL (filehdr_in->f_symptr, -GO32_STUBSIZE);
+ }
+ 
+ static void
+@@ -183,7 +175,7 @@ adjust_filehdr_out_post  (abfd, in, out)
+ {
+   struct internal_filehdr *filehdr_in = (struct internal_filehdr *) in;
+   /* Undo the above change.  */
+-  ADJUST_VAL (filehdr_in->f_symptr, STUBSIZE);
++  ADJUST_VAL (filehdr_in->f_symptr, GO32_STUBSIZE);
+ }
+ 
+ static void
+@@ -194,9 +186,9 @@ adjust_scnhdr_in_post  (abfd, ext, in)
+ {
+   struct internal_scnhdr *scnhdr_int = (struct internal_scnhdr *) in;
+ 
+-  ADJUST_VAL (scnhdr_int->s_scnptr, STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_relptr, STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_lnnoptr, STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_scnptr, GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_relptr, GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_lnnoptr, GO32_STUBSIZE);
+ }
+ 
+ static void
+@@ -207,9 +199,9 @@ adjust_scnhdr_out_pre  (abfd, in, out)
+ {
+   struct internal_scnhdr *scnhdr_int = (struct internal_scnhdr *) in;
+ 
+-  ADJUST_VAL (scnhdr_int->s_scnptr, -STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_relptr, -STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_lnnoptr, -STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_scnptr, -GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_relptr, -GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_lnnoptr, -GO32_STUBSIZE);
+ }
+ 
+ static void
+@@ -220,9 +212,9 @@ adjust_scnhdr_out_post (abfd, in, out)
+ {
+   struct internal_scnhdr *scnhdr_int = (struct internal_scnhdr *) in;
+ 
+-  ADJUST_VAL (scnhdr_int->s_scnptr, STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_relptr, STUBSIZE);
+-  ADJUST_VAL (scnhdr_int->s_lnnoptr, STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_scnptr, GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_relptr, GO32_STUBSIZE);
++  ADJUST_VAL (scnhdr_int->s_lnnoptr, GO32_STUBSIZE);
+ }
+ 
+ static void
+@@ -239,7 +231,7 @@ adjust_aux_in_post  (abfd, ext1, type, class, indx, numaux, in1)
+ 
+   if (class == C_BLOCK || class == C_FCN || ISFCN (type) || ISTAG (class))
+     {
+-      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, STUBSIZE);
++      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, GO32_STUBSIZE);
+     }
+ }
+ 
+@@ -257,7 +249,7 @@ adjust_aux_out_pre  (abfd, inp, type, class, indx, numaux, extp)
+ 
+   if (class == C_BLOCK || class == C_FCN || ISFCN (type) || ISTAG (class))
+     {
+-      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, -STUBSIZE);
++      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, -GO32_STUBSIZE);
+     }
+ }
+ 
+@@ -275,7 +267,7 @@ adjust_aux_out_post (abfd, inp, type, class, indx, numaux, extp)
+ 
+   if (class == C_BLOCK || class == C_FCN || ISFCN (type) || ISTAG (class))
+     {
+-      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, STUBSIZE);
++      ADJUST_VAL (in->x_sym.x_fcnary.x_fcn.x_lnnoptr, GO32_STUBSIZE);
+     }
+ }
+ 
+@@ -296,7 +288,7 @@ create_go32_stub (abfd)
+      bfd *abfd;
+ {
+   /* Do it only once.  */
+-  if (bfd_coff_go32stub (abfd) == NULL)
++  if (coff_data (abfd)->go32stub == NULL)
+     {
+       char *stub;
+       struct stat st;
+@@ -362,32 +354,32 @@ create_go32_stub (abfd)
+ 	  goto stub_end;
+ 	}
+       /* Now we found a correct stub (hopefully).  */
+-      bfd_coff_go32stub (abfd)
++      coff_data (abfd)->go32stub
+ 	= (PTR) bfd_alloc (abfd, (bfd_size_type) coff_start);
+-      if (bfd_coff_go32stub (abfd) == NULL)
++      if (coff_data (abfd)->go32stub == NULL)
+ 	{
+ 	  close (f);
+ 	  return;
+ 	}
+       lseek (f, 0L, SEEK_SET);
+-      if ((unsigned long) read (f, bfd_coff_go32stub (abfd), coff_start)
++      if ((unsigned long) read (f, coff_data (abfd)->go32stub, coff_start)
+ 	  != coff_start)
+ 	{
+-	  bfd_release (abfd, bfd_coff_go32stub (abfd));
+-	  bfd_coff_go32stub (abfd) = NULL;
++	  bfd_release (abfd, coff_data (abfd)->go32stub);
++	  coff_data (abfd)->go32stub = NULL;
+ 	}
+       close (f);
+     }
+ stub_end:
+   /* There was something wrong above, so use now the standard builtin
+      stub.  */
+-  if (bfd_coff_go32stub (abfd) == NULL)
++  if (coff_data (abfd)->go32stub == NULL)
+     {
+-      bfd_coff_go32stub (abfd)
+-	= (PTR) bfd_alloc (abfd, (bfd_size_type) STUBSIZE);
+-      if (bfd_coff_go32stub (abfd) == NULL)
++      coff_data (abfd)->go32stub
++	= (PTR) bfd_alloc (abfd, (bfd_size_type) GO32_STUBSIZE);
++      if (coff_data (abfd)->go32stub == NULL)
+ 	return;
+-      memcpy (bfd_coff_go32stub (abfd), stub_bytes, STUBSIZE);
++      memcpy (coff_data (abfd)->go32stub, stub_bytes, GO32_STUBSIZE);
+     }
+ }
+ 
+@@ -403,13 +395,20 @@ go32_stubbed_coff_bfd_copy_private_bfd_data  (ibfd, obfd)
+   if (ibfd->xvec != obfd->xvec)
+     return TRUE;
+ 
+-  /* Check if both have a valid stub.  */
+-  if (bfd_coff_go32stub (ibfd) == NULL
+-      || bfd_coff_go32stub (obfd) == NULL)
++  /* Check if we have a source stub.  */
++  if (coff_data (ibfd)->go32stub == NULL)
+     return TRUE;
+ 
++  /* As adjust_filehdr_out_pre may get called only after this function,
++     optionally allocate the output stub.  */
++  if (coff_data (obfd)->go32stub == NULL)
++    coff_data (obfd)->go32stub = (PTR) bfd_alloc (obfd,
++						(bfd_size_type) GO32_STUBSIZE);
++
+   /* Now copy the stub.  */
+-  memcpy (bfd_coff_go32stub (obfd), bfd_coff_go32stub (ibfd), STUBSIZE);
++  if (coff_data (obfd)->go32stub != NULL)
++    memcpy (coff_data (obfd)->go32stub, coff_data (ibfd)->go32stub,
++	    GO32_STUBSIZE);
+ 
+   return TRUE;
+ }
+diff --git a/bfd/coffcode.h b/bfd/coffcode.h
+index 4b748b4..1cc860a 100644
+--- a/bfd/coffcode.h
++++ b/bfd/coffcode.h
+@@ -1992,6 +1992,11 @@ coff_mkobject_hook (bfd * abfd,
+     abfd->flags |= HAS_DEBUG;
+ #endif
+ 
++  if ((internal_f->f_flags & F_GO32STUB) != 0)
++    coff->go32stub = (char *) bfd_alloc (abfd, (bfd_size_type) GO32_STUBSIZE);
++  if (coff->go32stub != NULL)
++    memcpy (coff->go32stub, internal_f->go32stub, GO32_STUBSIZE);
++
+   return coff;
+ }
+ #endif
+diff --git a/bfd/libcoff-in.h b/bfd/libcoff-in.h
+index 16b6c7b..f3108ee 100644
+--- a/bfd/libcoff-in.h
++++ b/bfd/libcoff-in.h
+@@ -106,6 +106,9 @@ typedef struct coff_tdata
+      used by ARM code.  */
+   flagword flags;
+ 
++  /* coff-stgo32 EXE stub header after BFD tdata has been allocated.  Its data
++     is kept in internal_filehdr.go32stub beforehand.  */
++  char *go32stub;
+ } coff_data_type;
+ 
+ /* Tdata for pe image files.  */
+diff --git a/bfd/libcoff.h b/bfd/libcoff.h
+index a4ab405..4bb43f3 100644
+--- a/bfd/libcoff.h
++++ b/bfd/libcoff.h
+@@ -110,6 +110,9 @@ typedef struct coff_tdata
+      used by ARM code.  */
+   flagword flags;
+ 
++  /* coff-stgo32 EXE stub header after BFD tdata has been allocated.  Its data
++     is kept in internal_filehdr.go32stub beforehand.  */
++  char *go32stub;
+ } coff_data_type;
+ 
+ /* Tdata for pe image files.  */
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
 index ccc4db8..496c9f2 100644
 --- a/gdb/Makefile.in
@@ -195,7 +472,7 @@ index ccc4db8..496c9f2 100644
  # Dependency tracking.  Most of this is conditional on GNU Make being
  # found by configure; if GNU Make is not found, we fall back to a
 diff --git a/gdb/NEWS b/gdb/NEWS
-index 970f4df..e8de474 100644
+index 0b8e3af..446246f 100644
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
 @@ -425,6 +425,13 @@ x86/x86_64 Darwin		i[34567]86-*-darwin*
@@ -340,7 +617,7 @@ index 53e7371..8290adc 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 2e598e4..38fdf8a 100644
+index f3940e1..70222a4 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -59,6 +59,7 @@
@@ -351,8 +628,8 @@ index 2e598e4..38fdf8a 100644
  
  /* readline include files */
  #include "readline/readline.h"
-@@ -564,6 +565,53 @@ get_number_or_range (char **pp)
- 
+@@ -578,6 +579,53 @@ get_breakpoint (int num)
+ }
  
  
 +/* Set break condition of breakpoint B to EXP.  */
@@ -405,7 +682,7 @@ index 2e598e4..38fdf8a 100644
  /* condition N EXP -- set break condition of breakpoint N to EXP.  */
  
  static void
-@@ -584,42 +632,7 @@ condition_command (char *arg, int from_tty)
+@@ -598,42 +646,7 @@ condition_command (char *arg, int from_tty)
    ALL_BREAKPOINTS (b)
      if (b->number == bnum)
        {
@@ -449,7 +726,7 @@ index 2e598e4..38fdf8a 100644
  	return;
        }
  
-@@ -8821,6 +8834,22 @@ all_tracepoints ()
+@@ -8843,6 +8856,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -472,17 +749,17 @@ index 2e598e4..38fdf8a 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -9323,4 +9352,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -9345,4 +9374,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
 +  observer_attach_mark_used (breakpoint_types_mark_used);
  }
 diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
-index d8fe047..3a929b5 100644
+index d93c6b6..a555c16 100644
 --- a/gdb/breakpoint.h
 +++ b/gdb/breakpoint.h
-@@ -913,6 +913,9 @@ extern void breakpoint_retire_moribund (void);
+@@ -918,6 +918,9 @@ extern void breakpoint_retire_moribund (void);
  /* Tell a breakpoint to be quiet.  */
  extern void make_breakpoint_silent (struct breakpoint *);
  
@@ -1720,7 +1997,7 @@ index 62800b8..97d587b 100644
  			{ $$ = $1.comp;
  			  if ($2) $$ = fill_comp (DEMANGLE_COMPONENT_LOCAL_NAME, $$, $2); }
 diff --git a/gdb/cp-namespace.c b/gdb/cp-namespace.c
-index d2d8f2e..3166818 100644
+index d2d8f2e..cc259e7 100644
 --- a/gdb/cp-namespace.c
 +++ b/gdb/cp-namespace.c
 @@ -35,15 +35,7 @@
@@ -1819,7 +2096,7 @@ index d2d8f2e..3166818 100644
        xfree (using);
  
        return retval;
-@@ -261,12 +270,30 @@ cp_copy_usings (struct using_direct *using,
+@@ -261,12 +270,42 @@ cp_copy_usings (struct using_direct *using,
  
  struct symbol *
  cp_lookup_symbol_nonlocal (const char *name,
@@ -1829,31 +2106,43 @@ index d2d8f2e..3166818 100644
  {
 -  return lookup_namespace_scope (name, linkage_name, block, domain,
 -				 block_scope (block), 0);
-+  struct symbol* sym = NULL;
-+  const struct block *global_block = block_global_block (block);
-+  const char* scope = block_scope(block);
-+    /* Check if either no block is specified or it's a global block.  */
++  struct symbol *sym;
++  const char* scope = block_scope (block); 
 +
-+  while (block != global_block)
-+    while (block != global_block)
-+      {
-+      sym = lookup_namespace_scope(name, block, domain, scope, 0, 0);
-+
-+      if (sym != NULL)
-+        return sym;
-+
-+      block = BLOCK_SUPERBLOCK (block);
-+    }
-+
-+
-+  if (sym != NULL)
++  sym = lookup_namespace_scope (name, block, domain, scope , 0, 0);
++  if ( sym != NULL)
 +    return sym;
 +
-+  return lookup_symbol_file(name, block, domain, 0);
++  return cp_lookup_symbol_namespace_incremental(scope, name, block, domain);
++}
++
++struct symbol*
++cp_lookup_symbol_namespace_incremental (const char *scope,
++                                        const char *name,
++                                        const struct block *block,
++                                        const domain_enum domain)
++{
++  struct symbol *sym;
++
++  sym = cp_lookup_symbol_namespace (scope, name, block, domain, 0);
++  if ( sym != NULL)
++    return sym;
++
++  while (block != NULL)
++    {
++      sym = cp_lookup_symbol_imports(scope, name, block, domain,0);
++
++      if (sym)
++        return sym;
++
++      block = BLOCK_SUPERBLOCK(block);
++    }
++
++  return NULL;
  }
  
  /* Lookup NAME at namespace scope (or, in C terms, in static and
-@@ -284,13 +311,13 @@ cp_lookup_symbol_nonlocal (const char *name,
+@@ -284,13 +323,13 @@ cp_lookup_symbol_nonlocal (const char *name,
     "A::x", and if that call fails, then the first call looks for
     "x".  */
  
@@ -1870,7 +2159,7 @@ index d2d8f2e..3166818 100644
  {
    char *namespace;
  
-@@ -308,8 +335,8 @@ lookup_namespace_scope (const char *name,
+@@ -308,8 +347,8 @@ lookup_namespace_scope (const char *name,
  	  new_scope_len += 2;
  	}
        new_scope_len += cp_find_first_component (scope + new_scope_len);
@@ -1881,54 +2170,20 @@ index d2d8f2e..3166818 100644
        if (sym != NULL)
  	return sym;
      }
-@@ -320,10 +347,44 @@ lookup_namespace_scope (const char *name,
+@@ -320,25 +359,50 @@ lookup_namespace_scope (const char *name,
    namespace = alloca (scope_len + 1);
    strncpy (namespace, scope, scope_len);
    namespace[scope_len] = '\0';
 -  return cp_lookup_symbol_namespace (namespace, name, linkage_name,
 -				     block, domain);
-+  return cp_lookup_symbol_namespace (namespace, name, block, domain,
-+				     declaration_only);
++  return cp_lookup_symbol_namespace (namespace, name, block, domain, declaration_only);
  }
  
-+/* Searches the for the given NAME in the given NAMESPACE, using import 
-+   statements implied by the given BLOCK, *and its' parents*. */
-+struct symbol *
-+cp_lookup_symbol_namespace_incremental (const char *namespace,
-+                                        const char *name,
-+                                        const struct block *block,
-+                                        const domain_enum domain,
-+                                        int declaration_only)
-+{
-+  struct symbol *sym;
-+  const struct block *global_block = block_global_block (block);
-+
-+  /* Check if either no block is specified or it's a global block.  */
-+
-+  if (global_block == NULL)
-+    return NULL;
-+
-+  while (block != global_block)
-+    {
-+      sym = cp_lookup_symbol_namespace (namespace, name, block, domain,
-+					declaration_only);
-+
-+      if (sym != NULL)
-+        return sym;
-+
-+      block = BLOCK_SUPERBLOCK (block);
-+    }
-+
-+  /* We've reached the global block without finding a result.  */
-+
-+  return NULL;
-+}
-+
-+
- /* Look up NAME in the C++ namespace NAMESPACE, applying the using
-    directives that are active in BLOCK.  Other arguments are as in
+-/* Look up NAME in the C++ namespace NAMESPACE, applying the using
+-   directives that are active in BLOCK.  Other arguments are as in
++/* Look up NAME in the C++ namespace NAMESPACE. Other arguments are as in
     cp_lookup_symbol_nonlocal.  */
-@@ -331,12 +392,12 @@ lookup_namespace_scope (const char *name,
+ 
  struct symbol *
  cp_lookup_symbol_namespace (const char *namespace,
  			    const char *name,
@@ -1937,21 +2192,53 @@ index d2d8f2e..3166818 100644
 -			    const domain_enum domain)
 +			    const domain_enum domain,
 +			    int declaration_only)
++{
++
++  if (namespace[0] == '\0')
++    {
++      return lookup_symbol_file (name, block,domain, 0);
++    }
++  else
++    {
++      char *concatenated_name
++	= alloca (strlen (namespace) + 2 + strlen (name) + 1);
++      strcpy (concatenated_name, namespace);
++      strcat (concatenated_name, "::");
++      strcat (concatenated_name, name);
++      return lookup_symbol_file (concatenated_name, block, domain,
++				cp_is_anonymous (namespace));
++    }
++}
++
++/* Search for NAME by applying all import statements belonging
++   to BLOCK which are applicable in SCOPE.  */
++
++struct symbol *
++cp_lookup_symbol_imports (const char *scope,
++                            const char *name,
++                            const struct block *block,
++                            const domain_enum domain,
++                            int declaration_only)
  {
    const struct using_direct *current;
 -  struct symbol *sym;
 +  struct symbol *sym = NULL;
  
-   /* First, go through the using directives.  If any of them add new
+-  /* First, go through the using directives.  If any of them add new
++  /* Go through the using directives.  If any of them add new
       names to the namespace we're searching in, see if we can find a
-@@ -346,15 +407,60 @@ cp_lookup_symbol_namespace (const char *namespace,
+      match by applying them.  */
+ 
+@@ -346,39 +410,65 @@ cp_lookup_symbol_namespace (const char *namespace,
         current != NULL;
         current = current->next)
      {
 -      if (strcmp (namespace, current->import_dest) == 0)
 +      int current_line = find_pc_line (get_frame_pc (get_current_frame ()), 0).line;
 +      
-+      if (strcmp (namespace, current->import_dest) == 0 && current->line_number < current_line)
++      /* If the import destination is the current scope or one of its ancestors then
++         it is applicable.  */
++      if (strncmp (scope, current->import_dest, strlen(current->import_dest)) == 0 && current->line_number < current_line )
  	{
 -	  sym = cp_lookup_symbol_namespace (current->import_src,
 -					    name,
@@ -1959,7 +2246,6 @@ index d2d8f2e..3166818 100644
 -					    block,
 -					    domain);
 -	  if (sym != NULL)
-+	  
 +	  /* If there is an import of a single declaration, compare the imported
 +	     declaration with the sought out name. If there is a match pass
 +	     current->import_src as NAMESPACE to direct the search towards the
@@ -1991,7 +2277,7 @@ index d2d8f2e..3166818 100644
 +	       sought name. Pass current->inner as the NAME to direct the
 +	       search towards the aliased namespace */
 +	    {
-+	    sym = cp_lookup_symbol_namespace (namespace,
++	    sym = cp_lookup_symbol_namespace (scope,
 +	                                      current->import_src,
 +	                                      block,
 +	                                      domain,
@@ -2012,32 +2298,32 @@ index d2d8f2e..3166818 100644
  	}
      }
  
-@@ -362,10 +468,11 @@ cp_lookup_symbol_namespace (const char *namespace,
-      that are still applicable; so let's see if we've got a match
-      using the current namespace.  */
-   
+-  /* We didn't find anything by applying any of the using directives
+-     that are still applicable; so let's see if we've got a match
+-     using the current namespace.  */
+-  
 -  if (namespace[0] == '\0')
-+  if (namespace[0] == '\0' && !declaration_only)
-     {
+-    {
 -      return lookup_symbol_file (name, linkage_name, block,
 -				 domain, 0);
-+      sym = lookup_symbol_file (name, block, domain,
-+				cp_is_anonymous (namespace));
-+      return sym;
-     }
-   else
-     {
-@@ -374,8 +481,7 @@ cp_lookup_symbol_namespace (const char *namespace,
-       strcpy (concatenated_name, namespace);
-       strcat (concatenated_name, "::");
-       strcat (concatenated_name, name);
+-    }
+-  else
+-    {
+-      char *concatenated_name
+-	= alloca (strlen (namespace) + 2 + strlen (name) + 1);
+-      strcpy (concatenated_name, namespace);
+-      strcat (concatenated_name, "::");
+-      strcat (concatenated_name, name);
 -      sym = lookup_symbol_file (concatenated_name, linkage_name,
 -				block, domain, 
-+      sym = lookup_symbol_file (concatenated_name, block, domain, 
- 				cp_is_anonymous (namespace));
-       return sym;
-     }
-@@ -388,14 +494,13 @@ cp_lookup_symbol_namespace (const char *namespace,
+-				cp_is_anonymous (namespace));
+-      return sym;
+-    }
++  return NULL;
+ }
+ 
+ /* Look up NAME in BLOCK's static block and in global blocks.  If
+@@ -388,17 +478,15 @@ cp_lookup_symbol_namespace (const char *namespace,
  
  static struct symbol *
  lookup_symbol_file (const char *name,
@@ -2052,8 +2338,11 @@ index d2d8f2e..3166818 100644
 +  sym = lookup_symbol_static (name, block, domain);
    if (sym != NULL)
      return sym;
- 
-@@ -408,12 +513,11 @@ lookup_symbol_file (const char *name,
+-
+   if (anonymous_namespace)
+     {
+       /* Symbols defined in anonymous namespaces have external linkage
+@@ -408,12 +496,11 @@ lookup_symbol_file (const char *name,
        const struct block *global_block = block_global_block (block);
        
        if (global_block != NULL)
@@ -2068,7 +2357,15 @@ index d2d8f2e..3166818 100644
      }
  
    if (sym != NULL)
-@@ -463,9 +567,8 @@ cp_lookup_nested_type (struct type *parent_type,
+@@ -434,6 +521,7 @@ lookup_symbol_file (const char *name,
+       sym = lookup_possible_namespace_symbol (name);
+       if (sym != NULL)
+ 	return sym;
++
+     }
+ 
+   return NULL;
+@@ -463,9 +551,8 @@ cp_lookup_nested_type (struct type *parent_type,
  	const char *parent_name = TYPE_TAG_NAME (parent_type);
  	struct symbol *sym = cp_lookup_symbol_namespace (parent_name,
  							 nested_name,
@@ -2079,7 +2376,7 @@ index d2d8f2e..3166818 100644
  	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
  	  return NULL;
  	else
-@@ -709,7 +812,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
+@@ -709,7 +796,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
  
    memcpy (name_copy, name, len);
    name_copy[len] = '\0';
@@ -2088,7 +2385,7 @@ index d2d8f2e..3166818 100644
  
    if (sym == NULL)
      {
-@@ -749,7 +852,7 @@ lookup_possible_namespace_symbol (const char *name)
+@@ -749,7 +836,7 @@ lookup_possible_namespace_symbol (const char *name)
        struct symbol *sym;
  
        sym = lookup_block_symbol (get_possible_namespace_block (objfile),
@@ -2219,7 +2516,7 @@ index f12d785..ca10007 100644
  _initialize_cp_support (void)
  {
 diff --git a/gdb/cp-support.h b/gdb/cp-support.h
-index b5a5c5f..0381686 100644
+index b5a5c5f..f126bed 100644
 --- a/gdb/cp-support.h
 +++ b/gdb/cp-support.h
 @@ -38,14 +38,29 @@ struct demangle_component;
@@ -2288,7 +2585,7 @@ index b5a5c5f..0381686 100644
  					  struct using_direct *next);
  
  extern void cp_initialize_namespace (void);
-@@ -97,15 +121,27 @@ extern void cp_set_block_scope (const struct symbol *symbol,
+@@ -97,15 +121,32 @@ extern void cp_set_block_scope (const struct symbol *symbol,
  extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol);
  
  extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
@@ -2303,11 +2600,16 @@ index b5a5c5f..0381686 100644
 +                                              int scope_len,
 +                                              int declaration_only);
 +
-+extern struct symbol *cp_lookup_symbol_namespace_incremental (const char *namespace,
-+                                                              const char *name,
-+                                                              const struct block *block,
-+                                                              const domain_enum domain,
-+                                                              int declaration_only);
++extern struct symbol* cp_lookup_symbol_namespace_incremental (const char *scope,
++                                        const char *name,
++                                        const struct block *block,
++                                        const domain_enum domain);
++
++struct symbol *cp_lookup_symbol_imports (const char *scope,
++                                         const char *name,
++                                         const struct block *block,
++                                         const domain_enum domain,
++                                         int declaration_only);
 +
  extern struct symbol *cp_lookup_symbol_namespace (const char *namespace,
 -						  const char *name,
@@ -2334,7 +2636,7 @@ index 7cb016d..bb9e35a 100644
    default_symfile_offsets, /* sym_offsets: parse user's offsets to
  			      internal form */
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index fab05fc..44cc1f2 100644
+index 4016acc..1042303 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -958,8 +958,10 @@ Connect to process ID @var{number}, as with the @code{attach} command.
@@ -2367,7 +2669,7 @@ index fab05fc..44cc1f2 100644
  @c resolve the situation of these eventually
  @item -tui
  @cindex @code{--tui}
-@@ -18427,7 +18439,7 @@ command:
+@@ -18465,7 +18477,7 @@ command:
  @table @code
  @kindex source
  @cindex execute commands from a file
@@ -2376,7 +2678,7 @@ index fab05fc..44cc1f2 100644
  Execute the command file @var{filename}.
  @end table
  
-@@ -18444,6 +18456,11 @@ If @code{-v}, for verbose mode, is given then @value{GDBN} displays
+@@ -18482,6 +18494,11 @@ If @code{-v}, for verbose mode, is given then @value{GDBN} displays
  each command as it is executed.  The option must be given before
  @var{filename}, and is interpreted as part of the filename anywhere else.
  
@@ -2388,7 +2690,7 @@ index fab05fc..44cc1f2 100644
  Commands that would ask for confirmation if used interactively proceed
  without asking when used in a command file.  Many @value{GDBN} commands that
  normally print messages to say what they are doing omit the messages
-@@ -18705,8 +18722,6 @@ containing @code{end}.  For example:
+@@ -18743,8 +18760,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -2397,7 +2699,7 @@ index fab05fc..44cc1f2 100644
  >print 23
  >end
  23
-@@ -18719,6 +18734,14 @@ in a Python script.  This can be controlled using @code{maint set
+@@ -18757,6 +18772,14 @@ in a Python script.  This can be controlled using @code{maint set
  python print-stack}: if @code{on}, the default, then Python stack
  printing is enabled; if @code{off}, then Python stack printing is
  disabled.
@@ -2412,7 +2714,7 @@ index fab05fc..44cc1f2 100644
  @end table
  
  @node Python API
-@@ -18726,6 +18749,14 @@ disabled.
+@@ -18764,6 +18787,14 @@ disabled.
  @cindex python api
  @cindex programming in python
  
@@ -2427,7 +2729,7 @@ index fab05fc..44cc1f2 100644
  @cindex python stdout
  @cindex python pagination
  At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
-@@ -18738,13 +18769,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
+@@ -18776,13 +18807,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
  * Basic Python::                Basic Python Functions.
  * Exception Handling::
  * Auto-loading::                Automatically loading Python code.
@@ -2446,7 +2748,7 @@ index fab05fc..44cc1f2 100644
  * Frames In Python::            Acessing inferior stack frames from Python.
  @end menu
  
-@@ -18771,6 +18806,12 @@ command as having originated from the user invoking it interactively.
+@@ -18809,6 +18844,12 @@ command as having originated from the user invoking it interactively.
  It must be a boolean value.  If omitted, it defaults to @code{False}.
  @end defun
  
@@ -2459,7 +2761,7 @@ index fab05fc..44cc1f2 100644
  @findex gdb.parameter
  @defun parameter parameter
  Return the value of a @value{GDBN} parameter.  @var{parameter} is a
-@@ -18787,6 +18828,7 @@ a Python value of the appropriate type, and returned.
+@@ -18825,6 +18866,7 @@ a Python value of the appropriate type, and returned.
  @defun history number
  Return a value from @value{GDBN}'s value history (@pxref{Value
  History}).  @var{number} indicates which history element to return.
@@ -2467,7 +2769,7 @@ index fab05fc..44cc1f2 100644
  If @var{number} is negative, then @value{GDBN} will take its absolute value
  and count backward from the last element (i.e., the most recent element) to
  find the value to return.  If @var{number} is zero, then @value{GDBN} will
-@@ -18798,6 +18840,28 @@ If no exception is raised, the return value is always an instance of
+@@ -18836,6 +18878,28 @@ If no exception is raised, the return value is always an instance of
  @code{gdb.Value} (@pxref{Values From Inferior}).
  @end defun
  
@@ -2496,7 +2798,7 @@ index fab05fc..44cc1f2 100644
  @findex gdb.write
  @defun write string
  Print a string to @value{GDBN}'s paginated standard output stream.
-@@ -18812,6 +18876,11 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
+@@ -18850,6 +18914,11 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
  function.
  @end defun
  
@@ -2508,7 +2810,7 @@ index fab05fc..44cc1f2 100644
  @node Exception Handling
  @subsubsection Exception Handling
  @cindex python exceptions
-@@ -18948,6 +19017,13 @@ The type of this @code{gdb.Value}.  The value of this attribute is a
+@@ -18986,6 +19055,13 @@ The type of this @code{gdb.Value}.  The value of this attribute is a
  The following methods are provided:
  
  @table @code
@@ -2522,7 +2824,7 @@ index fab05fc..44cc1f2 100644
  @defmethod Value dereference
  For pointer data types, this method returns a new @code{gdb.Value} object
  whose contents is the object pointed to by the pointer.  For example, if
-@@ -19019,6 +19095,9 @@ module:
+@@ -19057,6 +19133,9 @@ module:
  This function looks up a type by name.  @var{name} is the name of the
  type to look up.  It must be a string.
  
@@ -2532,7 +2834,7 @@ index fab05fc..44cc1f2 100644
  Ordinarily, this function will return an instance of @code{gdb.Type}.
  If the named type cannot be found, it will throw an exception.
  @end defun
-@@ -19071,6 +19150,12 @@ This is @code{True} if the field is artificial, usually meaning that
+@@ -19109,6 +19188,12 @@ This is @code{True} if the field is artificial, usually meaning that
  it was provided by the compiler and not the user.  This attribute is
  always provided, and is @code{False} if the field is not artificial.
  
@@ -2545,7 +2847,7 @@ index fab05fc..44cc1f2 100644
  @item bitsize
  If the field is packed, or is a bitfield, then this will have a
  non-zero value, which is the size of the field in bits.  Otherwise,
-@@ -19123,7 +19208,7 @@ If the type does not have a target, this method will throw an
+@@ -19161,7 +19246,7 @@ If the type does not have a target, this method will throw an
  exception.
  @end defmethod
  
@@ -2554,7 +2856,7 @@ index fab05fc..44cc1f2 100644
  If this @code{gdb.Type} is an instantiation of a template, this will
  return a new @code{gdb.Type} which represents the type of the
  @var{n}th template argument.
-@@ -19131,7 +19216,8 @@ return a new @code{gdb.Type} which represents the type of the
+@@ -19169,7 +19254,8 @@ return a new @code{gdb.Type} which represents the type of the
  If this @code{gdb.Type} is not a template type, this will throw an
  exception.  Ordinarily, only C@t{++} code will have template types.
  
@@ -2564,7 +2866,7 @@ index fab05fc..44cc1f2 100644
  @end defmethod
  @end table
  
-@@ -19485,6 +19571,121 @@ import gdb.libstdcxx.v6
+@@ -19523,6 +19609,121 @@ import gdb.libstdcxx.v6
  gdb.libstdcxx.v6.register_printers (gdb.current_objfile ())
  @end smallexample
  
@@ -2686,7 +2988,7 @@ index fab05fc..44cc1f2 100644
  @node Commands In Python
  @subsubsection Commands In Python
  
-@@ -19737,6 +19938,135 @@ registration of the command with @value{GDBN}.  Depending on how the
+@@ -19775,6 +19976,135 @@ registration of the command with @value{GDBN}.  Depending on how the
  Python code is read into @value{GDBN}, you may need to import the
  @code{gdb} module explicitly.
  
@@ -2822,7 +3124,7 @@ index fab05fc..44cc1f2 100644
  @node Functions In Python
  @subsubsection Writing new convenience functions
  
-@@ -19841,6 +20171,82 @@ which is used to format the value.  @xref{Pretty Printing}, for more
+@@ -19879,6 +20209,82 @@ which is used to format the value.  @xref{Pretty Printing}, for more
  information.
  @end defivar
  
@@ -2905,7 +3207,7 @@ index fab05fc..44cc1f2 100644
  @node Frames In Python
  @subsubsection Acessing inferior stack frames from Python.
  
-@@ -19905,6 +20311,14 @@ function to a string.
+@@ -19943,6 +20349,14 @@ function to a string.
  Returns the frame's resume address.
  @end defmethod
  
@@ -2920,7 +3222,7 @@ index fab05fc..44cc1f2 100644
  @defmethod Frame older
  Return the frame that called this frame.
  @end defmethod
-@@ -19913,10 +20327,18 @@ Return the frame that called this frame.
+@@ -19951,10 +20365,18 @@ Return the frame that called this frame.
  Return the frame called by this frame.
  @end defmethod
  
@@ -2939,7 +3241,7 @@ index fab05fc..44cc1f2 100644
  @end table
  
  @node Interpreters
-@@ -23238,6 +23660,8 @@ access this functionality:
+@@ -23306,6 +23728,8 @@ access this functionality:
  @item @strong{Operation}
  @tab @strong{Description}
  
@@ -2948,7 +3250,16 @@ index fab05fc..44cc1f2 100644
  @item @code{-var-create}
  @tab create a variable object
  @item @code{-var-delete}
-@@ -23273,6 +23697,23 @@ how it can be used.
+@@ -23334,6 +23758,8 @@ access this functionality:
+ @tab update the variable and its children
+ @item @code{-var-set-frozen}
+ @tab set frozeness attribute
++@item @code{-var-set-update-range}
++@tab set range of children to display on update
+ @end multitable
+ 
+ In the next subsection we describe each operation in detail and suggest
+@@ -23341,6 +23767,23 @@ how it can be used.
  
  @subheading Description And Use of Operations on Variable Objects
  
@@ -2972,7 +3283,7 @@ index fab05fc..44cc1f2 100644
  @subheading The @code{-var-create} Command
  @findex -var-create
  
-@@ -23405,7 +23846,7 @@ Returns the number of children of a variable object @var{name}:
+@@ -23473,7 +23916,7 @@ Returns the number of children of a variable object @var{name}:
  @subsubheading Synopsis
  
  @smallexample
@@ -2981,7 +3292,7 @@ index fab05fc..44cc1f2 100644
  @end smallexample
  @anchor{-var-list-children}
  
-@@ -23418,6 +23859,14 @@ values; and if it is 2 or @code{--simple-values} print the name and
+@@ -23486,6 +23929,12 @@ values; and if it is 2 or @code{--simple-values} print the name and
  value for simple data types and just the name for arrays, structures
  and unions.
  
@@ -2989,24 +3300,69 @@ index fab05fc..44cc1f2 100644
 +to report.  If @var{from} or @var{to} is less than zero, the range is
 +reset and all children will be reported.  Otherwise, children starting
 +at @var{from} (zero-based) and ending just before @var{to} will be
-+reported.  The selected range is sticky; future calls to
-+@code{-var-update} or @code{-var-list-children} will use any
-+previously set range.
++reported.
 +
  For each child the following results are returned:
  
  @table @var
-@@ -23449,6 +23898,10 @@ Otherwise this result is not present.
- 
- @item frozen
+@@ -23519,6 +23968,14 @@ Otherwise this result is not present.
  If the variable object is frozen, this variable will be present with a value of 1.
+ @end table
+ 
++The result may have its own attributes:
 +
++@table @var
 +@item has_more
 +This is an integer attribute which is nonzero if there are children
 +remaining after the end of the selected range.
- @end table
- 
++@end table
++
  @subsubheading Example
+ 
+ @smallexample
+@@ -23700,6 +24157,9 @@ With the @samp{*} parameter, if a variable object is bound to a
+ currently running thread, it will not be updated, without any
+ diagnostic.
+ 
++If @code{-var-set-update-range} was previously used on a varobj, then
++only the selected range of children will be reported.
++
+ @subsubheading Example
+ 
+ @smallexample
+@@ -23767,6 +24227,32 @@ Unfreezing a variable does not update it, only subsequent
+ (gdb)
+ @end smallexample
+ 
++@subheading The @code{-var-set-update-range} command
++@findex -var-set-update-range
++@anchor{-var-set-update-range}
++
++@subsubheading Synopsis
++
++@smallexample
++ -var-set-update-range @var{name} @var{from} @var{to}
++@end smallexample
++
++Set the range of children to be returned by future invocations of
++@code{-var-update}.
++
++@var{from} and @var{to} indicate the range of children to report.  If
++@var{from} or @var{to} is less than zero, the range is reset and all
++children will be reported.  Otherwise, children starting at @var{from}
++(zero-based) and ending just before @var{to} will be reported.
++
++@subsubheading Example
++
++@smallexample
++(gdb)
++-var-set-update-range V 1 2
++^done
++@end smallexample
++
+ @subheading The @code{-var-set-visualizer} command
+ @findex -var-set-visualizer
+ @anchor{-var-set-visualizer}
 diff --git a/gdb/doc/gdbint.texinfo b/gdb/doc/gdbint.texinfo
 index b1c0452..da24b98 100644
 --- a/gdb/doc/gdbint.texinfo
@@ -3169,7 +3525,7 @@ index 4984f31..4bbbe4e 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dwarf2-frame.c b/gdb/dwarf2-frame.c
-index c620067..6c4faf1 100644
+index 0f6da40..c1c162e 100644
 --- a/gdb/dwarf2-frame.c
 +++ b/gdb/dwarf2-frame.c
 @@ -38,6 +38,7 @@
@@ -3180,7 +3536,7 @@ index c620067..6c4faf1 100644
  
  struct comp_unit;
  
-@@ -305,6 +306,13 @@ no_get_frame_base (void *baton, gdb_byte **start, size_t *length)
+@@ -310,6 +311,13 @@ no_get_frame_base (void *baton, gdb_byte **start, size_t *length)
  }
  
  static CORE_ADDR
@@ -3194,7 +3550,7 @@ index c620067..6c4faf1 100644
  no_get_tls_address (void *baton, CORE_ADDR offset)
  {
    internal_error (__FILE__, __LINE__,
-@@ -355,14 +363,16 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
+@@ -360,14 +368,16 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
    ctx->read_reg = read_reg;
    ctx->read_mem = read_mem;
    ctx->get_frame_base = no_get_frame_base;
@@ -3212,7 +3568,7 @@ index c620067..6c4faf1 100644
  
    free_dwarf_expr_context (ctx);
  
-@@ -1242,6 +1252,14 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
+@@ -1247,6 +1257,14 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
  
    return NULL;
  }
@@ -3227,9 +3583,9 @@ index c620067..6c4faf1 100644
  
  const struct objfile_data *dwarf2_frame_objfile_data;
  
-@@ -1504,6 +1522,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
-       struct dwarf2_fde *fde;
+@@ -1536,6 +1554,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
        CORE_ADDR offset;
+       CORE_ADDR seek_pc;
  
 +      if (objfile->quick_addrmap)
 +	{
@@ -3239,8 +3595,8 @@ index c620067..6c4faf1 100644
 +      /* FIXME: Read-in only .debug_frame/.eh_frame without .debug_info?  */
 +      require_partial_symbols (objfile);
 +
-       fde = objfile_data (objfile, dwarf2_frame_objfile_data);
-       if (fde == NULL)
+       fde_table = objfile_data (objfile, dwarf2_frame_objfile_data);
+       if (fde_table == NULL)
  	continue;
 diff --git a/gdb/dwarf2-frame.h b/gdb/dwarf2-frame.h
 index b203661..dd03d59 100644
@@ -4036,7 +4392,7 @@ index 0bfcfca..01018d6 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 445bab8..be2dc2a 100644
+index 445bab8..51699bb 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1,8 +1,7 @@
@@ -4505,8 +4861,8 @@ index 445bab8..be2dc2a 100644
  
  static void
  dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
-@@ -1690,6 +1869,37 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
-   free_line_header (lh);
+@@ -1812,6 +1991,37 @@ lookup_signatured_type (struct objfile *objfile, ULONGEST sig)
+   return entry;
  }
  
 +/* Find the base address of the compilation unit for range lists and
@@ -4540,20 +4896,10 @@ index 445bab8..be2dc2a 100644
 +    }
 +}
 +
- static hashval_t
- hash_type_signature (const void *item)
- {
-@@ -1812,8 +2022,7 @@ lookup_signatured_type (struct objfile *objfile, ULONGEST sig)
-   return entry;
- }
- 
--/* Subroutine of process_type_comp_unit and dwarf2_build_psymtabs_hard
--   to combine the common parts.
-+/* Subroutine of dwarf2_build_psymtabs_hard to simplify it.
+ /* Subroutine of process_type_comp_unit and dwarf2_build_psymtabs_hard
+    to combine the common parts.
     Process a compilation unit for a psymtab.
-    BUFFER is a pointer to the beginning of the dwarf section buffer,
-    either .debug_info or debug_types.
-@@ -1878,7 +2087,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
+@@ -1878,7 +2088,7 @@ process_psymtab_comp_unit (struct objfile *objfile,
      }
  
    /* Set the language we're debugging.  */
@@ -4562,7 +4908,7 @@ index 445bab8..be2dc2a 100644
  
    /* Allocate a new partial symbol table structure.  */
    pst = start_psymtab_common (objfile, objfile->section_offsets,
-@@ -1929,8 +2138,8 @@ process_psymtab_comp_unit (struct objfile *objfile,
+@@ -1929,8 +2139,8 @@ process_psymtab_comp_unit (struct objfile *objfile,
      }
    else if (comp_unit_die.has_pc_info
  	   && comp_unit_die.lowpc < comp_unit_die.highpc)
@@ -4573,7 +4919,7 @@ index 445bab8..be2dc2a 100644
      addrmap_set_empty (objfile->psymtabs_addrmap,
  		       comp_unit_die.lowpc + baseaddr,
  		       comp_unit_die.highpc + baseaddr - 1, pst);
-@@ -2361,7 +2570,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+@@ -2361,7 +2571,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
  	 ignoring them.  */
        complaint (&symfile_complaints,
  		 _("unhandled containing DIE tag %d for DIE at %d"),
@@ -4582,7 +4928,7 @@ index 445bab8..be2dc2a 100644
        parent->scope = grandparent_scope;
      }
  
-@@ -2376,12 +2585,22 @@ partial_die_full_name (struct partial_die_info *pdi,
+@@ -2376,12 +2586,22 @@ partial_die_full_name (struct partial_die_info *pdi,
  		       struct dwarf2_cu *cu)
  {
    char *parent_scope;
@@ -4609,7 +4955,7 @@ index 445bab8..be2dc2a 100644
  }
  
  static void
-@@ -2397,12 +2616,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2397,12 +2617,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -4625,7 +4971,7 @@ index 445bab8..be2dc2a 100644
  
    if (actual_name == NULL)
      actual_name = pdi->name;
-@@ -2534,22 +2750,6 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2534,22 +2751,6 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
        break;
      }
  
@@ -4648,7 +4994,7 @@ index 445bab8..be2dc2a 100644
    if (built_actual_name)
      xfree (actual_name);
  }
-@@ -2559,9 +2759,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2559,9 +2760,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
     name listed in the die.  */
  
  static int
@@ -4660,7 +5006,7 @@ index 445bab8..be2dc2a 100644
      {
      case DW_TAG_namespace:
      case DW_TAG_typedef:
-@@ -2571,7 +2771,23 @@ pdi_needs_namespace (enum dwarf_tag tag)
+@@ -2571,7 +2772,23 @@ pdi_needs_namespace (enum dwarf_tag tag)
      case DW_TAG_union_type:
      case DW_TAG_enumeration_type:
      case DW_TAG_enumerator:
@@ -4684,7 +5030,7 @@ index 445bab8..be2dc2a 100644
      default:
        return 0;
      }
-@@ -2700,27 +2916,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
+@@ -2700,27 +2917,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
  
        if (real_pdi->die_parent != NULL)
  	return;
@@ -4712,7 +5058,7 @@ index 445bab8..be2dc2a 100644
      }
  }
  
-@@ -3170,7 +3365,6 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -3170,7 +3366,6 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
    CORE_ADDR lowpc, highpc;
    struct symtab *symtab;
    struct cleanup *back_to;
@@ -4720,7 +5066,7 @@ index 445bab8..be2dc2a 100644
    CORE_ADDR baseaddr;
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
-@@ -3180,30 +3374,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -3180,30 +3375,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
  
    cu->list_in_scope = &file_symbols;
  
@@ -4752,7 +5098,7 @@ index 445bab8..be2dc2a 100644
  
    /* Do line number decoding in read_file_scope () */
    process_die (cu->dies, cu);
-@@ -3234,6 +3405,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
+@@ -3234,6 +3406,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
  static void
  process_die (struct die_info *die, struct dwarf2_cu *cu)
  {
@@ -4760,7 +5106,7 @@ index 445bab8..be2dc2a 100644
    switch (die->tag)
      {
      case DW_TAG_padding:
-@@ -3312,42 +3484,69 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3312,42 +3485,69 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
  /* Return the fully qualified name of DIE, based on its DW_AT_name.
     If scope qualifiers are appropriate they will be added.  The result
     will be allocated on the objfile_obstack, or NULL if the DIE does
@@ -4852,7 +5198,7 @@ index 445bab8..be2dc2a 100644
  
  static void
  read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
-@@ -3356,9 +3555,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3356,9 +3556,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
    struct die_info *imported_die;
    const char *imported_name;
    const char *imported_name_prefix;
@@ -4870,7 +5216,7 @@ index 445bab8..be2dc2a 100644
    import_attr = dwarf2_attr (die, DW_AT_import, cu);
    if (import_attr == NULL)
      {
-@@ -3406,29 +3611,45 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3406,29 +3612,45 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
        return;
      }
  
@@ -4929,101 +5275,31 @@ index 445bab8..be2dc2a 100644
  }
  
  static void
-@@ -3677,6 +3898,93 @@ unsigned_int_compar (const void *ap, const void *bp)
+@@ -3676,7 +3898,7 @@ unsigned_int_compar (const void *ap, const void *bp)
+ 
    return (a > b) - (b > a);
  }
- 
-+static void explore_abstract_origin(struct die_info *die, struct dwarf2_cu *cu, unsigned* die_children_p){
-+  struct attribute *attr;
-+  unsigned die_children = *die_children_p;
-+  struct die_info *child_die;
-+  
-+  attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
-+  
-+  /* GCC currently uses DW_AT_specification to indicate die inheritence
-+     in the case of import statements. The following is to accommodate that */
-+  if(!attr){
-+    attr = dwarf2_attr (die, DW_AT_specification, cu);
-+  }
-+  
-+  if (attr)
-+    {
-+      /* For the list of CHILD_DIEs.  */
-+      unsigned *offsets;
-+      unsigned *offsets_end, *offsetp;
-+      struct die_info *origin_die, *origin_child_die;
-+      struct cleanup *cleanups;
-+
-+      origin_die = follow_die_ref (die, attr, &cu);
-+      if (die->tag != origin_die->tag)
-+        complaint (&symfile_complaints,
-+                   _("DIE 0x%x and its abstract origin 0x%x have different "
-+                     "tags"),
-+                   die->offset, origin_die->offset);
-+
-+      offsets = xmalloc (sizeof (*offsets) * die_children);
-+      cleanups = make_cleanup (xfree, offsets);
-+
-+      offsets_end = offsets;
-+      child_die = die->child;
-+      while (child_die && child_die->tag)
-+        {
-+          attr = dwarf2_attr (child_die, DW_AT_abstract_origin, cu);
-+          if (!attr)
-+            complaint (&symfile_complaints,
-+                       _("Child DIE 0x%x of DIE 0x%x has missing "
-+                         "DW_AT_abstract_origin"),
-+                       child_die->offset, die->offset);
-+          else
-+            {
-+              struct die_info *child_origin_die;
-+
-+              child_origin_die = follow_die_ref (child_die, attr, &cu);
-+              if (child_die->tag != child_origin_die->tag)
-+                complaint (&symfile_complaints,
-+                           _("Child DIE 0x%x and its abstract origin 0x%x have "
-+                             "different tags"),
-+                           child_die->offset, child_origin_die->offset);
-+              *offsets_end++ = child_origin_die->offset;
-+            }
-+          child_die = sibling_die (child_die);
-+        }
-+      qsort (offsets, offsets_end - offsets, sizeof (*offsets),
-+             unsigned_int_compar);
-+      /* Disabled as excessively expensive - check if we may ever complain.  */
-+      if (0)
-+        {
-+          for (offsetp = offsets + 1; offsetp < offsets_end; offsetp++)
-+            if (offsetp[-1] == *offsetp)
-+              complaint (&symfile_complaints,
-+                         _("Child DIEs of DIE 0x%x duplicitly abstract-origin "
-+                           "referenced DIE 0x%x"),
-+                         die->offset, *offsetp);
-+        }
-+
-+      offsetp = offsets;
-+      origin_child_die = origin_die->child;
-+      while (origin_child_die && origin_child_die->tag)
-+        {
-+          /* Is origin_child_die referenced by any of the DIE children?  */
-+          while (offsetp < offsets_end && *offsetp < origin_child_die->offset)
-+            offsetp++;
-+          if (offsetp >= offsets_end || *offsetp > origin_child_die->offset)
-+            {
-+              /* Found that origin_child_die is really not referenced.  */
-+              process_die (origin_child_die, cu);
-+            }
-+          origin_child_die = sibling_die (origin_child_die);
-+        }
-+
-+      do_cleanups (cleanups);
-+    }
-+}
+-
 +  
  /* DW_AT_abstract_origin inherits whole DIEs (not just their attributes).
     Inherit only the children of the DW_AT_abstract_origin DIE not being already
     referenced by DW_AT_abstract_origin from the children of the current DIE.  */
-@@ -3795,6 +4103,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3697,6 +3919,14 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
+   struct attribute *attr;
+ 
+   attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
++  
++  /* GCC 4.3 incorrectly uses DW_AT_specification to indicate die inheritence
++     in the case of import statements. The following is to accommodate 
++     that.  */
++  if(!attr){
++    attr = dwarf2_attr (die, DW_AT_specification, cu);
++  }
++  
+   if (!attr)
+     return;
+ 
+@@ -3795,6 +4025,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
    char *name;
    CORE_ADDR baseaddr;
    struct block *block;
@@ -5031,7 +5307,7 @@ index 445bab8..be2dc2a 100644
    int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
  
    if (inlined_func)
-@@ -3813,13 +4122,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3813,13 +4044,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -5050,7 +5326,7 @@ index 445bab8..be2dc2a 100644
 +	child_die = sibling_die (child_die);
 +	die_children++;
 +      }
-+    explore_abstract_origin(die, cu, &die_children);
++    inherit_abstract_dies(die, cu);
      return;
 -
 +  }
@@ -5058,7 +5334,7 @@ index 445bab8..be2dc2a 100644
    lowpc += baseaddr;
    highpc += baseaddr;
  
-@@ -3846,16 +4165,15 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3846,14 +4087,12 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    cu->list_in_scope = &local_symbols;
  
@@ -5077,11 +5353,8 @@ index 445bab8..be2dc2a 100644
 +      die_children++;
      }
  
-+  explore_abstract_origin(die, cu, &die_children);
    inherit_abstract_dies (die, cu);
- 
-   new = pop_context ();
-@@ -3905,7 +4223,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3905,7 +4144,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
       as multiple lexical blocks?  Handling children in a sane way would
       be nasty.  Might be easier to properly extend generic blocks to 
       describe ranges.  */
@@ -5090,16 +5363,16 @@ index 445bab8..be2dc2a 100644
      return;
    lowpc += baseaddr;
    highpc += baseaddr;
-@@ -3922,7 +4240,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3922,7 +4161,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
      }
    new = pop_context ();
  
 -  if (local_symbols != NULL)
-+  if (local_symbols != NULL || using_directives!= NULL )
++  if (local_symbols != NULL || using_directives != NULL)
      {
        struct block *block
          = finish_block (0, &local_symbols, new->old_blocks, new->start_addr,
-@@ -4077,7 +4395,8 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
+@@ -4077,7 +4316,8 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
     discontinuous, i.e. derived from DW_AT_ranges information.  */
  static int
  dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
@@ -5109,7 +5382,7 @@ index 445bab8..be2dc2a 100644
  {
    struct attribute *attr;
    CORE_ADDR low = 0;
-@@ -4105,7 +4424,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
+@@ -4105,7 +4345,7 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
  	{
  	  /* Value of the DW_AT_ranges attribute is the offset in the
  	     .debug_ranges section.  */
@@ -5118,7 +5391,7 @@ index 445bab8..be2dc2a 100644
  	    return 0;
  	  /* Found discontinuous range of addresses.  */
  	  ret = -1;
-@@ -4144,7 +4463,7 @@ dwarf2_get_subprogram_pc_bounds (struct die_info *die,
+@@ -4144,7 +4384,7 @@ dwarf2_get_subprogram_pc_bounds (struct die_info *die,
    CORE_ADDR low, high;
    struct die_info *child = die->child;
  
@@ -5127,7 +5400,7 @@ index 445bab8..be2dc2a 100644
      {
        *lowpc = min (*lowpc, low);
        *highpc = max (*highpc, high);
-@@ -4181,7 +4500,7 @@ get_scope_pc_bounds (struct die_info *die,
+@@ -4181,7 +4421,7 @@ get_scope_pc_bounds (struct die_info *die,
    CORE_ADDR best_high = (CORE_ADDR) 0;
    CORE_ADDR current_low, current_high;
  
@@ -5136,7 +5409,7 @@ index 445bab8..be2dc2a 100644
      {
        best_low = current_low;
        best_high = current_high;
-@@ -4393,7 +4712,12 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
+@@ -4393,7 +4633,12 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
                byte_offset = 0;
              }
            else if (attr_form_is_constant (attr))
@@ -5150,7 +5423,7 @@ index 445bab8..be2dc2a 100644
            else
              byte_offset = decode_locdesc (DW_BLOCK (attr), cu);
  
-@@ -4476,7 +4800,11 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
+@@ -4476,7 +4721,11 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
        if (fieldname == NULL)
  	return;
  
@@ -5163,7 +5436,7 @@ index 445bab8..be2dc2a 100644
        physname = dwarf2_linkage_name (die, cu);
  
        /* The name is already allocated along with this objfile, so we don't
-@@ -4607,7 +4935,11 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -4607,7 +4856,11 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
    if (fieldname == NULL)
      return;
  
@@ -5176,7 +5449,7 @@ index 445bab8..be2dc2a 100644
    physname = dwarf2_linkage_name (die, cu);
  
    /* Look up member function name in fieldlist.  */
-@@ -4652,7 +4984,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -4652,7 +4905,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
    /* The name is already allocated along with this objfile, so we don't
       need to duplicate it for the type.  */
    fnp->physname = physname ? physname : "";
@@ -5185,7 +5458,7 @@ index 445bab8..be2dc2a 100644
    this_type = read_type_die (die, cu);
    if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
      {
-@@ -4836,7 +5168,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4836,7 +5089,7 @@ quirk_gcc_member_function_pointer (struct die_info *die, struct dwarf2_cu *cu)
      return NULL;
  
    domain_type = TYPE_TARGET_TYPE (TYPE_FIELD_TYPE (pfn_type, 0));
@@ -5194,7 +5467,7 @@ index 445bab8..be2dc2a 100644
    smash_to_method_type (type, domain_type, TYPE_TARGET_TYPE (pfn_type),
  			TYPE_FIELDS (pfn_type), TYPE_NFIELDS (pfn_type),
  			TYPE_VARARGS (pfn_type));
-@@ -4889,7 +5221,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4889,7 +5142,7 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
        return set_die_type (die, type, cu);
      }
  
@@ -5203,7 +5476,7 @@ index 445bab8..be2dc2a 100644
    INIT_CPLUS_SPECIFIC (type);
  
    name = dwarf2_name (die, cu);
-@@ -4898,14 +5230,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4898,14 +5151,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
        if (cu->language == language_cplus
  	  || cu->language == language_java)
  	{
@@ -5225,7 +5498,7 @@ index 445bab8..be2dc2a 100644
  	}
      }
  
-@@ -5115,7 +5451,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5115,7 +5372,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
        return set_die_type (die, type, cu);
      }
  
@@ -5234,7 +5507,7 @@ index 445bab8..be2dc2a 100644
  
    TYPE_CODE (type) = TYPE_CODE_ENUM;
    name = dwarf2_full_name (die, cu);
-@@ -5143,51 +5479,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5143,51 +5400,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, type, cu);
  }
  
@@ -5286,7 +5559,7 @@ index 445bab8..be2dc2a 100644
  /* Given a pointer to a die which begins an enumeration, process all
     the dies that define the members of the enumeration, and create the
     symbol for the enumeration type.
-@@ -5265,6 +5556,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5265,6 +5477,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -5316,7 +5589,7 @@ index 445bab8..be2dc2a 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -5278,7 +5592,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5278,7 +5513,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -5325,7 +5598,7 @@ index 445bab8..be2dc2a 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -5325,16 +5639,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5325,16 +5560,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -5347,7 +5620,7 @@ index 445bab8..be2dc2a 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -5401,12 +5710,14 @@ read_set_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5401,12 +5631,14 @@ read_set_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, set_type, cu);
  }
  
@@ -5364,7 +5637,7 @@ index 445bab8..be2dc2a 100644
    struct attribute *attr;
    struct symbol *sym;
    CORE_ADDR base = (CORE_ADDR) 0;
-@@ -5431,10 +5742,40 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5431,10 +5663,40 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
      }
    if (die->child != NULL)
      {
@@ -5380,9 +5653,9 @@ index 445bab8..be2dc2a 100644
 +      /* Artificial type to be used only by `info common'.  */
 +      TYPE_NAME (type) = "<common>";
 +
-       child_die = die->child;
-       while (child_die && child_die->tag)
- 	{
++      child_die = die->child;
++      while (child_die && child_die->tag)
++	{
 +	  TYPE_NFIELDS (type)++;
 +	  child_die = sibling_die (child_die);
 +	}
@@ -5394,9 +5667,9 @@ index 445bab8..be2dc2a 100644
 +				     * TYPE_NFIELDS (type));
 +      
 +      field = TYPE_FIELDS (type);
-+      child_die = die->child;
-+      while (child_die && child_die->tag)
-+	{
+       child_die = die->child;
+       while (child_die && child_die->tag)
+ 	{
 +	  /* Create the symbol in the DW_TAG_common_block block in the current
 +	     symbol scope.  */
  	  sym = new_symbol (child_die, NULL, cu);
@@ -5405,7 +5678,7 @@ index 445bab8..be2dc2a 100644
  	  attr = dwarf2_attr (child_die, DW_AT_data_member_location, cu);
  	  if (attr)
  	    {
-@@ -5442,8 +5783,25 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5442,8 +5704,25 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
  		base + decode_locdesc (DW_BLOCK (attr), cu);
  	      add_symbol_to_list (sym, &global_symbols);
  	    }
@@ -5431,7 +5704,7 @@ index 445bab8..be2dc2a 100644
      }
  }
  
-@@ -5511,7 +5869,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5511,7 +5790,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
        if (is_anonymous)
  	{
  	  const char *previous_prefix = determine_prefix (die, cu);
@@ -5440,7 +5713,7 @@ index 445bab8..be2dc2a 100644
  	}
      }
  
-@@ -5705,29 +6063,95 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5705,29 +5984,95 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -5554,7 +5827,7 @@ index 445bab8..be2dc2a 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -5822,7 +6246,6 @@ static struct type *
+@@ -5822,7 +6167,6 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -5562,7 +5835,7 @@ index 445bab8..be2dc2a 100644
    const char *name = NULL;
    struct type *this_type;
  
-@@ -5930,8 +6353,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5930,8 +6274,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -5573,7 +5846,7 @@ index 445bab8..be2dc2a 100644
    char *name;
    
    base_type = die_type (die, cu);
-@@ -5944,42 +6367,90 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5944,42 +6288,90 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -5694,7 +5967,7 @@ index 445bab8..be2dc2a 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -6670,9 +7141,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6670,9 +7062,6 @@ read_partial_die (struct partial_die_info *part_die,
  	  if (part_die->dirname == NULL)
  	    part_die->dirname = DW_STRING (&attr);
  	  break;
@@ -5704,7 +5977,7 @@ index 445bab8..be2dc2a 100644
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
  	  part_die->lowpc = DW_ADDR (&attr);
-@@ -6744,10 +7212,10 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6744,10 +7133,10 @@ read_partial_die (struct partial_die_info *part_die,
  	  else
  	    part_die->sibling = buffer + dwarf2_get_ref_die_offset (&attr);
  	  break;
@@ -5719,7 +5992,7 @@ index 445bab8..be2dc2a 100644
          case DW_AT_byte_size:
            part_die->has_byte_size = 1;
            break;
-@@ -6789,13 +7257,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6789,13 +7178,6 @@ read_partial_die (struct partial_die_info *part_die,
  	  || dwarf2_per_objfile->has_section_at_zero))
      part_die->has_pc_info = 1;
  
@@ -5733,7 +6006,7 @@ index 445bab8..be2dc2a 100644
    return info_ptr;
  }
  
-@@ -6904,7 +7365,8 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6904,7 +7286,8 @@ fixup_partial_die (struct partial_die_info *part_die,
    /* If we found a reference attribute and the DIE has no name, try
       to find a name in the referred to DIE.  */
  
@@ -5743,7 +6016,7 @@ index 445bab8..be2dc2a 100644
      {
        struct partial_die_info *spec_die;
  
-@@ -8244,10 +8706,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -8244,10 +8627,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -5758,7 +6031,7 @@ index 445bab8..be2dc2a 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -8269,21 +8733,24 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8269,21 +8654,24 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -5790,7 +6063,7 @@ index 445bab8..be2dc2a 100644
  
        /* Default assumptions.
           Use the passed type or decode it from the die.  */
-@@ -8381,7 +8848,15 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8381,7 +8769,15 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  if (attr)
  	    {
  	      var_decode_location (attr, sym, cu);
@@ -5806,7 +6079,7 @@ index 445bab8..be2dc2a 100644
  	      if (attr2 && (DW_UNSND (attr2) != 0))
  		add_symbol_to_list (sym, &global_symbols);
  	      else
-@@ -8513,7 +8988,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8513,7 +8909,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  add_symbol_to_list (sym, cu->list_in_scope);
  	  break;
  	case DW_TAG_enumerator:
@@ -5815,7 +6088,7 @@ index 445bab8..be2dc2a 100644
  	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
  	  if (attr)
  	    {
-@@ -8537,6 +9012,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8537,6 +8933,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
  	  break;
@@ -5827,7 +6100,7 @@ index 445bab8..be2dc2a 100644
  	default:
  	  /* Not a tag we recognize.  Hopefully we aren't processing
  	     trash data, but since we must specifically ignore things
-@@ -8550,8 +9030,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8550,8 +8951,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
        /* For the benefit of old versions of GCC, check for anonymous
  	 namespaces based on the demangled name.  */
        if (!processing_has_namespace_info
@@ -5837,7 +6110,7 @@ index 445bab8..be2dc2a 100644
  	cp_scan_for_anonymous_namespaces (sym);
      }
    return (sym);
-@@ -8808,6 +9287,9 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8808,6 +9208,9 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -5847,7 +6120,7 @@ index 445bab8..be2dc2a 100644
    return this_type;
  }
  
-@@ -8889,10 +9371,97 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8889,10 +9292,97 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
  	     So it does not need a prefix.  */
  	  return "";
        default:
@@ -5946,7 +6219,7 @@ index 445bab8..be2dc2a 100644
  /* Return a newly-allocated string formed by concatenating PREFIX and
     SUFFIX with appropriate separator.  If PREFIX or SUFFIX is NULL or empty, then
     simply copy the SUFFIX or PREFIX, respectively.  If OBS is non-null,
-@@ -8948,14 +9517,75 @@ static char *
+@@ -8948,14 +9438,75 @@ static char *
  dwarf2_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct attribute *attr;
@@ -5982,7 +6255,11 @@ index 445bab8..be2dc2a 100644
 +	  && die->tag == DW_TAG_subprogram)
 +	{
 +	  struct type *type = read_type_die (die, cu);
-+
+ 
+-  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+-  if (attr && DW_STRING (attr))
+-    return DW_STRING (attr);
+-  return dwarf2_name (die, cu);
 +	  c_type_print_args (type, buf, 0, cu->language);
 +
 +	  if (cu->language == language_java)
@@ -6014,11 +6291,7 @@ index 445bab8..be2dc2a 100644
 +	    name = cname;
 +	}
 +    }
- 
--  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
--  if (attr && DW_STRING (attr))
--    return DW_STRING (attr);
--  return dwarf2_name (die, cu);
++
 +  return name;
  }
  
@@ -6027,7 +6300,7 @@ index 445bab8..be2dc2a 100644
  
  static char *
  dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
-@@ -10181,26 +10811,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
+@@ -10181,26 +10732,35 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
    return 0;
  }
  
@@ -6078,7 +6351,7 @@ index 445bab8..be2dc2a 100644
  }
  
  /* THIS_CU has a reference to PER_CU.  If necessary, load the new compilation
-@@ -10990,8 +11629,6 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10990,8 +11550,6 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
  {
    gdb_byte *mac_ptr, *mac_end;
    struct macro_source_file *current_file = 0;
@@ -6087,7 +6360,7 @@ index 445bab8..be2dc2a 100644
  
    if (dwarf2_per_objfile->macinfo.buffer == NULL)
      {
-@@ -10999,29 +11636,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10999,29 +11557,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
        return;
      }
  
@@ -6122,7 +6395,7 @@ index 445bab8..be2dc2a 100644
          }
  
        macinfo_type = read_1_byte (abfd, mac_ptr);
-@@ -11032,92 +11659,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11032,92 +11580,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            /* A zero macinfo type indicates the end of the macro
               information.  */
          case 0:
@@ -6216,7 +6489,7 @@ index 445bab8..be2dc2a 100644
  
          case DW_MACINFO_define:
          case DW_MACINFO_undef:
-@@ -11132,31 +11674,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11132,31 +11595,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              mac_ptr += bytes_read;
  
              if (! current_file)
@@ -6259,7 +6532,7 @@ index 445bab8..be2dc2a 100644
            }
            break;
  
-@@ -11170,22 +11700,9 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11170,22 +11621,9 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              file = read_unsigned_leb128 (abfd, mac_ptr, &bytes_read);
              mac_ptr += bytes_read;
  
@@ -6285,7 +6558,7 @@ index 445bab8..be2dc2a 100644
            }
            break;
  
-@@ -11239,7 +11756,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11239,7 +11677,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            }
            break;
          }
@@ -6294,7 +6567,7 @@ index 445bab8..be2dc2a 100644
  }
  
  /* Check if the attribute's form is a DW_FORM_block*
-@@ -11272,7 +11789,7 @@ attr_form_is_section_offset (struct attribute *attr)
+@@ -11272,7 +11710,7 @@ attr_form_is_section_offset (struct attribute *attr)
  
  /* Return non-zero if ATTR's value falls in the 'constant' class, or
     zero otherwise.  When this function returns true, you can apply
@@ -6303,7 +6576,7 @@ index 445bab8..be2dc2a 100644
  
     However, note that for some attributes you must check
     attr_form_is_section_offset before using this test.  DW_FORM_data4
-@@ -11299,6 +11816,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -11299,6 +11737,34 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -6338,7 +6611,7 @@ index 445bab8..be2dc2a 100644
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -11328,35 +11873,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+@@ -11328,35 +11794,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
        SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
@@ -6389,7 +6662,7 @@ index 445bab8..be2dc2a 100644
      }
  }
  
-@@ -11644,6 +12179,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -11644,6 +12100,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -6421,7 +6694,7 @@ index 445bab8..be2dc2a 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -11652,6 +12212,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -11652,6 +12133,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -6430,7 +6703,7 @@ index 445bab8..be2dc2a 100644
    if (cu->type_hash == NULL)
      {
        gdb_assert (cu->per_cu != NULL);
-@@ -11794,23 +12356,13 @@ show_dwarf2_cmd (char *args, int from_tty)
+@@ -11794,23 +12277,13 @@ show_dwarf2_cmd (char *args, int from_tty)
    cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
  }
  
@@ -6458,7 +6731,7 @@ index 445bab8..be2dc2a 100644
  }
  
  /* munmap debug sections for OBJFILE, if necessary.  */
-@@ -11819,15 +12371,15 @@ static void
+@@ -11819,15 +12292,15 @@ static void
  dwarf2_per_objfile_cleanup (struct objfile *objfile, void *d)
  {
    struct dwarf2_per_objfile *data = d;
@@ -6483,7 +6756,7 @@ index 445bab8..be2dc2a 100644
  }
  
  void _initialize_dwarf2_read (void);
-@@ -11835,6 +12387,7 @@ void _initialize_dwarf2_read (void);
+@@ -11835,6 +12308,7 @@ void _initialize_dwarf2_read (void);
  void
  _initialize_dwarf2_read (void)
  {
@@ -8733,7 +9006,7 @@ index 79d33fe..aecd820 100644
     once for each known thread.  */
  typedef int (*thread_callback_func) (struct thread_info *, void *);
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 2f77dca..09f15dc 100644
+index 2f77dca..8146175 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -38,6 +38,9 @@
@@ -9324,7 +9597,7 @@ index 2f77dca..09f15dc 100644
  /* Make a copy of the given TYPE, except that the pointer & reference
     types are not preserved.
     
-@@ -2973,6 +3227,219 @@ copy_type (const struct type *type)
+@@ -2973,6 +3227,217 @@ copy_type (const struct type *type)
    return new_type;
  }
  
@@ -9485,6 +9758,21 @@ index 2f77dca..09f15dc 100644
 +  main_type_crawl (type, type_mark_used_crawl, NULL);
 +}
 +
++/* Increment the reference count for TYPE.  */
++
++void
++type_incref (struct type *type)
++{
++}
++
++/* Decrement the reference count for TYPE.  If TYPE has no more
++   references, delete it.  */
++
++void
++type_decref (struct type *type)
++{
++}
++
 +/* A traverse callback for type_discardable_table which removes any
 +   type_discardable whose reference count is now zero (unused link).  */
 +
@@ -9524,27 +9812,10 @@ index 2f77dca..09f15dc 100644
 +
 +  htab_traverse (type_discardable_table, type_discardable_remove, NULL);
 +}
-+
-+/* Increment the reference count for TYPE.  */
-+/* We'll be replacing this with type GC soon.  */
-+
-+void
-+type_incref (struct type *type)
-+{
-+}
-+
-+/* Decrement the reference count for TYPE.  If TYPE has no more
-+   references, delete it.  */
-+/* We'll be replacing this with type GC soon.  */
-+
-+void
-+type_decref (struct type *type)
-+{
-+}
  
  /* Helper functions to initialize architecture-specific types.  */
  
-@@ -3463,6 +3930,11 @@ void
+@@ -3463,6 +3928,11 @@ void
  _initialize_gdbtypes (void)
  {
    gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
@@ -10196,10 +10467,10 @@ index aac82e9..626292c 100644
    TYPE_CPLUS_SPECIFIC (t) = (struct cplus_struct_type *) &cplus_struct_default;
    return t;
 diff --git a/gdb/mi/mi-cmd-var.c b/gdb/mi/mi-cmd-var.c
-index 0cf03d9..89936d2 100644
+index 0cf03d9..1913c49 100644
 --- a/gdb/mi/mi-cmd-var.c
 +++ b/gdb/mi/mi-cmd-var.c
-@@ -369,28 +369,39 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
+@@ -369,24 +369,35 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
    struct varobj *var;  
    VEC(varobj_p) *children;
    struct varobj *child;
@@ -10222,29 +10493,26 @@ index 0cf03d9..89936d2 100644
    else
      var = varobj_get_handle (argv[1]);
  
+-  children = varobj_list_children (var);
 +  if (argc > 2)
 +    {
 +      from = atoi (argv[argc - 2]);
 +      to = atoi (argv[argc - 1]);
-+      varobj_set_child_range (var, from, to);
++    }
++  else
++    {
++      from = -1;
++      to = -1;
 +    }
 +
-   children = varobj_list_children (var);
++  children = varobj_list_children (var, &from, &to);
    ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
 -  if (argc == 2)
 +  if (argc == 2 || argc == 4)
      print_values = mi_parse_values_option (argv[0]);
    else
      print_values = PRINT_NO_VALUES;
- 
-+  /* Re-fetch the child range, because varobj_get_child_range computes
-+     the real start and end indices for us.  */
-+  varobj_get_child_range (var, children, &from, &to);
-+
-   display_hint = varobj_get_display_hint (var);
-   if (display_hint)
-     {
-@@ -398,21 +409,29 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
+@@ -398,21 +409,28 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
        xfree (display_hint);
      }
  
@@ -10282,12 +10550,11 @@ index 0cf03d9..89936d2 100644
      }
 -  do_cleanups (cleanup_children);
 +
-+  ui_out_field_int (uiout, "has_more",
-+		    VEC_length (varobj_p, children) > to);
++  ui_out_field_int (uiout, "has_more", varobj_has_more (var, to));
  }
  
  void
-@@ -644,7 +663,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
+@@ -644,7 +662,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
      }
    else
      {
@@ -10295,37 +10562,63 @@ index 0cf03d9..89936d2 100644
        struct varobj *var = varobj_get_handle (name);
  
        varobj_update_one (var, print_values, 1 /* explicit */);
-@@ -714,14 +732,17 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+@@ -699,11 +716,11 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+ 	}
+ 
+       if (r->type_changed)
+-	{
+-          ui_out_field_string (uiout, "new_type", varobj_get_type (r->varobj));
+-          ui_out_field_int (uiout, "new_num_children", 
+-			    varobj_get_num_children (r->varobj));
+-	}
++	ui_out_field_string (uiout, "new_type", varobj_get_type (r->varobj));
++
++      if (r->type_changed || r->children_changed)
++	ui_out_field_int (uiout, "new_num_children", 
++			  varobj_get_num_children (r->varobj));
+ 
+       display_hint = varobj_get_display_hint (var);
+       if (display_hint)
+@@ -714,26 +731,58 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
  
        if (r->children_changed)
  	{
 -	  int ix;
-+	  int ix, from, to;
- 	  struct varobj *child;
- 	  struct cleanup *cleanup =
- 	    make_cleanup_ui_out_list_begin_end (uiout, "children");
+-	  struct varobj *child;
+-	  struct cleanup *cleanup =
+-	    make_cleanup_ui_out_list_begin_end (uiout, "children");
++	  int from, to;
++	  varobj_get_child_range (r->varobj, &from, &to);
++	  ui_out_field_int (uiout, "has_more",
++			    varobj_has_more (r->varobj, to));
++	}
  
- 	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
-+	  varobj_get_child_range (r->varobj, children, &from, &to);
+-	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
++      if (r->new)
++	{
++	  int j;
++	  varobj_p child;
++	  struct cleanup *cleanup;
  
 -	  for (ix = 0; VEC_iterate (varobj_p, children, ix, child); ++ix)
-+	  for (ix = from;
-+	       ix < to && VEC_iterate (varobj_p, children, ix, child);
-+	       ++ix)
++	  cleanup = make_cleanup_ui_out_list_begin_end (uiout, "new_children");
++	  for (j = 0; VEC_iterate (varobj_p, r->new, j, child); ++j)
  	    {
  	      struct cleanup *cleanup_child;
  	      cleanup_child = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
-@@ -730,6 +751,9 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+-	      print_varobj (child, print_values, 1 /* print expression */);
++	      print_varobj (child, print_values, 1 /* print_expression */);
+ 	      do_cleanups (cleanup_child);
  	    }
  
  	  do_cleanups (cleanup);
-+
-+	  ui_out_field_int (uiout, "has_more",
-+			    VEC_length (varobj_p, children) > to);
++	  VEC_free (varobj_p, r->new);
++	  r->new = NULL;	/* Paranoia.  */
  	}
-   
+-  
++
        if (mi_version (uiout) > 1)
-@@ -737,3 +761,11 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+ 	do_cleanups (cleanup);
      }
    VEC_free (varobj_update_result, changes);
  }
@@ -10337,11 +10630,27 @@ index 0cf03d9..89936d2 100644
 +    error (_("mi_cmd_enable_pretty_printing: no arguments allowed"));
 +  varobj_enable_pretty_printing ();
 +}
++
++void
++mi_cmd_var_set_update_range (char *command, char **argv, int argc)
++{
++  struct varobj *var;
++  int from, to;
++
++  if (argc != 3)
++    error (_("mi_cmd_var_set_update_range: Usage: VAROBJ FROM TO"));
++  
++  var = varobj_get_handle (argv[0]);
++  from = atoi (argv[1]);
++  to = atoi (argv[2]);
++
++  varobj_set_child_range (var, from, to);
++}
 diff --git a/gdb/mi/mi-cmds.c b/gdb/mi/mi-cmds.c
-index 4911146..772566e 100644
+index dd3d803..8ba086c 100644
 --- a/gdb/mi/mi-cmds.c
 +++ b/gdb/mi/mi-cmds.c
-@@ -51,6 +51,7 @@ struct mi_cmd mi_cmds[] =
+@@ -52,6 +52,7 @@ struct mi_cmd mi_cmds[] =
    { "data-write-memory", { NULL, 0 }, mi_cmd_data_write_memory},
    { "data-write-register-values", { NULL, 0 }, mi_cmd_data_write_register_values},
    { "enable-timings", { NULL, 0 }, mi_cmd_enable_timings},
@@ -10349,15 +10658,24 @@ index 4911146..772566e 100644
    { "environment-cd", { NULL, 0 }, mi_cmd_env_cd},
    { "environment-directory", { NULL, 0 }, mi_cmd_env_dir},
    { "environment-path", { NULL, 0 }, mi_cmd_env_path},
+@@ -112,6 +113,7 @@ struct mi_cmd mi_cmds[] =
+   { "var-list-children", { NULL, 0 }, mi_cmd_var_list_children},
+   { "var-set-format", { NULL, 0 }, mi_cmd_var_set_format},
+   { "var-set-frozen", { NULL, 0 }, mi_cmd_var_set_frozen},
++  { "var-set-update-range", { NULL, 0 }, mi_cmd_var_set_update_range },
+   { "var-set-visualizer", { NULL, 0 }, mi_cmd_var_set_visualizer},
+   { "var-show-attributes", { NULL, 0 }, mi_cmd_var_show_attributes},
+   { "var-show-format", { NULL, 0 }, mi_cmd_var_show_format},
 diff --git a/gdb/mi/mi-cmds.h b/gdb/mi/mi-cmds.h
-index afcba1e..79798ef 100644
+index 85ad0c4..dfab411 100644
 --- a/gdb/mi/mi-cmds.h
 +++ b/gdb/mi/mi-cmds.h
-@@ -98,6 +98,7 @@ extern mi_cmd_argv_ftype mi_cmd_var_set_visualizer;
+@@ -99,6 +99,8 @@ extern mi_cmd_argv_ftype mi_cmd_var_set_visualizer;
  extern mi_cmd_argv_ftype mi_cmd_var_show_attributes;
  extern mi_cmd_argv_ftype mi_cmd_var_show_format;
  extern mi_cmd_argv_ftype mi_cmd_var_update;
 +extern mi_cmd_argv_ftype mi_cmd_enable_pretty_printing;
++extern mi_cmd_argv_ftype mi_cmd_var_set_update_range;
  
  /* Description of a single command. */
  
@@ -10397,22 +10715,31 @@ index a84003f..924c1c5 100644
    default_symfile_offsets,	/* sym_offsets: dummy FIXME til implem sym reloc */
    default_symfile_segments,	/* sym_segments: Get segment information from
 diff --git a/gdb/objfiles.c b/gdb/objfiles.c
-index c983b11..2ac1bd1 100644
+index 43c5174..5ad4f8d 100644
 --- a/gdb/objfiles.c
 +++ b/gdb/objfiles.c
-@@ -433,9 +433,8 @@ free_objfile (struct objfile *objfile)
+@@ -432,10 +432,9 @@ free_objfile (struct objfile *objfile)
+ 	 doesn't reference it.  */
        objfile->separate_debug_objfile_backlink->separate_debug_objfile = NULL;
      }
-   
+-  
 -  /* Remove any references to this objfile in the global value
 -     lists.  */
 -  preserve_values (objfile);
++
 +  /* Remove any references to this objfile in the global value lists.  */
 +  observer_notify_objfile_unloading (objfile);
  
    /* First do any symbol file specific actions required when we are
       finished with a particular symbol file.  Note that if the objfile
-@@ -473,6 +472,9 @@ free_objfile (struct objfile *objfile)
+@@ -458,12 +457,14 @@ free_objfile (struct objfile *objfile)
+ 
+   unlink_objfile (objfile);
+ 
+-  /* If we are going to free the runtime common objfile, mark it
+-     as unallocated.  */
++  /* If we are going to free any existing OBJFILE reference, clear it.  */
+ 
    if (objfile == rt_common_objfile)
      rt_common_objfile = NULL;
  
@@ -10422,7 +10749,7 @@ index c983b11..2ac1bd1 100644
    /* Before the symbol table code was redone to make it easier to
       selectively load and remove information particular to a specific
       linkage unit, gdb used to do these things whenever the monolithic
-@@ -723,6 +725,20 @@ have_partial_symbols (void)
+@@ -714,6 +715,20 @@ have_partial_symbols (void)
  	return 1;
        }
    }
@@ -10443,30 +10770,8 @@ index c983b11..2ac1bd1 100644
    return 0;
  }
  
-@@ -1020,3 +1036,21 @@ objfiles_changed (void)
- {
-   objfiles_changed_p = 1;  /* Rebuild section map next time we need it.  */
- }
-+
-+/* Return non-zero if A and B point to the same OBJFILE, ignoring any binary
-+   vs. debuginfo variants of the pointers.  If either A or B is NULL return
-+   zero as not a match.  */
-+
-+int
-+matching_objfiles (struct objfile *a, struct objfile *b)
-+{
-+  if (a == NULL || b == NULL)
-+    return 0;
-+
-+  if (a->separate_debug_objfile_backlink)
-+    a = a->separate_debug_objfile_backlink;
-+  if (b->separate_debug_objfile_backlink)
-+    b = b->separate_debug_objfile_backlink;
-+
-+  return a == b;
-+}
 diff --git a/gdb/objfiles.h b/gdb/objfiles.h
-index 1857260..e421232 100644
+index aecf8d8..9a7d635 100644
 --- a/gdb/objfiles.h
 +++ b/gdb/objfiles.h
 @@ -212,6 +212,11 @@ struct objfile
@@ -10481,9 +10786,9 @@ index 1857260..e421232 100644
      /* Map addresses to the entries of PSYMTABS.  It would be more efficient to
         have a map per the whole process but ADDRMAP cannot selectively remove
         its items during FREE_OBJFILE.  This mapping is already present even for
-@@ -420,6 +425,15 @@ struct objfile
- #define OBJF_KEEPBFD	(1 << 4)	/* Do not delete bfd */
+@@ -414,6 +419,15 @@ struct objfile
  
+ #define OBJF_USERLOADED	(1 << 3)	/* User loaded */
  
 +/* Set if we have tried to read partial symtabs for this objfile.
 +   This is used to allow lazy reading of partial symtabs.  */
@@ -10497,16 +10802,7 @@ index 1857260..e421232 100644
  /* The object file that the main symbol table was loaded from (e.g. the
     argument to the "symbol-file" or "file" command).  */
  
-@@ -499,6 +513,8 @@ extern struct obj_section *find_pc_section (CORE_ADDR pc);
- 
- extern int in_plt_section (CORE_ADDR, char *);
- 
-+extern int matching_objfiles (struct objfile *a, struct objfile *b);
-+
- /* Keep a registry of per-objfile data-pointers required by other GDB
-    modules.  */
- 
-@@ -558,6 +574,13 @@ extern void *objfile_data (struct objfile *objfile,
+@@ -554,6 +568,13 @@ extern void gdb_bfd_unref (struct bfd *abfd);
    ALL_OBJFILES (objfile)	 \
      ALL_OBJFILE_PSYMTABS (objfile, p)
  
@@ -16408,27 +16704,27 @@ index 49c0437..84a476e 100644
 +  return 1;
 +}
 diff --git a/gdb/python/python-value.c b/gdb/python/python-value.c
-index dd3c919..fb9dab2 100644
+index dd3c919..dc76692 100644
 --- a/gdb/python/python-value.c
 +++ b/gdb/python/python-value.c
-@@ -25,6 +25,7 @@
+@@ -25,15 +25,7 @@
  #include "language.h"
  #include "dfp.h"
  #include "valprint.h"
-+#include "observer.h"
- 
- /* List of all values which are currently exposed to Python. It is
-    maintained so that when an objfile is discarded, preserve_values
-@@ -33,7 +34,7 @@
-    generic code.  */
- /* This variable is unnecessarily initialized to NULL in order to 
-    work around a linker bug on MacOS.  */
+-
+-/* List of all values which are currently exposed to Python. It is
+-   maintained so that when an objfile is discarded, preserve_values
+-   can copy the values' types if needed.  This is declared
+-   unconditionally to reduce the number of uses of HAVE_PYTHON in the
+-   generic code.  */
+-/* This variable is unnecessarily initialized to NULL in order to 
+-   work around a linker bug on MacOS.  */
 -struct value *values_in_python = NULL;
-+static struct value_object *values_in_python = NULL;
++#include "observer.h"
  
  #ifdef HAVE_PYTHON
  
-@@ -52,17 +53,23 @@ struct value *values_in_python = NULL;
+@@ -52,26 +44,43 @@ struct value *values_in_python = NULL;
  /* Python's long type corresponds to C's long long type.  */
  #define builtin_type_pylong builtin_type (python_gdbarch)->builtin_long_long
  
@@ -16445,67 +16741,100 @@ index dd3c919..fb9dab2 100644
 -typedef struct {
 +typedef struct value_object {
    PyObject_HEAD
++  struct value_object *next;
    struct value *value;
    PyObject *address;
    PyObject *type;
-+  struct value_object *next;
-+  struct value_object *prev;
  } value_object;
  
++/* List of all values which are currently exposed to Python. It is
++   maintained so that when an objfile is discarded, preserve_values
++   can copy the values' types if needed.  */
++/* This variable is unnecessarily initialized to NULL in order to
++   work around a linker bug on MacOS.  */
++static value_object *values_in_python = NULL;
++
  /* Called by the Python interpreter when deallocating a value object.  */
-@@ -71,7 +78,12 @@ valpy_dealloc (PyObject *obj)
+ static void
+ valpy_dealloc (PyObject *obj)
  {
    value_object *self = (value_object *) obj;
++  value_object **iter;
  
 -  value_remove_from_list (&values_in_python, self->value);
-+  if (self == values_in_python)
-+    values_in_python = self->next;
-+  if (self->prev)
-+    self->prev->next = self->next;
-+  if (self->next)
-+    self->next->prev = self->prev;
++  /* Remove OBJ from the global list.  */
++  iter = &values_in_python;
++  while (*iter != self)
++    iter = &(*iter)->next;
++  *iter = (*iter)->next;
  
    value_free (self->value);
  
-@@ -122,7 +134,17 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
+@@ -122,11 +131,23 @@ valpy_new (PyTypeObject *subtype, PyObject *args, PyObject *keywords)
    value_obj->address = NULL;
    value_obj->type = NULL;
    release_value (value);
 -  value_prepend_to_list (&values_in_python, value);
-+
-+  /* New FSF GDB reference counting no longer considers release_value as one
-+     incref.  FIXME: We are now leaking here if VALUE was already
-+     release_value-d before.  */
-+  value_incref (value);
-+
 +  value_obj->next = values_in_python;
 +  values_in_python = value_obj;
-+  if (value_obj->next)
-+    value_obj->next->prev = value_obj;
-+  value_obj->prev = NULL;
  
    return (PyObject *) value_obj;
  }
-@@ -803,7 +825,17 @@ value_to_value_object (struct value *val)
+ 
++/* Iterate over all the Value objects, calling preserve_one_value on
++   each.  */
++void
++preserve_python_values (struct objfile *objfile, htab_t copied_types)
++{
++  value_object *iter;
++
++  for (iter = values_in_python; iter; iter = iter->next)
++    preserve_one_value (iter->value, objfile, copied_types);
++}
++
+ /* Given a value of a pointer type, apply the C unary * operator to it.  */
+ static PyObject *
+ valpy_dereference (PyObject *self, PyObject *args)
+@@ -543,9 +564,7 @@ valpy_negative (PyObject *self)
+ static PyObject *
+ valpy_positive (PyObject *self)
+ {
+-  struct value *copy = value_copy (((value_object *) self)->value);
+-
+-  return value_to_value_object (copy);
++  return value_to_value_object (((value_object *) self)->value);
+ }
+ 
+ static PyObject *
+@@ -803,13 +822,15 @@ value_to_value_object (struct value *val)
        val_obj->address = NULL;
        val_obj->type = NULL;
        release_value (val);
 -      value_prepend_to_list (&values_in_python, val);
-+
-+      /* New FSF GDB reference counting no longer considers release_value as one
-+	 incref.  FIXME: We are now leaking here if VALUE was already
-+	 release_value-d before.  */
-+      value_incref (val);
-+
 +      val_obj->next = values_in_python;
 +      values_in_python = val_obj;
-+      if (val_obj->next)
-+	val_obj->next->prev = val_obj;
-+      val_obj->prev = NULL;
      }
  
    return (PyObject *) val_obj;
-@@ -853,7 +885,34 @@ convert_value_from_python (PyObject *obj)
+ }
+ 
+-/* Returns value structure corresponding to the given value object.  */
++/* Returns a borrowed reference to the struct value corresponding to
++   the given value object.  */
+ struct value *
+ value_object_to_value (PyObject *self)
+ {
+@@ -821,7 +842,8 @@ value_object_to_value (PyObject *self)
+ }
+ 
+ /* Try to convert a Python value to a gdb value.  If the value cannot
+-   be converted, set a Python exception and return NULL.  */
++   be converted, set a Python exception and return NULL.  Returns a
++   borrowed reference to the resulting struct value.  */
+ 
+ struct value *
+ convert_value_from_python (PyObject *obj)
+@@ -853,7 +875,34 @@ convert_value_from_python (PyObject *obj)
  	{
  	  LONGEST l = PyLong_AsLongLong (obj);
  
@@ -16541,7 +16870,21 @@ index dd3c919..fb9dab2 100644
  	    value = value_from_longest (builtin_type_pylong, l);
  	}
        else if (PyFloat_Check (obj))
-@@ -912,6 +971,34 @@ gdbpy_history (PyObject *self, PyObject *args)
+@@ -876,7 +925,12 @@ convert_value_from_python (PyObject *obj)
+ 	    }
+ 	}
+       else if (PyObject_TypeCheck (obj, &value_object_type))
+-	value = value_copy (((value_object *) obj)->value);
++	{
++	  /* This lets callers freely decref the Value wrapper object
++	     and not worry about whether or not the value will
++	     disappear.  */
++	  value = value_copy (((value_object *) obj)->value);
++	}
+       else
+ 	PyErr_Format (PyExc_TypeError, _("Could not convert Python object: %s"),
+ 		      PyString_AsString (PyObject_Str (obj)));
+@@ -912,6 +966,25 @@ gdbpy_history (PyObject *self, PyObject *args)
    return value_to_value_object (res_val);
  }
  
@@ -16550,19 +16893,10 @@ index dd3c919..fb9dab2 100644
 +static void
 +python_types_mark_used (void)
 +{
-+  value_object *val_obj;
++  value_object *iter;
 +
-+  for (val_obj = values_in_python; val_obj != NULL; val_obj = val_obj->next)
-+    type_mark_used (value_type (val_obj->value));
-+}
-+
-+void
-+preserve_python_values (struct objfile *objfile, htab_t copied_types)
-+{
-+  value_object *val_obj;
-+
-+  for (val_obj = values_in_python; val_obj != NULL; val_obj = val_obj->next)
-+    preserve_one_value (val_obj->value, objfile, copied_types);
++  for (iter = values_in_python; iter; iter = iter->next)
++    type_mark_used (value_type (iter->value));
 +}
 +
 +/* Returns 1 in OBJ is a gdb.Value object, 0 otherwise.  */
@@ -16576,7 +16910,7 @@ index dd3c919..fb9dab2 100644
  void
  gdbpy_initialize_values (void)
  {
-@@ -922,6 +1009,8 @@ gdbpy_initialize_values (void)
+@@ -922,6 +995,8 @@ gdbpy_initialize_values (void)
    PyModule_AddObject (gdb_module, "Value", (PyObject *) &value_object_type);
  
    values_in_python = NULL;
@@ -16585,20 +16919,32 @@ index dd3c919..fb9dab2 100644
  }
  
  
+@@ -1019,4 +1094,12 @@ PyTypeObject value_object_type = {
+   valpy_new			  /* tp_new */
+ };
+ 
++#else
++
++void
++preserve_python_values (struct objfile *objfile, htab_t copied_types)
++{
++  /* Nothing.  */
++}
++
+ #endif /* HAVE_PYTHON */
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index 254bd28..7cd2b3a 100644
+index 254bd28..5a2a9ae 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
-@@ -27,6 +27,8 @@
+@@ -27,6 +27,7 @@
  #include "observer.h"
  #include "value.h"
  #include "language.h"
 +#include "event-loop.h"
-+#include "valprint.h"
  
  #include <ctype.h>
  
-@@ -45,11 +47,18 @@ static int gdbpy_auto_load = 1;
+@@ -45,11 +46,18 @@ static int gdbpy_auto_load = 1;
  #include "cli/cli-decode.h"
  #include "charset.h"
  #include "top.h"
@@ -16617,7 +16963,7 @@ index 254bd28..7cd2b3a 100644
  
  static PyMethodDef GdbMethods[];
  
-@@ -197,10 +206,10 @@ python_command (char *arg, int from_tty)
+@@ -197,10 +205,10 @@ python_command (char *arg, int from_tty)
     NULL (and set a Python exception) on error.  Helper function for
     get_parameter.  */
  
@@ -16631,7 +16977,7 @@ index 254bd28..7cd2b3a 100644
      {
      case var_string:
      case var_string_noescape:
-@@ -208,7 +217,7 @@ parameter_to_python (struct cmd_list_element *cmd)
+@@ -208,7 +216,7 @@ parameter_to_python (struct cmd_list_element *cmd)
      case var_filename:
      case var_enum:
        {
@@ -16640,7 +16986,7 @@ index 254bd28..7cd2b3a 100644
  	if (! str)
  	  str = "";
  	return PyString_Decode (str, strlen (str), host_charset (), NULL);
-@@ -216,7 +225,7 @@ parameter_to_python (struct cmd_list_element *cmd)
+@@ -216,7 +224,7 @@ parameter_to_python (struct cmd_list_element *cmd)
  
      case var_boolean:
        {
@@ -16649,7 +16995,7 @@ index 254bd28..7cd2b3a 100644
  	  Py_RETURN_TRUE;
  	else
  	  Py_RETURN_FALSE;
-@@ -224,7 +233,7 @@ parameter_to_python (struct cmd_list_element *cmd)
+@@ -224,7 +232,7 @@ parameter_to_python (struct cmd_list_element *cmd)
  
      case var_auto_boolean:
        {
@@ -16658,7 +17004,7 @@ index 254bd28..7cd2b3a 100644
  	if (ab == AUTO_BOOLEAN_TRUE)
  	  Py_RETURN_TRUE;
  	else if (ab == AUTO_BOOLEAN_FALSE)
-@@ -234,15 +243,15 @@ parameter_to_python (struct cmd_list_element *cmd)
+@@ -234,15 +242,15 @@ parameter_to_python (struct cmd_list_element *cmd)
        }
  
      case var_integer:
@@ -16677,7 +17023,7 @@ index 254bd28..7cd2b3a 100644
  	if (val == UINT_MAX)
  	  Py_RETURN_NONE;
  	return PyLong_FromUnsignedLong (val);
-@@ -280,7 +289,7 @@ gdbpy_parameter (PyObject *self, PyObject *args)
+@@ -280,7 +288,7 @@ gdbpy_parameter (PyObject *self, PyObject *args)
  
    if (! cmd->var)
      return PyErr_Format (PyExc_RuntimeError, "`%s' is not a parameter", arg);
@@ -16686,7 +17032,7 @@ index 254bd28..7cd2b3a 100644
  }
  
  /* A Python function which evaluates a string using the gdb CLI.  */
-@@ -319,6 +328,233 @@ execute_gdb_command (PyObject *self, PyObject *args)
+@@ -319,6 +327,233 @@ execute_gdb_command (PyObject *self, PyObject *args)
    Py_RETURN_NONE;
  }
  
@@ -16920,7 +17266,7 @@ index 254bd28..7cd2b3a 100644
  
  
  /* Printing.  */
-@@ -357,6 +593,69 @@ gdbpy_print_stack (void)
+@@ -357,6 +592,69 @@ gdbpy_print_stack (void)
  
  
  
@@ -16990,152 +17336,7 @@ index 254bd28..7cd2b3a 100644
  /* The "current" objfile.  This is set when gdb detects that a new
     objfile has been loaded.  It is only set for the duration of a call
     to gdbpy_new_objfile; it is NULL at other times.  */
-@@ -475,6 +774,144 @@ gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
-   return list;
- }
- 
-+
-+
-+/* Helper function for find_pretty_printer which iterates over a
-+   list, calls each function and inspects output.  */
-+static PyObject *
-+search_pp_list (PyObject *list, PyObject *value)
-+{
-+  Py_ssize_t pp_list_size, list_index;
-+  PyObject *function, *printer = NULL;
-+  
-+  pp_list_size = PyList_Size (list);
-+  for (list_index = 0; list_index < pp_list_size; list_index++)
-+    {
-+      function = PyList_GetItem (list, list_index);
-+      if (! function)
-+	return NULL;
-+
-+      /* gdbpy_instantiate_printer can return three possible return
-+	 values:  NULL on error;  Py_None if the pretty-printer
-+	 in the list cannot print the value; or a printer instance if
-+	 the printer can print the value.  */
-+      printer = gdbpy_instantiate_printer (function, value);
-+      if (! printer)
-+	return NULL;
-+      else if (printer != Py_None)
-+	return printer;
-+
-+      Py_DECREF (printer);
-+    }
-+
-+  Py_RETURN_NONE;
-+}
-+
-+/* Find the pretty-printing constructor function for TYPE.  If no
-+   pretty-printer exists, return NULL.  If one exists, return a new
-+   reference.  */
-+static PyObject *
-+find_pretty_printer (PyObject *value)
-+{
-+  PyObject *pp_list = NULL;
-+  PyObject *function = NULL;
-+  struct objfile *obj;
-+  volatile struct gdb_exception except;
-+
-+  /* Look at the pretty-printer dictionary for each objfile.  */
-+  ALL_OBJFILES (obj)
-+  {
-+    PyObject *objf = objfile_to_objfile_object (obj);
-+    if (!objf)
-+      continue;
-+
-+    pp_list = objfpy_get_printers (objf, NULL);
-+    function = search_pp_list (pp_list, value);
-+
-+    /* If there is an error in any objfile list, abort the search and
-+       exit.  */
-+    if (! function)
-+      {
-+	Py_XDECREF (pp_list);
-+	return NULL;
-+      }
-+
-+    if (function != Py_None)
-+      goto done;
-+    
-+    /* In this loop, if function is not an instantiation of a
-+    pretty-printer, and it is not null, then it is a return of
-+    Py_RETURN_NONE, which must be decremented.  */
-+    Py_DECREF (function);
-+    Py_XDECREF (pp_list);
-+  }
-+
-+  pp_list = NULL;
-+  /* Fetch the global pretty printer dictionary.  */
-+  if (! PyObject_HasAttrString (gdb_module, "pretty_printers"))
-+    goto done;
-+  pp_list = PyObject_GetAttrString (gdb_module, "pretty_printers");
-+  if (! pp_list)
-+    goto done;
-+  if (! PyList_Check (pp_list))
-+    goto done;
-+
-+  function = search_pp_list (pp_list, value);
-+
-+ done:
-+  Py_XDECREF (pp_list);
-+  
-+  return function;
-+}
-+
-+/* Pretty-print a single value, via the printer object PRINTER.  If
-+   the function returns a string, an xmalloc()d copy is returned.
-+   Otherwise, if the function returns a value, a *OUT_VALUE is set to
-+   the value, and NULL is returned.  On error, *OUT_VALUE is set to
-+   NULL and NULL is returned.  */
-+static char *
-+pretty_print_one_value (PyObject *printer, struct value **out_value)
-+{
-+  char *output = NULL;
-+  volatile struct gdb_exception except;
-+
-+  TRY_CATCH (except, RETURN_MASK_ALL)
-+    {
-+      PyObject *result;
-+
-+      result = PyObject_CallMethodObjArgs (printer, gdbpy_to_string_cst, NULL);
-+      if (result)
-+	{
-+	  if (gdbpy_is_string (result))
-+	    output = python_string_to_host_string (result);
-+	  else if (PyObject_TypeCheck (result, &value_object_type))
-+	    {
-+	      /* If we just call convert_value_from_python for this
-+		 type, we won't know who owns the result.  For this
-+		 one case we need to copy the resulting value.  */
-+	      struct value *v = value_object_to_value (result);
-+	      *out_value = value_copy (v);
-+	    }
-+	  else
-+	    *out_value = convert_value_from_python (result);
-+	  Py_DECREF (result);
-+	}
-+    }
-+
-+  return output;
-+}
-+
-+/* Instantiate a pretty-printer given a constructor, CONS, and a
-+   value, VAL.  Return NULL on error.  Ownership of the object
-+   instance is transferred to the reciever */
-+PyObject *
-+gdbpy_instantiate_printer (PyObject *cons, PyObject *value)
-+{
-+  PyObject *result;
-+  result = PyObject_CallFunctionObjArgs (cons, value, NULL);
-+  return result;
-+}
-+
- #else /* HAVE_PYTHON */
- 
- /* Dummy implementation of the gdb "python" command.  */
-@@ -501,6 +938,13 @@ eval_python_from_control_command (struct command_line *cmd)
+@@ -501,6 +799,13 @@ eval_python_from_control_command (struct command_line *cmd)
    error (_("Python scripting is not supported in this copy of GDB."));
  }
  
@@ -17149,7 +17350,7 @@ index 254bd28..7cd2b3a 100644
  #endif /* HAVE_PYTHON */
  
  
-@@ -592,13 +1036,27 @@ Enables or disables auto-loading of Python code when an object is opened."),
+@@ -592,13 +897,27 @@ Enables or disables auto-loading of Python code when an object is opened."),
    PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
    PyModule_AddStringConstant (gdb_module, "HOST_CONFIG", (char*) host_name);
    PyModule_AddStringConstant (gdb_module, "TARGET_CONFIG", (char*) target_name);
@@ -17177,7 +17378,7 @@ index 254bd28..7cd2b3a 100644
  
    PyRun_SimpleString ("import gdb");
    PyRun_SimpleString ("gdb.pretty_printers = []");
-@@ -634,6 +1092,15 @@ class GdbOutputFile:\n\
+@@ -634,6 +953,15 @@ class GdbOutputFile:\n\
  \n\
  sys.stderr = GdbOutputFile()\n\
  sys.stdout = GdbOutputFile()\n\
@@ -17193,7 +17394,7 @@ index 254bd28..7cd2b3a 100644
  ");
  
    /* Release the GIL while gdb runs.  */
-@@ -653,9 +1120,14 @@ static PyMethodDef GdbMethods[] =
+@@ -653,9 +981,14 @@ static PyMethodDef GdbMethods[] =
      "Get a value from history" },
    { "execute", execute_gdb_command, METH_VARARGS,
      "Execute a gdb command" },
@@ -17208,7 +17409,7 @@ index 254bd28..7cd2b3a 100644
    { "default_visualizer", gdbpy_default_visualizer, METH_VARARGS,
      "Find the default visualizer for a Value." },
  
-@@ -676,6 +1148,37 @@ Return a string explaining unwind stop reason." },
+@@ -676,6 +1009,37 @@ Return a string explaining unwind stop reason." },
      "lookup_type (name [, block]) -> type\n\
  Return a Type corresponding to the given name." },
  
@@ -17247,16 +17448,15 @@ index 254bd28..7cd2b3a 100644
      "Write a string using gdb's filtered stream." },
    { "flush", gdbpy_flush, METH_NOARGS,
 diff --git a/gdb/python/python.h b/gdb/python/python.h
-index 33b0437..b761a65 100644
+index 33b0437..bbb6184 100644
 --- a/gdb/python/python.h
 +++ b/gdb/python/python.h
-@@ -22,10 +22,14 @@
+@@ -22,14 +22,18 @@
  
  #include "value.h"
  
 -extern struct value *values_in_python;
-+void preserve_python_values (struct objfile *objfile, htab_t copied_types);
- 
+-
  void eval_python_from_control_command (struct command_line *);
  
 +void source_python_script (FILE *stream, char *file);
@@ -17266,6 +17466,12 @@ index 33b0437..b761a65 100644
  int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
  			      int embedded_offset, CORE_ADDR address,
  			      struct ui_file *stream, int recurse,
+ 			      const struct value_print_options *options,
+ 			      const struct language_defn *language);
+ 
++void preserve_python_values (struct objfile *objfile, htab_t copied_types);
++
+ #endif /* GDB_PYTHON_H */
 diff --git a/gdb/scm-lang.c b/gdb/scm-lang.c
 index de34894..07518b0 100644
 --- a/gdb/scm-lang.c
@@ -17351,10 +17557,10 @@ index 6cfaa85..68aadc0 100644
  
  extern initialize_file_ftype _initialize_svr4_solib; /* -Wmissing-prototypes */
 diff --git a/gdb/solib.c b/gdb/solib.c
-index 157aaba..4c1b0fb 100644
+index 564a55c..8c75b81 100644
 --- a/gdb/solib.c
 +++ b/gdb/solib.c
-@@ -1072,13 +1072,12 @@ show_auto_solib_add (struct ui_file *file, int from_tty,
+@@ -1066,13 +1066,12 @@ show_auto_solib_add (struct ui_file *file, int from_tty,
  struct symbol *
  solib_global_lookup (const struct objfile *objfile,
  		     const char *name,
@@ -17493,7 +17699,7 @@ index 1c37801..594eb16 100644
  	  print_variable_and_value (NULL, sym, frame, stream, 4 * num_tabs);
  	  break;
 diff --git a/gdb/symfile.c b/gdb/symfile.c
-index 36480c1..4dea8d7 100644
+index 4bdab91..e8c0236 100644
 --- a/gdb/symfile.c
 +++ b/gdb/symfile.c
 @@ -52,7 +52,6 @@
@@ -17576,7 +17782,18 @@ index 36480c1..4dea8d7 100644
      {
        wrap_here ("");
        printf_unfiltered (_("(no debugging symbols found)"));
-@@ -2337,7 +2358,7 @@ reread_symbols (void)
+@@ -1166,7 +1187,9 @@ symbol_file_clear (int from_tty)
+      descriptors as well.  */
+   no_shared_libraries (NULL, from_tty);
+ 
+-  symfile_objfile = NULL;
++  /* free_objfile should have cleared it.  */
++  gdb_assert (symfile_objfile == NULL);
++
+   if (from_tty)
+     printf_unfiltered (_("No symbol file now.\n"));
+ }
+@@ -2346,7 +2369,7 @@ reread_symbols (void)
  
  	      /* Remove any references to this objfile in the global
  		 value lists.  */
@@ -17585,7 +17802,7 @@ index 36480c1..4dea8d7 100644
  
  	      /* Nuke all the state that we will re-read.  Much of the following
  	         code which sets things to NULL really is necessary to tell
-@@ -2425,13 +2446,15 @@ reread_symbols (void)
+@@ -2434,13 +2457,15 @@ reread_symbols (void)
  	         zero is OK since dbxread.c also does what it needs to do if
  	         objfile->global_psymbols.size is 0.  */
  	      (*objfile->sf->sym_read) (objfile, 0);
@@ -17602,7 +17819,7 @@ index 36480c1..4dea8d7 100644
  	      /* We're done reading the symbol file; finish off complaints.  */
  	      clear_complaints (&symfile_complaints, 0, 1);
  
-@@ -2440,6 +2463,9 @@ reread_symbols (void)
+@@ -2449,6 +2474,9 @@ reread_symbols (void)
  
  	      reinit_frame_cache ();
  
@@ -17612,7 +17829,7 @@ index 36480c1..4dea8d7 100644
  	      /* Discard cleanups as symbol reading was successful.  */
  	      discard_cleanups (old_cleanups);
  
-@@ -2729,7 +2755,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
+@@ -2738,7 +2766,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
  }
  
  struct partial_symtab *
@@ -17621,7 +17838,7 @@ index 36480c1..4dea8d7 100644
  {
    struct partial_symtab *psymtab;
  
-@@ -2820,10 +2846,6 @@ clear_symtab_users (void)
+@@ -2829,10 +2857,6 @@ clear_symtab_users (void)
       between expressions and which ought to be reset each time.  */
    expression_context_block = NULL;
    innermost_block = NULL;
@@ -17632,7 +17849,7 @@ index 36480c1..4dea8d7 100644
  }
  
  static void
-@@ -3043,7 +3065,8 @@ again2:
+@@ -3052,7 +3076,8 @@ again2:
  
  struct partial_symtab *
  start_psymtab_common (struct objfile *objfile,
@@ -17709,7 +17926,7 @@ index eb35369..dfd8c8c 100644
  	  {
  	    printf_filtered ("Global symbol `");
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index c88156a..567fa07 100644
+index c88156a..b269491 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -42,6 +42,7 @@
@@ -17949,7 +18166,7 @@ index c88156a..567fa07 100644
    if (sym != NULL)
      return sym;
  
-@@ -1364,30 +1352,79 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+@@ -1364,30 +1352,81 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
     Don't search STATIC_BLOCK or GLOBAL_BLOCK.  */
  
  static struct symbol *
@@ -17967,7 +18184,6 @@ index c88156a..567fa07 100644
 +  const struct language_defn *langdef;
 +
 +  langdef = language_def (language);
-+
  
    /* Check if either no block is specified or it's a global block.  */
  
@@ -17991,8 +18207,8 @@ index c88156a..567fa07 100644
 +    
 +      if (language == language_cplus )
 +        {
-+          sym = lookup_namespace_scope(name, block,domain,
-+				       block_scope (block_iterator), 0, 1);
++          sym = cp_lookup_symbol_imports (block_scope (block_iterator), name,
++                                          block_iterator, domain, 1);
 +
 +          if (sym != NULL)
 +            return sym;
@@ -18033,6 +18249,9 @@ index c88156a..567fa07 100644
 +            }
 +        }
 +
++      if (BLOCK_FUNCTION (block_iterator) != NULL && block_inlined_p (block_iterator))
++        break;
++
 +      block_iterator = BLOCK_SUPERBLOCK (block_iterator);
      }
  
@@ -18041,7 +18260,7 @@ index c88156a..567fa07 100644
  
    return NULL;
  }
-@@ -1416,13 +1453,12 @@ lookup_objfile_from_block (const struct block *block)
+@@ -1416,13 +1455,12 @@ lookup_objfile_from_block (const struct block *block)
     block_found appropriately.  */
  
  struct symbol *
@@ -18057,7 +18276,7 @@ index c88156a..567fa07 100644
    if (sym)
      {
        block_found = block;
-@@ -1438,7 +1474,6 @@ lookup_symbol_aux_block (const char *name, const char *linkage_name,
+@@ -1438,7 +1476,6 @@ lookup_symbol_aux_block (const char *name, const char *linkage_name,
  struct symbol *
  lookup_global_symbol_from_objfile (const struct objfile *objfile,
  				   const char *name,
@@ -18065,7 +18284,7 @@ index c88156a..567fa07 100644
  				   const domain_enum domain)
  {
    struct symbol *sym;
-@@ -1452,7 +1487,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
+@@ -1452,7 +1489,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -18074,7 +18293,7 @@ index c88156a..567fa07 100644
      if (sym)
        {
  	block_found = block;
-@@ -1461,23 +1496,23 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
+@@ -1461,23 +1498,23 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
    }
  
    /* Now go through psymtabs.  */
@@ -18102,7 +18321,7 @@ index c88156a..567fa07 100644
  
    return NULL;
  }
-@@ -1488,8 +1523,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
+@@ -1488,8 +1525,7 @@ lookup_global_symbol_from_objfile (const struct objfile *objfile,
     static symbols.  */
  
  static struct symbol *
@@ -18112,7 +18331,7 @@ index c88156a..567fa07 100644
  			   const domain_enum domain)
  {
    struct symbol *sym;
-@@ -1502,7 +1536,7 @@ lookup_symbol_aux_symtabs (int block_index,
+@@ -1502,7 +1538,7 @@ lookup_symbol_aux_symtabs (int block_index,
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, block_index);
@@ -18121,7 +18340,7 @@ index c88156a..567fa07 100644
      if (sym)
        {
  	block_found = block;
-@@ -1520,7 +1554,6 @@ lookup_symbol_aux_symtabs (int block_index,
+@@ -1520,7 +1556,6 @@ lookup_symbol_aux_symtabs (int block_index,
  
  static struct symbol *
  lookup_symbol_aux_psymtabs (int block_index, const char *name,
@@ -18129,7 +18348,7 @@ index c88156a..567fa07 100644
  			    const domain_enum domain)
  {
    struct symbol *sym;
-@@ -1531,16 +1564,15 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1531,16 +1566,15 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
    struct symtab *s;
    const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
  
@@ -18149,7 +18368,7 @@ index c88156a..567fa07 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort try
-@@ -1557,7 +1589,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1557,7 +1591,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
  	    block = BLOCKVECTOR_BLOCK (bv,
  				       block_index == GLOBAL_BLOCK ?
  				       STATIC_BLOCK : GLOBAL_BLOCK);
@@ -18158,7 +18377,7 @@ index c88156a..567fa07 100644
  	    if (!sym)
  	      error (_("Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n%s may be an inlined function, or may be a template function\n(if a template, try specifying an instantiation: %s<type>)."),
  		     block_index == GLOBAL_BLOCK ? "global" : "static",
-@@ -1576,7 +1608,6 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1576,7 +1610,6 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
  
  struct symbol *
  basic_lookup_symbol_nonlocal (const char *name,
@@ -18166,7 +18385,7 @@ index c88156a..567fa07 100644
  			      const struct block *block,
  			      const domain_enum domain)
  {
-@@ -1610,11 +1641,11 @@ basic_lookup_symbol_nonlocal (const char *name,
+@@ -1610,11 +1643,11 @@ basic_lookup_symbol_nonlocal (const char *name,
       than that one, so I don't think we should worry about that for
       now.  */
  
@@ -18180,7 +18399,7 @@ index c88156a..567fa07 100644
  }
  
  /* Lookup a symbol in the static block associated to BLOCK, if there
-@@ -1622,14 +1653,13 @@ basic_lookup_symbol_nonlocal (const char *name,
+@@ -1622,14 +1655,13 @@ basic_lookup_symbol_nonlocal (const char *name,
  
  struct symbol *
  lookup_symbol_static (const char *name,
@@ -18196,7 +18415,7 @@ index c88156a..567fa07 100644
    else
      return NULL;
  }
-@@ -1639,7 +1669,6 @@ lookup_symbol_static (const char *name,
+@@ -1639,7 +1671,6 @@ lookup_symbol_static (const char *name,
  
  struct symbol *
  lookup_symbol_global (const char *name,
@@ -18204,7 +18423,7 @@ index c88156a..567fa07 100644
  		      const struct block *block,
  		      const domain_enum domain)
  {
-@@ -1649,15 +1678,15 @@ lookup_symbol_global (const char *name,
+@@ -1649,15 +1680,15 @@ lookup_symbol_global (const char *name,
    /* Call library-specific lookup procedure.  */
    objfile = lookup_objfile_from_block (block);
    if (objfile != NULL)
@@ -18223,7 +18442,7 @@ index c88156a..567fa07 100644
  }
  
  int
-@@ -1681,14 +1710,11 @@ symbol_matches_domain (enum language symbol_language,
+@@ -1681,14 +1712,11 @@ symbol_matches_domain (enum language symbol_language,
  }
  
  /* Look, in partial_symtab PST, for symbol whose natural name is NAME.
@@ -18240,7 +18459,7 @@ index c88156a..567fa07 100644
  {
    struct partial_symbol *temp;
    struct partial_symbol **start, **psym;
-@@ -1740,9 +1766,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
+@@ -1740,9 +1768,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
  	internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
  
        while (top <= real_top
@@ -18251,7 +18470,7 @@ index c88156a..567fa07 100644
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
  				     SYMBOL_DOMAIN (*top), domain))
-@@ -1759,15 +1783,9 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
+@@ -1759,15 +1785,9 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
        for (psym = start; psym < start + length; psym++)
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
@@ -18270,7 +18489,7 @@ index c88156a..567fa07 100644
  	}
      }
  
-@@ -1809,22 +1827,25 @@ basic_lookup_transparent_type (const char *name)
+@@ -1809,22 +1829,25 @@ basic_lookup_transparent_type (const char *name)
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -18301,7 +18520,7 @@ index c88156a..567fa07 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort
-@@ -1833,7 +1854,7 @@ basic_lookup_transparent_type (const char *name)
+@@ -1833,7 +1856,7 @@ basic_lookup_transparent_type (const char *name)
  	     * the psymtab gets it wrong in some cases.
  	     */
  	    block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -18310,7 +18529,7 @@ index c88156a..567fa07 100644
  	    if (!sym)
  	      error (_("Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
  %s may be an inlined function, or may be a template function\n\
-@@ -1857,21 +1878,26 @@ basic_lookup_transparent_type (const char *name)
+@@ -1857,21 +1880,26 @@ basic_lookup_transparent_type (const char *name)
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -18341,7 +18560,7 @@ index c88156a..567fa07 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort
-@@ -1880,7 +1906,7 @@ basic_lookup_transparent_type (const char *name)
+@@ -1880,7 +1908,7 @@ basic_lookup_transparent_type (const char *name)
  	     * the psymtab gets it wrong in some cases.
  	     */
  	    block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -18350,7 +18569,7 @@ index c88156a..567fa07 100644
  	    if (!sym)
  	      error (_("Internal: static symbol `%s' found in %s psymtab but not in symtab.\n\
  %s may be an inlined function, or may be a template function\n\
-@@ -1905,9 +1931,23 @@ find_main_psymtab (void)
+@@ -1905,9 +1933,23 @@ find_main_psymtab (void)
    struct partial_symtab *pst;
    struct objfile *objfile;
  
@@ -18376,7 +18595,7 @@ index c88156a..567fa07 100644
        {
  	return (pst);
        }
-@@ -1925,14 +1965,10 @@ find_main_psymtab (void)
+@@ -1925,14 +1967,10 @@ find_main_psymtab (void)
     search on the symbols.  Each symbol which is marked as being a ObjC/C++
     symbol (language_cplus or language_objc set) has both the encoded and
     non-encoded names tested for a match.
@@ -18391,7 +18610,7 @@ index c88156a..567fa07 100644
  		     const domain_enum domain)
  {
    struct dict_iterator iter;
-@@ -1945,9 +1981,7 @@ lookup_block_symbol (const struct block *block, const char *name,
+@@ -1945,9 +1983,7 @@ lookup_block_symbol (const struct block *block, const char *name,
  	   sym = dict_iter_name_next (name, &iter))
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
@@ -18402,7 +18621,7 @@ index c88156a..567fa07 100644
  	    return sym;
  	}
        return NULL;
-@@ -1967,9 +2001,7 @@ lookup_block_symbol (const struct block *block, const char *name,
+@@ -1967,9 +2003,7 @@ lookup_block_symbol (const struct block *block, const char *name,
  	   sym = dict_iter_name_next (name, &iter))
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
@@ -18413,7 +18632,7 @@ index c88156a..567fa07 100644
  	    {
  	      sym_found = sym;
  	      if (!SYMBOL_IS_ARGUMENT (sym))
-@@ -3172,7 +3204,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
+@@ -3172,7 +3206,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
       matching the regexp.  That way we don't have to reproduce all of
       the machinery below. */
  
@@ -18552,10 +18771,10 @@ index 2c743e9..ef29610 100644
  /* Stuff that should be shared among the various remote targets.  */
  
 diff --git a/gdb/testsuite/ChangeLog b/gdb/testsuite/ChangeLog
-index d1e38f3..c7511cc 100644
+index 7993ac5..181b752 100644
 --- a/gdb/testsuite/ChangeLog
 +++ b/gdb/testsuite/ChangeLog
-@@ -1252,6 +1252,103 @@
+@@ -1263,6 +1263,103 @@
  	gdb_start_cmd.
  	Use runto_main before any test that requires execution.
  
@@ -19465,7 +19684,7 @@ index 0000000..b809c4e
 +#endif
 diff --git a/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
 new file mode 100644
-index 0000000..534120a
+index 0000000..b05411e
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
 @@ -0,0 +1,64 @@
@@ -19523,10 +19742,10 @@ index 0000000..534120a
 +
 +gdb_test "ptype array" "type = char \\\[26\\\]" "first: ptype array"
 +
-+gdb_test "p array\[1\]" "\\$\[0-9\] = 1 '\\\\1'"
-+gdb_test "p array\[2\]" "\\$\[0-9\] = 2 '\\\\2'"
-+gdb_test "p array\[3\]" "\\$\[0-9\] = 3 '\\\\3'"
-+gdb_test "p array\[4\]" "\\$\[0-9\] = 4 '\\\\4'"
++gdb_test "p array\[1\]" "\\$\[0-9\] = 1 '\\\\001'"
++gdb_test "p array\[2\]" "\\$\[0-9\] = 2 '\\\\002'"
++gdb_test "p array\[3\]" "\\$\[0-9\] = 3 '\\\\003'"
++gdb_test "p array\[4\]" "\\$\[0-9\] = 4 '\\\\004'"
 +
 +gdb_continue_to_breakpoint "break_here"
 +
@@ -20988,6 +21207,88 @@ index 0000000..e508103
 +gdb_test "print _a" "= 11"
 +gdb_test "print ab" "= 22"
 +gdb_test "print abc" "= 33"
+diff --git a/gdb/testsuite/gdb.cp/namespace-recursive.cc b/gdb/testsuite/gdb.cp/namespace-recursive.cc
+new file mode 100644
+index 0000000..cb712fa
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-recursive.cc
+@@ -0,0 +1,16 @@
++namespace A{
++  int ax = 9;
++}
++
++namespace B{
++  using namespace A;
++}
++
++namespace C{
++  using namespace B;
++}
++
++int main(){
++  using namespace C;
++  return ax;
++}
+\ No newline at end of file
+diff --git a/gdb/testsuite/gdb.cp/namespace-recursive.exp b/gdb/testsuite/gdb.cp/namespace-recursive.exp
+new file mode 100644
+index 0000000..4e6ad20
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-recursive.exp
+@@ -0,0 +1,53 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile namespace-recursive
++set srcfile ${testfile}.cc
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1;
++}
++
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++############################################
++# test printing of namespace imported within
++# the function.
++
++if ![runto_main] then {
++    perror "couldn't run to breakpoint main"
++    continue
++}
++
++setup_xfail *-*-*
++gdb_test "print ax" "= 9"
 diff --git a/gdb/testsuite/gdb.cp/namespace-using.cc b/gdb/testsuite/gdb.cp/namespace-using.cc
 index 4786fd5..8ff5622 100644
 --- a/gdb/testsuite/gdb.cp/namespace-using.cc
@@ -21154,10 +21455,22 @@ index 4786fd5..8ff5622 100644
 +  return marker1 ();
  }
 diff --git a/gdb/testsuite/gdb.cp/namespace-using.exp b/gdb/testsuite/gdb.cp/namespace-using.exp
-index f24973f..fa6b669 100644
+index f24973f..c015ef7 100644
 --- a/gdb/testsuite/gdb.cp/namespace-using.exp
 +++ b/gdb/testsuite/gdb.cp/namespace-using.exp
-@@ -46,15 +46,61 @@ if ![runto_main] then {
+@@ -28,6 +28,11 @@ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {deb
+     return -1
+ }
+ 
++if [get_compiler_info ${binfile}] {
++    return -1;
++}
++
++
+ # Get things started.
+ 
+ gdb_exit
+@@ -46,15 +51,61 @@ if ![runto_main] then {
  
  gdb_test "print _a" "= 1"
  
@@ -21219,7 +21532,7 @@ index f24973f..fa6b669 100644
  ############################################
  # Test printing of namespace aliases
  
-@@ -64,14 +110,24 @@ if ![runto marker2] then {
+@@ -64,16 +115,32 @@ if ![runto marker2] then {
      continue
  }
  
@@ -21245,9 +21558,18 @@ index f24973f..fa6b669 100644
 +    perror "couldn't run to breakpoint marker3"
 +}
  
- gdb_test "print _a" "No symbol \"_a\" in current context." "Print a without import"
+-gdb_test "print _a" "No symbol \"_a\" in current context." "Print a without import"
++# gcc-4-3 puts import statements for aliases in
++# the global scope instead of the corresponding
++# function scope. These wrong import statements throw
++# this test off. This is fixed in gcc-4-4.
++if [test_compiler_info gcc-4-3-*] then { setup_xfail *-*-* }
++
++gdb_test "print _a" "No symbol \"_a\" in current context." "Print _a without import"
  
-@@ -84,4 +140,57 @@ if ![runto marker4] then {
+ ############################################
+ # Test printing of individually imported elements
+@@ -84,4 +151,57 @@ if ![runto marker4] then {
      continue
  }
  
@@ -21257,8 +21579,8 @@ index f24973f..fa6b669 100644
 +############################################
 +# Test printing of namespace aliases
 +
-+if ![runto marker6] then {
-+    perror "couldn't run to breakpoint marker6"
++if ![runto marker5] then {
++    perror "couldn't run to marker5"
 +    continue
 +}
 +
@@ -21471,10 +21793,10 @@ index 8a6b795..9997a45 100644
  \[0-9\]+\[\t \]+breakpoint     keep y\[\t \]+$hex\[\t \]+in foo::overload1arg\\(char\\) at.*$srcfile:111\r
 diff --git a/gdb/testsuite/gdb.cp/shadowing.cc b/gdb/testsuite/gdb.cp/shadowing.cc
 new file mode 100644
-index 0000000..1651510
+index 0000000..6d9c2f1
 --- /dev/null
 +++ b/gdb/testsuite/gdb.cp/shadowing.cc
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,48 @@
 +namespace A
 +{
 +  int x = 11;
@@ -21492,22 +21814,25 @@ index 0000000..1651510
 +  func()
 +  {
 +    x = 33;
-+    y++; // marker1
++    y+=x; // marker1
 +
 +      {
 +        int x = 44;
-+        y++; // marker2
++        y+=x; // marker2
 +
 +          {
 +            int x = 55;
-+            y++; // marker3
++            y+=x; // marker3
 +
 +              {
++                int z = x; //prevent gcc from optimizing away this scope
 +                using namespace A;
-+                y++; // marker4
++                y+=x; // marker4
 +
 +                using A::x;
-+                y++; // marker5
++                y+=x; // marker5
++                
++                return this->x;
 +              }
 +          }
 +      }
@@ -21522,10 +21847,10 @@ index 0000000..1651510
 +}
 diff --git a/gdb/testsuite/gdb.cp/shadowing.exp b/gdb/testsuite/gdb.cp/shadowing.exp
 new file mode 100644
-index 0000000..fcbf680
+index 0000000..6922eed
 --- /dev/null
 +++ b/gdb/testsuite/gdb.cp/shadowing.exp
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,91 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -21554,6 +21879,10 @@ index 0000000..fcbf680
 +if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
 +    untested "Couldn't compile test program"
 +    return -1
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1;
 +}
 +
 +# Get things started.
@@ -21609,6 +21938,8 @@ index 0000000..fcbf680
 +
 +gdb_breakpoint [gdb_get_line_number "marker5"]
 +gdb_continue_to_breakpoint "marker5"
++
++if [test_compiler_info gcc-4-3-*] then { setup_xfail *-*-* }
 +
 +gdb_test "print x" "= 11" "Print imported namespace x"
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-stripped.c b/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
@@ -23339,10 +23670,10 @@ index 0000000..d444554
 +gdb_test "python print t0" "\\<gdb.InferiorThread object at 0x\[\[:xdigit:\]\]+>" "verify InferiorThread object"
 +gdb_test "python print 'result =', t0.num" " = \[0-9\]+" "test Inferior.num"
 diff --git a/gdb/testsuite/gdb.python/python-mi.exp b/gdb/testsuite/gdb.python/python-mi.exp
-index 3258810..e7bfe54 100644
+index 3258810..095ee78 100644
 --- a/gdb/testsuite/gdb.python/python-mi.exp
 +++ b/gdb/testsuite/gdb.python/python-mi.exp
-@@ -48,7 +48,21 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
+@@ -48,23 +48,42 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
  mi_continue_to_line [gdb_get_line_number {MI breakpoint here} ${testfile}.c] \
    "step to breakpoint"
  
@@ -23365,24 +23696,111 @@ index 3258810..e7bfe54 100644
  
  mi_list_varobj_children container {
  } "examine container children=0"
-@@ -92,6 +106,15 @@ mi_varobj_update_dynamic container {
-     { {container.\[1\]} {\[1\]} 0 int }
- } "varobj update after choosing via expression"
  
+ mi_next "next over update 1"
+ 
+-mi_varobj_update_dynamic container {
+-    { {container.\[0\]} {\[0\]} 0 int }
+-} "varobj update 1"
++mi_varobj_update_dynamic container "varobj update 1" {
++    type_changed false new_num_children 1 has_more 0
++} {
++} {
++    { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
++}
+ 
+ mi_next "next over update 2"
+ 
+-mi_varobj_update_dynamic container {
+-    { {container.\[0\]} {\[0\]} 0 int }
+-    { {container.\[1\]} {\[1\]} 0 int }
+-} "varobj update 2"
++mi_varobj_update_dynamic container "varobj update 2" {
++    type_changed false new_num_children 2 has_more 0
++} {
++} {
++    { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
++}
+ 
+ mi_gdb_test "-var-set-visualizer container None" \
+   "\\^done" \
+@@ -78,19 +97,68 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
+   "\\^done" \
+   "choose default visualizer"
+ 
+-mi_varobj_update_dynamic container {
+-    { {container.\[0\]} {\[0\]} 0 int }
+-    { {container.\[1\]} {\[1\]} 0 int }
+-} "varobj update after choosing default"
++mi_varobj_update_dynamic container "varobj update after choosing default" {
++    type_changed false new_num_children 2 has_more 0
++} {
++} {
++    { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
++    { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
++}
+ 
+ mi_gdb_test "-var-set-visualizer container ContainerPrinter" \
+   "\\^done" \
+   "choose visualizer using expression"
+ 
+-mi_varobj_update_dynamic container {
++mi_varobj_update_dynamic container \
++  "varobj update after choosing via expression" {
++      type_changed false new_num_children 2 has_more 0
++  } {
++  } {
++      { name {container.\[0\]} exp {\[0\]} numchild 0 type int thread-id 1 }
++      { name {container.\[1\]} exp {\[1\]} numchild 0 type int thread-id 1 }
++  }
++
 +mi_list_varobj_children_range container 1 2 2 {
 +    { {container.\[1\]} {\[1\]} 0 int }
 +} "list varobj children after selecting child range"
 +
 +mi_list_varobj_children_range container -1 -1 2 {
-+    { {container.\[0\]} {\[0\]} 0 int }
-+    { {container.\[1\]} {\[1\]} 0 int }
+     { {container.\[0\]} {\[0\]} 0 int }
+     { {container.\[1\]} {\[1\]} 0 int }
+-} "varobj update after choosing via expression"
 +} "list varobj children after resetting child range"
 +
++mi_next "next over update 3"
++
++mi_gdb_test "-var-set-update-range container 0 1" \
++  "\\^done" \
++  "set update range"
++
++# This should truncate the list.
++mi_list_varobj_children container {
++    { {container.\[0\]} {\[0\]} 0 int }
++} "list children after setting update range"
++
++# This should return just the items in [1,2).
++mi_list_varobj_children_range container 1 2 2 {
++    { {container.\[1\]} {\[1\]} 0 int }
++} "list selected children after setting range"
++
++# This should not be affected by the previous list-children request.
++mi_list_varobj_children container {
++    { {container.\[0\]} {\[0\]} 0 int }
++} "list children after listing selected range"
++
++mi_next "next over update 4"
++
++# This should only show the first child, because the update range has
++# been set.
++mi_varobj_update_dynamic container \
++  "update after next with restricted range" {
++      type_changed false new_num_children 1 has_more 1
++  } {
++      { name {container.\[0\]} in_scope true type_changed false }
++  } {
++  }
+ 
  mi_continue_to_line \
      [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \
-     "step to second breakpoint"
 diff --git a/gdb/testsuite/gdb.python/python-prettyprint.c b/gdb/testsuite/gdb.python/python-prettyprint.c
-index 3cafc48..5cc35be 100644
+index 3cafc48..6bbbf1d 100644
 --- a/gdb/testsuite/gdb.python/python-prettyprint.c
 +++ b/gdb/testsuite/gdb.python/python-prettyprint.c
 @@ -15,6 +15,8 @@
@@ -23420,6 +23838,16 @@ index 3cafc48..5cc35be 100644
  
    struct ns  ns;
    ns.null_str = "embedded\0null\0string";
+@@ -193,6 +203,9 @@ main ()
+   add_item (&c, 72);
+ 
+ #ifdef MI
++  add_item (&c, 1011);
++  c.elements[0] = 1023;
++
+   do_nothing ();
+ #endif
+ 
 diff --git a/gdb/testsuite/gdb.python/python-prettyprint.exp b/gdb/testsuite/gdb.python/python-prettyprint.exp
 index 01d4a06..b2dc85d 100644
 --- a/gdb/testsuite/gdb.python/python-prettyprint.exp
@@ -23699,19 +24127,92 @@ index 0c93a73..d0c3493 100644
  global GDB
  
 diff --git a/gdb/testsuite/lib/mi-support.exp b/gdb/testsuite/lib/mi-support.exp
-index 9b4c464..33f277a 100644
+index e691232..64bc28e 100644
 --- a/gdb/testsuite/lib/mi-support.exp
 +++ b/gdb/testsuite/lib/mi-support.exp
-@@ -1258,7 +1258,7 @@ proc mi_varobj_update_dynamic {name children testname} {
-     set er "\\^done,changelist=\\\["
+@@ -1201,7 +1201,7 @@ proc mi_create_varobj { name expression testname } {
  
-     append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
+ proc mi_create_floating_varobj { name expression testname } {
+     mi_gdb_test "-var-create $name @ $expression" \
+-        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*" \
++        "\\^done,name=\"$name\",numchild=\"\(-1\|\[0-9\]+\)\",value=\".*\",type=.*" \
+         $testname
+ }
+ 
+@@ -1250,16 +1250,64 @@ proc mi_varobj_update_with_type_change { name new_type new_children testname } {
+     mi_gdb_test "-var-update $name" $er $testname
+ }
+ 
+-# Update a dynamic varobj named NAME.  CHILDREN is a list of children,
+-# in the same form as mi_list_varobj_children.  TESTNAME is the name
+-# of the test.
+-proc mi_varobj_update_dynamic {name children testname} {
+-    set children_exp_j [mi_child_regexp $children 0]
++# A helper that turns a key/value list into a regular expression
++# matching some MI output.
++proc mi_varobj_update_kv_helper {list} {
++    set first 1
++    set rx ""
++    foreach {key value} $list {
++	if {!$first} {
++	    append rx ,
++	}
++	set first 0
++	if {$key == "new_children"} {
++	    append rx "$key=\\\[$value\\\]"
++	} else {
++	    append rx "$key=\"$value\""
++	}
++    }
++    return $rx
++}
++
++# A helper for mi_varobj_update_dynamic that computes a match
++# expression given a child list.
++proc mi_varobj_update_dynamic_helper {children} {
++    set crx ""
+ 
+-    set er "\\^done,changelist=\\\["
++    set first 1
++    foreach child $children {
++	if {!$first} {
++	    append crx ,
++	}
++	set first 0
++	append crx "{"
++	append crx [mi_varobj_update_kv_helper $child]
++	append crx "}"
++    }
++
++    return $crx
++}
++
++# Update a dynamic varobj named NAME.  CHILDREN is a list of children
++# that have been updated; NEW_CHILDREN is a list of children that were
++# added to the primary varobj.  Each child is a list of key/value
++# pairs that are expected.  SELF is a key/value list holding
++# information about the varobj itself.  TESTNAME is the name of the
++# test.
++proc mi_varobj_update_dynamic {name testname self children new_children} {
++    if {[llength $new_children]} {
++	set newrx [mi_varobj_update_dynamic_helper $new_children]
++	lappend self new_children $newrx
++    }
++    set selfrx [mi_varobj_update_kv_helper $self]
++    set crx [mi_varobj_update_dynamic_helper $children]
+ 
+-    append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
 -    append er ",children=\\\[$children_exp_j.*\\\]}\\\]"
-+    append er ",children=\\\[$children_exp_j.*\\\],has_more=\".\"}\\\]"
++    set er "\\^done,changelist=\\\[\{name=\"$name\",in_scope=\"true\""
++    append er ",$selfrx\}"
++    if {"$crx" != ""} {
++	append er ",$crx"
++    }
++    append er "\\\]"
  
      verbose -log "Expecting: $er"
      mi_gdb_test "-var-update $name" $er $testname
-@@ -1328,14 +1328,13 @@ proc mi_child_regexp {children add_child} {
+@@ -1329,14 +1377,13 @@ proc mi_child_regexp {children add_child} {
  # have no value.
  #
  proc mi_list_varobj_children { varname children testname } {
@@ -23730,7 +24231,7 @@ index 9b4c464..33f277a 100644
      set options ""
      if {[llength $varname] == 2} {
          set options [lindex $varname 1]
-@@ -1351,9 +1350,18 @@ proc mi_list_varobj_children_range {varname numchildren children testname} {
+@@ -1352,9 +1399,18 @@ proc mi_list_varobj_children_range {varname numchildren children testname} {
          set expected "\\^done,numchild=\"0\""
      }
  
@@ -24008,7 +24509,7 @@ index 1562d5a..d86a7eb 100644
  extern long ui_file_read (struct ui_file *file, char *buf, long length_buf);
  
 diff --git a/gdb/utils.c b/gdb/utils.c
-index eb75f2e..1e246b8 100644
+index a266b02..3d953e3 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
 @@ -2605,7 +2605,10 @@ fprintf_symbol_filtered (struct ui_file *stream, char *name,
@@ -24123,7 +24624,7 @@ index a9c875d..12f6f07 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 5e5c4ed..59c9018 100644
+index 5e5c4ed..446a4d1 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -38,6 +38,7 @@
@@ -24477,18 +24978,15 @@ index 5e5c4ed..59c9018 100644
  
  	  if (TYPE_FN_FIELD_STATIC_P (f, j))
  	    {
-@@ -2752,9 +2932,9 @@ value_maybe_namespace_elt (const struct type *curtype,
+@@ -2752,7 +2932,7 @@ value_maybe_namespace_elt (const struct type *curtype,
    struct symbol *sym;
    struct value *result;
  
 -  sym = cp_lookup_symbol_namespace (namespace_name, name, NULL,
-+  sym = cp_lookup_symbol_namespace_incremental (namespace_name, name,
++  sym = cp_lookup_symbol_namespace_incremental(namespace_name, name,
  				    get_selected_block (0), 
--				    VAR_DOMAIN);
-+				    VAR_DOMAIN, 0);
+ 				    VAR_DOMAIN);
  
-   if (sym == NULL)
-     return NULL;
 @@ -2896,7 +3076,7 @@ value_of_local (const char *name, int complain)
  
    /* Calling lookup_block_symbol is necessary to get the LOC_REGISTER
@@ -24529,7 +25027,7 @@ index cbb5d94..cf35bf0 100644
  	  ++reps;
  	  ++rep1;
 diff --git a/gdb/value.c b/gdb/value.c
-index 65a5aa9..007e4b0 100644
+index 65a5aa9..c943781 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -37,8 +37,10 @@
@@ -24543,7 +25041,22 @@ index 65a5aa9..007e4b0 100644
  
  #include "python/python.h"
  
-@@ -257,7 +259,9 @@ allocate_value_lazy (struct type *type)
+@@ -170,6 +172,14 @@ struct value
+      taken off this list.  */
+   struct value *next;
+ 
++  /* The reference count.  A value that is still on the `all_values'
++     list will have a reference count of 0.  A call to `release_value'
++     will increment the reference count (and remove the value from the
++     list, the first time).  A call to `value_free' will decrement the
++     reference count, and will free the value when there are no more
++     references.  */
++  int refcount;
++
+   /* Register number if the value is from a register.  */
+   short regnum;
+ 
+@@ -257,7 +267,9 @@ allocate_value_lazy (struct type *type)
    val->next = all_values;
    all_values = val;
    val->type = type;
@@ -24553,7 +25066,7 @@ index 65a5aa9..007e4b0 100644
    VALUE_LVAL (val) = not_lval;
    val->location.address = 0;
    VALUE_FRAME_ID (val) = null_frame_id;
-@@ -367,6 +371,8 @@ value_type (struct value *value)
+@@ -367,6 +379,8 @@ value_type (struct value *value)
  void
  deprecated_set_value_type (struct value *value, struct type *type)
  {
@@ -24562,27 +25075,91 @@ index 65a5aa9..007e4b0 100644
    value->type = type;
  }
  
-@@ -623,6 +629,9 @@ value_free (struct value *val)
+@@ -623,27 +637,28 @@ value_free (struct value *val)
  {
    if (val)
      {
-+      type_decref (val->type);
-+      type_decref (val->enclosing_type);
-+
-       gdb_assert (val->reference_count > 0);
-       val->reference_count--;
-       if (val->reference_count > 0)
-@@ -642,8 +651,8 @@ value_free (struct value *val)
- 	}
+-      gdb_assert (val->reference_count > 0);
+-      val->reference_count--;
+-      if (val->reference_count > 0)
+-	return;
++      /* If the count was already 0, then the value was on the
++	 all_values list, and we must be freeing back to some
++	 point.  */
++      if (val->refcount <= 1)
++	{
++	  type_decref (val->type);
++	  type_decref (val->enclosing_type);
  
-       xfree (val->contents);
-+      xfree (val);
+-      /* If there's an associated parent value, drop our reference to
+-	 it.  */
+-      if (val->parent != NULL)
+-	value_free (val->parent);
++	  if (VALUE_LVAL (val) == lval_computed)
++	    {
++	      struct lval_funcs *funcs = val->location.computed.funcs;
+ 
+-      if (VALUE_LVAL (val) == lval_computed)
+-	{
+-	  struct lval_funcs *funcs = val->location.computed.funcs;
++	      if (funcs->free_closure)
++		funcs->free_closure (val);
++	    }
+ 
+-	  if (funcs->free_closure)
+-	    funcs->free_closure (val);
++	  xfree (val->contents);
++	  xfree (val);
+ 	}
+-
+-      xfree (val->contents);
++      else
++	--val->refcount;
      }
 -  xfree (val);
  }
  
  /* Free all values allocated since MARK was obtained by value_mark
-@@ -736,6 +745,9 @@ value_copy (struct value *arg)
+@@ -686,22 +701,26 @@ free_all_values (void)
+ void
+ release_value (struct value *val)
+ {
+-  struct value *v;
+-
+-  if (all_values == val)
+-    {
+-      all_values = val->next;
+-      return;
+-    }
+-
+-  for (v = all_values; v; v = v->next)
++  /* If the reference count is nonzero, then we have already removed
++     the item from the list, so there is no reason to do it again.  */
++  if (val->refcount == 0)
+     {
+-      if (v->next == val)
++      if (all_values == val)
++	all_values = val->next;
++      else
+ 	{
+-	  v->next = val->next;
+-	  break;
++	  struct value *v;
++	  for (v = all_values; v; v = v->next)
++	    {
++	      if (v->next == val)
++		{
++		  v->next = val->next;
++		  break;
++		}
++	    }
+ 	}
+     }
++  ++val->refcount;
+ }
+ 
+ /* Release all values up to mark  */
+@@ -736,6 +755,9 @@ value_copy (struct value *arg)
      val = allocate_value_lazy (encl_type);
    else
      val = allocate_value (encl_type);
@@ -24592,7 +25169,7 @@ index 65a5aa9..007e4b0 100644
    val->type = arg->type;
    VALUE_LVAL (val) = VALUE_LVAL (arg);
    val->location = arg->location;
-@@ -771,12 +783,15 @@ value_copy (struct value *arg)
+@@ -771,12 +793,15 @@ value_copy (struct value *arg)
  void
  set_value_component_location (struct value *component, struct value *whole)
  {
@@ -24608,7 +25185,7 @@ index 65a5aa9..007e4b0 100644
    if (VALUE_LVAL (whole) == lval_computed)
      {
        struct lval_funcs *funcs = whole->location.computed.funcs;
-@@ -784,6 +799,10 @@ set_value_component_location (struct value *component, struct value *whole)
+@@ -784,6 +809,10 @@ set_value_component_location (struct value *component, struct value *whole)
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
@@ -24619,7 +25196,7 @@ index 65a5aa9..007e4b0 100644
  }
  
  
-@@ -914,6 +933,29 @@ show_values (char *num_exp, int from_tty)
+@@ -914,6 +943,29 @@ show_values (char *num_exp, int from_tty)
        num_exp[1] = '\0';
      }
  }
@@ -24649,7 +25226,7 @@ index 65a5aa9..007e4b0 100644
  
  /* Internal variables.  These are variables within the debugger
     that hold values assigned by debugger commands.
-@@ -1388,6 +1430,37 @@ call_internal_function (struct gdbarch *gdbarch,
+@@ -1388,6 +1440,37 @@ call_internal_function (struct gdbarch *gdbarch,
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -24687,7 +25264,7 @@ index 65a5aa9..007e4b0 100644
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -1430,17 +1503,26 @@ add_internal_function (const char *name, const char *doc,
+@@ -1430,16 +1513,15 @@ add_internal_function (const char *name, const char *doc,
  /* Update VALUE before discarding OBJFILE.  COPIED_TYPES is used to
     prevent cycles / duplicates.  */
  
@@ -24698,27 +25275,15 @@ index 65a5aa9..007e4b0 100644
  {
    if (TYPE_OBJFILE (value->type) == objfile)
 -    value->type = copy_type_recursive (objfile, value->type, copied_types);
-+    {
-+      /* No need to decref the old type here, since we know it has no
-+	 reference count.  */
-+      value->type = copy_type_recursive (value->type, copied_types);
-+      type_incref (value->type);
-+    }
++    value->type = copy_type_recursive (value->type, copied_types);
  
    if (TYPE_OBJFILE (value->enclosing_type) == objfile)
 -    value->enclosing_type = copy_type_recursive (objfile,
 -						 value->enclosing_type,
--						 copied_types);
-+    {
-+      /* No need to decref the old type here, since we know it has no
-+	 reference count.  */
-+      value->enclosing_type = copy_type_recursive (value->enclosing_type,
-+						   copied_types);
-+      type_incref (value->enclosing_type);
-+    }
++    value->enclosing_type = copy_type_recursive (value->enclosing_type,
+ 						 copied_types);
  }
  
- /* Likewise for internal variable VAR.  */
 @@ -1454,7 +1536,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
      case INTERNALVAR_SCALAR:
        if (var->u.scalar.type && TYPE_OBJFILE (var->u.scalar.type) == objfile)
@@ -24839,7 +25404,7 @@ index 65a5aa9..007e4b0 100644
 +  observer_attach_mark_used (value_types_mark_used);
  }
 diff --git a/gdb/value.h b/gdb/value.h
-index 29ad783..bc96309 100644
+index 29ad783..ee8440b 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -344,11 +344,16 @@ extern LONGEST unpack_field_as_long (struct type *type,
@@ -24867,7 +25432,7 @@ index 29ad783..bc96309 100644
  					  int want_address,
  					  enum noside noside);
  
-@@ -658,12 +664,13 @@ extern void typedef_print (struct type *type, struct symbol *news,
+@@ -658,12 +664,12 @@ extern void typedef_print (struct type *type, struct symbol *news,
  
  extern char *internalvar_name (struct internalvar *var);
  
@@ -24877,13 +25442,12 @@ index 29ad783..bc96309 100644
  
  extern struct value *value_copy (struct value *);
  
-+extern void preserve_one_value (struct value *value, struct objfile *objfile,
-+				htab_t copied_types);
++extern void preserve_one_value (struct value *, struct objfile *, htab_t);
 +
  /* From valops.c */
  
  extern struct value *varying_to_slice (struct value *);
-@@ -681,7 +688,7 @@ extern struct value *value_allocate_space_in_inferior (int);
+@@ -681,7 +687,7 @@ extern struct value *value_allocate_space_in_inferior (int);
  extern struct value *value_of_local (const char *name, int complain);
  
  extern struct value *value_subscripted_rvalue (struct value *array,
@@ -24893,10 +25457,15 @@ index 29ad783..bc96309 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index 4a94988..9bfc130 100644
+index 4a94988..34333fb 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
-@@ -29,11 +29,14 @@
+@@ -26,14 +26,18 @@
+ #include "gdbcmd.h"
+ #include "block.h"
+ #include "valprint.h"
++#include "objfiles.h"
++#include "parser-defs.h"
  
  #include "gdb_assert.h"
  #include "gdb_string.h"
@@ -24907,11 +25476,10 @@ index 4a94988..9bfc130 100644
  #include "gdbthread.h"
  #include "inferior.h"
 +#include "observer.h"
-+#include "parser-defs.h"
  
  #if HAVE_PYTHON
  #include "python/python.h"
-@@ -59,6 +62,15 @@ char *varobj_format_string[] =
+@@ -59,6 +63,15 @@ char *varobj_format_string[] =
  /* String representations of gdb's known languages */
  char *varobj_language_string[] = { "unknown", "C", "C++", "Java" };
  
@@ -24927,7 +25495,7 @@ index 4a94988..9bfc130 100644
  /* Data structures */
  
  /* Every root variable has one of these structures saved in its
-@@ -173,6 +185,17 @@ struct varobj
+@@ -173,9 +186,31 @@ struct varobj
       frozen.  */
    int not_fetched;
  
@@ -24945,7 +25513,21 @@ index 4a94988..9bfc130 100644
    /* The pretty-printer that has been constructed.  If NULL, then a
       new printer object is needed, and one will be constructed.  */
    PyObject *pretty_printer;
-@@ -221,6 +244,8 @@ static void free_variable (struct varobj *var);
++
++  /* The iterator returned by the printer's 'children' method, or NULL
++     if not available.  */
++  PyObject *child_iter;
++
++  /* We request one extra item from the iterator, so that we can
++     report to the caller whether there are more items than we have
++     already reported.  However, we don't want to install this value
++     when we read it, because that will mess up future updates.  So,
++     we stash it here instead.  */
++  PyObject *saved_item;
+ };
+ 
+ struct cpstack
+@@ -221,6 +256,8 @@ static void free_variable (struct varobj *var);
  
  static struct cleanup *make_cleanup_free_variable (struct varobj *var);
  
@@ -24954,7 +25536,7 @@ index 4a94988..9bfc130 100644
  static struct type *get_type (struct varobj *var);
  
  static struct type *get_value_type (struct varobj *var);
-@@ -236,8 +261,6 @@ static char *cppop (struct cpstack **pstack);
+@@ -236,8 +273,6 @@ static char *cppop (struct cpstack **pstack);
  static int install_new_value (struct varobj *var, struct value *value, 
  			      int initial);
  
@@ -24963,7 +25545,16 @@ index 4a94988..9bfc130 100644
  /* Language-specific routines. */
  
  static enum varobj_languages variable_language (struct varobj *var);
-@@ -614,9 +637,9 @@ varobj_create (char *objname,
+@@ -450,6 +485,8 @@ is_root_p (struct varobj *var)
+ struct cleanup *
+ varobj_ensure_python_env (struct varobj *var)
+ {
++  gdb_assert (var->root->is_valid);
++
+   return ensure_python_env (var->root->exp->gdbarch,
+ 			    var->root->exp->language_defn);
+ }
+@@ -614,9 +651,9 @@ varobj_create (char *objname,
  	  do_cleanups (old_chain);
  	  return NULL;
  	}
@@ -24974,18 +25565,339 @@ index 4a94988..9bfc130 100644
    discard_cleanups (old_chain);
    return var;
  }
-@@ -884,7 +907,9 @@ update_dynamic_varobj_children (struct varobj *var,
+@@ -731,15 +768,8 @@ instantiate_pretty_printer (PyObject *constructor, struct value *value)
+ #if HAVE_PYTHON
+   PyObject *val_obj = NULL; 
+   PyObject *printer;
+-  volatile struct gdb_exception except;
+ 
+-  TRY_CATCH (except, RETURN_MASK_ALL)
+-    {
+-      value = value_copy (value);
+-    }
+-  GDB_PY_HANDLE_EXCEPTION (except);
+   val_obj = value_to_value_object (value);
+-
+   if (! val_obj)
+     return NULL;
+ 
+@@ -792,7 +822,12 @@ varobj_get_display_hint (struct varobj *var)
+   char *result = NULL;
+ 
+ #if HAVE_PYTHON
+-  struct cleanup *back_to = varobj_ensure_python_env (var);
++  struct cleanup *back_to;
++  
++  if (!var->root->is_valid)
++    return NULL;
++
++  back_to = varobj_ensure_python_env (var);
+ 
+   if (var->pretty_printer)
+     result = gdbpy_get_display_hint (var->pretty_printer);
+@@ -803,6 +838,17 @@ varobj_get_display_hint (struct varobj *var)
+   return result;
+ }
+ 
++/* Return true if the varobj has items after TO, false otherwise.  */
++
++int
++varobj_has_more (struct varobj *var, int to)
++{
++  if (VEC_length (varobj_p, var->children) > to)
++    return 1;
++  return (VEC_length (varobj_p, var->children) == to
++	  && var->saved_item != NULL);
++}
++
+ /* If the variable object is bound to a specific thread, that
+    is its evaluation can always be done in context of a frame
+    inside that thread, returns GDB id of the thread -- which
+@@ -835,22 +881,73 @@ varobj_get_frozen (struct varobj *var)
+   return var->frozen;
+ }
+ 
++/* A helper function that restricts a range to what is actually
++   available in a VEC.  This follows the usual rules for the meaning
++   of FROM and TO -- if either is negative, the entire range is
++   used.  */
++
++static void
++restrict_range (VEC (varobj_p) *children, int *from, int *to)
++{
++  if (*from < 0 || *to < 0)
++    {
++      *from = 0;
++      *to = VEC_length (varobj_p, children);
++    }
++  else
++    {
++      if (*from > VEC_length (varobj_p, children))
++	*from = VEC_length (varobj_p, children);
++      if (*to > VEC_length (varobj_p, children))
++	*to = VEC_length (varobj_p, children);
++      if (*from > *to)
++	*from = *to;
++    }
++}
++
++/* A helper for update_dynamic_varobj_children that installs a new
++   child when needed.  */
++
++static void
++install_dynamic_child (struct varobj *var,
++		       VEC (varobj_p) **changed,
++		       VEC (varobj_p) **new,
++		       int *cchanged,
++		       int index,
++		       const char *name,
++		       struct value *value)
++{
++  if (VEC_length (varobj_p, var->children) < index + 1)
++    {
++      /* There's no child yet.  */
++      struct varobj *child = varobj_add_child (var, name, value);
++      if (new)
++	VEC_safe_push (varobj_p, *new, child);
++      *cchanged = 1;
++    }
++  else 
++    {
++      varobj_p existing = VEC_index (varobj_p, var->children, index);
++      if (install_new_value (existing, value, 0))
++	{
++	  if (changed)
++	    VEC_safe_push (varobj_p, *changed, existing);
++	}
++    }
++}
++
+ static int
+ update_dynamic_varobj_children (struct varobj *var,
+ 				VEC (varobj_p) **changed,
+-				VEC (varobj_p) **new_and_unchanged,
+-				int *cchanged)
+-
++				VEC (varobj_p) **new,
++				int *cchanged,
++				int update_children,
++				int to)
+ {
+ #if HAVE_PYTHON
+-  /* FIXME: we *might* want to provide this functionality as
+-     a standalone function, so that other interested parties
+-     than varobj code can benefit for this.  */
+   struct cleanup *back_to;
+   PyObject *children;
+-  PyObject *iterator;
+   int i;
+-  int children_changed = 0;
+   PyObject *printer = var->pretty_printer;
+ 
+   back_to = varobj_ensure_python_env (var);
+@@ -862,96 +959,103 @@ update_dynamic_varobj_children (struct varobj *var,
+       return 0;
      }
-   make_cleanup_py_decref (iterator);
+ 
+-  children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
+-					 NULL);
+-
+-  if (!children)
++  if (update_children || !var->child_iter)
+     {
+-      gdbpy_print_stack ();
+-      error (_("Null value returned for children"));
+-    }
++      children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
++					     NULL);
+ 
+-  make_cleanup_py_decref (children);
++      if (!children)
++	{
++	  gdbpy_print_stack ();
++	  error (_("Null value returned for children"));
++	}
+ 
+-  if (!PyIter_Check (children))
+-    error (_("Returned value is not iterable"));
++      make_cleanup_py_decref (children);
+ 
+-  iterator = PyObject_GetIter (children);
+-  if (!iterator)
+-    {
+-      gdbpy_print_stack ();
+-      error (_("Could not get children iterator"));
++      if (!PyIter_Check (children))
++	error (_("Returned value is not iterable"));
++
++      Py_XDECREF (var->child_iter);
++      var->child_iter = PyObject_GetIter (children);
++      if (!var->child_iter)
++	{
++	  gdbpy_print_stack ();
++	  error (_("Could not get children iterator"));
++	}
++
++      Py_XDECREF (var->saved_item);
++      var->saved_item = NULL;
++
++      i = 0;
+     }
+-  make_cleanup_py_decref (iterator);
++  else
++    i = VEC_length (varobj_p, var->children);
  
 -  for (i = 0; ; ++i)
 +  /* We ask for one extra child, so that MI can report whether there
 +     are more children.  */
-+  for (i = 0; var->to < 0 || i < var->to + 1; ++i)
++  for (; to < 0 || i < to + 1; ++i)
      {
-       PyObject *item = PyIter_Next (iterator);
-       PyObject *py_v;
-@@ -1015,7 +1040,6 @@ varobj_list_children (struct varobj *var)
+-      PyObject *item = PyIter_Next (iterator);
+-      PyObject *py_v;
+-      struct value *v;
+-      char *name;
+-      struct cleanup *inner;
+-      
+-      if (!item)
+-	break;
+-      inner = make_cleanup_py_decref (item);
++      PyObject *item;
+ 
+-      if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
+-	error (_("Invalid item from the child list"));
+-      
+-      if (PyObject_TypeCheck (py_v, &value_object_type))
++      /* See if there was a leftover from last time.  */
++      if (var->saved_item)
+ 	{
+-	  /* If we just call convert_value_from_python for this type,
+-	     we won't know who owns the result.  For this one case we
+-	     need to copy the resulting value.  */
+-	  v = value_object_to_value (py_v);
+-	  v = value_copy (v);
++	  item = var->saved_item;
++	  var->saved_item = NULL;
+ 	}
+       else
+-	v = convert_value_from_python (py_v);
++	item = PyIter_Next (var->child_iter);
+ 
+-      /* TODO: This assume the name of the i-th child never changes.  */
++      if (!item)
++	break;
+ 
+-      /* Now see what to do here.  */
+-      if (VEC_length (varobj_p, var->children) < i + 1)
++      /* We don't want to push the extra child on any report list.  */
++      if (to < 0 || i < to)
+ 	{
+-	  /* There's no child yet.  */
+-	  struct varobj *child = varobj_add_child (var, name, v);
+-	  if (new_and_unchanged)
+-	    VEC_safe_push (varobj_p, *new_and_unchanged, child);
+-	  children_changed = 1;
++	  PyObject *py_v;
++	  char *name;
++	  struct value *v;
++	  struct cleanup *inner;
++
++	  inner = make_cleanup_py_decref (item);
++
++	  if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
++	    error (_("Invalid item from the child list"));
++
++	  v = convert_value_from_python (py_v);
++	  install_dynamic_child (var, changed, new,
++				 cchanged, i, name, v);
++	  do_cleanups (inner);
+ 	}
+-      else 
++      else
+ 	{
+-	  varobj_p existing = VEC_index (varobj_p, var->children, i);
+-	  if (install_new_value (existing, v, 0) && changed)
+-	    {
+-	      if (changed)
+-		VEC_safe_push (varobj_p, *changed, existing);
+-	    }
+-	  else
+-	    {
+-	      if (new_and_unchanged)
+-		VEC_safe_push (varobj_p, *new_and_unchanged, existing);
+-	    }
+-	}
++	  Py_XDECREF (var->saved_item);
++	  var->saved_item = item;
+ 
+-      do_cleanups (inner);
++	  /* We want to truncate the child list just before this
++	     element.  */
++	  break;
++	}
+     }
+ 
+   if (i < VEC_length (varobj_p, var->children))
+     {
+-      int i;
+-      children_changed = 1;
+-      for (i = 0; i < VEC_length (varobj_p, var->children); ++i)
+-	varobj_delete (VEC_index (varobj_p, var->children, i), NULL, 0);
++      int j;
++      *cchanged = 1;
++      for (j = i; j < VEC_length (varobj_p, var->children); ++j)
++	varobj_delete (VEC_index (varobj_p, var->children, j), NULL, 0);
++      VEC_truncate (varobj_p, var->children, i);
+     }
+-  VEC_truncate (varobj_p, var->children, i);
++
++  /* If there are fewer children than requested, note that the list of
++     children changed.  */
++  if (to >= 0 && VEC_length (varobj_p, var->children) < to)
++    *cchanged = 1;
++
+   var->num_children = VEC_length (varobj_p, var->children);
+  
+   do_cleanups (back_to);
+ 
+-  *cchanged = children_changed;
+   return 1;
+ #else
+   gdb_assert (0 && "should never be called if Python is not enabled");
+@@ -964,8 +1068,7 @@ varobj_get_num_children (struct varobj *var)
+   if (var->num_children == -1)
+     {
+       int changed;
+-      if (!var->pretty_printer
+-	  || !update_dynamic_varobj_children (var, NULL, NULL, &changed))
++      if (!var->pretty_printer)
+ 	var->num_children = number_of_children (var);
+     }
+ 
+@@ -976,7 +1079,7 @@ varobj_get_num_children (struct varobj *var)
+    the return code is the number of such children or -1 on error */
+ 
+ VEC (varobj_p)*
+-varobj_list_children (struct varobj *var)
++varobj_list_children (struct varobj *var, int *from, int *to)
+ {
+   struct varobj *child;
+   char *name;
+@@ -988,8 +1091,12 @@ varobj_list_children (struct varobj *var)
+       /* This, in theory, can result in the number of children changing without
+ 	 frontend noticing.  But well, calling -var-list-children on the same
+ 	 varobj twice is not something a sane frontend would do.  */
+-      && update_dynamic_varobj_children (var, NULL, NULL, &children_changed))
+-    return var->children;
++      && update_dynamic_varobj_children (var, NULL, NULL, &children_changed,
++					 0, *to))
++    {
++      restrict_range (var->children, from, to);
++      return var->children;
++    }
+ 
+   if (var->num_children == -1)
+     var->num_children = number_of_children (var);
+@@ -1015,10 +1122,10 @@ varobj_list_children (struct varobj *var)
  	  name = name_of_child (var, i);
  	  existing = create_child (var, i, name);
  	  VEC_replace (varobj_p, var->children, i, existing);
@@ -24993,7 +25905,11 @@ index 4a94988..9bfc130 100644
  	}
      }
  
-@@ -1029,7 +1053,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
++  restrict_range (var->children, from, to);
+   return var->children;
+ }
+ 
+@@ -1029,7 +1136,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
  					VEC_length (varobj_p, var->children), 
  					name, value);
    VEC_safe_push (varobj_p, var->children, v);
@@ -25001,7 +25917,7 @@ index 4a94988..9bfc130 100644
    return v;
  }
  
-@@ -1168,6 +1191,112 @@ varobj_set_value (struct varobj *var, char *expression)
+@@ -1168,6 +1274,115 @@ varobj_set_value (struct varobj *var, char *expression)
    return 1;
  }
  
@@ -25019,6 +25935,9 @@ index 4a94988..9bfc130 100644
 +
 +  Py_XDECREF (var->pretty_printer);
 +  var->pretty_printer = visualizer;
++
++  Py_XDECREF (var->child_iter);
++  var->child_iter = NULL;
 +}
 +
 +/* Install the default visualizer for VAR.  */
@@ -25114,7 +26033,7 @@ index 4a94988..9bfc130 100644
  /* Assign a new value to a variable object.  If INITIAL is non-zero,
     this is the first assignement after the variable object was just
     created, or changed type.  In that case, just assign the value 
-@@ -1274,7 +1403,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1274,7 +1489,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
  	{
  	  changed = 1;
  	}
@@ -25123,7 +26042,7 @@ index 4a94988..9bfc130 100644
  	{
  	  /* Try to compare the values.  That requires that both
  	     values are non-lazy.  */
-@@ -1328,65 +1457,47 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1328,65 +1543,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      var->not_fetched = 0;
    var->updated = 0;
  
@@ -25136,7 +26055,13 @@ index 4a94988..9bfc130 100644
  
 -static void
 -install_visualizer (struct varobj *var, PyObject *visualizer)
--{
++/* Return the requested range for a varobj.  VAR is the varobj.  FROM
++   and TO are out parameters; *FROM and *TO will be set to the
++   selected sub-range of VAR.  If no range was selected using
++   -var-set-update-range, then both will be -1.  */
++void
++varobj_get_child_range (struct varobj *var, int *from, int *to)
+ {
 -#if HAVE_PYTHON
 -  /* If there are any children now, wipe them.  */
 -  varobj_delete (var, NULL, 1 /* children only */);
@@ -25156,19 +26081,17 @@ index 4a94988..9bfc130 100644
 -#else
 -  error (_("Python support required"));
 -#endif
--}
--
++  *from = var->from;
++  *to = var->to;
+ }
+ 
 -static void
 -install_default_visualizer (struct varobj *var)
-+/* Return the effective requested range for a varobj.  VAR is the
-+   varobj.  CHILDREN is the computed list of children.  FROM and TO
-+   are out parameters.  If VAR has no bounds selected, *FROM and *TO
-+   will be set to the full range of CHILDREN.  Otherwise, *FROM and
-+   *TO will be set to the selected sub-range of VAR, clipped to be in
-+   range of CHILDREN.  */
++/* Set the selected sub-range of children of VAR to start at index
++   FROM and end at index TO.  If either FROM or TO is less than zero,
++   this is interpreted as a request for all children.  */
 +void
-+varobj_get_child_range (struct varobj *var, VEC (varobj_p) *children,
-+			int *from, int *to)
++varobj_set_child_range (struct varobj *var, int from, int to)
  {
 -#if HAVE_PYTHON
 -  struct cleanup *cleanup;
@@ -25177,50 +26100,32 @@ index 4a94988..9bfc130 100644
 -  cleanup = varobj_ensure_python_env (var);
 -
 -  if (var->value)
-+  if (var->from < 0 || var->to < 0)
-     {
+-    {
 -      pretty_printer = gdbpy_get_varobj_pretty_printer (var->value);
 -      if (! pretty_printer)
 -	{
 -	  gdbpy_print_stack ();
 -	  error (_("Cannot instantiate printer for default visualizer"));
 -	}
-+      *from = 0;
-+      *to = VEC_length (varobj_p, children);
-     }
+-    }
 -      
 -  if (pretty_printer == Py_None)
-+  else
-     {
+-    {
 -      Py_DECREF (pretty_printer);
 -      pretty_printer = NULL;
-+      *from = var->from;
-+      if (*from > VEC_length (varobj_p, children))
-+	*from = VEC_length (varobj_p, children);
-+      *to = var->to;
-+      if (*to > VEC_length (varobj_p, children))
-+	*to = VEC_length (varobj_p, children);
-     }
+-    }
 -  
 -  install_visualizer (var, pretty_printer);
 -  do_cleanups (cleanup);
 -#else
 -  /* No error is right as this function is inserted just as a hook.  */
 -#endif
-+}
-+
-+/* Set the selected sub-range of children of VAR to start at index
-+   FROM and end at index TO.  If either FROM or TO is less than zero,
-+   this is interpreted as a request for all children.  */
-+void
-+varobj_set_child_range (struct varobj *var, int from, int to)
-+{
 +  var->from = from;
 +  var->to = to;
  }
  
  void 
-@@ -1404,31 +1515,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
+@@ -1404,31 +1586,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
    make_cleanup_py_decref (globals);
  
    constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
@@ -25233,9 +26138,9 @@ index 4a94988..9bfc130 100644
 -    }
 -  else
 -    pretty_printer = instantiate_pretty_printer (constructor, var->value);
- 
--  Py_XDECREF (constructor);
 -
+-  Py_XDECREF (constructor);
+ 
 -  if (! pretty_printer)
 +  if (! constructor)
      {
@@ -25258,7 +26163,57 @@ index 4a94988..9bfc130 100644
  
    do_cleanups (back_to);
  #else
-@@ -1864,6 +1963,9 @@ new_variable (void)
+@@ -1543,7 +1713,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+ 	 UI, so we need not bother getting it.  */
+       if (v->pretty_printer)
+ 	{
+-	  VEC (varobj_p) *changed = 0, *new_and_unchanged = 0;
++	  VEC (varobj_p) *changed = 0, *new = 0;
+ 	  int i, children_changed;
+ 	  varobj_p tmp;
+ 
+@@ -1555,28 +1725,28 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+ 
+ 	  /* If update_dynamic_varobj_children returns 0, then we have
+ 	     a non-conforming pretty-printer, so we skip it.  */
+-	  if (update_dynamic_varobj_children (v, &changed, &new_and_unchanged,
+-					      &children_changed))
++	  if (update_dynamic_varobj_children (v, &changed, &new,
++					      &children_changed, 1, v->to))
+ 	    {
+-	      if (children_changed)
+-		r.children_changed = 1;
+-	      for (i = 0; VEC_iterate (varobj_p, changed, i, tmp); ++i)
++	      if (children_changed || new)
+ 		{
+-		  varobj_update_result r = {tmp};
+-		  r.changed = 1;
+-		  r.value_installed = 1;
+-		  VEC_safe_push (varobj_update_result, stack, &r);
++		  r.children_changed = 1;
++		  r.new = new;
+ 		}
+-	      for (i = 0;
+-		   VEC_iterate (varobj_p, new_and_unchanged, i, tmp);
+-		   ++i)
++	      for (i = 0; VEC_iterate (varobj_p, changed, i, tmp); ++i)
+ 		{
+ 		  varobj_update_result r = {tmp};
++		  r.changed = 1;
+ 		  r.value_installed = 1;
+ 		  VEC_safe_push (varobj_update_result, stack, &r);
+ 		}
+ 	      if (r.changed || r.children_changed)
+ 		VEC_safe_push (varobj_update_result, result, &r);
++
++	      /* Free CHANGED, but not NEW, because NEW has been put
++		 into the result vector.  */
++	      VEC_free (varobj_p, changed);
++
+ 	      continue;
+ 	    }
+ 	}
+@@ -1864,7 +2034,12 @@ new_variable (void)
    var->frozen = 0;
    var->not_fetched = 0;
    var->children_requested = 0;
@@ -25266,9 +26221,24 @@ index 4a94988..9bfc130 100644
 +  var->to = -1;
 +  var->constructor = 0;
    var->pretty_printer = 0;
++  var->child_iter = 0;
++  var->saved_item = 0;
  
    return var;
-@@ -1927,6 +2029,18 @@ make_cleanup_free_variable (struct varobj *var)
+ }
+@@ -1894,7 +2069,10 @@ free_variable (struct varobj *var)
+   if (var->pretty_printer)
+     {
+       struct cleanup *cleanup = varobj_ensure_python_env (var);
+-      Py_DECREF (var->pretty_printer);
++      Py_XDECREF (var->constructor);
++      Py_XDECREF (var->pretty_printer);
++      Py_XDECREF (var->child_iter);
++      Py_XDECREF (var->saved_item);
+       do_cleanups (cleanup);
+     }
+ #endif
+@@ -1927,6 +2105,18 @@ make_cleanup_free_variable (struct varobj *var)
    return make_cleanup (do_free_variable_cleanup, var);
  }
  
@@ -25287,16 +26257,16 @@ index 4a94988..9bfc130 100644
  /* This returns the type of the variable. It also skips past typedefs
     to return the real type of the variable.
  
-@@ -2187,7 +2301,7 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
-   long dummy;
-   struct ui_file *stb;
-   struct cleanup *old_chain;
--  gdb_byte *thevalue = NULL;
-+  char *thevalue = NULL;
-   struct value_print_options opts;
-   int len = 0;
+@@ -2141,6 +2331,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
+       else
+ 	{
+ 	  tmp_var->obj_name = xstrdup (var->obj_name);
++	  tmp_var->from = var->from;
++	  tmp_var->to = var->to;
+ 	  varobj_delete (var, NULL, 0);
  
-@@ -3173,6 +3287,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+ 	  install_variable (tmp_var);
+@@ -3173,6 +3365,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
    return cplus_value_of_variable (var, format);
  }
  
@@ -25316,7 +26286,7 @@ index 4a94988..9bfc130 100644
  /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
     with an arbitrary caller supplied DATA pointer.  */
  
-@@ -3190,48 +3317,110 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+@@ -3190,48 +3395,110 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
        (*func) (var_root->rootvar, data);
      }
  }
@@ -25454,8 +26424,12 @@ index 4a94988..9bfc130 100644
  	  tmp_var->obj_name = xstrdup (var->obj_name);
  	  varobj_delete (var, NULL, 0);
  	  install_variable (tmp_var);
-@@ -3243,12 +3432,61 @@ varobj_invalidate_iter (struct varobj *var, void *unused)
-     var->root->is_valid = 0;
+@@ -3239,16 +3506,64 @@ varobj_invalidate_iter (struct varobj *var, void *unused)
+       else
+ 	var->root->is_valid = 0;
+     }
+-  else /* locals must be invalidated.  */
+-    var->root->is_valid = 0;
  }
  
 -/* Invalidate the varobjs that are tied to locals and re-create the ones that
@@ -25467,8 +26441,7 @@ index 4a94988..9bfc130 100644
 -varobj_invalidate (void)
 +static void 
 +varobj_invalidate (struct objfile *objfile)
- {
--  all_root_varobjs (varobj_invalidate_iter, NULL);
++{
 +  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
 +     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
 +     check_typedef.  */
@@ -25495,7 +26468,8 @@ index 4a94988..9bfc130 100644
 +
 +static void
 +varobj_revalidate_for_objfile (struct objfile *objfile)
-+{
+ {
+-  all_root_varobjs (varobj_invalidate_iter, NULL);
 +  varobj_revalidate ();
 +}
 +
@@ -25517,29 +26491,58 @@ index 4a94988..9bfc130 100644
 +			    show_varobjdebug,
 +			    &setlist, &showlist);
 +
++
 +  observer_attach_objfile_unloading (varobj_invalidate );
 +  observer_attach_objfile_unloaded (varobj_revalidate);
 +  observer_attach_new_objfile (varobj_revalidate_for_objfile);
 +  observer_attach_mark_used (varobj_types_mark_used);
  }
 diff --git a/gdb/varobj.h b/gdb/varobj.h
-index 7297243..aabd743 100644
+index 7297243..fbe2f2f 100644
 --- a/gdb/varobj.h
 +++ b/gdb/varobj.h
-@@ -112,6 +112,12 @@ extern void varobj_set_frozen (struct varobj *var, int frozen);
+@@ -78,6 +78,12 @@ typedef struct varobj_update_result_t
+      new value of varobj is already computed and installed, or has to
+      be yet installed.  Don't use this outside varobj.c */
+   int value_installed;  
++
++  /* This will be non-NULL when new children were added to the varobj.
++     It lists the new children (which must necessarily come at the end
++     of the child list) added during an update.  The caller is
++     responsible for freeing this vector.  */
++  VEC (varobj_p) *new;
+ } varobj_update_result;
+ 
+ DEF_VEC_O (varobj_update_result);
+@@ -112,13 +118,24 @@ extern void varobj_set_frozen (struct varobj *var, int frozen);
  
  extern int varobj_get_frozen (struct varobj *var);
  
-+extern void varobj_get_child_range (struct varobj *var,
-+				    VEC (varobj_p) *children,
-+				    int *from, int *to);
++extern void varobj_get_child_range (struct varobj *var, int *from, int *to);
 +
 +extern void varobj_set_child_range (struct varobj *var, int from, int to);
 +
  extern char *varobj_get_display_hint (struct varobj *var);
  
  extern int varobj_get_num_children (struct varobj *var);
-@@ -143,12 +149,13 @@ extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
+ 
+-/* Return the list of children of VAR.  The returned vector
+-   should not be modified in any way.  */
+-extern VEC (varobj_p)* varobj_list_children (struct varobj *var);
++/* Return the list of children of VAR.  The returned vector should not
++   be modified in any way.  FROM and TO are in/out parameters
++   indicating the range of children to return.  If either *FROM or *TO
++   is less than zero on entry, then all children will be returned.  On
++   return, *FROM and *TO will be updated to indicate the real range
++   that was returned.  The resulting VEC will contain at least the
++   children from *FROM to just before *TO; it might contain more
++   children, depending on whether any more were available.  */
++extern VEC (varobj_p)* varobj_list_children (struct varobj *var,
++					     int *from, int *to);
+ 
+ extern char *varobj_get_type (struct varobj *var);
+ 
+@@ -143,12 +160,15 @@ extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
  extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
  						 int explicit);
  
@@ -25554,6 +26557,8 @@ index 7297243..aabd743 100644
 +varobj_set_visualizer (struct varobj *var, const char *visualizer);
 +
 +extern void varobj_enable_pretty_printing (void);
++
++extern int varobj_has_more (struct varobj *var, int to);
  
  #endif /* VAROBJ_H */
 diff --git a/gdb/xcoffread.c b/gdb/xcoffread.c
@@ -25568,3 +26573,68 @@ index c56ab86..dacf913 100644
    xcoff_symfile_finish,		/* sym_finish: finished with file, cleanup */
    xcoff_symfile_offsets,	/* sym_offsets: xlate offsets ext->int form */
    default_symfile_segments,	/* sym_segments: Get segment information from
+diff --git a/include/coff/go32exe.h b/include/coff/go32exe.h
+index c85da0c..2248ff2 100644
+--- a/include/coff/go32exe.h
++++ b/include/coff/go32exe.h
+@@ -16,11 +16,9 @@
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
+ 
+-#define STUBSIZE 2048
+-
+ struct external_filehdr_go32_exe
+   {
+-    char stub[STUBSIZE];/* the stub to load the image	*/
++    char stub[GO32_STUBSIZE]; /* the stub to load the image */
+ 			/* the standard COFF header     */
+     char f_magic[2];	/* magic number			*/
+     char f_nscns[2];	/* number of sections		*/
+@@ -34,4 +32,4 @@ struct external_filehdr_go32_exe
+ #undef FILHDR
+ #define	FILHDR	struct external_filehdr_go32_exe
+ #undef FILHSZ
+-#define	FILHSZ	STUBSIZE+20
++#define	FILHSZ	GO32_STUBSIZE+20
+diff --git a/include/coff/internal.h b/include/coff/internal.h
+index c5d6cd1..36d03eb 100644
+--- a/include/coff/internal.h
++++ b/include/coff/internal.h
+@@ -58,10 +58,19 @@ struct internal_extra_pe_filehdr
+   bfd_vma  nt_signature;   	/* required NT signature, 0x4550 */ 
+ };
+ 
++#define GO32_STUBSIZE 2048
++
+ struct internal_filehdr
+ {
+   struct internal_extra_pe_filehdr pe;
+ 
++  /* coff-stgo32 EXE stub header before BFD tdata has been allocated.
++     Its data is kept in INTERNAL_FILEHDR.GO32STUB afterwards.
++     
++     F_GO32STUB is set iff go32stub contains a valid data.  Artifical headers
++     created in BFD have no pre-set go32stub.  */
++  char go32stub[GO32_STUBSIZE];
++
+   /* Standard coff internal info.  */
+   unsigned short f_magic;	/* magic number			*/
+   unsigned short f_nscns;	/* number of sections		*/
+@@ -84,7 +93,8 @@ struct internal_filehdr
+  	F_AR32W		file is 32-bit big-endian
+  	F_DYNLOAD	rs/6000 aix: dynamically loadable w/imports & exports
+  	F_SHROBJ	rs/6000 aix: file is a shared object
+-        F_DLL           PE format DLL.  */
++	F_DLL           PE format DLL
++	F_GO32STUB      Field go32stub contains valid data.  */
+ 
+ #define	F_RELFLG	(0x0001)
+ #define	F_EXEC		(0x0002)
+@@ -96,6 +106,7 @@ struct internal_filehdr
+ #define	F_DYNLOAD	(0x1000)
+ #define	F_SHROBJ	(0x2000)
+ #define F_DLL           (0x2000)
++#define F_GO32STUB      (0x4000)
+ 
+ /* Extra structure which is used in the optional header.  */
+ typedef struct _IMAGE_DATA_DIRECTORY 
