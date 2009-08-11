@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 93f5e942bdcdcc376ece452c309bedabae71def9
+commit 2888fafe63889757c6fd27ccc2f25661d43fd1a4
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -3214,26 +3214,10 @@ index b1c0452..da24b98 100644
  
  @node Language Support
 diff --git a/gdb/doc/observer.texi b/gdb/doc/observer.texi
-index 4984f31..4bbbe4e 100644
+index 4984f31..fcf1b5d 100644
 --- a/gdb/doc/observer.texi
 +++ b/gdb/doc/observer.texi
-@@ -130,6 +130,15 @@ Called with @var{objfile} equal to @code{NULL} to indicate
- previously loaded symbol table data has now been invalidated.
- @end deftypefun
- 
-+@deftypefun void objfile_unloading (struct objfile *@var{objfile})
-+The file specified by @var{objfile} is going to be removed from @value{GDBN}.
-+@end deftypefun
-+
-+@deftypefun void objfile_unloaded (void)
-+Removal of @var{objfile} started by @code{objfile_unloading} finished and
-+@var{objfile} is no longer known to @value{GDBN}.
-+@end deftypefun
-+
- @deftypefun void new_thread (struct thread_info *@var{t})
- The thread specified by @var{t} has been created.
- @end deftypefun
-@@ -206,6 +215,11 @@ Either @value{GDBN} detached from the inferior, or the inferior
+@@ -206,6 +206,11 @@ Either @value{GDBN} detached from the inferior, or the inferior
  exited.  The argument @var{pid} identifies the inferior.
  @end deftypefun
  
@@ -10513,23 +10497,17 @@ index a84003f..924c1c5 100644
    default_symfile_offsets,	/* sym_offsets: dummy FIXME til implem sym reloc */
    default_symfile_segments,	/* sym_segments: Get segment information from
 diff --git a/gdb/objfiles.c b/gdb/objfiles.c
-index 586f5d0..a4bf719 100644
+index 586f5d0..6d0451c 100644
 --- a/gdb/objfiles.c
 +++ b/gdb/objfiles.c
-@@ -432,10 +432,9 @@ free_objfile (struct objfile *objfile)
- 	 doesn't reference it.  */
-       objfile->separate_debug_objfile_backlink->separate_debug_objfile = NULL;
-     }
--  
--  /* Remove any references to this objfile in the global value
--     lists.  */
--  preserve_values (objfile);
-+
-+  /* Remove any references to this objfile in the global value lists.  */
-+  observer_notify_objfile_unloading (objfile);
+@@ -50,7 +50,6 @@
+ #include "addrmap.h"
+ #include "arch-utils.h"
+ #include "exec.h"
+-#include "observer.h"
  
-   /* First do any symbol file specific actions required when we are
-      finished with a particular symbol file.  Note that if the objfile
+ /* Prototypes for local functions */
+ 
 @@ -458,12 +457,14 @@ free_objfile (struct objfile *objfile)
  
    unlink_objfile (objfile);
@@ -10842,7 +10820,7 @@ index cbda9c3..a07e6f2 100644
 +
  #endif /* PARSER_DEFS_H */
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
-index 5d8b936..49c575d 100644
+index 5d8b936..fb0a455 100644
 --- a/gdb/printcmd.c
 +++ b/gdb/printcmd.c
 @@ -46,7 +46,6 @@
@@ -10939,13 +10917,11 @@ index 5d8b936..49c575d 100644
  /* display_chain items point to blocks and expressions.  Some expressions in
     turn may point to symbols.
     Both symbols and blocks are obstack_alloc'd on objfile_stack, and are
-@@ -1851,20 +1827,18 @@ display_uses_solib_p (const struct display *d,
-    an item by re-parsing .exp_string field in the new execution context.  */
- 
+@@ -1853,18 +1829,20 @@ display_uses_solib_p (const struct display *d,
  static void
--clear_dangling_display_expressions (struct so_list *solib)
-+clear_dangling_display_expressions (struct objfile *objfile)
+ clear_dangling_display_expressions (struct so_list *solib)
  {
++  struct objfile *objfile = solib->objfile;
    struct display *d;
 -  struct objfile *objfile = NULL;
  
@@ -10958,6 +10934,9 @@ index 5d8b936..49c575d 100644
 -	  d->block = NULL;
 -	}
 -    }
++  if (objfile == NULL)
++    return;
++
 +  for (d = display_chain; d != NULL; d = d->next)
 +    if (block_objfile (d->block) == objfile
 +	|| (d->exp && exp_uses_objfile (d->exp, objfile)))
@@ -10969,16 +10948,7 @@ index 5d8b936..49c575d 100644
  }
  
  
-@@ -2593,7 +2567,7 @@ _initialize_printcmd (void)
- 
-   current_display_number = -1;
- 
--  observer_attach_solib_unloaded (clear_dangling_display_expressions);
-+  observer_attach_objfile_unloading (clear_dangling_display_expressions);
- 
-   add_info ("address", address_info,
- 	    _("Describe where symbol SYM is stored."));
-@@ -2749,4 +2723,6 @@ Show printing of source filename and line number with <symbol>."), NULL,
+@@ -2749,4 +2727,6 @@ Show printing of source filename and line number with <symbol>."), NULL,
  			   NULL,
  			   show_print_symbol_filename,
  			   &setprintlist, &showprintlist);
@@ -17497,26 +17467,13 @@ index 1c37801..594eb16 100644
  	  print_variable_and_value (NULL, sym, frame, stream, 4 * num_tabs);
  	  break;
 diff --git a/gdb/symfile.c b/gdb/symfile.c
-index c182faa..8b971fb 100644
+index c182faa..550d06a 100644
 --- a/gdb/symfile.c
 +++ b/gdb/symfile.c
-@@ -52,7 +52,6 @@
- #include "observer.h"
- #include "exec.h"
- #include "parser-defs.h"
--#include "varobj.h"
- #include "elf-bfd.h"
- #include "solib.h"
- #include "remote.h"
-@@ -926,6 +925,20 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
- 
-   /* We're done reading the symbol file; finish off complaints.  */
+@@ -928,6 +928,17 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
    clear_complaints (&symfile_complaints, 0, add_flags & SYMFILE_VERBOSE);
-+
-+  /* We have finished unloading of OBJFILE.  */
-+  observer_notify_objfile_unloaded ();
-+}
-+
+ }
+ 
 +/* A helper function which returns true if OBJFILE has any debug
 +   symbols, and false otherwise.  */
 +static int
@@ -17526,10 +17483,12 @@ index c182faa..8b971fb 100644
 +	  || (objfile->separate_debug_objfile
 +	      && (objfile->separate_debug_objfile->psymtabs
 +		  || objfile->separate_debug_objfile->quick_addrmap)));
- }
- 
++}
++
  /* Process a symbol file, as either the main file or as a dynamically
-@@ -965,13 +978,16 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+    loaded file.
+ 
+@@ -965,13 +976,16 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
    /* Give user a chance to burp if we'd be
       interactively wiping out any existing symbols.  */
  
@@ -17548,7 +17507,7 @@ index c182faa..8b971fb 100644
    discard_cleanups (my_cleanups);
  
    if (addrs)
-@@ -1007,6 +1023,8 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+@@ -1007,6 +1021,8 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
  
    if ((flags & OBJF_READNOW) || readnow_symbol_files)
      {
@@ -17557,7 +17516,7 @@ index c182faa..8b971fb 100644
        if ((from_tty || info_verbose) && print_symbol_loading)
  	{
  	  printf_unfiltered (_("expanding to full symbols..."));
-@@ -1025,7 +1043,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+@@ -1025,7 +1041,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
    /* If the file has its own symbol tables it has no separate debug info.
       `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to SYMTABS/PSYMTABS.
       `.gnu_debuglink' may no longer be present with `.note.gnu.build-id'.  */
@@ -17566,7 +17525,7 @@ index c182faa..8b971fb 100644
      debugfile = find_separate_debug_file (objfile);
    if (debugfile)
      {
-@@ -1049,8 +1067,11 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+@@ -1049,8 +1065,11 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
        xfree (debugfile);
      }
  
@@ -17580,7 +17539,7 @@ index c182faa..8b971fb 100644
      {
        wrap_here ("");
        printf_unfiltered (_("(no debugging symbols found)"));
-@@ -1166,7 +1187,9 @@ symbol_file_clear (int from_tty)
+@@ -1166,7 +1185,9 @@ symbol_file_clear (int from_tty)
       descriptors as well.  */
    no_shared_libraries (NULL, from_tty);
  
@@ -17591,16 +17550,7 @@ index c182faa..8b971fb 100644
    if (from_tty)
      printf_unfiltered (_("No symbol file now.\n"));
  }
-@@ -2349,7 +2372,7 @@ reread_symbols (void)
- 
- 	      /* Remove any references to this objfile in the global
- 		 value lists.  */
--	      preserve_values (objfile);
-+	      observer_notify_objfile_unloading (objfile);
- 
- 	      /* Nuke all the state that we will re-read.  Much of the following
- 	         code which sets things to NULL really is necessary to tell
-@@ -2437,13 +2460,15 @@ reread_symbols (void)
+@@ -2437,13 +2458,15 @@ reread_symbols (void)
  	         zero is OK since dbxread.c also does what it needs to do if
  	         objfile->global_psymbols.size is 0.  */
  	      (*objfile->sf->sym_read) (objfile, 0);
@@ -17617,17 +17567,7 @@ index c182faa..8b971fb 100644
  	      /* We're done reading the symbol file; finish off complaints.  */
  	      clear_complaints (&symfile_complaints, 0, 1);
  
-@@ -2452,6 +2477,9 @@ reread_symbols (void)
- 
- 	      reinit_frame_cache ();
- 
-+	      /* We have finished reloading of OBJFILE.  */
-+	      observer_notify_objfile_unloaded ();
-+
- 	      /* Discard cleanups as symbol reading was successful.  */
- 	      discard_cleanups (old_cleanups);
- 
-@@ -2741,7 +2769,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
+@@ -2741,7 +2764,7 @@ allocate_symtab (char *filename, struct objfile *objfile)
  }
  
  struct partial_symtab *
@@ -17636,18 +17576,7 @@ index c182faa..8b971fb 100644
  {
    struct partial_symtab *psymtab;
  
-@@ -2832,10 +2860,6 @@ clear_symtab_users (void)
-      between expressions and which ought to be reset each time.  */
-   expression_context_block = NULL;
-   innermost_block = NULL;
--
--  /* Varobj may refer to old symbols, perform a cleanup.  */
--  varobj_invalidate ();
--
- }
- 
- static void
-@@ -3055,7 +3079,8 @@ again2:
+@@ -3055,7 +3078,8 @@ again2:
  
  struct partial_symtab *
  start_psymtab_common (struct objfile *objfile,
@@ -25201,7 +25130,7 @@ index cbb5d94..cf35bf0 100644
  	  ++reps;
  	  ++rep1;
 diff --git a/gdb/value.c b/gdb/value.c
-index 65a5aa9..c943781 100644
+index 65a5aa9..fa39d3d 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -37,8 +37,10 @@
@@ -25467,15 +25396,6 @@ index 65a5aa9..c943781 100644
        break;
  
      case INTERNALVAR_VALUE:
-@@ -1469,7 +1551,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
-    this objfile's types, and the convenience variables will be adjusted to
-    use the new global types.  */
- 
--void
-+static void
- preserve_values (struct objfile *objfile)
- {
-   htab_t copied_types;
 @@ -1490,8 +1572,7 @@ preserve_values (struct objfile *objfile)
    for (var = internalvars; var; var = var->next)
      preserve_one_internalvar (var, objfile, copied_types);
@@ -25567,18 +25487,17 @@ index 65a5aa9..c943781 100644
  /* Create a value representing a pointer of type TYPE to the address
     ADDR.  */
  struct value *
-@@ -2342,4 +2476,9 @@ VARIABLE is already initialized."));
+@@ -2342,4 +2476,8 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);
 +
 +  make_final_cleanup (value_history_cleanup, NULL);
 +
-+  observer_attach_objfile_unloading (preserve_values);
 +  observer_attach_mark_used (value_types_mark_used);
  }
 diff --git a/gdb/value.h b/gdb/value.h
-index 29ad783..ee8440b 100644
+index 29ad783..c357d80 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -344,11 +344,16 @@ extern LONGEST unpack_field_as_long (struct type *type,
@@ -25606,13 +25525,7 @@ index 29ad783..ee8440b 100644
  					  int want_address,
  					  enum noside noside);
  
-@@ -658,12 +664,12 @@ extern void typedef_print (struct type *type, struct symbol *news,
- 
- extern char *internalvar_name (struct internalvar *var);
- 
--extern void preserve_values (struct objfile *);
--
- /* From values.c */
+@@ -664,6 +670,8 @@ extern void preserve_values (struct objfile *);
  
  extern struct value *value_copy (struct value *);
  
@@ -25621,7 +25534,7 @@ index 29ad783..ee8440b 100644
  /* From valops.c */
  
  extern struct value *varying_to_slice (struct value *);
-@@ -681,7 +687,7 @@ extern struct value *value_allocate_space_in_inferior (int);
+@@ -681,7 +689,7 @@ extern struct value *value_allocate_space_in_inferior (int);
  extern struct value *value_of_local (const char *name, int complain);
  
  extern struct value *value_subscripted_rvalue (struct value *array,
@@ -25631,10 +25544,10 @@ index 29ad783..ee8440b 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index 4a94988..34333fb 100644
+index 4a94988..f2654f0 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
-@@ -26,14 +26,18 @@
+@@ -26,9 +26,12 @@
  #include "gdbcmd.h"
  #include "block.h"
  #include "valprint.h"
@@ -25647,13 +25560,7 @@ index 4a94988..34333fb 100644
  
  #include "varobj.h"
  #include "vec.h"
- #include "gdbthread.h"
- #include "inferior.h"
-+#include "observer.h"
- 
- #if HAVE_PYTHON
- #include "python/python.h"
-@@ -59,6 +63,15 @@ char *varobj_format_string[] =
+@@ -59,6 +62,15 @@ char *varobj_format_string[] =
  /* String representations of gdb's known languages */
  char *varobj_language_string[] = { "unknown", "C", "C++", "Java" };
  
@@ -25669,7 +25576,7 @@ index 4a94988..34333fb 100644
  /* Data structures */
  
  /* Every root variable has one of these structures saved in its
-@@ -173,9 +186,31 @@ struct varobj
+@@ -173,9 +185,31 @@ struct varobj
       frozen.  */
    int not_fetched;
  
@@ -25701,7 +25608,7 @@ index 4a94988..34333fb 100644
  };
  
  struct cpstack
-@@ -221,6 +256,8 @@ static void free_variable (struct varobj *var);
+@@ -221,6 +255,8 @@ static void free_variable (struct varobj *var);
  
  static struct cleanup *make_cleanup_free_variable (struct varobj *var);
  
@@ -25710,7 +25617,7 @@ index 4a94988..34333fb 100644
  static struct type *get_type (struct varobj *var);
  
  static struct type *get_value_type (struct varobj *var);
-@@ -236,8 +273,6 @@ static char *cppop (struct cpstack **pstack);
+@@ -236,8 +272,6 @@ static char *cppop (struct cpstack **pstack);
  static int install_new_value (struct varobj *var, struct value *value, 
  			      int initial);
  
@@ -25719,7 +25626,7 @@ index 4a94988..34333fb 100644
  /* Language-specific routines. */
  
  static enum varobj_languages variable_language (struct varobj *var);
-@@ -450,6 +485,8 @@ is_root_p (struct varobj *var)
+@@ -450,6 +484,8 @@ is_root_p (struct varobj *var)
  struct cleanup *
  varobj_ensure_python_env (struct varobj *var)
  {
@@ -25728,7 +25635,7 @@ index 4a94988..34333fb 100644
    return ensure_python_env (var->root->exp->gdbarch,
  			    var->root->exp->language_defn);
  }
-@@ -614,9 +651,9 @@ varobj_create (char *objname,
+@@ -614,9 +650,9 @@ varobj_create (char *objname,
  	  do_cleanups (old_chain);
  	  return NULL;
  	}
@@ -25739,7 +25646,7 @@ index 4a94988..34333fb 100644
    discard_cleanups (old_chain);
    return var;
  }
-@@ -731,15 +768,8 @@ instantiate_pretty_printer (PyObject *constructor, struct value *value)
+@@ -731,15 +767,8 @@ instantiate_pretty_printer (PyObject *constructor, struct value *value)
  #if HAVE_PYTHON
    PyObject *val_obj = NULL; 
    PyObject *printer;
@@ -25755,7 +25662,7 @@ index 4a94988..34333fb 100644
    if (! val_obj)
      return NULL;
  
-@@ -792,7 +822,12 @@ varobj_get_display_hint (struct varobj *var)
+@@ -792,7 +821,12 @@ varobj_get_display_hint (struct varobj *var)
    char *result = NULL;
  
  #if HAVE_PYTHON
@@ -25769,7 +25676,7 @@ index 4a94988..34333fb 100644
  
    if (var->pretty_printer)
      result = gdbpy_get_display_hint (var->pretty_printer);
-@@ -803,6 +838,17 @@ varobj_get_display_hint (struct varobj *var)
+@@ -803,6 +837,17 @@ varobj_get_display_hint (struct varobj *var)
    return result;
  }
  
@@ -25787,7 +25694,7 @@ index 4a94988..34333fb 100644
  /* If the variable object is bound to a specific thread, that
     is its evaluation can always be done in context of a frame
     inside that thread, returns GDB id of the thread -- which
-@@ -835,22 +881,73 @@ varobj_get_frozen (struct varobj *var)
+@@ -835,22 +880,73 @@ varobj_get_frozen (struct varobj *var)
    return var->frozen;
  }
  
@@ -25869,7 +25776,7 @@ index 4a94988..34333fb 100644
    PyObject *printer = var->pretty_printer;
  
    back_to = varobj_ensure_python_env (var);
-@@ -862,96 +959,103 @@ update_dynamic_varobj_children (struct varobj *var,
+@@ -862,96 +958,103 @@ update_dynamic_varobj_children (struct varobj *var,
        return 0;
      }
  
@@ -25884,26 +25791,26 @@ index 4a94988..34333fb 100644
 -    }
 +      children = PyObject_CallMethodObjArgs (printer, gdbpy_children_cst,
 +					     NULL);
- 
--  make_cleanup_py_decref (children);
++
 +      if (!children)
 +	{
 +	  gdbpy_print_stack ();
 +	  error (_("Null value returned for children"));
 +	}
  
+-  make_cleanup_py_decref (children);
++      make_cleanup_py_decref (children);
+ 
 -  if (!PyIter_Check (children))
 -    error (_("Returned value is not iterable"));
-+      make_cleanup_py_decref (children);
++      if (!PyIter_Check (children))
++	error (_("Returned value is not iterable"));
  
 -  iterator = PyObject_GetIter (children);
 -  if (!iterator)
 -    {
 -      gdbpy_print_stack ();
 -      error (_("Could not get children iterator"));
-+      if (!PyIter_Check (children))
-+	error (_("Returned value is not iterable"));
-+
 +      Py_XDECREF (var->child_iter);
 +      var->child_iter = PyObject_GetIter (children);
 +      if (!var->child_iter)
@@ -26037,7 +25944,7 @@ index 4a94988..34333fb 100644
    return 1;
  #else
    gdb_assert (0 && "should never be called if Python is not enabled");
-@@ -964,8 +1068,7 @@ varobj_get_num_children (struct varobj *var)
+@@ -964,8 +1067,7 @@ varobj_get_num_children (struct varobj *var)
    if (var->num_children == -1)
      {
        int changed;
@@ -26047,7 +25954,7 @@ index 4a94988..34333fb 100644
  	var->num_children = number_of_children (var);
      }
  
-@@ -976,7 +1079,7 @@ varobj_get_num_children (struct varobj *var)
+@@ -976,7 +1078,7 @@ varobj_get_num_children (struct varobj *var)
     the return code is the number of such children or -1 on error */
  
  VEC (varobj_p)*
@@ -26056,7 +25963,7 @@ index 4a94988..34333fb 100644
  {
    struct varobj *child;
    char *name;
-@@ -988,8 +1091,12 @@ varobj_list_children (struct varobj *var)
+@@ -988,8 +1090,12 @@ varobj_list_children (struct varobj *var)
        /* This, in theory, can result in the number of children changing without
  	 frontend noticing.  But well, calling -var-list-children on the same
  	 varobj twice is not something a sane frontend would do.  */
@@ -26071,7 +25978,7 @@ index 4a94988..34333fb 100644
  
    if (var->num_children == -1)
      var->num_children = number_of_children (var);
-@@ -1015,10 +1122,10 @@ varobj_list_children (struct varobj *var)
+@@ -1015,10 +1121,10 @@ varobj_list_children (struct varobj *var)
  	  name = name_of_child (var, i);
  	  existing = create_child (var, i, name);
  	  VEC_replace (varobj_p, var->children, i, existing);
@@ -26083,7 +25990,7 @@ index 4a94988..34333fb 100644
    return var->children;
  }
  
-@@ -1029,7 +1136,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
+@@ -1029,7 +1135,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
  					VEC_length (varobj_p, var->children), 
  					name, value);
    VEC_safe_push (varobj_p, var->children, v);
@@ -26091,7 +25998,7 @@ index 4a94988..34333fb 100644
    return v;
  }
  
-@@ -1168,6 +1274,115 @@ varobj_set_value (struct varobj *var, char *expression)
+@@ -1168,6 +1273,115 @@ varobj_set_value (struct varobj *var, char *expression)
    return 1;
  }
  
@@ -26207,7 +26114,7 @@ index 4a94988..34333fb 100644
  /* Assign a new value to a variable object.  If INITIAL is non-zero,
     this is the first assignement after the variable object was just
     created, or changed type.  In that case, just assign the value 
-@@ -1274,7 +1489,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1274,7 +1488,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
  	{
  	  changed = 1;
  	}
@@ -26216,7 +26123,7 @@ index 4a94988..34333fb 100644
  	{
  	  /* Try to compare the values.  That requires that both
  	     values are non-lazy.  */
-@@ -1328,65 +1543,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1328,65 +1542,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      var->not_fetched = 0;
    var->updated = 0;
  
@@ -26299,7 +26206,7 @@ index 4a94988..34333fb 100644
  }
  
  void 
-@@ -1404,31 +1586,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
+@@ -1404,31 +1585,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
    make_cleanup_py_decref (globals);
  
    constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
@@ -26312,9 +26219,9 @@ index 4a94988..34333fb 100644
 -    }
 -  else
 -    pretty_printer = instantiate_pretty_printer (constructor, var->value);
--
--  Py_XDECREF (constructor);
  
+-  Py_XDECREF (constructor);
+-
 -  if (! pretty_printer)
 +  if (! constructor)
      {
@@ -26337,7 +26244,7 @@ index 4a94988..34333fb 100644
  
    do_cleanups (back_to);
  #else
-@@ -1543,7 +1713,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+@@ -1543,7 +1712,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
  	 UI, so we need not bother getting it.  */
        if (v->pretty_printer)
  	{
@@ -26346,7 +26253,7 @@ index 4a94988..34333fb 100644
  	  int i, children_changed;
  	  varobj_p tmp;
  
-@@ -1555,28 +1725,28 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+@@ -1555,28 +1724,28 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
  
  	  /* If update_dynamic_varobj_children returns 0, then we have
  	     a non-conforming pretty-printer, so we skip it.  */
@@ -26387,7 +26294,7 @@ index 4a94988..34333fb 100644
  	      continue;
  	    }
  	}
-@@ -1864,7 +2034,12 @@ new_variable (void)
+@@ -1864,7 +2033,12 @@ new_variable (void)
    var->frozen = 0;
    var->not_fetched = 0;
    var->children_requested = 0;
@@ -26400,7 +26307,7 @@ index 4a94988..34333fb 100644
  
    return var;
  }
-@@ -1894,7 +2069,10 @@ free_variable (struct varobj *var)
+@@ -1894,7 +2068,10 @@ free_variable (struct varobj *var)
    if (var->pretty_printer)
      {
        struct cleanup *cleanup = varobj_ensure_python_env (var);
@@ -26412,7 +26319,7 @@ index 4a94988..34333fb 100644
        do_cleanups (cleanup);
      }
  #endif
-@@ -1927,6 +2105,18 @@ make_cleanup_free_variable (struct varobj *var)
+@@ -1927,6 +2104,18 @@ make_cleanup_free_variable (struct varobj *var)
    return make_cleanup (do_free_variable_cleanup, var);
  }
  
@@ -26431,7 +26338,7 @@ index 4a94988..34333fb 100644
  /* This returns the type of the variable. It also skips past typedefs
     to return the real type of the variable.
  
-@@ -2141,6 +2331,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
+@@ -2141,6 +2330,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
        else
  	{
  	  tmp_var->obj_name = xstrdup (var->obj_name);
@@ -26440,7 +26347,7 @@ index 4a94988..34333fb 100644
  	  varobj_delete (var, NULL, 0);
  
  	  install_variable (tmp_var);
-@@ -3173,6 +3365,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+@@ -3173,6 +3364,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
    return cplus_value_of_variable (var, format);
  }
  
@@ -26460,41 +26367,26 @@ index 4a94988..34333fb 100644
  /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
     with an arbitrary caller supplied DATA pointer.  */
  
-@@ -3190,48 +3395,110 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+@@ -3190,6 +3394,43 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
        (*func) (var_root->rootvar, data);
      }
  }
--
--extern void _initialize_varobj (void);
--void
--_initialize_varobj (void)
 +
 +/* Helper for varobj_types_mark_used.  Call type_mark_used for any TYPEs
 +   referenced from this VAR.  */
 +
 +static void
 +varobj_types_mark_used_iter (struct varobj *var, void *unused)
- {
--  int sizeof_table = sizeof (struct vlist *) * VAROBJ_TABLE_SIZE;
++{
 +  /* Even FLOATING or IS_INVALID VARs with non-NULL TYPE references will
 +     free them in free_variable.  Still EXP may also reference TYPEs
 +     but these belong to SYMBOLs which should be always associated with
 +     an OBJFILE (and therefore not useful to be type_mark_used).  */
- 
--  varobj_table = xmalloc (sizeof_table);
--  memset (varobj_table, 0, sizeof_table);
++
 +  type_mark_used (var->type);
 +  if (var->value)
 +    type_mark_used (value_type (var->value));
- 
--  add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
--			    &varobjdebug, _("\
--Set varobj debugging."), _("\
--Show varobj debugging."), _("\
--When non-zero, varobj debugging is enabled."),
--			    NULL,
--			    show_varobjdebug,
--			    &setlist, &showlist);
++
 +  /* Check VAROBJROOTs only once during the varobj_types_mark_used pass.  */
 +
 +  if (var->root->rootvar == var)
@@ -26502,20 +26394,13 @@ index 4a94988..34333fb 100644
 +      if (var->root->exp)
 +	exp_types_mark_used (var->root->exp);
 +    }
- }
- 
--/* Invalidate varobj VAR if it is tied to locals and re-create it if it is
--   defined on globals.  It is a helper for varobj_invalidate.  */
++}
++
 +/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
- 
- static void
--varobj_invalidate_iter (struct varobj *var, void *unused)
++
++static void
 +varobj_types_mark_used (void)
- {
--  /* Floating varobjs are reparsed on each stop, so we don't care if the
--     presently parsed expression refers to something that's gone.  */
--  if (var->root->floating)
--    return;
++{
 +  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
 +     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
 +     check_typedef.  Such types references will not be interconnected into the
@@ -26523,156 +26408,11 @@ index 4a94988..34333fb 100644
 +
 +  all_varobjs (varobj_types_mark_used_iter, NULL);
 +}
-+
-+/* Invalidate VAR if it is tied to the specified OBJFILE.  Call this function
-+   before you start removing OBJFILE.
-+
-+   Call varobj_revalidate_iter after the OBJFILE update get finished.
-+
-+   Invalidated varobjs will be always printed in_scope="invalid".  */
-+
-+static void
-+varobj_invalidate_iter (struct varobj *var, void *objfile_voidp)
-+{
-+  struct objfile *objfile = objfile_voidp;
-+
-+  /* Check VAROBJROOTs only once during the varobj_invalidate pass.  */
-+
-+  if (var->root->rootvar == var)
-+    {
-+      /* Check even FLOATING VAROBJROOTs as their data will be still checked
-+	 during varobj_update by varobj_get_type.  */
-+
-+      if (var->root->is_valid
-+	  && block_objfile (var->root->valid_block) == objfile)
-+	var->root->is_valid = 0;
-+
-+      if (var->root->exp && exp_uses_objfile (var->root->exp, objfile))
-+	{
-+	  var->root->is_valid = 0;
-+
-+	  /* No one touches EXP for !IS_VALID varobj.  */
-+	  xfree (var->root->exp);
-+	  var->root->exp = NULL;
-+	}
-+    }
-+
-+  if (var->type && TYPE_OBJFILE (var->type) == objfile)
-+    {
-+      var->root->is_valid = 0;
-+
-+      var->type = NULL;
-+    }
-+
-+  if (var->value && TYPE_OBJFILE (value_type (var->value)) == objfile)
-+    {
-+      var->root->is_valid = 0;
-+
-+      value_free (var->value);
-+      var->value = NULL;
-+    }
-+}
-+
-+/* Recreate any global varobjs possibly previously invalidated.  If the
-+   expressions are no longer evaluatable set/keep the VAR invalid.  */
-+
-+static void
-+varobj_revalidate_iter (struct varobj *var, void *unused)
-+{
-+  /* Global VAR must be re-evaluated.  */
- 
--  /* global var must be re-evaluated.  */     
-   if (var->root->valid_block == NULL)
-     {
-       struct varobj *tmp_var;
- 
-       /* Try to create a varobj with same expression.  If we succeed
- 	 replace the old varobj, otherwise invalidate it.  */
--      tmp_var = varobj_create (NULL, var->name, (CORE_ADDR) 0,
--			       USE_CURRENT_FRAME);
--      if (tmp_var != NULL) 
--	{ 
-+      tmp_var = varobj_create (NULL, var->name, 0, USE_CURRENT_FRAME);
-+      if (tmp_var != NULL)
-+	{
- 	  tmp_var->obj_name = xstrdup (var->obj_name);
- 	  varobj_delete (var, NULL, 0);
- 	  install_variable (tmp_var);
-@@ -3239,16 +3506,64 @@ varobj_invalidate_iter (struct varobj *var, void *unused)
-       else
- 	var->root->is_valid = 0;
-     }
--  else /* locals must be invalidated.  */
--    var->root->is_valid = 0;
- }
- 
--/* Invalidate the varobjs that are tied to locals and re-create the ones that
--   are defined on globals.
--   Invalidated varobjs will be always printed in_scope="invalid".  */
-+/* Call varobj_invalidate_iter for all the VAROBJs.  */
- 
--void 
--varobj_invalidate (void)
-+static void 
-+varobj_invalidate (struct objfile *objfile)
-+{
-+  /* Check all the VAROBJs, even non-root ones.  Child VAROBJs can reference
-+     types from other OBJFILEs through TYPE_IS_OPAQUE resolutions by
-+     check_typedef.  */
-+
-+  all_varobjs (varobj_invalidate_iter, objfile);
-+}
-+
-+/* Call varobj_revalidate_iter for all the root VAROBJs.  */
-+
-+static void 
-+varobj_revalidate (void)
-+{
-+  /* Check only root VAROBJs.  Any successful revalidation will replace the
-+     whole VAROBJs tree starting with root VAROBJs and its children get created
-+     later on-demand.  So there is no point trying to revalidate the child
-+     VAROBJs.  */
-+
-+  all_root_varobjs (varobj_revalidate_iter, NULL);
-+}
-+
-+/* Call varobj_revalidate just providing a different function prototype.
-+   Currently existing VAROBJs may become valid or change with new symbols
-+   loaded.  */
-+
-+static void
-+varobj_revalidate_for_objfile (struct objfile *objfile)
- {
--  all_root_varobjs (varobj_invalidate_iter, NULL);
-+  varobj_revalidate ();
-+}
-+
-+extern void _initialize_varobj (void);
-+void
-+_initialize_varobj (void)
-+{
-+  int sizeof_table = sizeof (struct vlist *) * VAROBJ_TABLE_SIZE;
-+
-+  varobj_table = xmalloc (sizeof_table);
-+  memset (varobj_table, 0, sizeof_table);
-+
-+  add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
-+			    &varobjdebug, _("\
-+Set varobj debugging."), _("\
-+Show varobj debugging."), _("\
-+When non-zero, varobj debugging is enabled."),
-+			    NULL,
-+			    show_varobjdebug,
-+			    &setlist, &showlist);
-+
-+
-+  observer_attach_objfile_unloading (varobj_invalidate );
-+  observer_attach_objfile_unloaded (varobj_revalidate);
-+  observer_attach_new_objfile (varobj_revalidate_for_objfile);
-+  observer_attach_mark_used (varobj_types_mark_used);
- }
+ 
+ extern void _initialize_varobj (void);
+ void
 diff --git a/gdb/varobj.h b/gdb/varobj.h
-index 7297243..fbe2f2f 100644
+index 7297243..0744cc3 100644
 --- a/gdb/varobj.h
 +++ b/gdb/varobj.h
 @@ -78,6 +78,12 @@ typedef struct varobj_update_result_t
@@ -26716,13 +26456,7 @@ index 7297243..fbe2f2f 100644
  
  extern char *varobj_get_type (struct varobj *var);
  
-@@ -143,12 +160,15 @@ extern void all_root_varobjs (void (*func) (struct varobj *var, void *data),
- extern VEC(varobj_update_result) *varobj_update (struct varobj **varp, 
- 						 int explicit);
- 
--extern void varobj_invalidate (void);
--
- extern int varobj_editable_p (struct varobj *var);
+@@ -149,6 +166,11 @@ extern int varobj_editable_p (struct varobj *var);
  
  extern int varobj_floating_p (struct varobj *var);
  
