@@ -14,7 +14,7 @@ Version: 6.8.50.20090811
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -825,6 +825,10 @@ fi
 %endif
 
 %changelog
+* Tue Aug 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090811-2
+- archer-jankratochvil-fedora12 commit: 93f5e942bdcdcc376ece452c309bedabae71def9
+- Fix "can't compute CFA for this frame" (by Tom Tromey, BZ 516627).
+
 * Tue Aug 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090811-1
 - Support constant DW_AT_data_member_location by GCC PR debug/40659 (BZ 515377).
 - Fix .spec URL.
