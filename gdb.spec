@@ -14,7 +14,7 @@ Version: 6.8.50.20090811
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 4%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -109,6 +109,7 @@ Patch136: gdb-6.3-test-movedir-20050125.patch
 Patch140: gdb-6.3-gcore-thread-20050204.patch
 
 # Stop while intentionally stepping and the thread exit is met.
+Patch141: gdb-6.6-step-thread-exit.patch
 Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Prevent gdb from being pushed into background
@@ -465,6 +466,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch133 -p1
 %patch136 -p1
 %patch140 -p1
+%patch141 -p1
 %patch259 -p1
 %patch142 -p1
 %patch145 -p1
@@ -825,6 +827,9 @@ fi
 %endif
 
 %changelog
+* Wed Aug 12 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090811-4
+- Fix minor regressions introduced by the rebase from F-11 (6.8.50.20090302).
+
 * Tue Aug 11 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090811-3
 - archer-jankratochvil-fedora12 commit: 2888fafe63889757c6fd27ccc2f25661d43fd1a4
 - Drop archer-jankratochvil-vla VAROBJ invalidate/revalidate split to fix
