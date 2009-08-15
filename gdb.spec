@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?_with_upstream:.upstream}%{?dist}
+Release: 37%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -391,6 +391,9 @@ Patch374: gdb-bz507267-block-sort-fast.patch
 # Fix crash running gdbserver (incompatibility with python).
 Patch376: gdb-python-gdbserver-tp-crash.patch
 
+# Fix GDB crash/hang on corrupted .debug_aranges (from old GCCs).
+Patch377: gdb-delayed-symfile-aranges.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -591,6 +594,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch370 -p1
 %patch374 -p1
 %patch376 -p1
+%patch377 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -748,7 +752,8 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
-  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
+  # FIXME: Temporary F11 disable: ./orphanripper
+  make %{?_smp_mflags} -k $CHECK || :
 )
 for t in sum log
 do
@@ -870,6 +875,10 @@ fi
 %endif
 
 %changelog
+* Sat Aug 15 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-37
+- Fix GDB crash/hang on corrupted .debug_aranges (from old GCCs).
+- Temporarily disabled orphanripper on Fedora 11.
+
 * Sun Aug  2 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-36
 - Fix compilation error typo in the previous commit 6.8.50.20090302-35.
 
