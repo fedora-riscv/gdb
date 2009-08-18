@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 5e0d1cc74f119391a2c3ae25ef5749fc28674f06
+commit 850e3cb38a25cb7fdfa4cef667626ffbde51bcac
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -290,6 +290,102 @@ index 9b5d2c6..61676a9 100644
    ada_op_name,
    ada_dump_subexp_body,
    ada_evaluate_subexp
+diff --git a/gdb/amd64-linux-nat.c b/gdb/amd64-linux-nat.c
+index 7d8461c..a6d35d7 100644
+--- a/gdb/amd64-linux-nat.c
++++ b/gdb/amd64-linux-nat.c
+@@ -270,6 +270,8 @@ amd64_linux_dr_get (ptid_t ptid, int regnum)
+   return value;
+ }
+ 
++/* Set debug register REGNUM to VALUE in only the one LWP of PTID.  */
++
+ static void
+ amd64_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+ {
+@@ -286,6 +288,8 @@ amd64_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+     perror_with_name (_("Couldn't write debug register"));
+ }
+ 
++/* Set DR_CONTROL to ADDR in all LWPs of LWP_LIST.  */
++
+ static void
+ amd64_linux_dr_set_control (unsigned long control)
+ {
+@@ -297,6 +301,8 @@ amd64_linux_dr_set_control (unsigned long control)
+     amd64_linux_dr_set (ptid, DR_CONTROL, control);
+ }
+ 
++/* Set address REGNUM (zero based) to ADDR in all LWPs of LWP_LIST.  */
++
+ static void
+ amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+ {
+@@ -310,18 +316,55 @@ amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+     amd64_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
+ }
+ 
++/* Set address REGNUM (zero based) to zero in all LWPs of LWP_LIST.  */
++
+ static void
+ amd64_linux_dr_reset_addr (int regnum)
+ {
+   amd64_linux_dr_set_addr (regnum, 0);
+ }
+ 
++/* Get DR_STATUS from only the one LWP of INFERIOR_PTID.  */
++
+ static unsigned long
+ amd64_linux_dr_get_status (void)
+ {
+   return amd64_linux_dr_get (inferior_ptid, DR_STATUS);
+ }
+ 
++/* Unset VALUE bits in DR_STATUS in all LWPs of LWP_LIST.  */
++
++static void
++amd64_linux_dr_unset_status (unsigned long mask)
++{
++  struct lwp_info *lp;
++  ptid_t ptid;
++
++  ALL_LWPS (lp, ptid)
++    {
++      unsigned long value;
++      
++      value = amd64_linux_dr_get (ptid, DR_STATUS);
++      value &= ~mask;
++      amd64_linux_dr_set (ptid, DR_STATUS, value);
++    }
++}
++
++/* See i386_dr_low_type.detach.  Do not use wrappers amd64_linux_dr_set_control
++   or amd64_linux_dr_reset_addr as they would modify the register cache
++   (amd64_linux_dr).  */
++
++static void
++amd64_linux_dr_detach (void)
++{
++  int regnum;
++
++  amd64_linux_dr_set (inferior_ptid, DR_CONTROL, 0);
++  amd64_linux_dr_unset_status (~0UL);
++  for (regnum = DR_FIRSTADDR; regnum <= DR_LASTADDR; regnum++)
++    amd64_linux_dr_set (inferior_ptid, regnum, 0);
++}
++
+ static void
+ amd64_linux_new_thread (ptid_t ptid)
+ {
+@@ -672,6 +715,8 @@ _initialize_amd64_linux_nat (void)
+   i386_dr_low.set_addr = amd64_linux_dr_set_addr;
+   i386_dr_low.reset_addr = amd64_linux_dr_reset_addr;
+   i386_dr_low.get_status = amd64_linux_dr_get_status;
++  i386_dr_low.unset_status = amd64_linux_dr_unset_status;
++  i386_dr_low.detach = amd64_linux_dr_detach;
+   i386_set_debug_register_length (8);
+ 
+   /* Override the GNU/Linux inferior startup hook.  */
 diff --git a/gdb/block.c b/gdb/block.c
 index 1889ecd..37fa342 100644
 --- a/gdb/block.c
@@ -368,7 +464,7 @@ index 53e7371..d373f8a 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index f3940e1..70222a4 100644
+index f3940e1..2349fbc 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -59,6 +59,7 @@
@@ -477,7 +573,97 @@ index f3940e1..70222a4 100644
  	return;
        }
  
-@@ -8843,6 +8856,22 @@ all_tracepoints ()
+@@ -1690,6 +1703,7 @@ detach_breakpoints (int pid)
+     if (b->inserted)
+       val |= remove_breakpoint (b, mark_inserted);
+   }
++  val |= target_detach_watchpoints ();
+   do_cleanups (old_chain);
+   return val;
+ }
+@@ -1782,12 +1796,14 @@ remove_breakpoint (struct bp_location *b, insertion_state_t is)
+ 	return val;
+       b->inserted = (is == mark_inserted);
+     }
+-  else if (b->loc_type == bp_loc_hardware_watchpoint)
++  /* bp_loc_hardware_watchpoint with mark_inserted is being handled by
++     target_detach_watchpoints.  */
++  else if (b->loc_type == bp_loc_hardware_watchpoint && is == mark_uninserted)
+     {
+       struct value *v;
+       struct value *n;
+ 
+-      b->inserted = (is == mark_inserted);
++      b->inserted = 0;
+       val = target_remove_watchpoint (b->address, b->length, 
+ 				      b->watchpoint_type);
+ 
+@@ -2961,8 +2977,12 @@ bpstat_check_location (const struct bp_location *bl, CORE_ADDR bp_addr)
+ 
+ /* If BS refers to a watchpoint, determine if the watched values
+    has actually changed, and we should stop.  If not, set BS->stop
+-   to 0.  */
+-static void
++   to 0.
++   Return 0 for watchpoints which could not be the cause of this trap.
++   In such case PRINT_IT will be print_it_noop and STOP will be 0.
++   Otherwise return 1 but in such case it is not guaranteed whether this
++   breakpoint did or did not trigger this trap.  */
++static int
+ bpstat_check_watchpoint (bpstat bs)
+ {
+   const struct bp_location *bl = bs->breakpoint_at;
+@@ -3051,8 +3071,10 @@ bpstat_check_watchpoint (bpstat bs)
+ 	     anything for this watchpoint.  */
+ 	  bs->print_it = print_it_noop;
+ 	  bs->stop = 0;
++	  return 0;
+ 	}
+     }
++  return 1;
+ }
+ 
+ 
+@@ -3156,6 +3178,8 @@ bpstat_stop_status (CORE_ADDR bp_addr, ptid_t ptid)
+ 
+   ALL_BP_LOCATIONS (bl)
+   {
++    bpstat bs_prev = bs;
++
+     b = bl->owner;
+     gdb_assert (b);
+     if (!breakpoint_enabled (b) && b->enable_state != bp_permanent)
+@@ -3176,6 +3200,7 @@ bpstat_stop_status (CORE_ADDR bp_addr, ptid_t ptid)
+     /* Come here if it's a watchpoint, or if the break address matches */
+ 
+     bs = bpstat_alloc (bl, bs);	/* Alloc a bpstat to explain stop */
++    gdb_assert (bs_prev->next == bs);
+ 
+     /* Assume we stop.  Should we find watchpoint that is not actually
+        triggered, or if condition of breakpoint is false, we'll reset
+@@ -3183,9 +3208,18 @@ bpstat_stop_status (CORE_ADDR bp_addr, ptid_t ptid)
+     bs->stop = 1;
+     bs->print = 1;
+ 
+-    bpstat_check_watchpoint (bs);
+-    if (!bs->stop)
+-      continue;
++    if (!bpstat_check_watchpoint (bs))
++      {
++	/* Ensure bpstat_explains_signal stays false if this BL could not be
++	   the cause of this trap.  */
++
++	gdb_assert (bs->print_it == print_it_noop);
++	gdb_assert (!bs->stop);
++	xfree (bs);
++	bs = bs_prev;
++	bs->next = NULL;
++	continue;
++      }
+ 
+     if (b->type == bp_thread_event || b->type == bp_overlay_event
+ 	|| b->type == bp_longjmp_master)
+@@ -8843,6 +8877,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -500,7 +686,7 @@ index f3940e1..70222a4 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -9345,4 +9374,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -9345,4 +9395,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
@@ -10362,6 +10548,274 @@ index 5e55573..5439aba 100644
  # This Makefile.in is free software; the Free Software Foundation
  # gives unlimited permission to copy and/or distribute it,
  # with or without modifications, as long as this notice is preserved.
+diff --git a/gdb/i386-linux-nat.c b/gdb/i386-linux-nat.c
+index 991b27f..411b41b 100644
+--- a/gdb/i386-linux-nat.c
++++ b/gdb/i386-linux-nat.c
+@@ -586,6 +586,8 @@ i386_linux_store_inferior_registers (struct target_ops *ops,
+ 
+ static unsigned long i386_linux_dr[DR_CONTROL + 1];
+ 
++/* Get debug register REGNUM value from only the one LWP of PTID.  */
++
+ static unsigned long
+ i386_linux_dr_get (ptid_t ptid, int regnum)
+ {
+@@ -614,6 +616,8 @@ i386_linux_dr_get (ptid_t ptid, int regnum)
+   return value;
+ }
+ 
++/* Set debug register REGNUM to VALUE in only the one LWP of PTID.  */
++
+ static void
+ i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+ {
+@@ -630,6 +634,8 @@ i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+     perror_with_name (_("Couldn't write debug register"));
+ }
+ 
++/* Set DR_CONTROL to ADDR in all LWPs of LWP_LIST.  */
++
+ static void
+ i386_linux_dr_set_control (unsigned long control)
+ {
+@@ -641,6 +647,8 @@ i386_linux_dr_set_control (unsigned long control)
+     i386_linux_dr_set (ptid, DR_CONTROL, control);
+ }
+ 
++/* Set address REGNUM (zero based) to ADDR in all LWPs of LWP_LIST.  */
++
+ static void
+ i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+ {
+@@ -654,18 +662,55 @@ i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+     i386_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
+ }
+ 
++/* Set address REGNUM (zero based) to zero in all LWPs of LWP_LIST.  */
++
+ static void
+ i386_linux_dr_reset_addr (int regnum)
+ {
+   i386_linux_dr_set_addr (regnum, 0);
+ }
+ 
++/* Get DR_STATUS from only the one LWP of INFERIOR_PTID.  */
++
+ static unsigned long
+ i386_linux_dr_get_status (void)
+ {
+   return i386_linux_dr_get (inferior_ptid, DR_STATUS);
+ }
+ 
++/* Unset VALUE bits in DR_STATUS in all LWPs of LWP_LIST.  */
++
++static void
++i386_linux_dr_unset_status (unsigned long mask)
++{
++  struct lwp_info *lp;
++  ptid_t ptid;
++
++  ALL_LWPS (lp, ptid)
++    {
++      unsigned long value;
++      
++      value = i386_linux_dr_get (ptid, DR_STATUS);
++      value &= ~mask;
++      i386_linux_dr_set (ptid, DR_STATUS, value);
++    }
++}
++
++/* See i386_dr_low_type.detach.  Do not use wrappers i386_linux_dr_set_control
++   or i386_linux_dr_reset_addr as they would modify the register cache
++   (i386_linux_dr).  */
++
++static void
++i386_linux_dr_detach (void)
++{
++  int regnum;
++
++  i386_linux_dr_set (inferior_ptid, DR_CONTROL, 0);
++  i386_linux_dr_unset_status (~0UL);
++  for (regnum = DR_FIRSTADDR; regnum <= DR_LASTADDR; regnum++)
++    i386_linux_dr_set (inferior_ptid, regnum, 0);
++}
++
+ static void
+ i386_linux_new_thread (ptid_t ptid)
+ {
+@@ -832,6 +877,8 @@ _initialize_i386_linux_nat (void)
+   i386_dr_low.set_addr = i386_linux_dr_set_addr;
+   i386_dr_low.reset_addr = i386_linux_dr_reset_addr;
+   i386_dr_low.get_status = i386_linux_dr_get_status;
++  i386_dr_low.unset_status = i386_linux_dr_unset_status;
++  i386_dr_low.detach = i386_linux_dr_detach;
+   i386_set_debug_register_length (4);
+ 
+   /* Override the default ptrace resume method.  */
+diff --git a/gdb/i386-nat.c b/gdb/i386-nat.c
+index ab1bd8a..ee330b8 100644
+--- a/gdb/i386-nat.c
++++ b/gdb/i386-nat.c
+@@ -137,8 +137,11 @@ struct i386_dr_low_type i386_dr_low;
+ #define I386_DR_GET_RW_LEN(i) \
+   ((dr_control_mirror >> (DR_CONTROL_SHIFT + DR_CONTROL_SIZE * (i))) & 0x0f)
+ 
++/* Mask that this I'th watchpoint has triggered.  */
++#define I386_DR_WATCH_MASK(i)	(1 << (i))
++
+ /* Did the watchpoint whose address is in the I'th register break?  */
+-#define I386_DR_WATCH_HIT(i)	(dr_status_mirror & (1 << (i)))
++#define I386_DR_WATCH_HIT(i)	(dr_status_mirror & I386_DR_WATCH_MASK (i))
+ 
+ /* A macro to loop over all debug registers.  */
+ #define ALL_DEBUG_REGISTERS(i)	for (i = 0; i < DR_NADDR; i++)
+@@ -358,6 +361,10 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+   i386_dr_low.set_addr (i, addr);
+   i386_dr_low.set_control (dr_control_mirror);
+ 
++  /* Only a sanity check for leftover bits (set possibly only by inferior).  */
++  if (i386_dr_low.unset_status)
++    i386_dr_low.unset_status (I386_DR_WATCH_MASK (i));
++
+   return 0;
+ }
+ 
+@@ -387,6 +394,11 @@ i386_remove_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+ 	      i386_dr_low.set_control (dr_control_mirror);
+ 	      if (i386_dr_low.reset_addr)
+ 		i386_dr_low.reset_addr (i);
++
++	      /* Status must be already queried for each LWP.  Otherwise it will
++	         be lost in all-stop mode + breakpoint always-inserted off.  */
++	      if (i386_dr_low.unset_status)
++		i386_dr_low.unset_status (I386_DR_WATCH_MASK (i));
+ 	    }
+ 	  retval = 0;
+ 	}
+@@ -520,6 +532,17 @@ i386_remove_watchpoint (CORE_ADDR addr, int len, int type)
+   return retval;
+ }
+ 
++/* See target_detach_watchpoints.  */
++
++static int
++i386_detach_watchpoints (void)
++{
++  if (i386_dr_low.detach)
++    i386_dr_low.detach ();
++
++  return 0;
++}
++
+ /* Return non-zero if we can watch a memory region that starts at
+    address ADDR and whose length is LEN bytes.  */
+ 
+@@ -575,28 +598,7 @@ static int
+ i386_stopped_by_watchpoint (void)
+ {
+   CORE_ADDR addr = 0;
+-  return i386_stopped_data_address (&current_target, &addr);
+-}
+-
+-/* Return non-zero if the inferior has some break/watchpoint that
+-   triggered.  */
+-
+-static int
+-i386_stopped_by_hwbp (void)
+-{
+-  int i;
+-
+-  dr_status_mirror = i386_dr_low.get_status ();
+-  if (maint_show_dr)
+-    i386_show_dr ("stopped_by_hwbp", 0, 0, hw_execute);
+-
+-  ALL_DEBUG_REGISTERS(i)
+-    {
+-      if (I386_DR_WATCH_HIT (i))
+-	return 1;
+-    }
+-
+-  return 0;
++  return target_stopped_data_address (&current_target, &addr);
+ }
+ 
+ /* Insert a hardware-assisted breakpoint at BP_TGT->placed_address.
+@@ -690,6 +692,7 @@ i386_use_watchpoints (struct target_ops *t)
+   t->to_stopped_data_address = i386_stopped_data_address;
+   t->to_insert_watchpoint = i386_insert_watchpoint;
+   t->to_remove_watchpoint = i386_remove_watchpoint;
++  t->to_detach_watchpoints = i386_detach_watchpoints;
+   t->to_insert_hw_breakpoint = i386_insert_hw_breakpoint;
+   t->to_remove_hw_breakpoint = i386_remove_hw_breakpoint;
+ }
+diff --git a/gdb/i386-nat.h b/gdb/i386-nat.h
+index f49b9f6..cd31958 100644
+--- a/gdb/i386-nat.h
++++ b/gdb/i386-nat.h
+@@ -49,16 +49,23 @@ extern void i386_use_watchpoints (struct target_ops *);
+    functions are:
+ 
+       set_control              -- set the debug control (DR7)
+-				  register to a given value
++				  register to a given value for all LWPs
+ 
+       set_addr                 -- put an address into one debug
+-				  register
++				  register for all LWPs
+ 
+       reset_addr               -- reset the address stored in
+-				  one debug register
++				  one debug register for all LWPs
+ 
+       get_status               -- return the value of the debug
+-				  status (DR6) register.
++				  status (DR6) register for current LWP
++
++      unset_status             -- unset the specified bits of the debug
++				  status (DR6) register for all LWPs
++
++      detach                   -- clear all debug registers of only the
++				  INFERIOR_PTID task without affecting any
++				  register caches.
+ 
+    Additionally, the native file should set the debug_register_length
+    field to 4 or 8 depending on the number of bytes used for
+@@ -70,6 +77,8 @@ struct i386_dr_low_type
+     void (*set_addr) (int, CORE_ADDR);
+     void (*reset_addr) (int);
+     unsigned long (*get_status) (void);
++    void (*unset_status) (unsigned long);
++    void (*detach) (void);
+     int debug_register_length;
+   };
+ 
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index e3eddce..8917ac9 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -2630,6 +2630,10 @@ handle_inferior_event (struct execution_control_state *ecs)
+ 
+       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
+ 
++      /* Clear WATCHPOINT_TRIGGERED values from previous stop which could
++	 confuse bpstat_stop_status and bpstat_explains_signal.  */
++      watchpoints_triggered (&ecs->ws);
++
+       ecs->event_thread->stop_bpstat = bpstat_stop_status (stop_pc, ecs->ptid);
+ 
+       ecs->random_signal = !bpstat_explains_signal (ecs->event_thread->stop_bpstat);
+@@ -2667,6 +2671,10 @@ handle_inferior_event (struct execution_control_state *ecs)
+ 
+       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
+ 
++      /* Clear WATCHPOINT_TRIGGERED values from previous stop which could
++	 confuse bpstat_stop_status and bpstat_explains_signal.  */
++      watchpoints_triggered (&ecs->ws);
++
+       /* This causes the eventpoints and symbol table to be reset.
+          Must do this now, before trying to determine whether to
+          stop.  */
 diff --git a/gdb/jv-lang.c b/gdb/jv-lang.c
 index 6b68e7d..5095180 100644
 --- a/gdb/jv-lang.c
@@ -10507,6 +10961,158 @@ index 3e943a1..3b8956c 100644
  	    build_canonical_line_spec (values.sals, copy, canonical);
  	}
        return values;
+diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
+index 1308844..e6fad24 100644
+--- a/gdb/linux-nat.c
++++ b/gdb/linux-nat.c
+@@ -1629,6 +1629,7 @@ resume_callback (struct lwp_info *lp, void *data)
+       lp->stopped = 0;
+       lp->step = 0;
+       memset (&lp->siginfo, 0, sizeof (lp->siginfo));
++      lp->watchpoint_hit_set = 0;
+     }
+   else if (lp->stopped && debug_linux_nat)
+     fprintf_unfiltered (gdb_stdlog, "RC: Not resuming sibling %s (has pending)\n",
+@@ -1766,6 +1767,7 @@ linux_nat_resume (struct target_ops *ops,
+ 
+   linux_ops->to_resume (linux_ops, ptid, step, signo);
+   memset (&lp->siginfo, 0, sizeof (lp->siginfo));
++  lp->watchpoint_hit_set = 0;
+ 
+   if (debug_linux_nat)
+     fprintf_unfiltered (gdb_stdlog,
+@@ -2164,6 +2166,78 @@ maybe_clear_ignore_sigint (struct lwp_info *lp)
+     }
+ }
+ 
++/* Fetch the possible triggered data watchpoint info and store it to LP.
++   The hardware data watchpoint trigger gets cleared during this fetch.  */
++
++static void
++save_sigtrap (struct lwp_info *lp)
++{
++  struct cleanup *old_chain;
++
++  /* linux_nat_stopped_data_address is not even installed in this case.  */
++  if (linux_ops->to_stopped_data_address == NULL)
++    return;
++
++  old_chain = save_inferior_ptid ();
++  inferior_ptid = lp->ptid;
++
++  lp->watchpoint_hit_set =
++    linux_ops->to_stopped_data_address (&current_target, &lp->watchpoint_hit);
++
++  do_cleanups (old_chain);
++}
++
++/* Wrap target_stopped_data_address where the GNU/Linux native target may be
++   directed by the watchpoint/debug register number.  Base the reported value
++   on the triggered data address instead.  During inferior stop the assignment
++   of watchpoint/debug registers may change making the register number specific
++   trigger info stale.  */
++
++static int
++linux_nat_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
++{
++  struct lwp_info *lp = find_lwp_pid (inferior_ptid);
++
++  gdb_assert (lp != NULL);
++
++  *addr_p = lp->watchpoint_hit;
++
++  return lp->watchpoint_hit_set;
++}
++
++/* In `set follow-fork-mode child' with multithreaded parent we need to detach
++   watchpoints from all the LWPs.  In such case INFERIOR_PTID will be the
++   non-threaded new child while LWP_LIST will still contain all the threads of
++   the parent being detached.  */
++
++static int
++linux_nat_detach_watchpoints (void)
++{
++  struct lwp_info *lp;
++  int found = 0, retval = 0;
++  ptid_t filter = pid_to_ptid (ptid_get_pid (inferior_ptid));
++  struct cleanup *old_chain = save_inferior_ptid ();
++
++  for (lp = lwp_list; lp; lp = lp->next)
++    if (ptid_match (lp->ptid, filter))
++      {
++	inferior_ptid = lp->ptid;
++	retval |= linux_ops->to_detach_watchpoints ();
++	found = 1;
++      }
++
++  do_cleanups (old_chain);
++
++  if (!found)
++    {
++      gdb_assert (!is_lwp (inferior_ptid));
++
++      retval |= linux_ops->to_detach_watchpoints ();
++    }
++
++  return retval;
++}
++
+ /* Wait until LP is stopped.  */
+ 
+ static int
+@@ -2215,6 +2289,8 @@ stop_wait_callback (struct lwp_info *lp, void *data)
+ 	      /* Save the trap's siginfo in case we need it later.  */
+ 	      save_siginfo (lp);
+ 
++	      save_sigtrap (lp);
++
+ 	      /* Now resume this LWP and get the SIGSTOP event. */
+ 	      errno = 0;
+ 	      ptrace (PTRACE_CONT, GET_LWP (lp->ptid), 0, 0);
+@@ -2579,9 +2655,13 @@ linux_nat_filter_event (int lwpid, int status, int options)
+       add_thread (lp->ptid);
+     }
+ 
+-  /* Save the trap's siginfo in case we need it later.  */
+   if (WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP)
+-    save_siginfo (lp);
++    {
++      /* Save the trap's siginfo in case we need it later.  */
++      save_siginfo (lp);
++
++      save_sigtrap (lp);
++    }
+ 
+   /* Handle GNU/Linux's extended waitstatus for trace events.  */
+   if (WIFSTOPPED (status) && WSTOPSIG (status) == SIGTRAP && status >> 16 != 0)
+@@ -4871,6 +4951,10 @@ linux_nat_add_target (struct target_ops *t)
+   t->to_thread_alive = linux_nat_thread_alive;
+   t->to_pid_to_str = linux_nat_pid_to_str;
+   t->to_has_thread_control = tc_schedlock;
++  if (linux_ops->to_stopped_data_address)
++    t->to_stopped_data_address = linux_nat_stopped_data_address;
++  if (linux_ops->to_detach_watchpoints)
++    t->to_detach_watchpoints = linux_nat_detach_watchpoints;
+ 
+   t->to_can_async_p = linux_nat_can_async_p;
+   t->to_is_async_p = linux_nat_is_async_p;
+diff --git a/gdb/linux-nat.h b/gdb/linux-nat.h
+index d1ed6fc..faf68bb 100644
+--- a/gdb/linux-nat.h
++++ b/gdb/linux-nat.h
+@@ -62,6 +62,12 @@ struct lwp_info
+      be the address of a hardware watchpoint.  */
+   struct siginfo siginfo;
+ 
++  /* WATCHPOINT_HIT_SET is non-zero if this LWP stopped with a trap and a data
++     watchpoint has been found as triggered.  In such case WATCHPOINT_HIT
++     contains data address of the triggered data watchpoint.  */
++  unsigned watchpoint_hit_set : 1;
++  CORE_ADDR watchpoint_hit;
++
+   /* Non-zero if we expect a duplicated SIGINT.  */
+   int ignore_sigint;
+ 
 diff --git a/gdb/m2-lang.c b/gdb/m2-lang.c
 index 88c7e5e..2d0b3ca 100644
 --- a/gdb/m2-lang.c
@@ -11406,6 +12012,43 @@ index cbda9c3..a07e6f2 100644
 +extern void exp_types_mark_used (struct expression *exp);
 +
  #endif /* PARSER_DEFS_H */
+diff --git a/gdb/ppc-linux-nat.c b/gdb/ppc-linux-nat.c
+index 47b74ad..22fb2fc 100644
+--- a/gdb/ppc-linux-nat.c
++++ b/gdb/ppc-linux-nat.c
+@@ -1391,6 +1391,24 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw)
+   return 0;
+ }
+ 
++/* See target_detach_watchpoints.  Do not use wrapper
++   ppc_linux_remove_watchpoint as it would modify the register cache
++   (saved_dabr_value).  */
++
++static int
++ppc_linux_detach_watchpoints (void)
++{
++  pid_t tid;
++
++  tid = TIDGET (inferior_ptid);
++  if (tid == 0)
++    tid = PIDGET (inferior_ptid);
++
++  if (ptrace (PTRACE_SET_DEBUGREG, tid, NULL, NULL) < 0)
++    return -1;
++  return 0;
++}
++
+ static void
+ ppc_linux_new_thread (ptid_t ptid)
+ {
+@@ -1648,6 +1666,7 @@ _initialize_ppc_linux_nat (void)
+   t->to_region_ok_for_hw_watchpoint = ppc_linux_region_ok_for_hw_watchpoint;
+   t->to_insert_watchpoint = ppc_linux_insert_watchpoint;
+   t->to_remove_watchpoint = ppc_linux_remove_watchpoint;
++  t->to_detach_watchpoints = ppc_linux_detach_watchpoints;
+   t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
+   t->to_stopped_data_address = ppc_linux_stopped_data_address;
+   t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
 index 5d8b936..fb0a455 100644
 --- a/gdb/printcmd.c
@@ -18928,11 +19571,94 @@ index 740d4e0..461ff95 100644
  						  const domain_enum domain);
  
  extern struct symtabs_and_lines
+diff --git a/gdb/target.c b/gdb/target.c
+index 7ee444f..631e5f8 100644
+--- a/gdb/target.c
++++ b/gdb/target.c
+@@ -124,6 +124,8 @@ static int debug_to_insert_watchpoint (CORE_ADDR, int, int);
+ 
+ static int debug_to_remove_watchpoint (CORE_ADDR, int, int);
+ 
++static int debug_to_detach_watchpoints (void);
++
+ static int debug_to_stopped_by_watchpoint (void);
+ 
+ static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
+@@ -584,6 +586,7 @@ update_current_target (void)
+       INHERIT (to_remove_hw_breakpoint, t);
+       INHERIT (to_insert_watchpoint, t);
+       INHERIT (to_remove_watchpoint, t);
++      INHERIT (to_detach_watchpoints, t);
+       INHERIT (to_stopped_data_address, t);
+       INHERIT (to_have_steppable_watchpoint, t);
+       INHERIT (to_have_continuable_watchpoint, t);
+@@ -694,6 +697,9 @@ update_current_target (void)
+   de_fault (to_remove_watchpoint,
+ 	    (int (*) (CORE_ADDR, int, int))
+ 	    return_minus_one);
++  de_fault (to_detach_watchpoints,
++	    (int (*) (void))
++	    return_zero);
+   de_fault (to_stopped_by_watchpoint,
+ 	    (int (*) (void))
+ 	    return_zero);
+@@ -3095,6 +3101,19 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type)
+   return retval;
+ }
+ 
++static int
++debug_to_detach_watchpoints (void)
++{
++  int retval;
++
++  retval = debug_target.to_detach_watchpoints ();
++
++  fprintf_unfiltered (gdb_stdlog,
++		      "target_detach_watchpoints () = %ld\n",
++		      (unsigned long) retval);
++  return retval;
++}
++
+ static void
+ debug_to_terminal_init (void)
+ {
+@@ -3342,6 +3361,7 @@ setup_target_debug (void)
+   current_target.to_remove_hw_breakpoint = debug_to_remove_hw_breakpoint;
+   current_target.to_insert_watchpoint = debug_to_insert_watchpoint;
+   current_target.to_remove_watchpoint = debug_to_remove_watchpoint;
++  current_target.to_detach_watchpoints = debug_to_detach_watchpoints;
+   current_target.to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
+   current_target.to_stopped_data_address = debug_to_stopped_data_address;
+   current_target.to_watchpoint_addr_within_range = debug_to_watchpoint_addr_within_range;
 diff --git a/gdb/target.h b/gdb/target.h
-index 2c743e9..ef29610 100644
+index 2c743e9..dbbce12 100644
 --- a/gdb/target.h
 +++ b/gdb/target.h
-@@ -1157,6 +1157,20 @@ extern int target_search_memory (CORE_ADDR start_addr,
+@@ -376,6 +376,7 @@ struct target_ops
+     int (*to_remove_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
+     int (*to_remove_watchpoint) (CORE_ADDR, int, int);
+     int (*to_insert_watchpoint) (CORE_ADDR, int, int);
++    int (*to_detach_watchpoints) (void);
+     int (*to_stopped_by_watchpoint) (void);
+     int to_have_steppable_watchpoint;
+     int to_have_continuable_watchpoint;
+@@ -1120,6 +1121,15 @@ extern char *normal_pid_to_str (ptid_t ptid);
+ #define	target_remove_watchpoint(addr, len, type)	\
+      (*current_target.to_remove_watchpoint) (addr, len, type)
+ 
++/* Clear all debug registers without affecting any register caches.  Function
++   acts on INFERIOR_PTID which should be the forked-off process, either the
++   non-threaded child one or the threaded parent one, depending on `set
++   follow-fork-mode'.  Both watchpoints and hardware breakpoints get removed.
++   Return 0 on success, -1 on failure.  */
++
++#define	target_detach_watchpoints()	\
++     (*current_target.to_detach_watchpoints) ()
++
+ #define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
+      (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt)
+ 
+@@ -1157,6 +1167,20 @@ extern int target_search_memory (CORE_ADDR start_addr,
                                   ULONGEST pattern_len,
                                   CORE_ADDR *found_addrp);
  
@@ -18953,7 +19679,7 @@ index 2c743e9..ef29610 100644
  /* Command logging facility.  */
  
  #define target_log_command(p)						\
-@@ -1276,6 +1290,14 @@ extern struct target_ops *find_target_beneath (struct target_ops *);
+@@ -1276,6 +1300,14 @@ extern struct target_ops *find_target_beneath (struct target_ops *);
  
  extern char *target_get_osdata (const char *type);
  
@@ -20519,6 +21245,91 @@ index 0000000..5da7378
 +gdb_test "p temp1" " = '1' <repeats 78 times>" "second: print temp1"
 +gdb_test "p temp2" " = '2' <repeats 78 times>" "second: print temp2"
 +gdb_test "p temp3" " = '3' <repeats 48 times>" "second: print temp3"
+diff --git a/gdb/testsuite/gdb.base/watchpoint-hw.c b/gdb/testsuite/gdb.base/watchpoint-hw.c
+index 8da9af5..e2de53a 100644
+--- a/gdb/testsuite/gdb.base/watchpoint-hw.c
++++ b/gdb/testsuite/gdb.base/watchpoint-hw.c
+@@ -20,5 +20,11 @@ int watchee;
+ int
+ main (void)
+ {
++  volatile int dummy;
++
++  dummy = watchee;
++  dummy = 1;
++  dummy = 2;	/* break-at-exit */
++
+   return 0;
+ }
+diff --git a/gdb/testsuite/gdb.base/watchpoint-hw.exp b/gdb/testsuite/gdb.base/watchpoint-hw.exp
+index a2bb731..d74d6c7 100644
+--- a/gdb/testsuite/gdb.base/watchpoint-hw.exp
++++ b/gdb/testsuite/gdb.base/watchpoint-hw.exp
+@@ -21,19 +21,12 @@ if {(![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"]
+     return
+ }
+ 
+-set testfile watchpoint-hw
+-set srcfile ${testfile}.c
+-set binfile ${objdir}/${subdir}/${testfile}
+-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+-    untested "Couldn't compile test program"
++set test watchpoint-hw
++set srcfile ${test}.c
++if { [prepare_for_testing ${test}.exp ${test} ${srcfile}] } {
+     return -1
+ }
+ 
+-gdb_exit
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-gdb_load ${binfile}
+-
+ # Create the watchpoint before the inferior gets started.  Now the native CPU
+ # target is still not active and its `to_can_use_hw_breakpoint' is not
+ # installed, therefore only a software watchpoint gets created.
+@@ -43,10 +36,40 @@ gdb_test "watch watchee" "atchpoint 1: watchee"
+ # `runto_main' or `runto main' would delete the watchpoint created above.
+ 
+ if { [gdb_start_cmd] < 0 } {
+-    untested start
++    untested ${test}.exp
+     return -1
+ }
+ gdb_test "" "main .* at .*" "start"
+ 
+ # Check it is really a `hw'-watchpoint.
+ gdb_test "info watchpoints" "1 *hw watchpoint .* watchee"
++
++# Before the inferior gets started we would get:
++# 	Target does not support this type of hardware watchpoint.
++gdb_test "delete 1"
++gdb_test "rwatch watchee"
++
++set breakline [gdb_get_line_number "break-at-exit"]
++gdb_breakpoint $breakline
++
++gdb_test "continue" "Continuing.\r\nHardware read watchpoint 3: watchee\r\n\r\nValue = 0\r\n.*"
++
++# Here should be no repeated notification of the read watchpoint.
++gdb_test "continue" \
++	 "Continuing\\.\[ \r\n\]+Breakpoint \[0-9\]+, .*break-at-exit.*" \
++	 "continue to break-at-exit after rwatch"
++
++clean_restart ${test}
++
++if ![runto_main] {
++    untested ${test}.exp
++    return -1
++}
++
++gdb_test "hbreak ${srcfile}:${breakline}" \
++	 "Hardware assisted breakpoint 2 at 0x\[0-9a-f\]+: file .*${srcfile}, line ${breakline}\\." \
++	 "hbreak"
++
++gdb_test "continue" \
++	 "Continuing\\.\[ \r\n\]+Breakpoint \[0-9\]+, .*break-at-exit.*" \
++	 "continue to break-at-exit after hbreak"
 diff --git a/gdb/testsuite/gdb.cp/cp-relocate.exp b/gdb/testsuite/gdb.cp/cp-relocate.exp
 index 4095ccf..03c07d5 100644
 --- a/gdb/testsuite/gdb.cp/cp-relocate.exp
@@ -24965,6 +25776,1028 @@ index 5223fc8..03e1eab 100644
  }
  
  gdb_py_test_multiple "multi-line python command" \
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c b/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
+new file mode 100644
+index 0000000..4dc308b
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
+@@ -0,0 +1,175 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008, 2009 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <string.h>
++#include <errno.h>
++
++static void
++delay (void)
++{
++  int i = usleep (1000000 / 100);
++  assert (i == 0 || errno == EINTR);
++}
++
++#if defined FOLLOW_PARENT
++
++static void
++forkoff (int nr)
++{
++  pid_t child, pid_got;
++  int exit_code = 42 + nr;
++  int status, i;
++
++  child = fork ();
++  switch (child)
++    {
++    case -1:
++      assert (0);
++    case 0:
++      printf ("child%d: %d\n", nr, (int) getpid ());
++      /* Delay to get both the "child%d" and "parent%d" message printed without
++	 a race breaking expect by its endless wait on `$gdb_prompt$':
++	 Breakpoint 3, breakpoint () at ../../../gdb/testsuite/gdb.threads/watchpoint-fork.c:33
++	 33      }
++	 (gdb) parent2: 14223  */
++      i = sleep (1);
++      assert (i == 0);
++
++      /* We must not get caught here (against a forgotten breakpoint).  */
++      var++;
++      breakpoint ();
++
++      _exit (exit_code);
++    default:
++      printf ("parent%d: %d\n", nr, (int) child);
++      /* Delay to get both the "child%d" and "parent%d" message printed, see
++	 above.  */
++      i = sleep (1);
++      assert (i == 0);
++
++      pid_got = wait (&status);
++      assert (pid_got == child);
++      assert (WIFEXITED (status));
++      assert (WEXITSTATUS (status) == exit_code);
++
++      /* We must get caught here (against a false watchpoint removal).  */
++      breakpoint ();
++    }
++}
++
++#elif defined FOLLOW_CHILD
++
++static volatile int usr1_got;
++
++static void
++handler_usr1 (int signo)
++{
++  usr1_got++;
++}
++
++static void
++forkoff (int nr)
++{
++  pid_t child;
++  int i, loop;
++  struct sigaction act, oldact;
++#ifdef THREAD
++  void *thread_result;
++#endif
++
++  memset (&act, 0, sizeof act);
++  act.sa_flags = SA_RESTART;
++  act.sa_handler = handler_usr1;
++  sigemptyset (&act.sa_mask);
++  i = sigaction (SIGUSR1, &act, &oldact);
++  assert (i == 0);
++
++  child = fork ();
++  switch (child)
++    {
++    case -1:
++      assert (0);
++    default:
++      printf ("parent%d: %d\n", nr, (int) child);
++
++      /* Sleep for a while to possibly get incorrectly ATTACH_THREADed by GDB
++	 tracing the child fork with no longer valid thread/lwp entries of the
++	 parent.  */
++
++      i = sleep (2);
++      assert (i == 0);
++
++      /* We must not get caught here (against a forgotten breakpoint).  */
++
++      var++;
++      breakpoint ();
++
++#ifdef THREAD
++      /* And neither got caught our thread.  */
++
++      step = 99;
++      i = pthread_join (thread, &thread_result);
++      assert (i == 0);
++      assert (thread_result == (void *) 99UL);
++#endif
++
++      /* Be sure our child knows we did not get caught above.  */
++
++      i = kill (child, SIGUSR1);
++      assert (i == 0);
++
++      /* Sleep for a while to check GDB's `info threads' no longer tracks us in
++	 the child fork.  */
++
++      i = sleep (2);
++      assert (i == 0);
++
++      _exit (0);
++    case 0:
++      printf ("child%d: %d\n", nr, (int) getpid ());
++
++      /* Let the parent signal us about its success.  Be careful of races.  */
++
++      for (loop = 0; loop < 1000; loop++)
++	{
++	  /* Parent either died (and USR1_GOT is zero) or it succeeded.  */
++	  if (kill (getppid (), 0) != 0)
++	    break;
++	  /* Parent succeeded?  */
++	  if (usr1_got)
++	    break;
++
++	  delay ();
++	}
++      assert (usr1_got);
++
++      /* We must get caught here (against a false watchpoint removal).  */
++
++      breakpoint ();
++    }
++
++  i = sigaction (SIGUSR1, &oldact, NULL);
++  assert (i == 0);
++}
++
++#else
++# error "!FOLLOW_PARENT && !FOLLOW_CHILD"
++#endif
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c b/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
+new file mode 100644
+index 0000000..edacfc0
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
+@@ -0,0 +1,157 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008, 2009 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <assert.h>
++#include <unistd.h>
++#include <sys/wait.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <pthread.h>
++
++#include <asm/unistd.h>
++#include <unistd.h>
++#define gettid() syscall (__NR_gettid)
++
++/* Non-atomic `var++' should not hurt as we synchronize the threads by the STEP
++   variable.  Hit-comments need to be duplicite there to catch both at-stops
++   and behind-stops, depending on the target.  */
++
++static volatile int var;
++
++static void
++dummy (void)
++{
++}
++
++static void
++breakpoint (void)
++{
++}
++
++/* Include here the functions:
++   static void forkoff (int nr);
++   static void delay (void);  */
++
++static pthread_t thread;
++static volatile int step;
++#define THREAD
++
++#include "watchpoint-fork-forkoff.c"
++
++static void *
++start (void *arg)
++{
++  if (step >= 3)
++    goto step_3;
++
++  while (step != 1)
++    delay ();
++
++  var++;	/* validity-thread-B */
++  dummy ();	/* validity-thread-B */
++  step = 2;
++  while (step != 3)
++    {
++      if (step == 99)
++	goto step_99;
++      delay ();
++    }
++
++step_3:
++  if (step >= 5)
++    goto step_5;
++
++  var++;	/* after-fork1-B */
++  dummy ();	/* after-fork1-B */
++  step = 4;
++  while (step != 5)
++    {
++      if (step == 99)
++	goto step_99;
++      delay ();
++    }
++
++step_5:
++  var++;	/* after-fork2-B */
++  dummy ();	/* after-fork2-B */
++  return (void *) 5UL;
++
++step_99:
++  /* We must not get caught here (against a forgotten breakpoint).  */
++  var++;
++  breakpoint ();
++  return (void *) 99UL;
++}
++
++int
++main (void)
++{
++  int i;
++  void *thread_result;
++
++  setbuf (stdout, NULL);
++  printf ("main: %d\n", (int) gettid ());
++
++  /* General watchpoints validity.  */
++  var++;	/* validity-first */
++  dummy ();	/* validity-first */
++
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++
++  var++;	/* validity-thread-A */
++  dummy ();	/* validity-thread-A */
++  step = 1;
++  while (step != 2)
++    delay ();
++
++  /* Hardware watchpoints got disarmed here.  */
++  forkoff (1);
++
++  var++;	/* after-fork1-A */
++  dummy ();	/* after-fork1-A */
++  step = 3;
++#ifdef FOLLOW_CHILD
++  /* Spawn new thread as it was deleted in the child of FORK.  */
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++#endif
++  while (step != 4)
++    delay ();
++
++  /* A sanity check for double hardware watchpoints removal.  */
++  forkoff (2);
++
++  var++;	/* after-fork2-A */
++  dummy ();	/* after-fork2-A */
++  step = 5;
++#ifdef FOLLOW_CHILD
++  /* Spawn new thread as it was deleted in the child of FORK.  */
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++#endif
++
++  i = pthread_join (thread, &thread_result);
++  assert (i == 0);
++  assert (thread_result == (void *) 5UL);
++
++  return 0;
++}
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork.c b/gdb/testsuite/gdb.threads/watchpoint-fork.c
+new file mode 100644
+index 0000000..5f62e7f
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork.c
+@@ -0,0 +1,57 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008, 2009 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <assert.h>
++#include <unistd.h>
++#include <sys/wait.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++static volatile int var;
++
++static void
++breakpoint (void)
++{
++}
++
++/* Include here the function:
++   static void forkoff (int nr);  */
++
++#include "watchpoint-fork-forkoff.c"
++
++int
++main (void)
++{
++  setbuf (stdout, NULL);
++  printf ("main: %d\n", (int) getpid ());
++
++  /* General watchpoints validity.  */
++  var++;
++  /* Hardware watchpoints got disarmed here.  */
++  forkoff (1);
++  /* This watchpoint got lost before.  */
++  var++;
++  /* A sanity check for double hardware watchpoints removal.  */
++  forkoff (2);
++  var++;
++
++  return 0;
++}
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork.exp b/gdb/testsuite/gdb.threads/watchpoint-fork.exp
+new file mode 100644
+index 0000000..1dc93ab
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork.exp
+@@ -0,0 +1,130 @@
++# Copyright 2008, 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++proc test {type symbol} {
++    global objdir subdir srcdir
++
++    set test watchpoint-fork
++
++    global pf_prefix
++    set prefix_test $pf_prefix
++    lappend pf_prefix "$type:"
++    set prefix_mt $pf_prefix
++
++    # no threads
++
++    set pf_prefix $prefix_mt
++    lappend pf_prefix "singlethreaded:"
++
++    set executable ${test}-${type}
++    if { [gdb_compile ${srcdir}/${subdir}/${test}.c ${objdir}/${subdir}/${executable} executable [list debug additional_flags=-D$symbol]] != "" } {
++	untested ${test}.exp
++	return -1
++    }
++    clean_restart $executable
++
++    gdb_test "show detach-on-fork" "Whether gdb will detach the child of a fork is on."
++    gdb_test "set follow-fork-mode $type"
++    gdb_test "show follow-fork-mode" "Debugger response to a program call of fork or vfork is \"$type\"."
++    # Testcase uses it for the `follow-fork-mode child' type.
++    gdb_test "handle SIGUSR1 nostop noprint pass"
++
++    if { ![runto_main] } then {
++	gdb_suppress_tests
++	return
++    }
++
++    # Install the watchpoint only after getting into MAIN - workaround some PPC
++    # problem.
++    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++
++    # It is never hit but it should not be left over in the fork()ed-off child.
++    gdb_breakpoint "breakpoint"
++
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 0.*New value = 1.*forkoff *\\(1\\).*" "watchpoints work"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 1.*New value = 2.*forkoff *\\(2\\).*" "watchpoint after the first fork"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 2.*New value = 3.*return *0;" "watchpoint after the second fork"
++    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++
++
++    # threads
++
++    set pf_prefix $prefix_mt
++    lappend pf_prefix "multithreaded:"
++
++    set executable ${test}-mt-${type}
++    if { [gdb_compile_pthreads ${srcdir}/${subdir}/${test}-mt.c ${objdir}/${subdir}/${executable} executable [list debug additional_flags=-D$symbol]] != "" } {
++	untested ${test}.exp
++	return -1
++    }
++    clean_restart $executable
++
++    gdb_test "set follow-fork-mode $type"
++    # Testcase uses it for the `follow-fork-mode child' type.
++    gdb_test "handle SIGUSR1 nostop noprint pass"
++
++    if { ![runto_main] } then {
++	gdb_suppress_tests
++	return
++    }
++
++    # Install the watchpoint only after getting into MAIN - workaround some PPC
++    # problem.
++    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++
++    # It is never hit but it should not be left over in the fork()ed-off child.
++    gdb_breakpoint "breakpoint"
++
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 0.*New value = 1.*validity-first.*" "singlethread watchpoints work"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 1.*New value = 2.*validity-thread-A.*" "multithreaded watchpoints work at A"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 2.*New value = 3.*validity-thread-B.*" "multithreaded watchpoints work at B"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 3.*New value = 4.*after-fork1-A.*" "watchpoint A after the first fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 4.*New value = 5.*after-fork1-B.*" "watchpoint B after the first fork"
++    gdb_test "continue" \
++	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 5.*New value = 6.*after-fork2-A.*" "watchpoint A after the second fork"
++    gdb_test "continue" \
++	     "atchpoint 2: var.*Old value = 6.*New value = 7.*after-fork2-B.*" "watchpoint B after the second fork"
++    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++
++
++    # cleanup
++
++    set pf_prefix $prefix_test
++}
++
++test parent FOLLOW_PARENT
++
++# Only GNU/Linux is known to support `set follow-fork-mode child'.
++if {[istarget "*-*-linux*"]} {
++    test child FOLLOW_CHILD
++}
+diff --git a/gdb/testsuite/gdb.threads/watchthreads-reorder.c b/gdb/testsuite/gdb.threads/watchthreads-reorder.c
+new file mode 100644
+index 0000000..14f42d6
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchthreads-reorder.c
+@@ -0,0 +1,366 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#define _GNU_SOURCE
++#include <pthread.h>
++#include <stdio.h>
++#include <limits.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <string.h>
++#include <assert.h>
++#include <sys/types.h>
++#include <signal.h>
++#include <unistd.h>
++#include <asm/unistd.h>
++
++#define gettid() syscall (__NR_gettid)
++
++/* Terminate always in the main task, it can lock up with SIGSTOPped GDB
++   otherwise.  */
++#define TIMEOUT (gettid () == getpid() ? 10 : 15)
++
++static pthread_mutex_t gdbstop_mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
++
++static pid_t thread1_tid;
++static pthread_cond_t thread1_tid_cond = PTHREAD_COND_INITIALIZER;
++static pthread_mutex_t thread1_tid_mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
++
++static pid_t thread2_tid;
++static pthread_cond_t thread2_tid_cond = PTHREAD_COND_INITIALIZER;
++static pthread_mutex_t thread2_tid_mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
++
++static pthread_mutex_t terminate_mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
++
++static volatile int thread1_rwatch;
++static volatile int thread2_rwatch;
++
++static int unused1_rwatch;
++static int unused2_rwatch;
++
++/* Do not use alarm as it would create a ptrace event which would hang up us if
++ * we are being traced by GDB which we stopped ourselves.  */
++
++static void timed_mutex_lock (pthread_mutex_t *mutex)
++{
++  int i;
++  struct timespec start, now;
++
++  i = clock_gettime (CLOCK_MONOTONIC, &start);
++  assert (i == 0);
++
++  do
++    {
++      i = pthread_mutex_trylock (mutex);
++      if (i == 0)
++	return;
++      assert (i == EBUSY);
++
++      i = clock_gettime (CLOCK_MONOTONIC, &now);
++      assert (i == 0);
++      assert (now.tv_sec >= start.tv_sec);
++    }
++  while (now.tv_sec - start.tv_sec < TIMEOUT);
++
++  fprintf (stderr, "Timed out waiting for internal lock!\n");
++  exit (EXIT_FAILURE);
++}
++
++static void *
++thread1_func (void *unused)
++{
++  int i;
++  volatile int rwatch_store;
++
++  thread1_tid = gettid ();
++  i = pthread_cond_signal (&thread1_tid_cond);
++  assert (i == 0);
++
++  /* Be sure GDB is already stopped before continuing.  */
++  timed_mutex_lock (&gdbstop_mutex);
++  i = pthread_mutex_unlock (&gdbstop_mutex);
++  assert (i == 0);
++
++  rwatch_store = thread1_rwatch;
++
++  /* Be sure the "T (tracing stop)" test can proceed for both threads.  */
++  timed_mutex_lock (&terminate_mutex);
++  i = pthread_mutex_unlock (&terminate_mutex);
++  assert (i == 0);
++
++  return NULL;
++}
++
++static void *
++thread2_func (void *unused)
++{
++  int i;
++  volatile int rwatch_store;
++
++  thread2_tid = gettid ();
++  i = pthread_cond_signal (&thread2_tid_cond);
++  assert (i == 0);
++
++  /* Be sure GDB is already stopped before continuing.  */
++  timed_mutex_lock (&gdbstop_mutex);
++  i = pthread_mutex_unlock (&gdbstop_mutex);
++  assert (i == 0);
++
++  rwatch_store = thread2_rwatch;
++
++  /* Be sure the "T (tracing stop)" test can proceed for both threads.  */
++  timed_mutex_lock (&terminate_mutex);
++  i = pthread_mutex_unlock (&terminate_mutex);
++  assert (i == 0);
++
++  return NULL;
++}
++
++static const char *
++proc_string (const char *filename, const char *line)
++{
++  FILE *f;
++  static char buf[LINE_MAX];
++  size_t line_len = strlen (line);
++
++  f = fopen (filename, "r");
++  if (f == NULL)
++    {
++      fprintf (stderr, "fopen (\"%s\") for \"%s\": %s\n", filename, line,
++	       strerror (errno));
++      exit (EXIT_FAILURE);
++    }
++  while (errno = 0, fgets (buf, sizeof (buf), f))
++    {
++      char *s;
++
++      s = strchr (buf, '\n');
++      assert (s != NULL);
++      *s = 0;
++
++      if (strncmp (buf, line, line_len) != 0)
++	continue;
++
++      if (fclose (f))
++	{
++	  fprintf (stderr, "fclose (\"%s\") for \"%s\": %s\n", filename, line,
++		   strerror (errno));
++	  exit (EXIT_FAILURE);
++	}
++
++      return &buf[line_len];
++    }
++  if (errno != 0)
++    {
++      fprintf (stderr, "fgets (\"%s\": %s\n", filename, strerror (errno));
++      exit (EXIT_FAILURE);
++    }
++  fprintf (stderr, "\"%s\": No line \"%s\" found.\n", filename, line);
++  exit (EXIT_FAILURE);
++}
++
++static unsigned long
++proc_ulong (const char *filename, const char *line)
++{
++  const char *s = proc_string (filename, line);
++  long retval;
++  char *end;
++
++  errno = 0;
++  retval = strtol (s, &end, 10);
++  if (retval < 0 || retval >= LONG_MAX || (end && *end))
++    {
++      fprintf (stderr, "\"%s\":\"%s\": %ld, %s\n", filename, line, retval,
++	       strerror (errno));
++      exit (EXIT_FAILURE);
++    }
++  return retval;
++}
++
++static void
++state_wait (pid_t process, const char *wanted)
++{
++  char *filename;
++  int i;
++  struct timespec start, now;
++  const char *state;
++
++  i = asprintf (&filename, "/proc/%lu/status", (unsigned long) process);
++  assert (i > 0);
++
++  i = clock_gettime (CLOCK_MONOTONIC, &start);
++  assert (i == 0);
++
++  do
++    {
++      state = proc_string (filename, "State:\t");
++      if (strcmp (state, wanted) == 0)
++	{
++	  free (filename);
++	  return;
++	}
++
++      if (sched_yield ())
++	{
++	  perror ("sched_yield()");
++	  exit (EXIT_FAILURE);
++	}
++
++      i = clock_gettime (CLOCK_MONOTONIC, &now);
++      assert (i == 0);
++      assert (now.tv_sec >= start.tv_sec);
++    }
++  while (now.tv_sec - start.tv_sec < TIMEOUT);
++
++  fprintf (stderr, "Timed out waiting for PID %lu \"%s\" (now it is \"%s\")!\n",
++	   (unsigned long) process, wanted, state);
++  exit (EXIT_FAILURE);
++}
++
++static volatile pid_t tracer = 0;
++static pthread_t thread1, thread2;
++
++static void
++cleanup (void)
++{
++  printf ("Resuming GDB PID %lu.\n", (unsigned long) tracer);
++
++  if (tracer)
++    {
++      int i;
++      int tracer_save = tracer;
++
++      tracer = 0;
++
++      i = kill (tracer_save, SIGCONT);
++      assert (i == 0);
++    }
++}
++
++int
++main (int argc, char **argv)
++{
++  int i;
++  int standalone = 0;
++
++  if (argc == 2 && strcmp (argv[1], "-s") == 0)
++    standalone = 1;
++  else
++    assert (argc == 1);
++
++  setbuf (stdout, NULL);
++
++  timed_mutex_lock (&gdbstop_mutex);
++
++  timed_mutex_lock (&terminate_mutex);
++
++  i = pthread_create (&thread1, NULL, thread1_func, NULL);
++  assert (i == 0);
++
++  i = pthread_create (&thread2, NULL, thread2_func, NULL);
++  assert (i == 0);
++
++  if (!standalone)
++    {
++      tracer = proc_ulong ("/proc/self/status", "TracerPid:\t");
++      if (tracer == 0)
++	{
++	  fprintf (stderr, "The testcase must be run by GDB!\n");
++	  exit (EXIT_FAILURE);
++	}
++      if (tracer != getppid ())
++	{
++	  fprintf (stderr, "The testcase parent must be our GDB tracer!\n");
++	  exit (EXIT_FAILURE);
++	}
++    }
++
++  /* SIGCONT our debugger in the case of our crash as we would deadlock
++     otherwise.  */
++
++  atexit (cleanup);
++
++  printf ("Stopping GDB PID %lu.\n", (unsigned long) tracer);
++
++  if (tracer)
++    {
++      i = kill (tracer, SIGSTOP);
++      assert (i == 0);
++      state_wait (tracer, "T (stopped)");
++    }
++
++  timed_mutex_lock (&thread1_tid_mutex);
++  timed_mutex_lock (&thread2_tid_mutex);
++
++  /* Let the threads start.  */
++  i = pthread_mutex_unlock (&gdbstop_mutex);
++  assert (i == 0);
++
++  printf ("Waiting till the threads initialize their TIDs.\n");
++
++  if (thread1_tid == 0)
++    {
++      i = pthread_cond_wait (&thread1_tid_cond, &thread1_tid_mutex);
++      assert (i == 0);
++
++      assert (thread1_tid > 0);
++    }
++
++  if (thread2_tid == 0)
++    {
++      i = pthread_cond_wait (&thread2_tid_cond, &thread2_tid_mutex);
++      assert (i == 0);
++
++      assert (thread2_tid > 0);
++    }
++
++  printf ("Thread 1 TID = %lu, thread 2 TID = %lu, PID = %lu.\n",
++	  (unsigned long) thread1_tid, (unsigned long) thread2_tid,
++	  (unsigned long) getpid ());
++
++  printf ("Waiting till the threads get trapped by the watchpoints.\n");
++
++  if (tracer)
++    {
++      /* s390x-unknown-linux-gnu will fail with "R (running)".  */
++
++      state_wait (thread1_tid, "T (tracing stop)");
++
++      state_wait (thread2_tid, "T (tracing stop)");
++    }
++
++  cleanup ();
++
++  printf ("Joining the threads.\n");
++
++  i = pthread_mutex_unlock (&terminate_mutex);
++  assert (i == 0);
++
++  i = pthread_join (thread1, NULL);
++  assert (i == 0);
++
++  i = pthread_join (thread2, NULL);
++  assert (i == 0);
++
++  printf ("Exiting.\n");	/* break-at-exit */
++
++  /* Just prevent compiler `warning: ‘unusedX_rwatch’ defined but not used'.  */
++  unused1_rwatch = 1;
++  unused2_rwatch = 2;
++
++  return EXIT_SUCCESS;
++}
+diff --git a/gdb/testsuite/gdb.threads/watchthreads-reorder.exp b/gdb/testsuite/gdb.threads/watchthreads-reorder.exp
+new file mode 100644
+index 0000000..8f65364
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchthreads-reorder.exp
+@@ -0,0 +1,101 @@
++# This testcase is part of GDB, the GNU debugger.
++
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test GDB can cope with two watchpoints being hit by different threads at the
++# same time, GDB reports one of them and after "continue" to report the other
++# one GDB should not be confused by differently set watchpoints that time.
++# This is the goal of "reorder1".  "reorder0" tests the basic functionality of
++# two watchpoint being hit at the same time, without reordering them during the
++# stop.  The formerly broken functionality is due to the all-stop mode default
++# "show breakpoint always-inserted" being "off".  Formerly the remembered hit
++# could be assigned during continuation of a thread with pending SIGTRAP to the
++# different/new watchpoint, just based on the watchpoint/debug register number.
++
++if {[target_info exists gdb,no_hardware_watchpoints]
++    || ![istarget *-*-linux*]} {
++    return 0;
++}
++
++set testfile "watchthreads-reorder"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" ${binfile} executable [list debug additional_flags=-lrt]] != "" } {
++    return -1
++}
++
++foreach reorder {0 1} {
++
++    global pf_prefix
++    set prefix_test $pf_prefix
++    lappend pf_prefix "reorder$reorder:"
++
++    clean_restart $testfile
++
++    gdb_test "set can-use-hw-watchpoints 1"
++
++    if ![runto_main] {
++	gdb_suppress_tests
++    }
++
++    # Use "rwatch" as "watch" would report the watchpoint changed just based on its
++    # read memory value during a stop by unrelated event.  We are interested to not
++    # to lose the hardware watchpoint trigger.
++
++    gdb_test "rwatch thread1_rwatch" "Hardware read watchpoint \[0-9\]+: thread1_rwatch"
++    gdb_test {set $rwatch1=$bpnum}
++    set test "rwatch thread2_rwatch"
++    gdb_test_multiple $test $test {
++	-re "Target does not support this type of hardware watchpoint\\.\r\n$gdb_prompt $" {
++	    # ppc64 supports at most 1 hw watchpoints.
++	    unsupported $test
++	    return
++	}
++	-re "Hardware read watchpoint \[0-9\]+: thread2_rwatch\r\n$gdb_prompt $" {
++	    pass $test
++	}
++    }
++    gdb_test {set $rwatch2=$bpnum}
++    gdb_breakpoint [gdb_get_line_number "break-at-exit"]
++
++    # The watchpoints can happen in arbitrary order depending on random:
++    # SEL: Found 2 SIGTRAP events, selecting #[01]
++    # As GDB contains no srand() on the specific host/OS it will behave always the
++    # same.  Such order cannot be guaranteed for GDB in general.
++
++    gdb_test "continue" \
++	     "Hardware read watchpoint \[0-9\]+: thread\[12\]_rwatch\r\n\r\nValue = 0\r\n0x\[0-9a-f\]+ in thread\[12\]_func .*" \
++	     "continue a"
++
++    if $reorder {
++	gdb_test {delete $rwatch1}
++	gdb_test {delete $rwatch2}
++
++	gdb_test "rwatch unused1_rwatch" "Hardware read watchpoint \[0-9\]+: unused1_rwatch"
++	gdb_test "rwatch unused2_rwatch" "Hardware read watchpoint \[0-9\]+: unused2_rwatch"
++
++	gdb_test "rwatch thread1_rwatch" "Hardware read watchpoint \[0-9\]+: thread1_rwatch"
++	gdb_test "rwatch thread2_rwatch" "Hardware read watchpoint \[0-9\]+: thread2_rwatch"
++    }
++
++    gdb_test "continue" \
++	     "Hardware read watchpoint \[0-9\]+: thread\[12\]_rwatch\r\n\r\nValue = 0\r\n0x\[0-9a-f\]+ in thread\[12\]_func .*" \
++	     "continue b"
++
++    gdb_continue_to_breakpoint "break-at-exit" ".*break-at-exit.*"
++
++    set pf_prefix $prefix_test
++}
 diff --git a/gdb/testsuite/lib/cp-support.exp b/gdb/testsuite/lib/cp-support.exp
 index dbd2f59..44e1b51 100644
 --- a/gdb/testsuite/lib/cp-support.exp

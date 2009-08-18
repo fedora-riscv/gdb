@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -821,6 +821,10 @@ fi
 %endif
 
 %changelog
+* Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-3
+- archer-jankratochvil-fedora12 commit: 850e3cb38a25cb7fdfa4cef667626ffbde51bcac
+- Fix the hardware watchpoints.
+
 * Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-2
 - Fix patch fuzz 0.
 
