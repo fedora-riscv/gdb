@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -821,6 +821,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-2
+- Fix patch fuzz 0.
+
 * Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-1
 - Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090818
 - archer-jankratochvil-fedora12 commit: 5e0d1cc74f119391a2c3ae25ef5749fc28674f06
