@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090811
+Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -218,8 +218,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.8.50.20090811 snapshot fixups.
-#Patch232: gdb-6.8.50.20090811-upstream.patch
+# Backported post gdb-6.8.50.20090818 snapshot fixups.
+#Patch232: gdb-6.8.50.20090818-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -264,11 +264,6 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 Patch274: gdb-6.6-buildid-locate.patch
 Patch353: gdb-6.6-buildid-locate-rpm.patch
-
-# Fix hardware watchpoints after inferior forks-off some process.
-# Threaded `set follow-fork-mode child' still not fixed there, glibc fixes reqd.
-# `set detach-on-fork off' not fixed there in general - it already assert-fails.
-Patch280: gdb-6.6-multifork-debugreg.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 Patch282: gdb-6.7-charsign-test.patch
@@ -521,7 +516,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch271 -p1
 %patch274 -p1
 %patch353 -p1
-%patch280 -p1
 %patch282 -p1
 %patch284 -p1
 %patch287 -p1
@@ -827,6 +821,10 @@ fi
 %endif
 
 %changelog
+* Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-1
+- Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090818
+- archer-jankratochvil-fedora12 commit: 5e0d1cc74f119391a2c3ae25ef5749fc28674f06
+
 * Wed Aug 12 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090811-4
 - Fix minor regressions introduced by the rebase from F-11 (6.8.50.20090302).
 
