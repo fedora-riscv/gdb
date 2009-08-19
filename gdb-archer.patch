@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 850e3cb38a25cb7fdfa4cef667626ffbde51bcac
+commit 2ba2bc451eb832182ef84c3934115de7a329da7c
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -27214,10 +27214,10 @@ index bf9915c..233206c 100644
  extern long ui_file_read (struct ui_file *file, char *buf, long length_buf);
  
 diff --git a/gdb/utils.c b/gdb/utils.c
-index 5fa2f26..f985fa9 100644
+index 16ad084..3021a43 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
-@@ -2604,7 +2604,10 @@ fprintf_symbol_filtered (struct ui_file *stream, char *name,
+@@ -2610,7 +2610,10 @@ fprintf_symbol_filtered (struct ui_file *stream, char *name,
     As an extra hack, string1=="FOO(ARGS)" matches string2=="FOO".
     This "feature" is useful when searching for matching C++ function names
     (such as if the user types 'break FOO', where FOO is a mangled C++
@@ -27229,7 +27229,7 @@ index 5fa2f26..f985fa9 100644
  
  int
  strcmp_iw (const char *string1, const char *string2)
-@@ -2629,7 +2632,7 @@ strcmp_iw (const char *string1, const char *string2)
+@@ -2635,7 +2638,7 @@ strcmp_iw (const char *string1, const char *string2)
  	  string2++;
  	}
      }
@@ -27732,7 +27732,7 @@ index cbb5d94..cf35bf0 100644
  	  ++reps;
  	  ++rep1;
 diff --git a/gdb/value.c b/gdb/value.c
-index 97f236c..8af6ae1 100644
+index 48fedfd..5c207e3 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -37,8 +37,10 @@
@@ -27857,7 +27857,7 @@ index 97f236c..8af6ae1 100644
  
  /* Internal variables.  These are variables within the debugger
     that hold values assigned by debugger commands.
-@@ -1363,6 +1413,37 @@ call_internal_function (struct gdbarch *gdbarch,
+@@ -1364,6 +1414,40 @@ call_internal_function (struct gdbarch *gdbarch,
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -27876,10 +27876,13 @@ index 97f236c..8af6ae1 100644
 +	type_mark_used (value_type (var->u.value));
 +	break;
 +
-+      case INTERNALVAR_SCALAR:
-+	type_mark_used (var->u.scalar.type);
++      case INTERNALVAR_INTEGER:
++	type_mark_used (var->u.integer.type);
 +	break;
 +
++      case INTERNALVAR_POINTER:
++	type_mark_used (var->u.pointer.type);
++	break;
 +      }
 +
 +  for (chunk = value_history_chain; chunk != NULL; chunk = chunk->next)
@@ -27895,7 +27898,7 @@ index 97f236c..8af6ae1 100644
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -1410,11 +1491,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
+@@ -1411,11 +1495,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
  		    htab_t copied_types)
  {
    if (TYPE_OBJFILE (value->type) == objfile)
@@ -27909,16 +27912,23 @@ index 97f236c..8af6ae1 100644
  						 copied_types);
  }
  
-@@ -1429,7 +1509,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
-     case INTERNALVAR_SCALAR:
-       if (var->u.scalar.type && TYPE_OBJFILE (var->u.scalar.type) == objfile)
- 	var->u.scalar.type
--	  = copy_type_recursive (objfile, var->u.scalar.type, copied_types);
-+	  = copy_type_recursive (var->u.scalar.type, copied_types);
+@@ -1430,13 +1513,13 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
+     case INTERNALVAR_INTEGER:
+       if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
+ 	var->u.integer.type
+-	  = copy_type_recursive (objfile, var->u.integer.type, copied_types);
++	  = copy_type_recursive (var->u.integer.type, copied_types);
+       break;
+ 
+     case INTERNALVAR_POINTER:
+       if (TYPE_OBJFILE (var->u.pointer.type) == objfile)
+ 	var->u.pointer.type
+-	  = copy_type_recursive (objfile, var->u.pointer.type, copied_types);
++	  = copy_type_recursive (var->u.pointer.type, copied_types);
        break;
  
      case INTERNALVAR_VALUE:
-@@ -1831,6 +1911,8 @@ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
+@@ -1838,6 +1921,8 @@ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
      val->contents =
        (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
  
@@ -27927,7 +27937,7 @@ index 97f236c..8af6ae1 100644
    val->enclosing_type = new_encl_type;
    return val;
  }
-@@ -1895,6 +1977,8 @@ value_primitive_field (struct value *arg1, int offset,
+@@ -1902,6 +1987,8 @@ value_primitive_field (struct value *arg1, int offset,
  	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
  		  TYPE_LENGTH (value_enclosing_type (arg1)));
  	}
@@ -27936,7 +27946,7 @@ index 97f236c..8af6ae1 100644
        v->type = type;
        v->offset = value_offset (arg1);
        v->embedded_offset = (offset + value_embedded_offset (arg1)
-@@ -2145,6 +2229,42 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
+@@ -2152,6 +2239,42 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
  }
  
  
@@ -27979,7 +27989,7 @@ index 97f236c..8af6ae1 100644
  /* Convert C numbers into newly allocated values.  */
  
  struct value *
-@@ -2158,6 +2278,19 @@ value_from_longest (struct type *type, LONGEST num)
+@@ -2165,6 +2288,19 @@ value_from_longest (struct type *type, LONGEST num)
  }
  
  
@@ -27999,7 +28009,7 @@ index 97f236c..8af6ae1 100644
  /* Create a value representing a pointer of type TYPE to the address
     ADDR.  */
  struct value *
-@@ -2316,4 +2449,8 @@ VARIABLE is already initialized."));
+@@ -2323,4 +2459,8 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);

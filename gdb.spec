@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 4%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -219,7 +219,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported post gdb-6.8.50.20090818 snapshot fixups.
-#Patch232: gdb-6.8.50.20090818-upstream.patch
+Patch232: gdb-6.8.50.20090818-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -444,7 +444,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -821,6 +821,10 @@ fi
 %endif
 
 %changelog
+* Wed Aug 19 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-4
+- Fixup "bad type" internal error, import from FSF GDB.
+- archer-jankratochvil-fedora12 commit: 2ba2bc451eb832182ef84c3934115de7a329da7c
+
 * Tue Aug 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-3
 - archer-jankratochvil-fedora12 commit: 850e3cb38a25cb7fdfa4cef667626ffbde51bcac
 - Fix the hardware watchpoints.
