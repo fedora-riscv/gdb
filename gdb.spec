@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 5%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -360,6 +360,9 @@ Patch360: gdb-6.8-bz457187-largefile-test.patch
 # Fix compatibility of --with-system-readline and readline-6.0+.
 Patch375: gdb-readline-6.0.patch
 
+# Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
+Patch378: gdb-bz515434-qsort_cmp.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -548,6 +551,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch360 -p1
 %patch375 -p1
+%patch378 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -821,6 +825,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-5
+- Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
+
 * Wed Aug 19 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-4
 - Fixup "bad type" internal error, import from FSF GDB.
 - archer-jankratochvil-fedora12 commit: 2ba2bc451eb832182ef84c3934115de7a329da7c
