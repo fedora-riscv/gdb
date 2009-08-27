@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?_with_upstream:.upstream}%{?dist}
+Release: 38%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -394,6 +394,9 @@ Patch376: gdb-python-gdbserver-tp-crash.patch
 # Fix GDB crash/hang on corrupted .debug_aranges (from old GCCs).
 Patch377: gdb-delayed-symfile-aranges.patch
 
+# Remove wrong assertion on types objfile (BZ 508406).
+Patch379: gdb-bz508406-vla-type-objfile.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -595,6 +598,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch374 -p1
 %patch376 -p1
 %patch377 -p1
+%patch379 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -875,6 +879,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-38
+- Remove wrong assertion on types objfile (BZ 508406).
+
 * Sat Aug 15 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-37
 - Fix GDB crash/hang on corrupted .debug_aranges (from old GCCs).
 - Temporarily disabled orphanripper on Fedora 11.
