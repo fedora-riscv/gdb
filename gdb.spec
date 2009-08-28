@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -363,6 +363,9 @@ Patch375: gdb-readline-6.0.patch
 # Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
 Patch378: gdb-bz515434-qsort_cmp.patch
 
+# Revert bitfields regression (BZ 520129).
+Patch380: gdb-bz520129-drow-bitfields.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -552,6 +555,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch375 -p1
 %patch378 -p1
+%patch380 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -825,6 +829,10 @@ fi
 %endif
 
 %changelog
+* Fri Aug 28 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-6
+- Real upstream fixup of qsort_cmp (BZ 515434).
+- Revert bitfields regression (BZ 520129).
+
 * Tue Aug 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-5
 - Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
 
