@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 2ba2bc451eb832182ef84c3934115de7a329da7c
+commit d25596676e8811b03f8c9aba6bbd04ebaa9ff5db
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -3458,7 +3458,7 @@ index 4984f31..fcf1b5d 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dwarf2-frame.c b/gdb/dwarf2-frame.c
-index 427f58f..fc70309 100644
+index 427f58f..392a1b4 100644
 --- a/gdb/dwarf2-frame.c
 +++ b/gdb/dwarf2-frame.c
 @@ -38,6 +38,7 @@
@@ -3501,7 +3501,7 @@ index 427f58f..fc70309 100644
  
    do_cleanups (old_chain);
  
-@@ -1250,6 +1260,14 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
+@@ -1250,6 +1260,16 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
  
    return NULL;
  }
@@ -3509,6 +3509,8 @@ index 427f58f..fc70309 100644
 +CORE_ADDR
 +dwarf2_frame_cfa (struct frame_info *this_frame)
 +{
++  while (get_frame_type (this_frame) == INLINE_FRAME)
++    this_frame = get_prev_frame (this_frame);
 +  if (! frame_unwinder_is (this_frame, &dwarf2_frame_unwind))
 +    error (_("can't compute CFA for this frame"));
 +  return get_frame_base (this_frame);
@@ -3516,7 +3518,7 @@ index 427f58f..fc70309 100644
  
  const struct objfile_data *dwarf2_frame_objfile_data;
  
-@@ -1539,6 +1557,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
+@@ -1539,6 +1559,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
        CORE_ADDR offset;
        CORE_ADDR seek_pc;
  
@@ -3834,7 +3836,7 @@ index 2306e49..597c2de 100644
    /* The length of the piece, in bytes.  */
    ULONGEST size;
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index 1df6a9f..c101371 100644
+index 1df6a9f..939f7a2 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
 @@ -36,6 +36,7 @@
@@ -3875,7 +3877,7 @@ index 1df6a9f..c101371 100644
 +      gdb_assert (symbaton != NULL);
 +      *start = symbaton->data;
 +      *length = symbaton->size;
-+    }
+     }
 +  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_missing_funcs)
 +    {
 +      struct dwarf2_locexpr_baton *symbaton;
@@ -3884,7 +3886,7 @@ index 1df6a9f..c101371 100644
 +      gdb_assert (symbaton == NULL);
 +      *start = NULL;
 +      *length = 0;	/* unused */
-     }
++    }
 +  else
 +    internal_error (__FILE__, __LINE__,
 +		    _("Unsupported SYMBOL_COMPUTED_OPS %p for \"%s\""),
@@ -3905,7 +3907,7 @@ index 1df6a9f..c101371 100644
  }
  
  /* Using the objfile specified in BATON, find the address for the
-@@ -204,6 +226,118 @@ dwarf_expr_tls_address (void *baton, CORE_ADDR offset)
+@@ -204,6 +226,129 @@ dwarf_expr_tls_address (void *baton, CORE_ADDR offset)
    return target_translate_tls_address (debaton->objfile, offset);
  }
  
@@ -4016,6 +4018,17 @@ index 1df6a9f..c101371 100644
 +
 +  retval = dwarf_expr_fetch (ctx, 0);
 +
++  if (ctx->location == DWARF_VALUE_REGISTER)
++    {
++      /* Inlined dwarf_expr_read_reg as we no longer have the baton. */
++
++      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (ctx->gdbarch, retval);
++      struct type *type = builtin_type (ctx->gdbarch)->builtin_data_ptr;
++      struct frame_info *frame = get_selected_frame (NULL);
++
++      retval = address_from_register (type, gdb_regnum, frame);
++    }
++
 +  do_cleanups (back_to);
 +
 +  return retval;
@@ -4024,7 +4037,7 @@ index 1df6a9f..c101371 100644
  /* Evaluate a location description, starting at DATA and with length
     SIZE, to find the current location of variable VAR in the context
     of FRAME.  */
-@@ -213,9 +347,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -213,9 +358,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
  			  struct dwarf2_per_cu_data *per_cu)
  {
    struct value *retval;
@@ -4035,7 +4048,7 @@ index 1df6a9f..c101371 100644
  
    if (size == 0)
      {
-@@ -225,21 +358,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -225,21 +369,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
        return retval;
      }
  
@@ -4044,7 +4057,8 @@ index 1df6a9f..c101371 100644
 -
 -  ctx = new_dwarf_expr_context ();
 -  old_chain = make_cleanup_free_dwarf_expr_context (ctx);
--
++  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
+ 
 -  ctx->gdbarch = get_objfile_arch (baton.objfile);
 -  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
 -  ctx->baton = &baton;
@@ -4052,13 +4066,12 @@ index 1df6a9f..c101371 100644
 -  ctx->read_mem = dwarf_expr_read_mem;
 -  ctx->get_frame_base = dwarf_expr_frame_base;
 -  ctx->get_tls_address = dwarf_expr_tls_address;
-+  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
- 
+-
 -  dwarf_expr_eval (ctx, data, size);
    if (ctx->num_pieces > 0)
      {
        int i;
-@@ -251,36 +371,115 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -251,36 +382,115 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
        for (i = 0; i < ctx->num_pieces; i++)
  	{
  	  struct dwarf_expr_piece *p = &ctx->pieces[i];
@@ -4197,7 +4210,7 @@ index 1df6a9f..c101371 100644
      }
  
    set_value_initialized (retval, ctx->initialized);
-@@ -330,6 +529,15 @@ needs_frame_frame_base (void *baton, gdb_byte **start, size_t * length)
+@@ -330,6 +540,15 @@ needs_frame_frame_base (void *baton, gdb_byte **start, size_t * length)
    nf_baton->needs_frame = 1;
  }
  
@@ -4213,7 +4226,7 @@ index 1df6a9f..c101371 100644
  /* Thread-local accesses do require a frame.  */
  static CORE_ADDR
  needs_frame_tls_address (void *baton, CORE_ADDR offset)
-@@ -362,11 +570,12 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
+@@ -362,11 +581,12 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
    ctx->read_reg = needs_frame_read_reg;
    ctx->read_mem = needs_frame_read_mem;
    ctx->get_frame_base = needs_frame_frame_base;
@@ -4227,7 +4240,7 @@ index 1df6a9f..c101371 100644
  
    if (ctx->num_pieces > 0)
      {
-@@ -375,7 +584,7 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
+@@ -375,7 +595,7 @@ dwarf2_loc_desc_needs_frame (gdb_byte *data, unsigned short size,
        /* If the location has several pieces, and any of them are in
           registers, then we will need a frame to fetch them from.  */
        for (i = 0; i < ctx->num_pieces; i++)
@@ -4236,7 +4249,7 @@ index 1df6a9f..c101371 100644
            in_reg = 1;
      }
  
-@@ -607,7 +816,7 @@ static int
+@@ -607,7 +827,7 @@ static int
  loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
  {
    /* FIXME: Could print the entire list of locations.  */
@@ -4245,7 +4258,7 @@ index 1df6a9f..c101371 100644
    return 1;
  }
  
-@@ -623,16 +832,56 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+@@ -623,16 +843,56 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
  
    data = find_location_expression (dlbaton, &size, ax->scope);
    if (data == NULL)
@@ -4322,7 +4335,7 @@ index 0bfcfca..01018d6 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 445bab8..2e0a4bc 100644
+index 445bab8..42039ea 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1,8 +1,7 @@
@@ -5862,16 +5875,16 @@ index 445bab8..2e0a4bc 100644
  {
 -  struct die_info *child_die = die->child;
 +  struct type *type;
- 
--  /* FIXME: Support the separate Fortran module namespaces.  */
++
 +  type = read_module_type (die, cu);
- 
++
 +  if (type)
 +    new_symbol (die, type, cu);
 +}
-+
+ 
+-  /* FIXME: Support the separate Fortran module namespaces.  */
 +/* Read a Fortran module as type.
-+
+ 
 +   Modules present only as declarations - being used only for DW_AT_import of
 +   DW_TAG_imported_module - are ignored here.  They are read in only in form of
 +   the module name by read_fortran_imported_module.  */
@@ -6008,7 +6021,7 @@ index 445bab8..2e0a4bc 100644
  }
  
  /* Return the name of the namespace represented by DIE.  Set
-@@ -5705,29 +6159,93 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5705,29 +6159,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -6039,37 +6052,58 @@ index 445bab8..2e0a4bc 100644
 +	 its value.  */
 +      else
 +	{
-+	  struct dwarf2_locexpr_baton *length_baton;
-+	  struct attribute *size_attr;
++	  struct dwarf2_locexpr_baton *length_baton = NULL;
++	  struct dwarf_block *blk = DW_BLOCK (attr);
 +
-+	  length_baton = obstack_alloc (&cu->comp_unit_obstack,
-+					sizeof (*length_baton));
-+	  length_baton->per_cu = cu->per_cu;
-+	  length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
-+					      DW_BLOCK (attr)->size + 2);
-+	  memcpy (length_baton->data, DW_BLOCK (attr)->data,
-+		  DW_BLOCK (attr)->size);
++	  /* Turn any single DW_OP_reg* into DW_OP_breg*(0) but clearing
++	     DW_OP_deref* in such case.  */
 +
-+	  /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
-+	     specifies the size of an integer to fetch.  */
-+
-+	  size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-+	  if (size_attr)
++	  if (blk->size == 1 && blk->data[0] >= DW_OP_reg0
++	      && blk->data[0] <= DW_OP_reg31)
++	    length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
++	  else if (blk->size > 1 && blk->data[0] == DW_OP_regx)
 +	    {
-+	      length_baton->size = DW_BLOCK (attr)->size + 2;
-+	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
-+	      length_baton->data[DW_BLOCK (attr)->size + 1]
-+							 = DW_UNSND (size_attr);
-+	      if (length_baton->data[DW_BLOCK (attr)->size + 1]
-+		  != DW_UNSND (size_attr))
-+		complaint (&symfile_complaints,
-+			   _("DW_AT_string_length's DW_AT_byte_size integer "
-+			     "exceeds the byte size storage"));
++	      ULONGEST ulongest;
++	      gdb_byte *end;
++
++	      end = read_uleb128 (&blk->data[1], &blk->data[blk->size],
++				  &ulongest);
++	      if (end == &blk->data[blk->size])
++		length_baton = dwarf2_attr_to_locexpr_baton (attr, cu);
 +	    }
-+	  else
++
++	  if (length_baton == NULL)
 +	    {
-+	      length_baton->size = DW_BLOCK (attr)->size + 1;
-+	      length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
++	      struct attribute *size_attr;
++
++	      length_baton = obstack_alloc (&cu->comp_unit_obstack,
++					    sizeof (*length_baton));
++	      length_baton->per_cu = cu->per_cu;
++	      length_baton->size = DW_BLOCK (attr)->size + 2;
++	      length_baton->data = obstack_alloc (&cu->comp_unit_obstack,
++						  length_baton->size);
++	      memcpy (length_baton->data, DW_BLOCK (attr)->data,
++		      DW_BLOCK (attr)->size);
++
++	      /* DW_AT_BYTE_SIZE existing together with DW_AT_STRING_LENGTH
++		 specifies the size of an integer to fetch.  */
++	      size_attr = dwarf2_attr (die, DW_AT_byte_size, cu);
++	      if (size_attr)
++		{
++		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref_size;
++		  length_baton->data[DW_BLOCK (attr)->size + 1] =
++							   DW_UNSND (size_attr);
++		  if (length_baton->data[DW_BLOCK (attr)->size + 1]
++		      != DW_UNSND (size_attr))
++		    complaint (&symfile_complaints,
++			       _("DW_AT_string_length's DW_AT_byte_size "
++				 "integer exceeds the byte size storage"));
++		}
++	      else
++		{
++		  length_baton->data[DW_BLOCK (attr)->size] = DW_OP_deref;
++		  length_baton->data[DW_BLOCK (attr)->size + 1] = DW_OP_nop;
++		}
 +	    }
 +
 +	  TYPE_RANGE_BOUND_SET_DWARF_BLOCK (range_type, 1);
@@ -6116,7 +6150,7 @@ index 445bab8..2e0a4bc 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -5822,7 +6340,6 @@ static struct type *
+@@ -5822,7 +6361,6 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -6124,7 +6158,7 @@ index 445bab8..2e0a4bc 100644
    const char *name = NULL;
    struct type *this_type;
  
-@@ -5930,8 +6447,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5930,8 +6468,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -6134,7 +6168,7 @@ index 445bab8..2e0a4bc 100644
    char *name;
    
    base_type = die_type (die, cu);
-@@ -5944,42 +6460,91 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5944,42 +6481,91 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -6255,7 +6289,7 @@ index 445bab8..2e0a4bc 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -6450,6 +7015,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
+@@ -6450,6 +7036,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
  	  && abbrev->tag != DW_TAG_lexical_block
  	  && abbrev->tag != DW_TAG_variable
  	  && abbrev->tag != DW_TAG_namespace
@@ -6263,7 +6297,7 @@ index 445bab8..2e0a4bc 100644
  	  && abbrev->tag != DW_TAG_member)
  	{
  	  /* Otherwise we skip to the next sibling, if any.  */
-@@ -6670,9 +7236,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6670,9 +7257,6 @@ read_partial_die (struct partial_die_info *part_die,
  	  if (part_die->dirname == NULL)
  	    part_die->dirname = DW_STRING (&attr);
  	  break;
@@ -6273,7 +6307,7 @@ index 445bab8..2e0a4bc 100644
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
  	  part_die->lowpc = DW_ADDR (&attr);
-@@ -6744,10 +7307,10 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6744,10 +7328,10 @@ read_partial_die (struct partial_die_info *part_die,
  	  else
  	    part_die->sibling = buffer + dwarf2_get_ref_die_offset (&attr);
  	  break;
@@ -6288,7 +6322,7 @@ index 445bab8..2e0a4bc 100644
          case DW_AT_byte_size:
            part_die->has_byte_size = 1;
            break;
-@@ -6789,13 +7352,6 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6789,13 +7373,6 @@ read_partial_die (struct partial_die_info *part_die,
  	  || dwarf2_per_objfile->has_section_at_zero))
      part_die->has_pc_info = 1;
  
@@ -6302,7 +6336,7 @@ index 445bab8..2e0a4bc 100644
    return info_ptr;
  }
  
-@@ -6904,7 +7460,8 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6904,7 +7481,8 @@ fixup_partial_die (struct partial_die_info *part_die,
    /* If we found a reference attribute and the DIE has no name, try
       to find a name in the referred to DIE.  */
  
@@ -6312,7 +6346,7 @@ index 445bab8..2e0a4bc 100644
      {
        struct partial_die_info *spec_die;
  
-@@ -8244,10 +8801,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -8244,10 +8822,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -6327,7 +6361,7 @@ index 445bab8..2e0a4bc 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -8269,21 +8828,30 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8269,21 +8849,30 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -6365,7 +6399,7 @@ index 445bab8..2e0a4bc 100644
  
        /* Default assumptions.
           Use the passed type or decode it from the die.  */
-@@ -8381,9 +8949,28 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8381,9 +8970,28 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  if (attr)
  	    {
  	      var_decode_location (attr, sym, cu);
@@ -6395,7 +6429,7 @@ index 445bab8..2e0a4bc 100644
  	      else
  		add_symbol_to_list (sym, cu->list_in_scope);
  	    }
-@@ -8513,7 +9100,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8513,7 +9121,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  add_symbol_to_list (sym, cu->list_in_scope);
  	  break;
  	case DW_TAG_enumerator:
@@ -6404,7 +6438,7 @@ index 445bab8..2e0a4bc 100644
  	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
  	  if (attr)
  	    {
-@@ -8537,6 +9124,16 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8537,6 +9145,16 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
  	  break;
@@ -6421,7 +6455,7 @@ index 445bab8..2e0a4bc 100644
  	default:
  	  /* Not a tag we recognize.  Hopefully we aren't processing
  	     trash data, but since we must specifically ignore things
-@@ -8550,8 +9147,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8550,8 +9168,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
        /* For the benefit of old versions of GCC, check for anonymous
  	 namespaces based on the demangled name.  */
        if (!processing_has_namespace_info
@@ -6431,7 +6465,7 @@ index 445bab8..2e0a4bc 100644
  	cp_scan_for_anonymous_namespaces (sym);
      }
    return (sym);
-@@ -8802,12 +9398,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8802,12 +9419,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
      case DW_TAG_namespace:
        this_type = read_namespace_type (die, cu);
        break;
@@ -6450,7 +6484,7 @@ index 445bab8..2e0a4bc 100644
    return this_type;
  }
  
-@@ -8889,10 +9491,97 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8889,10 +9512,97 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
  	     So it does not need a prefix.  */
  	  return "";
        default:
@@ -6549,7 +6583,7 @@ index 445bab8..2e0a4bc 100644
  /* Return a newly-allocated string formed by concatenating PREFIX and
     SUFFIX with appropriate separator.  If PREFIX or SUFFIX is NULL or empty, then
     simply copy the SUFFIX or PREFIX, respectively.  If OBS is non-null,
-@@ -8948,14 +9637,108 @@ static char *
+@@ -8948,14 +9658,108 @@ static char *
  dwarf2_linkage_name (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct attribute *attr;
@@ -6561,11 +6595,7 @@ index 445bab8..2e0a4bc 100644
 +  if (cu->language != language_cplus
 +      && cu->language != language_java)
 +    return name;
- 
--  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
--  if (attr && DW_STRING (attr))
--    return DW_STRING (attr);
--  return dwarf2_name (die, cu);
++
 +  if (die_needs_namespace (die, cu))
 +    {
 +      long length;
@@ -6589,7 +6619,11 @@ index 445bab8..2e0a4bc 100644
 +	  && die->tag == DW_TAG_subprogram)
 +	{
 +	  struct type *type = read_type_die (die, cu);
-+
+ 
+-  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+-  if (attr && DW_STRING (attr))
+-    return DW_STRING (attr);
+-  return dwarf2_name (die, cu);
 +	  c_type_print_args (type, buf, 0, cu->language);
 +
 +	  if (cu->language == language_java)
@@ -6663,7 +6697,7 @@ index 445bab8..2e0a4bc 100644
  
  static char *
  dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
-@@ -10181,11 +10964,12 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
+@@ -10181,11 +10985,12 @@ dwarf2_get_ref_die_offset (struct attribute *attr)
    return 0;
  }
  
@@ -6679,7 +6713,7 @@ index 445bab8..2e0a4bc 100644
  {
    if (attr->form == DW_FORM_sdata)
      return DW_SND (attr);
-@@ -10195,6 +10979,8 @@ dwarf2_get_attr_constant_value (struct attribute *attr, int default_value)
+@@ -10195,6 +11000,8 @@ dwarf2_get_attr_constant_value (struct attribute *attr, int default_value)
             || attr->form == DW_FORM_data4
             || attr->form == DW_FORM_data8)
      return DW_UNSND (attr);
@@ -6688,7 +6722,7 @@ index 445bab8..2e0a4bc 100644
    else
      {
        complaint (&symfile_complaints, _("Attribute value is not a constant (%s)"),
-@@ -10990,8 +11776,6 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10990,8 +11797,6 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
  {
    gdb_byte *mac_ptr, *mac_end;
    struct macro_source_file *current_file = 0;
@@ -6697,7 +6731,7 @@ index 445bab8..2e0a4bc 100644
  
    if (dwarf2_per_objfile->macinfo.buffer == NULL)
      {
-@@ -10999,29 +11783,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -10999,29 +11804,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
        return;
      }
  
@@ -6732,7 +6766,7 @@ index 445bab8..2e0a4bc 100644
          }
  
        macinfo_type = read_1_byte (abfd, mac_ptr);
-@@ -11032,92 +11806,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11032,92 +11827,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            /* A zero macinfo type indicates the end of the macro
               information.  */
          case 0:
@@ -6826,7 +6860,7 @@ index 445bab8..2e0a4bc 100644
  
          case DW_MACINFO_define:
          case DW_MACINFO_undef:
-@@ -11132,31 +11821,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11132,31 +11842,19 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              mac_ptr += bytes_read;
  
              if (! current_file)
@@ -6869,7 +6903,7 @@ index 445bab8..2e0a4bc 100644
            }
            break;
  
-@@ -11170,22 +11847,9 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11170,22 +11868,9 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
              file = read_unsigned_leb128 (abfd, mac_ptr, &bytes_read);
              mac_ptr += bytes_read;
  
@@ -6895,7 +6929,7 @@ index 445bab8..2e0a4bc 100644
            }
            break;
  
-@@ -11239,7 +11903,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
+@@ -11239,7 +11924,7 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
            }
            break;
          }
@@ -6904,7 +6938,7 @@ index 445bab8..2e0a4bc 100644
  }
  
  /* Check if the attribute's form is a DW_FORM_block*
-@@ -11299,6 +11963,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -11299,6 +11984,34 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -6939,7 +6973,7 @@ index 445bab8..2e0a4bc 100644
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -11328,35 +12020,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+@@ -11328,35 +12041,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
        SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
@@ -6990,7 +7024,7 @@ index 445bab8..2e0a4bc 100644
      }
  }
  
-@@ -11644,6 +12326,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -11644,6 +12347,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -7022,7 +7056,7 @@ index 445bab8..2e0a4bc 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -11652,6 +12359,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -11652,6 +12380,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -7031,7 +7065,7 @@ index 445bab8..2e0a4bc 100644
    if (cu->type_hash == NULL)
      {
        gdb_assert (cu->per_cu != NULL);
-@@ -11794,23 +12503,13 @@ show_dwarf2_cmd (char *args, int from_tty)
+@@ -11794,23 +12524,13 @@ show_dwarf2_cmd (char *args, int from_tty)
    cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
  }
  
@@ -7059,7 +7093,7 @@ index 445bab8..2e0a4bc 100644
  }
  
  /* munmap debug sections for OBJFILE, if necessary.  */
-@@ -11819,15 +12518,15 @@ static void
+@@ -11819,15 +12539,15 @@ static void
  dwarf2_per_objfile_cleanup (struct objfile *objfile, void *d)
  {
    struct dwarf2_per_objfile *data = d;
@@ -7084,7 +7118,7 @@ index 445bab8..2e0a4bc 100644
  }
  
  void _initialize_dwarf2_read (void);
-@@ -11835,6 +12534,7 @@ void _initialize_dwarf2_read (void);
+@@ -11835,6 +12555,7 @@ void _initialize_dwarf2_read (void);
  void
  _initialize_dwarf2_read (void)
  {
@@ -11319,7 +11353,7 @@ index aac82e9..626292c 100644
    TYPE_CPLUS_SPECIFIC (t) = (struct cplus_struct_type *) &cplus_struct_default;
    return t;
 diff --git a/gdb/mi/mi-cmd-var.c b/gdb/mi/mi-cmd-var.c
-index 0cf03d9..d6a85d9 100644
+index 0cf03d9..e4ca621 100644
 --- a/gdb/mi/mi-cmd-var.c
 +++ b/gdb/mi/mi-cmd-var.c
 @@ -41,7 +41,7 @@ static void varobj_update_one (struct varobj *var,
@@ -11346,7 +11380,16 @@ index 0cf03d9..d6a85d9 100644
  
    type = varobj_get_type (var);
    if (type != NULL)
-@@ -223,6 +227,7 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
+@@ -138,6 +142,8 @@ mi_cmd_var_create (char *command, char **argv, int argc)
+ 
+   print_varobj (var, PRINT_ALL_VALUES, 0 /* don't print expression */);
+ 
++  ui_out_field_int (uiout, "has_more", varobj_has_more (var, 0));
++
+   do_cleanups (old_cleanups);
+ }
+ 
+@@ -223,6 +229,7 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
  {
    enum varobj_display_formats format;
    struct varobj *var;
@@ -11354,7 +11397,7 @@ index 0cf03d9..d6a85d9 100644
  
    if (argc != 2)
      error (_("mi_cmd_var_set_format: Usage: NAME FORMAT."));
-@@ -239,7 +244,9 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
+@@ -239,7 +246,9 @@ mi_cmd_var_set_format (char *command, char **argv, int argc)
    ui_out_field_string (uiout, "format", varobj_format_string[(int) format]);
   
    /* Report the value in the new format */
@@ -11365,7 +11408,7 @@ index 0cf03d9..d6a85d9 100644
  }
  
  void
-@@ -337,11 +344,12 @@ Must be: 0 or \"%s\", 1 or \"%s\", 2 or \"%s\""),
+@@ -337,11 +346,12 @@ Must be: 0 or \"%s\", 1 or \"%s\", 2 or \"%s\""),
  }
  
  /* Return 1 if given the argument PRINT_VALUES we should display
@@ -11380,7 +11423,7 @@ index 0cf03d9..d6a85d9 100644
  
    if (print_values == PRINT_NO_VALUES)
      return 0;
-@@ -349,6 +357,10 @@ mi_print_value_p (struct type *type, enum print_values print_values)
+@@ -349,6 +359,10 @@ mi_print_value_p (struct type *type, enum print_values print_values)
    if (print_values == PRINT_ALL_VALUES)
      return 1;
  
@@ -11391,7 +11434,7 @@ index 0cf03d9..d6a85d9 100644
    if (type == NULL)
      return 1;
    else
-@@ -369,24 +381,35 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
+@@ -369,24 +383,35 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
    struct varobj *var;  
    VEC(varobj_p) *children;
    struct varobj *child;
@@ -11415,6 +11458,8 @@ index 0cf03d9..d6a85d9 100644
      var = varobj_get_handle (argv[1]);
  
 -  children = varobj_list_children (var);
+-  ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
+-  if (argc == 2)
 +  if (argc > 2)
 +    {
 +      from = atoi (argv[argc - 2]);
@@ -11427,13 +11472,12 @@ index 0cf03d9..d6a85d9 100644
 +    }
 +
 +  children = varobj_list_children (var, &from, &to);
-   ui_out_field_int (uiout, "numchild", VEC_length (varobj_p, children));
--  if (argc == 2)
++  ui_out_field_int (uiout, "numchild", to - from);
 +  if (argc == 2 || argc == 4)
      print_values = mi_parse_values_option (argv[0]);
    else
      print_values = PRINT_NO_VALUES;
-@@ -398,21 +421,28 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
+@@ -398,21 +423,28 @@ mi_cmd_var_list_children (char *command, char **argv, int argc)
        xfree (display_hint);
      }
  
@@ -11475,7 +11519,7 @@ index 0cf03d9..d6a85d9 100644
  }
  
  void
-@@ -538,16 +568,24 @@ mi_cmd_var_evaluate_expression (char *command, char **argv, int argc)
+@@ -538,16 +570,24 @@ mi_cmd_var_evaluate_expression (char *command, char **argv, int argc)
    var = varobj_get_handle (argv[optind]);
     
    if (formatFound)
@@ -11503,7 +11547,7 @@ index 0cf03d9..d6a85d9 100644
  
    if (argc != 2)
      error (_("mi_cmd_var_assign: Usage: NAME EXPRESSION."));
-@@ -563,7 +601,9 @@ mi_cmd_var_assign (char *command, char **argv, int argc)
+@@ -563,7 +603,9 @@ mi_cmd_var_assign (char *command, char **argv, int argc)
    if (!varobj_set_value (var, expression))
      error (_("mi_cmd_var_assign: Could not assign expression to variable object"));
  
@@ -11514,7 +11558,7 @@ index 0cf03d9..d6a85d9 100644
  }
  
  /* Type used for parameters passing to mi_cmd_var_update_iter.  */
-@@ -644,7 +684,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
+@@ -644,7 +686,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
      }
    else
      {
@@ -11522,7 +11566,15 @@ index 0cf03d9..d6a85d9 100644
        struct varobj *var = varobj_get_handle (name);
  
        varobj_update_one (var, print_values, 1 /* explicit */);
-@@ -678,8 +717,12 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+@@ -670,6 +711,7 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+   for (i = 0; VEC_iterate (varobj_update_result, changes, i, r); ++i)
+     {
+       char *display_hint;
++      int from, to;
+ 
+       if (mi_version (uiout) > 1)
+         cleanup = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+@@ -678,8 +720,12 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
        switch (r->status)
  	{
  	case VAROBJ_IN_SCOPE:
@@ -11537,7 +11589,7 @@ index 0cf03d9..d6a85d9 100644
  	  ui_out_field_string (uiout, "in_scope", "true");
  	  break;
          case VAROBJ_NOT_IN_SCOPE:
-@@ -699,11 +742,11 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+@@ -699,11 +745,11 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
  	}
  
        if (r->type_changed)
@@ -11554,19 +11606,19 @@ index 0cf03d9..d6a85d9 100644
  
        display_hint = varobj_get_display_hint (var);
        if (display_hint)
-@@ -714,26 +757,58 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+@@ -712,28 +758,56 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
+ 	  xfree (display_hint);
+ 	}
  
-       if (r->children_changed)
- 	{
+-      if (r->children_changed)
+-	{
 -	  int ix;
 -	  struct varobj *child;
 -	  struct cleanup *cleanup =
 -	    make_cleanup_ui_out_list_begin_end (uiout, "children");
-+	  int from, to;
-+	  varobj_get_child_range (r->varobj, &from, &to);
-+	  ui_out_field_int (uiout, "has_more",
-+			    varobj_has_more (r->varobj, to));
-+	}
++      varobj_get_child_range (r->varobj, &from, &to);
++      ui_out_field_int (uiout, "has_more",
++			varobj_has_more (r->varobj, to));
  
 -	  VEC (varobj_p)* children = varobj_list_children (r->varobj);
 +      if (r->new)
@@ -17702,7 +17754,7 @@ index 49c0437..84a476e 100644
 +  return 1;
 +}
 diff --git a/gdb/python/python-value.c b/gdb/python/python-value.c
-index c4217d5..f1da660 100644
+index c4217d5..b993515 100644
 --- a/gdb/python/python-value.c
 +++ b/gdb/python/python-value.c
 @@ -25,6 +25,7 @@
@@ -17724,7 +17776,37 @@ index c4217d5..f1da660 100644
  #define builtin_type_pybool \
    language_bool_type (python_language, python_gdbarch)
  
-@@ -883,7 +888,34 @@ convert_value_from_python (PyObject *obj)
+@@ -693,7 +698,10 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
+     {
+       value_other = convert_value_from_python (other);
+       if (value_other == NULL)
+-	return NULL;
++	{
++	  result = -1;
++	  break;
++	}
+ 
+       switch (op) {
+         case Py_LT:
+@@ -720,11 +728,16 @@ valpy_richcompare (PyObject *self, PyObject *other, int op)
+ 	  /* Can't happen.  */
+ 	  PyErr_SetString (PyExc_NotImplementedError,
+ 			   "Invalid operation on gdb.Value.");
+-	  return NULL;
++	  result = -1;
++	  break;
+       }
+     }
+   GDB_PY_HANDLE_EXCEPTION (except);
+ 
++  /* In this case, the Python exception has already been set.  */
++  if (result < 0)
++    return NULL;
++
+   if (result == 1)
+     Py_RETURN_TRUE;
+ 
+@@ -883,7 +896,34 @@ convert_value_from_python (PyObject *obj)
  	{
  	  LONGEST l = PyLong_AsLongLong (obj);
  
@@ -17760,7 +17842,7 @@ index c4217d5..f1da660 100644
  	    value = value_from_longest (builtin_type_pylong, l);
  	}
        else if (PyFloat_Check (obj))
-@@ -942,6 +974,25 @@ gdbpy_history (PyObject *self, PyObject *args)
+@@ -942,6 +982,25 @@ gdbpy_history (PyObject *self, PyObject *args)
    return value_to_value_object (res_val);
  }
  
@@ -17786,7 +17868,7 @@ index c4217d5..f1da660 100644
  void
  gdbpy_initialize_values (void)
  {
-@@ -952,6 +1003,8 @@ gdbpy_initialize_values (void)
+@@ -952,6 +1011,8 @@ gdbpy_initialize_values (void)
    PyModule_AddObject (gdb_module, "Value", (PyObject *) &value_object_type);
  
    values_in_python = NULL;
@@ -20806,6 +20888,215 @@ index 750fd23..dfdb929 100644
  gdb_test "set input-radix 1" \
      "Nonsense input radix ``decimal 1''; input radix unchanged\\." \
      "Reject input-radix 1"
+diff --git a/gdb/testsuite/gdb.base/solib-overlap-lib.c b/gdb/testsuite/gdb.base/solib-overlap-lib.c
+new file mode 100644
+index 0000000..d4aec0d
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/solib-overlap-lib.c
+@@ -0,0 +1,27 @@
++/* Copyright 2009 Free Software Foundation, Inc.
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Contributed by Jan Kratochvil <jan.kratochvil@redhat.com>.  */
++
++void
++libsym (void)
++{
++}
++
++#ifdef SYMB
++void
++libsymb (void)
++{
++}
++#endif
+diff --git a/gdb/testsuite/gdb.base/solib-overlap-main.c b/gdb/testsuite/gdb.base/solib-overlap-main.c
+new file mode 100644
+index 0000000..1e91dd2
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/solib-overlap-main.c
+@@ -0,0 +1,25 @@
++/* Copyright 2009 Free Software Foundation, Inc.
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   Contributed by Jan Kratochvil <jan.kratochvil@redhat.com>.  */
++
++#include <unistd.h>
++
++int
++main (void)
++{
++  sleep (60);
++
++  return 1;
++}
+diff --git a/gdb/testsuite/gdb.base/solib-overlap.exp b/gdb/testsuite/gdb.base/solib-overlap.exp
+new file mode 100644
+index 0000000..d644d9b
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/solib-overlap.exp
+@@ -0,0 +1,139 @@
++# Copyright 2009 Free Software Foundation, Inc.
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++#
++# Contributed by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++# Test GDB can cope with two libraries loaded with overlapping VMA ranges.
++# Prelink libraries first so they can be loaded and their native address.
++# In such case `struct linkmap'.l_addr will be zero.  Provide different
++# unprelinked library files on the disk which have zero-based VMAs.  These
++# different files should have their .dynamic section at a different offset in
++# page size so that we get for
++#   warning: .dynamic section for "..." is not at the expected address
++# the reason
++#   (wrong library or version mismatch?)
++# and not:
++#   difference appears to be caused by prelink, adjusting expectations
++# In such case both disk libraries will be loaded at VMAs starting at zero.
++
++if [skip_shlib_tests] {
++    return 0
++}
++
++# Are we on a target board?  It is required for attaching to a process.
++if [is_remote target] {
++    return 0
++}
++
++if [get_compiler_info binfile-unused] {
++    return -1;
++}
++
++# Library file.
++set libname "solib-overlap-lib"
++set srcfile_lib ${srcdir}/${subdir}/${libname}.c
++# Binary file.
++set testfile "solib-overlap-main"
++set srcfile ${srcdir}/${subdir}/${testfile}.c
++
++# Base addresses for `prelink -r' which should be compatible with both -m32 and
++# -m64 targets.  If it clashes with system prelinked libraries it would give
++# false PASS.
++# Prelink first lib1 at 0x40000000 and lib2 at 0x41000000.
++# During second pass try lib1 at 0x50000000 and lib2 at 0x51000000.
++foreach prelink_lib1 {0x40000000 0x50000000} {
++    set prelink_lib2 [format "0x%x" [expr $prelink_lib1 + 0x01000000]]
++
++    set old_prefix $pf_prefix
++    lappend pf_prefix "$prelink_lib1:"
++
++    # Library file.
++    set binfile_lib1 ${objdir}/${subdir}/${libname}1-${prelink_lib1}.so
++    set binfile_lib2 ${objdir}/${subdir}/${libname}2-${prelink_lib1}.so
++    set lib_flags {debug}
++    # Binary file.
++    set binfile_base ${testfile}-${prelink_lib1}
++    set binfile ${objdir}/${subdir}/${binfile_base}
++    set bin_flags [list debug shlib=${binfile_lib1} shlib=${binfile_lib2}]
++    set escapedbinfile  [string_to_regexp ${binfile}]
++
++    if { [gdb_compile_shlib ${srcfile_lib} ${binfile_lib1} $lib_flags] != ""
++	 || [gdb_compile_shlib ${srcfile_lib} ${binfile_lib2} $lib_flags] != ""
++	 || [gdb_compile ${srcfile} ${binfile} executable $bin_flags] != "" } {
++	untested "Could not compile ${binfile_lib1}, ${binfile_lib2} or ${binfile}."
++	return -1
++    }
++
++    if {[catch "system \"prelink -N -r ${prelink_lib1} ${binfile_lib1}\""] != 0
++	|| [catch "system \"prelink -N -r ${prelink_lib2} ${binfile_lib2}\""] != 0} {
++	# Maybe we don't have prelink.
++	untested "Could not prelink ${binfile_lib1} or ${binfile_lib2}."
++	return -1
++    }
++
++    # Start the program running and then wait for a bit, to be sure
++    # that it can be attached to.
++
++    set testpid [eval exec $binfile &]
++    sleep 2
++    if { [istarget "*-*-cygwin*"] } {
++	# testpid is the Cygwin PID, GDB uses the Windows PID, which might be
++	# different due to the way fork/exec works.
++	set testpid [ exec ps -e | gawk "{ if (\$1 == $testpid) print \$4; }" ]
++    }
++
++    remote_exec build "mv -f ${binfile_lib1} ${binfile_lib1}-running"
++    remote_exec build "mv -f ${binfile_lib2} ${binfile_lib2}-running"
++
++    # Provide another exported function name to cause different sizes of sections.
++    lappend lib_flags additional_flags=-DSYMB
++
++    if { [gdb_compile_shlib ${srcfile_lib} ${binfile_lib1} $lib_flags] != ""
++	 || [gdb_compile_shlib ${srcfile_lib} ${binfile_lib2} $lib_flags] != ""} {
++	untested "Could not recompile ${binfile_lib1} or ${binfile_lib2}."
++	remote_exec build "kill -9 ${testpid}"
++	return -1
++    }
++
++    clean_restart ${binfile_base}
++    # This testcase currently does not support remote targets.
++    # gdb_load_shlibs ${binfile_lib1} ${binfile_lib2}
++
++    # Here we should get:
++    # warning: .dynamic section for ".../solib-overlap-lib1.so" is not at the expected address (wrong library or version mismatch?)
++    # warning: .dynamic section for ".../solib-overlap-lib2.so" is not at the expected address (wrong library or version mismatch?)
++
++    set test attach
++    gdb_test_multiple "attach $testpid" $test {
++	-re "Attaching to program.*`?$escapedbinfile'?, process $testpid.*$gdb_prompt $" {
++	    pass $test
++	}
++	-re "Attaching to program.*`?$escapedbinfile\.exe'?, process $testpid.*\[Switching to thread $testpid\..*\].*$gdb_prompt $" {
++	    # Response expected on Cygwin
++	    pass $test
++	}
++    }
++
++    # Detach the process.
++
++    gdb_test "detach" "Detaching from program: .*$escapedbinfile, process $testpid"
++
++    # Wait a bit for gdb to finish detaching
++
++    sleep 5
++
++    remote_exec build "kill -9 ${testpid}"
++
++    set pf_prefix $old_prefix
++}
 diff --git a/gdb/testsuite/gdb.base/valgrind-attach.c b/gdb/testsuite/gdb.base/valgrind-attach.c
 new file mode 100644
 index 0000000..84b57db
@@ -24670,6 +24961,345 @@ index d4acdc2..244c731 100644
      "list children of fooPtr.$i"
  }
  
+diff --git a/gdb/testsuite/gdb.mi/mi-break.exp b/gdb/testsuite/gdb.mi/mi-break.exp
+index 619727d..8d06c0e 100644
+--- a/gdb/testsuite/gdb.mi/mi-break.exp
++++ b/gdb/testsuite/gdb.mi/mi-break.exp
+@@ -175,7 +175,7 @@ proc test_error {} {
+     # containing function call, the internal breakpoint created to handle
+     # function call would be reported, messing up MI output.
+     mi_gdb_test "-var-create V * return_1()" \
+-        "\\^done,name=\"V\",numchild=\"0\",value=\"1\",type=\"int\"" \
++        "\\^done,name=\"V\",numchild=\"0\",value=\"1\",type=\"int\",has_more=\"0\"" \
+         "create varobj for function call"
+ 
+     mi_gdb_test "-var-update *" \
+diff --git a/gdb/testsuite/gdb.mi/mi-var-block.exp b/gdb/testsuite/gdb.mi/mi-var-block.exp
+index 8806848..93ded26 100644
+--- a/gdb/testsuite/gdb.mi/mi-var-block.exp
++++ b/gdb/testsuite/gdb.mi/mi-var-block.exp
+@@ -74,7 +74,7 @@ mi_step_to "do_block_tests" "" "var-cmd.c" \
+ # Test: c_variable-3.4
+ # Desc: check foo, cb changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"foo\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"cb\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"foo\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"cb\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: cb foo changed"
+ 
+ # step to "foo = 321;"
+diff --git a/gdb/testsuite/gdb.mi/mi-var-child.exp b/gdb/testsuite/gdb.mi/mi-var-child.exp
+index 1f4bdc6..eb6c456 100644
+--- a/gdb/testsuite/gdb.mi/mi-var-child.exp
++++ b/gdb/testsuite/gdb.mi/mi-var-child.exp
+@@ -680,7 +680,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.2
+ # Desc: check that integer changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.integer\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.integer"
+ 
+ # Step over:
+@@ -693,7 +693,7 @@ mi_execute_to "exec-step 3" "end-stepping-range" do_children_tests {} ".*${srcfi
+ # Test: c_variable-5.3
+ # Desc: check that char_ptr changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.char_ptr"
+ 
+ # Step over "struct_declarations.int_ptr_ptr = &foo;"
+@@ -703,7 +703,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.4
+ # Desc: check that int_ptr_ptr and children changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr.\\*\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr.\\*\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr.\\*\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr.\\*\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars int_ptr_ptr and children changed"
+ 
+ # Step over "weird->long_array[0] = 1234;"
+@@ -713,7 +713,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.5
+ # Desc: check that long_array[0] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.0\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.0\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.0 changed"
+ 
+ # Step over "struct_declarations.long_array[1] = 2345;"
+@@ -723,7 +723,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.6
+ # Desc: check that long_array[1] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.1\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.1\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.1 changed"
+ 
+ # Step over "weird->long_array[2] = 3456;"
+@@ -733,7 +733,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.7
+ # Desc: check that long_array[2] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.2\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.2\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.2 changed"
+ 
+ # Step over:
+@@ -752,7 +752,7 @@ mi_execute_to "exec-step 7" "end-stepping-range" do_children_tests {} ".*${srcfi
+ # Test: c_variable-5.8
+ # Desc: check that long_array[3-9] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.3\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.4\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.5\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.6\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.7\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.8\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.9\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.3\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.4\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.5\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.6\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.7\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.8\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.9\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.3-9 changed"
+ 
+ 
+@@ -763,7 +763,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.9
+ # Desc: check that func_ptr changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.func_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.func_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.func_ptr changed"
+ 
+ # Step over "struct_declarations.long_array[10] = 3456";
+@@ -771,7 +771,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+     [expr $line_dct_nothing + 2] "step \$line_dct_nothing + 2"
+ 
+ mi_gdb_test "-var-update --no-values *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.10\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.10\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+  "update all vars struct_declarations.long_array.10 changed, don't print values."
+ 
+ # Step over "struct_declarations.long_array[11] = 5678";
+@@ -780,7 +780,7 @@ mi_step_to  do_children_tests {} ".*${srcfile}" \
+     $line_dct_a0_0 "step \$line_dct_a0_0"
+ 
+ mi_gdb_test "-var-update --all-values *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.11\",value=\"5678\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.11\",value=\"5678\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+  "update all vars struct_declarations.long_array.11 changed, print values."
+ 
+ mi_list_varobj_children {struct_declarations.long_array --all-values} {
+@@ -1121,7 +1121,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.47
+ # Desc: check that psnp->char_ptr (and [0].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr.\\*\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr.\\*\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->char_ptr (and 0.char_ptr) changed"
+ 
+ #  Step over "snp1.char_ptr = &c3;"
+@@ -1131,7 +1131,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.48
+ # Desc: check that psnp->next->char_ptr (and [1].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr.\\*\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr.\\*\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->char_ptr (and 1.char_ptr) changed"
+ 
+ 
+@@ -1142,7 +1142,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.49
+ # Desc: check that psnp->next->next->char_ptr (and [2].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->next->char_ptr (and 2.char_ptr) changed"
+ 
+ 
+@@ -1153,7 +1153,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.50
+ # Desc: check that psnp->long_ptr (and [0].long_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr.\\*\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr.\\*\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->long_ptr (and 0.long_ptr) changed"
+ 
+ 
+@@ -1181,7 +1181,7 @@ mi_step_to do_children_tests {} ".*${srcfile}" \
+ # Test: c_variable-5.52
+ # Desc: check that psnp->next->next->long_ptr (and [2].long_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.long_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->next->long_ptr (and 2.long_ptr) changed"
+ 
+ mi_prepare_inline_tests $srcfile
+diff --git a/gdb/testsuite/gdb.mi/mi-var-cmd.exp b/gdb/testsuite/gdb.mi/mi-var-cmd.exp
+index ad2e55c..6efb333 100644
+--- a/gdb/testsuite/gdb.mi/mi-var-cmd.exp
++++ b/gdb/testsuite/gdb.mi/mi-var-cmd.exp
+@@ -146,7 +146,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" $line_dlt_linteger "step at do_local
+ # Test: c_variable-2.2
+ # Desc: check whether only linteger changed values
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: linteger changed"
+ 
+ # Step over "lpinteger = &linteger;"
+@@ -155,7 +155,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 1] "step
+ # Test: c_variable-2.3
+ # Desc: check whether only lpinteger changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpinteger changed"
+ 
+ # Step over "lcharacter = 'a';"
+@@ -164,7 +164,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 2] "step
+ # Test: c_variable-2.4
+ # Desc: check whether only lcharacter changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lcharacter changed"
+ 
+ # Step over "lpcharacter = &lcharacter;"
+@@ -173,7 +173,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 3] "step
+ # Test: c_variable-2.5
+ # Desc: check whether only lpcharacter changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpcharacter changed"
+ 
+ 
+@@ -195,7 +195,7 @@ mi_execute_to "exec-step 9" "end-stepping-range" "do_locals_tests" "" \
+ # Desc: check whether llong, lplong, lfloat, lpfloat, ldouble, lpdouble, lsimple.integer,
+ #       lsimple.unsigned_character lsimple.integer lsimple.character changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpdouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lplong\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpdouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lplong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: many changed"
+ 
+ # Step over:
+@@ -212,7 +212,7 @@ mi_execute_to "exec-step 4" "end-stepping-range" "do_locals_tests" "" \
+ # Test: c_variable-2.7
+ # Desc: check whether (lsimple.signed_character, lsimple.char_ptr) lpsimple, func changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"func\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpsimple\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"func\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpsimple\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: func and lpsimple changed"
+ 
+ # Step over
+@@ -234,7 +234,7 @@ mi_execute_to "exec-step 8" "end-stepping-range" "do_locals_tests" "" \
+ # Note: this test also checks that lpsimple->integer and lsimple.integer have
+ #       changed (they are the same)
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lsimple and others changed"
+ 
+ 
+@@ -257,7 +257,7 @@ mi_gdb_test "-var-assign linteger 3333" \
+ # change.
+ set lpchar_update "\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\},"
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[($lpchar_update)?\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[($lpchar_update)?\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: linteger changed after assign"
+ 
+ mi_gdb_test "-var-assign linteger 3333" \
+@@ -277,7 +277,7 @@ mi_gdb_test "-var-assign lpinteger \"&linteger + 3\"" \
+ 	"assign to lpinteger"
+ 
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpinteger changed after assign"
+ 
+ mi_gdb_test "-var-update *" \
+@@ -377,7 +377,7 @@ mi_gdb_test "-var-update *" \
+ 	"assign same value to func (update)"
+ 
+ mi_gdb_test "-var-create array_ptr * array_ptr" \
+-	"\\^done,name=\"array_ptr\",numchild=\"1\",value=\"$hex\",type=\"int \\*\"" \
++	"\\^done,name=\"array_ptr\",numchild=\"1\",value=\"$hex\",type=\"int \\*\",has_more=\"0\"" \
+ 	"create global variable array_ptr"
+ 
+ mi_gdb_test "-var-assign array_ptr array2" \
+@@ -385,7 +385,7 @@ mi_gdb_test "-var-assign array_ptr array2" \
+ 	"assign array to pointer"
+ 
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"array_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"array_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"assign array to pointer (update)"
+ 
+ mi_gdb_test "-var-assign array_ptr array2" \
+@@ -439,7 +439,7 @@ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\
+ # Test: c_variable-2.13
+ # Desc: change subroutine1 local i
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"i\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"i\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: i changed"
+ 
+ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\}" \
+@@ -448,7 +448,7 @@ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\
+ # Test: c_variable-2.14
+ # Desc: change do_locals_tests local llong
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: llong changed"
+ 
+ set line_dlt_call_subroutine1 [gdb_get_line_number "subroutine1 (linteger, &llong);"]
+@@ -458,7 +458,7 @@ mi_next_to "do_locals_tests" ""	"var-cmd.c" \
+ # Test: c_variable-2.15
+ # Desc: check for out of scope subroutine1 locals
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"l\",in_scope=\"false\"\,type_changed=\"false\"},\{name=\"i\",in_scope=\"false\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"l\",in_scope=\"false\"\,type_changed=\"false\",has_more=\"0\"},\{name=\"i\",in_scope=\"false\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: all now out of scope"
+ 
+ # Done with locals/globals tests. Erase all variables
+@@ -550,14 +550,14 @@ mi_gdb_test "-var-create selected_a @ a" \
+ mi_continue_to incr_a
+ 
+ mi_gdb_test "-var-update selected_a" \
+-	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"char\",new_num_children=\"0\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"char\",new_num_children=\"0\",has_more=\"0\"\}\\\]" \
+ 	"update selected_a in incr_a"
+ 
+ mi_next "step a line in incr_a"
+ mi_next "return from incr_a to do_special_tests"
+ 
+ mi_gdb_test "-var-update selected_a" \
+-	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"int\",new_num_children=\"0\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"int\",new_num_children=\"0\",has_more=\"0\"\}\\\]" \
+ 	"update selected_a in do_special_tests"
+ 
+ mi_gdb_test "-file-exec-and-symbols ${binfile}" "\\^done" \
+@@ -596,7 +596,7 @@ mi_check_varobj_value F 7 "check F inside callee"
+ # A varobj we fail to read during -var-update should be considered
+ # out of scope.
+ mi_gdb_test "-var-create null_ptr * **0" \
+-    {\^done,name="null_ptr",numchild="0",value=".*",type="int"} \
++    {\^done,name="null_ptr",numchild="0",value=".*",type="int",has_more="0"} \
+     "create null_ptr"
+ 
+ # Allow this to succeed, if address zero is readable, although it
+@@ -644,7 +644,7 @@ mi_check_varobj_value "L" "{...}" "in-and-out-of-scope: check initial value"
+ mi_runto main
+ 
+ mi_gdb_test "-var-update L" \
+-    {\^done,changelist=\[{name="L",in_scope="false",type_changed="false"}\]} \
++    {\^done,changelist=\[{name="L",in_scope="false",type_changed="false",has_more="0"}\]} \
+     "in-and-out-of-scope: out of scope now"
+ 
+ mi_gdb_test "-var-update L" \
+@@ -654,7 +654,7 @@ mi_gdb_test "-var-update L" \
+ mi_continue_to do_locals_tests
+ 
+ mi_gdb_test "-var-update L" \
+-    {\^done,changelist=\[{name="L",in_scope="true",type_changed="false"}\]} \
++    {\^done,changelist=\[{name="L",in_scope="true",type_changed="false",has_more="0"}\]} \
+     "in-and-out-of-scope: in scope now"
+ 
+ mi_gdb_test "-var-update L" \
 diff --git a/gdb/testsuite/gdb.mi/mi-var-display.exp b/gdb/testsuite/gdb.mi/mi-var-display.exp
 index 4b02e50..faa9172 100644
 --- a/gdb/testsuite/gdb.mi/mi-var-display.exp
@@ -24692,6 +25322,284 @@ index 4b02e50..faa9172 100644
  	"get children of anone"
  
  
+diff --git a/gdb/testsuite/gdb.mi/mi2-var-block.exp b/gdb/testsuite/gdb.mi/mi2-var-block.exp
+index 6bcfea3..9b3d08f 100644
+--- a/gdb/testsuite/gdb.mi/mi2-var-block.exp
++++ b/gdb/testsuite/gdb.mi/mi2-var-block.exp
+@@ -74,7 +74,7 @@ mi_step_to "do_block_tests" "" "var-cmd.c" \
+ # Test: c_variable-3.4
+ # Desc: check foo, cb changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"foo\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"cb\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"foo\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"cb\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: cb foo changed"
+ 
+ # step to "foo = 321;"
+diff --git a/gdb/testsuite/gdb.mi/mi2-var-child.exp b/gdb/testsuite/gdb.mi/mi2-var-child.exp
+index 161b34f..0f9b4d4 100644
+--- a/gdb/testsuite/gdb.mi/mi2-var-child.exp
++++ b/gdb/testsuite/gdb.mi/mi2-var-child.exp
+@@ -1,4 +1,4 @@
+-# Copyright 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation
++# Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2009 Free Software Foundation
+ 
+ # This program is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+@@ -680,7 +680,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.2
+ # Desc: check that integer changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.integer\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.integer"
+ 
+ # Step over:
+@@ -693,7 +693,7 @@ mi_execute_to "exec-step 3" "end-stepping-range" do_children_tests {} {.*var-cmd
+ # Test: c_variable-5.3
+ # Desc: check that char_ptr changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.char_ptr"
+ 
+ # Step over "struct_declarations.int_ptr_ptr = &foo;"
+@@ -703,7 +703,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.4
+ # Desc: check that int_ptr_ptr and children changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr.\\*\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr.\\*\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"weird->int_ptr_ptr.\\*weird->int_ptr_ptr.\\*\\*weird->int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.int_ptr_ptr.\\*int_ptr_ptr.\\*\\*int_ptr_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars int_ptr_ptr and children changed"
+ 
+ # Step over "weird->long_array[0] = 1234;"
+@@ -713,7 +713,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.5
+ # Desc: check that long_array[0] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.0\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.0\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.0 changed"
+ 
+ # Step over "struct_declarations.long_array[1] = 2345;"
+@@ -723,7 +723,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.6
+ # Desc: check that long_array[1] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.1\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.1\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.1 changed"
+ 
+ # Step over "weird->long_array[2] = 3456;"
+@@ -733,7 +733,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.7
+ # Desc: check that long_array[2] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.2\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.2\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.2 changed"
+ 
+ # Step over:
+@@ -752,7 +752,7 @@ mi_execute_to "exec-step 7" "end-stepping-range" do_children_tests {} {.*var-cmd
+ # Test: c_variable-5.8
+ # Desc: check that long_array[3-9] changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.3\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.4\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.5\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.6\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.7\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.8\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"struct_declarations.long_array.9\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.long_array.3\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.4\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.5\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.6\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.7\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.8\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"struct_declarations.long_array.9\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.long_array.3-9 changed"
+ 
+ 
+@@ -764,7 +764,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.9
+ # Desc: check that func_ptr changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"struct_declarations.func_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"struct_declarations.func_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars struct_declarations.func_ptr changed"
+ 
+ # Delete all variables
+@@ -1075,7 +1075,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.47
+ # Desc: check that psnp->char_ptr (and [0].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr.\\*\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->char_ptr.\\*psnp->char_ptr.\\*\\*psnp->char_ptr.\\*\\*\\*psnp->char_ptr.\\*\\*\\*\\*psnp->char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->char_ptr (and 0.char_ptr) changed"
+ 
+ #  Step over "snp1.char_ptr = &c3;"
+@@ -1085,7 +1085,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.48
+ # Desc: check that psnp->next->char_ptr (and [1].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr.\\*\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->ptrs.0.next.char_ptr.\\*char_ptr.\\*\\*char_ptr.\\*\\*\\*char_ptr.\\*\\*\\*\\*char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->char_ptr (and 1.char_ptr) changed"
+ 
+ 
+@@ -1096,7 +1096,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.49
+ # Desc: check that psnp->next->next->char_ptr (and [2].char_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.char_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.char_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->next->char_ptr (and 2.char_ptr) changed"
+ 
+ 
+@@ -1107,7 +1107,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.50
+ # Desc: check that psnp->long_ptr (and [0].long_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr.\\*\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"psnp->long_ptr.\\*psnp->long_ptr.\\*\\*psnp->long_ptr.\\*\\*\\*psnp->long_ptr.\\*\\*\\*\\*psnp->long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->long_ptr (and 0.long_ptr) changed"
+ 
+ 
+@@ -1120,7 +1120,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Why does this have a FIXME?
+ setup_xfail *-*-*
+ mi_gdb_test "-var-update *" \
+-	"FIXME\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.long_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"FIXME\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->long_ptr (and 1.long_ptr) changed"
+ clear_xfail *-*-*
+ 
+@@ -1135,7 +1135,7 @@ mi_step_to do_children_tests {} {.*var-cmd.c} \
+ # Test: c_variable-5.52
+ # Desc: check that psnp->next->next->long_ptr (and [2].long_ptr) changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.long_ptr\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"psnp->ptrs.0.next.next.long_ptr\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars psnp->next->next->long_ptr (and 2.long_ptr) changed"
+ 
+ 
+diff --git a/gdb/testsuite/gdb.mi/mi2-var-cmd.exp b/gdb/testsuite/gdb.mi/mi2-var-cmd.exp
+index 96d42a1..e900d14 100644
+--- a/gdb/testsuite/gdb.mi/mi2-var-cmd.exp
++++ b/gdb/testsuite/gdb.mi/mi2-var-cmd.exp
+@@ -146,7 +146,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" $line_dlt_linteger "step at do_local
+ # Test: c_variable-2.2
+ # Desc: check whether only linteger changed values
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: linteger changed"
+ 
+ # Step over "lpinteger = &linteger;"
+@@ -155,7 +155,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 1] "step
+ # Test: c_variable-2.3
+ # Desc: check whether only lpinteger changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpinteger changed"
+ 
+ # Step over "lcharacter = 'a';"
+@@ -164,7 +164,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 2] "step
+ # Test: c_variable-2.4
+ # Desc: check whether only lcharacter changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lcharacter changed"
+ 
+ # Step over "lpcharacter = &lcharacter;"
+@@ -173,7 +173,7 @@ mi_step_to "do_locals_tests" "" "var-cmd.c" [expr $line_dlt_linteger + 3] "step
+ # Test: c_variable-2.5
+ # Desc: check whether only lpcharacter changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpcharacter changed"
+ 
+ 
+@@ -195,7 +195,7 @@ mi_execute_to "exec-step 9" "end-stepping-range" "do_locals_tests" "" \
+ # Desc: check whether llong, lplong, lfloat, lpfloat, ldouble, lpdouble, lsimple.integer,
+ #       lsimple.unsigned_character lsimple.integer lsimple.character changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpdouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lplong\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpdouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lplong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: many changed"
+ 
+ # Step over:
+@@ -212,7 +212,7 @@ mi_execute_to "exec-step 4" "end-stepping-range" "do_locals_tests" "" \
+ # Test: c_variable-2.7
+ # Desc: check whether (lsimple.signed_character, lsimple.char_ptr) lpsimple, func changed
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"func\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpsimple\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"func\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpsimple\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: func and lpsimple changed"
+ 
+ # Step over
+@@ -234,7 +234,7 @@ mi_execute_to "exec-step 8" "end-stepping-range" "do_locals_tests" "" \
+ # Note: this test also checks that lpsimple->integer and lsimple.integer have
+ #       changed (they are the same)
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\"\},\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lsimple.integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple->integer\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lsimple.character\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"ldouble\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lfloat\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"lcharacter\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\},\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lsimple and others changed"
+ 
+ 
+@@ -257,7 +257,7 @@ mi_gdb_test "-var-assign linteger 3333" \
+ # change.
+ set lpchar_update "\{name=\"lpcharacter\",in_scope=\"true\",type_changed=\"false\"\},"
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[($lpchar_update)?\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[($lpchar_update)?\{name=\"linteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: linteger changed after assign"
+ 
+ mi_gdb_test "-var-assign linteger 3333" \
+@@ -277,7 +277,7 @@ mi_gdb_test "-var-assign lpinteger \"&linteger + 3\"" \
+ 	"assign to lpinteger"
+ 
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"lpinteger\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: lpinteger changed after assign"
+ 
+ mi_gdb_test "-var-update *" \
+@@ -402,7 +402,7 @@ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\
+ # Test: c_variable-2.13
+ # Desc: change subroutine1 local i
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"i\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"i\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: i changed"
+ 
+ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\}" \
+@@ -411,7 +411,7 @@ mi_step_to "subroutine1" "\{name=\"i\",value=\".*\"\},\{name=\"l\",value=\".*\"\
+ # Test: c_variable-2.14
+ # Desc: change do_locals_tests local llong
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"llong\",in_scope=\"true\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"llong\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: llong changed"
+ 
+ set line_dlt_call_subroutine1 [gdb_get_line_number "subroutine1 (linteger, &llong);"]
+@@ -421,7 +421,7 @@ mi_next_to "do_locals_tests" ""	"var-cmd.c" \
+ # Test: c_variable-2.15
+ # Desc: check for out of scope subroutine1 locals
+ mi_gdb_test "-var-update *" \
+-	"\\^done,changelist=\\\[\{name=\"l\",in_scope=\"false\"\,type_changed=\"false\"},\{name=\"i\",in_scope=\"false\",type_changed=\"false\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"l\",in_scope=\"false\"\,type_changed=\"false\",has_more=\"0\"},\{name=\"i\",in_scope=\"false\",type_changed=\"false\",has_more=\"0\"\}\\\]" \
+ 	"update all vars: all now out of scope"
+ 
+ # Done with locals/globals tests. Erase all variables
+@@ -513,14 +513,14 @@ mi_gdb_test "-var-create selected_a @ a" \
+ mi_continue_to incr_a
+ 
+ mi_gdb_test "-var-update selected_a" \
+-	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"char\",new_num_children=\"0\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"char\",new_num_children=\"0\"\,has_more=\"0\"}\\\]" \
+ 	"update selected_a in incr_a"
+ 
+ mi_next "step a line in incr_a"
+ mi_next "return from incr_a to do_special_tests"
+ 
+ mi_gdb_test "-var-update selected_a" \
+-	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"int\",new_num_children=\"0\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"selected_a\",in_scope=\"true\",type_changed=\"true\",new_type=\"int\",new_num_children=\"0\",has_more=\"0\"\}\\\]" \
+ 	"update selected_a in do_special_tests"
+ 
+ mi_gdb_test "-file-exec-and-symbols ${binfile}" "\\^done" \
 diff --git a/gdb/testsuite/gdb.mi/mi2-var-display.exp b/gdb/testsuite/gdb.mi/mi2-var-display.exp
 index d6ce673..17e208a 100644
 --- a/gdb/testsuite/gdb.mi/mi2-var-display.exp
@@ -24815,6 +25723,87 @@ index 0000000..f2de718
 +# Seen regression:
 +# Address requested for identifier "arr" which is in register $rdi
 +gdb_test "p arr\[0\]" "\\$\[0-9\]+ = 42"
+diff --git a/gdb/testsuite/gdb.opt/fortran-string.exp b/gdb/testsuite/gdb.opt/fortran-string.exp
+new file mode 100644
+index 0000000..f997eec
+--- /dev/null
++++ b/gdb/testsuite/gdb.opt/fortran-string.exp
+@@ -0,0 +1,41 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++# This file was written by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++# Test GDB can cope with Fortran strings having their length present in a CPU
++# register.  With -O0 the string length is passed on the stack.  To make this
++# test meaningful the follow assertion should pass.  It is not being checked
++# here as the "_s" symbol is compiler dependent:
++#   (gdb) info address _s
++#   Symbol "_s" is a variable in register XX.
++
++set test fortran-string
++set srcfile ${test}.f90
++if { [prepare_for_testing ${test}.exp ${test} ${srcfile} {debug f77 additional_flags=-O2}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++gdb_breakpoint [gdb_get_line_number "s = s"]
++gdb_continue_to_breakpoint "s = s"
++gdb_test "frame" ".*s='foo'.*"
++gdb_test "ptype s" "type = character\\*3"
++gdb_test "p s" "\\$\[0-9\]* = 'foo'"
+diff --git a/gdb/testsuite/gdb.opt/fortran-string.f90 b/gdb/testsuite/gdb.opt/fortran-string.f90
+new file mode 100644
+index 0000000..e48d520
+--- /dev/null
++++ b/gdb/testsuite/gdb.opt/fortran-string.f90
+@@ -0,0 +1,28 @@
++! Copyright 2009 Free Software Foundation, Inc.
++!
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 2 of the License, or
++! (at your option) any later version.
++!
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++!
++! You should have received a copy of the GNU General Public License
++! along with this program; if not, write to the Free Software
++! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++!
++! Ihis file is the Fortran source file for dynamic.exp.
++! Original file written by Jakub Jelinek <jakub@redhat.com>.
++! Modified for the GDB testcase by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++  subroutine f(s)
++  character*(*) s
++  s = s
++  end
++
++  program main
++  call f ('foo')
++  end
 diff --git a/gdb/testsuite/gdb.python/Makefile.in b/gdb/testsuite/gdb.python/Makefile.in
 index 79be9e7..c49f713 100644
 --- a/gdb/testsuite/gdb.python/Makefile.in
@@ -25353,7 +26342,7 @@ index 0000000..d444554
 +gdb_test "python print t0" "\\<gdb.InferiorThread object at 0x\[\[:xdigit:\]\]+>" "verify InferiorThread object"
 +gdb_test "python print 'result =', t0.num" " = \[0-9\]+" "test Inferior.num"
 diff --git a/gdb/testsuite/gdb.python/python-mi.exp b/gdb/testsuite/gdb.python/python-mi.exp
-index 3258810..095ee78 100644
+index 3258810..018c6a2 100644
 --- a/gdb/testsuite/gdb.python/python-mi.exp
 +++ b/gdb/testsuite/gdb.python/python-mi.exp
 @@ -48,23 +48,42 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
@@ -25361,7 +26350,7 @@ index 3258810..095ee78 100644
    "step to breakpoint"
  
 -mi_create_floating_varobj container c "create container varobj"
-+mi_create_floating_varobj container c \
++mi_create_dynamic_varobj container c \
 +  "create container varobj, no pretty-printing"
 +
 +mi_list_varobj_children container {
@@ -25374,7 +26363,7 @@ index 3258810..095ee78 100644
 +
 +mi_gdb_test "-enable-pretty-printing" ""
 +
-+mi_create_floating_varobj container c \
++mi_create_dynamic_varobj container c \
 +  "create container varobj"
  
  mi_list_varobj_children container {
@@ -25407,7 +26396,7 @@ index 3258810..095ee78 100644
  
  mi_gdb_test "-var-set-visualizer container None" \
    "\\^done" \
-@@ -78,19 +97,68 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
+@@ -78,19 +97,88 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
    "\\^done" \
    "choose default visualizer"
  
@@ -25470,20 +26459,40 @@ index 3258810..095ee78 100644
 +
 +mi_next "next over update 4"
 +
++
++# Regression test: examine an object that has no children, then update
++# it to ensure that we don't print the children.
++mi_create_dynamic_varobj container2 c2 \
++  "create second container varobj"
++
++mi_gdb_test "-var-update container2" \
++  "\\^done,changelist=.." \
++  "update varobj, no children requested"
++
++mi_next "next over update 5"
++
++# Now container2 has an element -- and an update should mention that
++# it has_more.  But, because we did not request children, we still
++# should not actually see them.
++mi_varobj_update_dynamic container2 \
++    "update varobj 2, no children requested" {
++	type_changed false has_more 1
++    } {} {}
++
 +# This should only show the first child, because the update range has
 +# been set.
 +mi_varobj_update_dynamic container \
 +  "update after next with restricted range" {
 +      type_changed false new_num_children 1 has_more 1
 +  } {
-+      { name {container.\[0\]} in_scope true type_changed false }
++      { name {container.\[0\]} in_scope true type_changed false has_more 0 }
 +  } {
 +  }
  
  mi_continue_to_line \
      [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \
 diff --git a/gdb/testsuite/gdb.python/python-prettyprint.c b/gdb/testsuite/gdb.python/python-prettyprint.c
-index 3cafc48..6bbbf1d 100644
+index 3cafc48..5fbd534 100644
 --- a/gdb/testsuite/gdb.python/python-prettyprint.c
 +++ b/gdb/testsuite/gdb.python/python-prettyprint.c
 @@ -15,6 +15,8 @@
@@ -25507,9 +26516,11 @@ index 3cafc48..6bbbf1d 100644
  int
  main ()
  {
-@@ -156,10 +163,13 @@ main ()
+@@ -155,11 +162,15 @@ main ()
+   struct ss  ssa[2];
    string x = make_string ("this is x");
    zzz_type c = make_container ("container");
++  zzz_type c2 = make_container ("container2");
    const struct string_repr cstring = { { "const string" } };
 +  /* Clearing by being `static' could invoke an other GDB C++ bug.  */
 +  struct nullstr nullstr;
@@ -25521,13 +26532,15 @@ index 3cafc48..6bbbf1d 100644
  
    struct ns  ns;
    ns.null_str = "embedded\0null\0string";
-@@ -193,6 +203,9 @@ main ()
+@@ -193,6 +204,11 @@ main ()
    add_item (&c, 72);
  
  #ifdef MI
 +  add_item (&c, 1011);
 +  c.elements[0] = 1023;
 +
++  add_item (&c2, 2222);
++  add_item (&c2, 3333);
    do_nothing ();
  #endif
  
@@ -26832,10 +27845,17 @@ index 0c93a73..d0c3493 100644
  global GDB
  
 diff --git a/gdb/testsuite/lib/mi-support.exp b/gdb/testsuite/lib/mi-support.exp
-index e691232..64bc28e 100644
+index e691232..167a02c 100644
 --- a/gdb/testsuite/lib/mi-support.exp
 +++ b/gdb/testsuite/lib/mi-support.exp
-@@ -1201,7 +1201,7 @@ proc mi_create_varobj { name expression testname } {
+@@ -1195,13 +1195,13 @@ proc mi_list_breakpoints { expected test } {
+ # Name cannot be "-".
+ proc mi_create_varobj { name expression testname } {
+     mi_gdb_test "-var-create $name * $expression" \
+-        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*" \
++        "\\^done,name=\"$name\",numchild=\"\[0-9\]+\",value=\".*\",type=.*,has_more=\"0\"" \
+         $testname
+ }
  
  proc mi_create_floating_varobj { name expression testname } {
      mi_gdb_test "-var-create $name @ $expression" \
@@ -26844,7 +27864,38 @@ index e691232..64bc28e 100644
          $testname
  }
  
-@@ -1250,16 +1250,64 @@ proc mi_varobj_update_with_type_change { name new_type new_children testname } {
+@@ -1214,6 +1214,14 @@ proc mi_create_varobj_checked { name expression type testname } {
+         $testname
+ }
+ 
++# Same as mi_create_floating_varobj, but assumes the test is creating
++# a dynamic varobj that has children, so the value must be "{...}".
++proc mi_create_dynamic_varobj {name expression testname} {
++    mi_gdb_test "-var-create $name @ $expression" \
++        "\\^done,name=\"$name\",numchild=\"\(-1\|\[0-9\]+\)\",value=\"{\\.\\.\\.}\",type=.*" \
++        $testname
++}
++
+ # Deletes the specified NAME. 
+ proc mi_delete_varobj { name testname } {
+     mi_gdb_test "-var-delete $name" \
+@@ -1229,7 +1237,7 @@ proc mi_varobj_update { name expected testname } {
+     set er "\\^done,changelist=\\\["
+     set first 1
+     foreach item $expected {
+-        set v "{name=\"$item\",in_scope=\"true\",type_changed=\"false\"}"
++        set v "{name=\"$item\",in_scope=\"true\",type_changed=\"false\",has_more=\".\"}"
+         if {$first == 1} {
+             set er "$er$v"
+             set first 0
+@@ -1244,22 +1252,70 @@ proc mi_varobj_update { name expected testname } {
+ }
+ 
+ proc mi_varobj_update_with_type_change { name new_type new_children testname } {
+-    set v "{name=\"$name\",in_scope=\"true\",type_changed=\"true\",new_type=\"$new_type\",new_num_children=\"$new_children\"}"
++    set v "{name=\"$name\",in_scope=\"true\",type_changed=\"true\",new_type=\"$new_type\",new_num_children=\"$new_children\",has_more=\".\"}"
+     set er "\\^done,changelist=\\\[$v\\\]"
+     verbose -log "Expecting: $er"
      mi_gdb_test "-var-update $name" $er $testname
  }
  
@@ -26871,13 +27922,15 @@ index e691232..64bc28e 100644
 +    }
 +    return $rx
 +}
-+
+ 
+-    set er "\\^done,changelist=\\\["
 +# A helper for mi_varobj_update_dynamic that computes a match
 +# expression given a child list.
 +proc mi_varobj_update_dynamic_helper {children} {
 +    set crx ""
  
--    set er "\\^done,changelist=\\\["
+-    append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
+-    append er ",children=\\\[$children_exp_j.*\\\]}\\\]"
 +    set first 1
 +    foreach child $children {
 +	if {!$first} {
@@ -26905,9 +27958,7 @@ index e691232..64bc28e 100644
 +    }
 +    set selfrx [mi_varobj_update_kv_helper $self]
 +    set crx [mi_varobj_update_dynamic_helper $children]
- 
--    append er "{name=\"$name\",in_scope=\"true\",type_changed=\"false\""
--    append er ",children=\\\[$children_exp_j.*\\\]}\\\]"
++
 +    set er "\\^done,changelist=\\\[\{name=\"$name\",in_scope=\"true\""
 +    append er ",$selfrx\}"
 +    if {"$crx" != ""} {
@@ -26917,7 +27968,7 @@ index e691232..64bc28e 100644
  
      verbose -log "Expecting: $er"
      mi_gdb_test "-var-update $name" $er $testname
-@@ -1329,14 +1377,13 @@ proc mi_child_regexp {children add_child} {
+@@ -1329,14 +1385,13 @@ proc mi_child_regexp {children add_child} {
  # have no value.
  #
  proc mi_list_varobj_children { varname children testname } {
@@ -26936,7 +27987,7 @@ index e691232..64bc28e 100644
      set options ""
      if {[llength $varname] == 2} {
          set options [lindex $varname 1]
-@@ -1352,9 +1399,18 @@ proc mi_list_varobj_children_range {varname numchildren children testname} {
+@@ -1352,9 +1407,18 @@ proc mi_list_varobj_children_range {varname numchildren children testname} {
          set expected "\\^done,numchild=\"0\""
      }
  
@@ -27711,10 +28762,18 @@ index 5e5c4ed..7aedbfd 100644
  					TYPE_TARGET_TYPE (range_type),
  					lowbound, 
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index cbb5d94..cf35bf0 100644
+index cbb5d94..f9634ea 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
-@@ -1153,6 +1153,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -236,7 +236,6 @@ scalar_type_p (struct type *type)
+     case TYPE_CODE_STRUCT:
+     case TYPE_CODE_UNION:
+     case TYPE_CODE_SET:
+-    case TYPE_CODE_STRING:
+     case TYPE_CODE_BITSTRING:
+       return 0;
+     default:
+@@ -1153,6 +1152,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
  
    for (; i < len && things_printed < options->print_max; i++)
      {
@@ -27722,7 +28781,7 @@ index cbb5d94..cf35bf0 100644
        if (i != 0)
  	{
  	  if (options->prettyprint_arrays)
-@@ -1172,7 +1173,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1172,7 +1172,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
        rep1 = i + 1;
        reps = 1;
        while ((rep1 < len) &&
@@ -28057,7 +29116,7 @@ index 6f6b756..b9ca650 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index fbe8ff8..1bfc5e4 100644
+index fbe8ff8..a730095 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
 @@ -26,9 +26,12 @@
@@ -28200,14 +29259,14 @@ index fbe8ff8..1bfc5e4 100644
 +{
 +  if (VEC_length (varobj_p, var->children) > to)
 +    return 1;
-+  return (VEC_length (varobj_p, var->children) == to
++  return ((to == -1 || VEC_length (varobj_p, var->children) == to)
 +	  && var->saved_item != NULL);
 +}
 +
  /* If the variable object is bound to a specific thread, that
     is its evaluation can always be done in context of a frame
     inside that thread, returns GDB id of the thread -- which
-@@ -835,22 +880,73 @@ varobj_get_frozen (struct varobj *var)
+@@ -835,22 +880,90 @@ varobj_get_frozen (struct varobj *var)
    return var->frozen;
  }
  
@@ -28266,6 +29325,23 @@ index fbe8ff8..1bfc5e4 100644
 +    }
 +}
 +
++#if HAVE_PYTHON
++
++static int
++dynamic_varobj_has_child_method (struct varobj *var)
++{
++  struct cleanup *back_to;
++  PyObject *printer = var->pretty_printer;
++  int result;
++
++  back_to = varobj_ensure_python_env (var);
++  result = PyObject_HasAttr (printer, gdbpy_children_cst);
++  do_cleanups (back_to);
++  return result;
++}
++
++#endif
++
  static int
  update_dynamic_varobj_children (struct varobj *var,
  				VEC (varobj_p) **changed,
@@ -28289,7 +29365,7 @@ index fbe8ff8..1bfc5e4 100644
    PyObject *printer = var->pretty_printer;
  
    back_to = varobj_ensure_python_env (var);
-@@ -862,87 +958,103 @@ update_dynamic_varobj_children (struct varobj *var,
+@@ -862,87 +975,103 @@ update_dynamic_varobj_children (struct varobj *var,
        return 0;
      }
  
@@ -28450,17 +29526,30 @@ index fbe8ff8..1bfc5e4 100644
    return 1;
  #else
    gdb_assert (0 && "should never be called if Python is not enabled");
-@@ -955,8 +1067,7 @@ varobj_get_num_children (struct varobj *var)
+@@ -954,20 +1083,26 @@ varobj_get_num_children (struct varobj *var)
+ {
    if (var->num_children == -1)
      {
-       int changed;
+-      int changed;
 -      if (!var->pretty_printer
 -	  || !update_dynamic_varobj_children (var, NULL, NULL, &changed))
-+      if (!var->pretty_printer)
++      if (var->pretty_printer)
++	{
++	  int dummy;
++
++	  /* If we have a dynamic varobj, don't report -1 children.
++	     So, try to fetch some children first.  */
++	  update_dynamic_varobj_children (var, NULL, NULL, &dummy, 0, 0);
++	}
++      else
  	var->num_children = number_of_children (var);
      }
  
-@@ -967,7 +1078,7 @@ varobj_get_num_children (struct varobj *var)
+-  return var->num_children;
++  return var->num_children >= 0 ? var->num_children : 0;
+ }
+ 
+ /* Creates a list of the immediate children of a variable object;
     the return code is the number of such children or -1 on error */
  
  VEC (varobj_p)*
@@ -28469,7 +29558,7 @@ index fbe8ff8..1bfc5e4 100644
  {
    struct varobj *child;
    char *name;
-@@ -975,12 +1086,16 @@ varobj_list_children (struct varobj *var)
+@@ -975,12 +1110,16 @@ varobj_list_children (struct varobj *var)
  
    var->children_requested = 1;
  
@@ -28489,7 +29578,7 @@ index fbe8ff8..1bfc5e4 100644
  
    if (var->num_children == -1)
      var->num_children = number_of_children (var);
-@@ -1006,10 +1121,10 @@ varobj_list_children (struct varobj *var)
+@@ -1006,10 +1145,10 @@ varobj_list_children (struct varobj *var)
  	  name = name_of_child (var, i);
  	  existing = create_child (var, i, name);
  	  VEC_replace (varobj_p, var->children, i, existing);
@@ -28501,7 +29590,7 @@ index fbe8ff8..1bfc5e4 100644
    return var->children;
  }
  
-@@ -1020,7 +1135,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
+@@ -1020,7 +1159,6 @@ varobj_add_child (struct varobj *var, const char *name, struct value *value)
  					VEC_length (varobj_p, var->children), 
  					name, value);
    VEC_safe_push (varobj_p, var->children, v);
@@ -28509,7 +29598,7 @@ index fbe8ff8..1bfc5e4 100644
    return v;
  }
  
-@@ -1082,6 +1196,12 @@ varobj_get_attributes (struct varobj *var)
+@@ -1082,6 +1220,12 @@ varobj_get_attributes (struct varobj *var)
    return attributes;
  }
  
@@ -28522,7 +29611,7 @@ index fbe8ff8..1bfc5e4 100644
  char *
  varobj_get_formatted_value (struct varobj *var,
  			    enum varobj_display_formats format)
-@@ -1159,6 +1279,115 @@ varobj_set_value (struct varobj *var, char *expression)
+@@ -1159,6 +1303,116 @@ varobj_set_value (struct varobj *var, char *expression)
    return 1;
  }
  
@@ -28615,8 +29704,9 @@ index fbe8ff8..1bfc5e4 100644
 +install_new_value_visualizer (struct varobj *var)
 +{
 +#if HAVE_PYTHON
-+  /* If the constructor is None, then we want the raw value.  */
-+  if (var->constructor != Py_None)
++  /* If the constructor is None, then we want the raw value.  If VAR
++     does not have a value, just skip this.  */
++  if (var->constructor != Py_None && var->value)
 +    {
 +      struct cleanup *cleanup;
 +      PyObject *pretty_printer = NULL;
@@ -28638,7 +29728,7 @@ index fbe8ff8..1bfc5e4 100644
  /* Assign a new value to a variable object.  If INITIAL is non-zero,
     this is the first assignement after the variable object was just
     created, or changed type.  In that case, just assign the value 
-@@ -1199,10 +1428,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1199,10 +1453,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
       that in C++ a reference is not rebindable, it cannot
       meaningfully change.  So, get hold of the real value.  */
    if (value)
@@ -28650,7 +29740,7 @@ index fbe8ff8..1bfc5e4 100644
  
    if (var->type && TYPE_CODE (var->type) == TYPE_CODE_UNION)
      /* For unions, we need to fetch the value implicitly because
-@@ -1249,7 +1475,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1249,7 +1500,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
       values.  Don't get string rendering if the value is
       lazy -- if it is, the code above has decided that the value
       should not be fetched.  */
@@ -28659,7 +29749,7 @@ index fbe8ff8..1bfc5e4 100644
      print_value = value_get_print_value (value, var->format, var);
  
    /* If the type is changeable, compare the old and the new values.
-@@ -1265,7 +1491,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1265,7 +1516,7 @@ install_new_value (struct varobj *var, struct value *value, int initial)
  	{
  	  changed = 1;
  	}
@@ -28668,7 +29758,7 @@ index fbe8ff8..1bfc5e4 100644
  	{
  	  /* Try to compare the values.  That requires that both
  	     values are non-lazy.  */
-@@ -1310,6 +1536,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1310,6 +1561,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
    if (var->value != NULL && var->value != value)
      value_free (var->value);
    var->value = value;
@@ -28677,7 +29767,7 @@ index fbe8ff8..1bfc5e4 100644
    if (var->print_value)
      xfree (var->print_value);
    var->print_value = print_value;
-@@ -1319,65 +1547,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1319,65 +1572,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
      var->not_fetched = 0;
    var->updated = 0;
  
@@ -28760,7 +29850,7 @@ index fbe8ff8..1bfc5e4 100644
  }
  
  void 
-@@ -1395,31 +1590,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
+@@ -1395,31 +1615,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
    make_cleanup_py_decref (globals);
  
    constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
@@ -28798,8 +29888,13 @@ index fbe8ff8..1bfc5e4 100644
  
    do_cleanups (back_to);
  #else
-@@ -1534,7 +1717,7 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
- 	 UI, so we need not bother getting it.  */
+@@ -1530,44 +1738,60 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+ 
+       /* We probably should not get children of a varobj that has a
+ 	 pretty-printer, but for which -var-list-children was never
+-	 invoked.  Presumably, such varobj is not yet expanded in the
+-	 UI, so we need not bother getting it.  */
++	 invoked.    */
        if (v->pretty_printer)
  	{
 -	  VEC (varobj_p) *changed = 0, *new_and_unchanged = 0;
@@ -28807,8 +29902,32 @@ index fbe8ff8..1bfc5e4 100644
  	  int i, children_changed;
  	  varobj_p tmp;
  
-@@ -1546,28 +1729,28 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+-	  if (!v->children_requested)
+-	    continue;
+-
+ 	  if (v->frozen)
+ 	    continue;
  
++	  if (!v->children_requested)
++	    {
++	      int dummy;
++
++	      /* If we initially did not have potential children, but
++		 now we do, consider the varobj as changed.
++		 Otherwise, if children were never requested, consider
++		 it as unchanged -- presumably, such varobj is not yet
++		 expanded in the UI, so we need not bother getting
++		 it.  */
++	      if (varobj_has_more (v, 0))
++		continue;
++
++	      update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
++	      if (varobj_has_more (v, 0))
++		VEC_safe_push (varobj_update_result, result, &r);
++
++	      continue;
++	    }
++
  	  /* If update_dynamic_varobj_children returns 0, then we have
  	     a non-conforming pretty-printer, so we skip it.  */
 -	  if (update_dynamic_varobj_children (v, &changed, &new_and_unchanged,
@@ -28848,7 +29967,7 @@ index fbe8ff8..1bfc5e4 100644
  	      continue;
  	    }
  	}
-@@ -1855,7 +2038,12 @@ new_variable (void)
+@@ -1855,7 +2079,12 @@ new_variable (void)
    var->frozen = 0;
    var->not_fetched = 0;
    var->children_requested = 0;
@@ -28861,7 +29980,7 @@ index fbe8ff8..1bfc5e4 100644
  
    return var;
  }
-@@ -1885,7 +2073,10 @@ free_variable (struct varobj *var)
+@@ -1885,7 +2114,10 @@ free_variable (struct varobj *var)
    if (var->pretty_printer)
      {
        struct cleanup *cleanup = varobj_ensure_python_env (var);
@@ -28873,7 +29992,7 @@ index fbe8ff8..1bfc5e4 100644
        do_cleanups (cleanup);
      }
  #endif
-@@ -1918,6 +2109,18 @@ make_cleanup_free_variable (struct varobj *var)
+@@ -1918,6 +2150,18 @@ make_cleanup_free_variable (struct varobj *var)
    return make_cleanup (do_free_variable_cleanup, var);
  }
  
@@ -28892,7 +30011,7 @@ index fbe8ff8..1bfc5e4 100644
  /* This returns the type of the variable. It also skips past typedefs
     to return the real type of the variable.
  
-@@ -2132,6 +2335,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
+@@ -2132,6 +2376,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
        else
  	{
  	  tmp_var->obj_name = xstrdup (var->obj_name);
@@ -28901,7 +30020,7 @@ index fbe8ff8..1bfc5e4 100644
  	  varobj_delete (var, NULL, 0);
  
  	  install_variable (tmp_var);
-@@ -2166,7 +2371,11 @@ static char *
+@@ -2166,7 +2412,11 @@ static char *
  my_value_of_variable (struct varobj *var, enum varobj_display_formats format)
  {
    if (var->root->is_valid)
@@ -28914,7 +30033,90 @@ index fbe8ff8..1bfc5e4 100644
    else
      return NULL;
  }
-@@ -2954,10 +3163,7 @@ cplus_describe_child (struct varobj *parent, int index,
+@@ -2189,43 +2439,51 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
+     struct cleanup *back_to = varobj_ensure_python_env (var);
+     PyObject *value_formatter = var->pretty_printer;
+ 
+-    if (value_formatter && PyObject_HasAttr (value_formatter,
+-					     gdbpy_to_string_cst))
++    if (value_formatter)
+       {
+-	char *hint;
+-	struct value *replacement;
+-	int string_print = 0;
+-	PyObject *output = NULL;
++	/* First check to see if we have any children at all.  If so,
++	   we simply return {...}.  */
++	if (dynamic_varobj_has_child_method (var))
++	  return xstrdup ("{...}");
+ 
+-	hint = gdbpy_get_display_hint (value_formatter);
+-	if (hint)
++	if (PyObject_HasAttr (value_formatter, gdbpy_to_string_cst))
+ 	  {
+-	    if (!strcmp (hint, "string"))
+-	      string_print = 1;
+-	    xfree (hint);
+-	  }
++	    char *hint;
++	    struct value *replacement;
++	    int string_print = 0;
++	    PyObject *output = NULL;
++
++	    hint = gdbpy_get_display_hint (value_formatter);
++	    if (hint)
++	      {
++		if (!strcmp (hint, "string"))
++		  string_print = 1;
++		xfree (hint);
++	      }
+ 
+-	output = apply_varobj_pretty_printer (value_formatter,
+-					      &replacement);
+- 	if (output)
+-  	  {
+- 	    PyObject *py_str = python_string_to_target_python_string (output);
+- 	    if (py_str)
+- 	      {
+- 		char *s = PyString_AsString (py_str);
+- 		len = PyString_Size (py_str);
+-		thevalue = xmemdup (s, len + 1, len + 1);
+- 		Py_DECREF (py_str);
++	    output = apply_varobj_pretty_printer (value_formatter,
++						  &replacement);
++	    if (output)
++	      {
++		PyObject *py_str
++		  = python_string_to_target_python_string (output);
++		if (py_str)
++		  {
++		    char *s = PyString_AsString (py_str);
++		    len = PyString_Size (py_str);
++		    thevalue = xmemdup (s, len + 1, len + 1);
++		    Py_DECREF (py_str);
++		  }
++		Py_DECREF (output);
+ 	      }
+- 	    Py_DECREF (output);
+-	  }
+-	if (thevalue && !string_print)
+-	  {
+-	    do_cleanups (back_to);
+-	    return thevalue;
++	    if (thevalue && !string_print)
++	      {
++		do_cleanups (back_to);
++		return thevalue;
++	      }
++	    if (replacement)
++	      value = replacement;
+ 	  }
+-	if (replacement)
+-	  value = replacement;
+       }
+     do_cleanups (back_to);
+   }
+@@ -2954,10 +3212,7 @@ cplus_describe_child (struct varobj *parent, int index,
  	    *cname = xstrdup (TYPE_FIELD_NAME (type, index));
  
  	  if (cvalue && value)
@@ -28926,7 +30128,7 @@ index fbe8ff8..1bfc5e4 100644
  
  	  if (ctype)
  	    {
-@@ -3163,6 +3369,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+@@ -3163,6 +3418,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
    return cplus_value_of_variable (var, format);
  }
  
@@ -28946,7 +30148,7 @@ index fbe8ff8..1bfc5e4 100644
  /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
     with an arbitrary caller supplied DATA pointer.  */
  
-@@ -3180,6 +3399,43 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+@@ -3180,6 +3448,43 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
        (*func) (var_root->rootvar, data);
      }
  }

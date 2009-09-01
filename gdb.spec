@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -829,6 +829,12 @@ fi
 %endif
 
 %changelog
+* Tue Sep  1 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-7
+- archer-jankratochvil-fedora12 commit: d25596676e8811b03f8c9aba6bbd04ebaa9ff5db
+  - [call-frame-cfa] Fix parsing CFA-relative frames (BZ 516627, Tom Tromey).
+  - [vla] variable length Fortran strings for -O -g code (part of BZ 508406, me).
+  - [python] varobj + general fixes (Tom Tromey).
+
 * Fri Aug 28 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-6
 - Real upstream fixup of qsort_cmp (BZ 515434).
 - Revert bitfields regression (BZ 520129).
