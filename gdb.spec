@@ -14,7 +14,7 @@ Version: 6.8.50.20090818
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -829,6 +829,11 @@ fi
 %endif
 
 %changelog
+* Thu Sep  3 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-8
+- archer-jankratochvil-fedora12 commit: a081d2f12945e9468edd5f4341d3e945bd0fefe9
+  - [expr] Fix too slow lookups in large C++ programs (Sami Wagiaalla).
+  - [python] Fix varobj changed values reporting (GDB PR 10584, Tom Tromey).
+
 * Tue Sep  1 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-7
 - archer-jankratochvil-fedora12 commit: d25596676e8811b03f8c9aba6bbd04ebaa9ff5db
   - [call-frame-cfa] Fix parsing CFA-relative frames (BZ 516627, Tom Tromey).

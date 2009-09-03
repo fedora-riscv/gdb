@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit d25596676e8811b03f8c9aba6bbd04ebaa9ff5db
+commit a081d2f12945e9468edd5f4341d3e945bd0fefe9
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -1934,7 +1934,7 @@ index 62800b8..97d587b 100644
  			{ $$ = $1.comp;
  			  if ($2) $$ = fill_comp (DEMANGLE_COMPONENT_LOCAL_NAME, $$, $2); }
 diff --git a/gdb/cp-namespace.c b/gdb/cp-namespace.c
-index d2d8f2e..5805a30 100644
+index d2d8f2e..7672b2e 100644
 --- a/gdb/cp-namespace.c
 +++ b/gdb/cp-namespace.c
 @@ -36,14 +36,17 @@ static struct using_direct *cp_copy_usings (struct using_direct *using,
@@ -2081,7 +2081,7 @@ index d2d8f2e..5805a30 100644
 +  /* Search for name in namespaces imported to this and parent blocks.  */
 +  while (block != NULL)
 +    {
-+      sym = cp_lookup_symbol_imports(scope,name, block, domain,0);
++      sym = cp_lookup_symbol_imports(scope,name, block, domain,0,1);
 +
 +      if (sym)
 +        return sym;
@@ -2114,7 +2114,7 @@ index d2d8f2e..5805a30 100644
        if (sym != NULL)
  	return sym;
      }
-@@ -320,25 +377,55 @@ lookup_namespace_scope (const char *name,
+@@ -320,25 +377,81 @@ lookup_namespace_scope (const char *name,
    namespace = alloca (scope_len + 1);
    strncpy (namespace, scope, scope_len);
    namespace[scope_len] = '\0';
@@ -2152,7 +2152,29 @@ index d2d8f2e..5805a30 100644
 +}
 +
 +/* Search for NAME by applying all import statements belonging
-+   to BLOCK which are applicable in SCOPE.  */
++   to BLOCK which are applicable in SCOPE. If DECLARATION_ONLY the search
++   is restricted to using declarations.
++   Example:
++
++     namespace A{
++       int x;
++     }
++     using A::x;
++
++   If SEARCH_PARENTS the search will include imports which are applicable in
++   parents of scopes.
++   Example:
++
++     namespace A{
++       using namespace X;
++       namespace B{
++         using namespace Y;
++       }
++     }
++
++   If SCOPE is "A::B" and SEARCH_PARENTS is true the imports of namespaces X
++   and Y will be considered. If SEARCH_PARENTS is false only the import of Y
++   is considered.  */
 +
  struct symbol *
 -cp_lookup_symbol_namespace (const char *namespace,
@@ -2164,17 +2186,21 @@ index d2d8f2e..5805a30 100644
 +                            const char *name,
 +                            const struct block *block,
 +                            const domain_enum domain,
-+                            int declaration_only)
++                            int declaration_only,
++                            int search_parents)
  {
 -  const struct using_direct *current;
 -  struct symbol *sym;
 +  struct using_direct *current;
 +  struct symbol *sym = NULL;
++  int directive_match;
++  int current_line = find_pc_line (get_frame_pc (get_current_frame ()), 0).line;
  
 -  /* First, go through the using directives.  If any of them add new
 +  if(!declaration_only)
-+  /* First, try to find the symbol in the given namespace.  */
-+  sym = cp_lookup_symbol_in_namespace (scope, name, block, domain);
++    /* First, try to find the symbol in the given namespace.  */
++    sym = cp_lookup_symbol_in_namespace (scope, name, block, domain);
++
 +  if ( sym != NULL)
 +    return sym;
 +
@@ -2182,17 +2208,20 @@ index d2d8f2e..5805a30 100644
       names to the namespace we're searching in, see if we can find a
       match by applying them.  */
  
-@@ -346,39 +433,70 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -346,39 +459,74 @@ cp_lookup_symbol_namespace (const char *namespace,
         current != NULL;
         current = current->next)
      {
 -      if (strcmp (namespace, current->import_dest) == 0)
-+      int current_line = find_pc_line (get_frame_pc (get_current_frame ()), 0).line;
 +  
 +      /* If the import destination is the current scope or one of its ancestors then
 +         it is applicable.  */
-+      if (strncmp (scope, current->import_dest,
-+          strlen(current->import_dest)) == 0 &&
++      directive_match = search_parents ?
++                        strncmp (scope, current->import_dest,
++                                 strlen(current->import_dest)) == 0 :
++                        strcmp (scope, current->import_dest) == 0;
++
++      if (directive_match &&
 +          current->line_number < current_line &&
 +          !current->searched)
  	{
@@ -2244,6 +2273,7 @@ index d2d8f2e..5805a30 100644
 +		                                name,
 +		                                block,
 +		                                domain,
++		                                0,
 +		                                0);
 +	    }
 +
@@ -2281,7 +2311,7 @@ index d2d8f2e..5805a30 100644
  }
  
  /* Look up NAME in BLOCK's static block and in global blocks.  If
-@@ -388,17 +506,15 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -388,17 +536,15 @@ cp_lookup_symbol_namespace (const char *namespace,
  
  static struct symbol *
  lookup_symbol_file (const char *name,
@@ -2300,7 +2330,7 @@ index d2d8f2e..5805a30 100644
    if (anonymous_namespace)
      {
        /* Symbols defined in anonymous namespaces have external linkage
-@@ -408,12 +524,11 @@ lookup_symbol_file (const char *name,
+@@ -408,12 +554,11 @@ lookup_symbol_file (const char *name,
        const struct block *global_block = block_global_block (block);
        
        if (global_block != NULL)
@@ -2315,7 +2345,7 @@ index d2d8f2e..5805a30 100644
      }
  
    if (sym != NULL)
-@@ -434,6 +549,7 @@ lookup_symbol_file (const char *name,
+@@ -434,6 +579,7 @@ lookup_symbol_file (const char *name,
        sym = lookup_possible_namespace_symbol (name);
        if (sym != NULL)
  	return sym;
@@ -2323,7 +2353,7 @@ index d2d8f2e..5805a30 100644
      }
  
    return NULL;
-@@ -461,9 +577,8 @@ cp_lookup_nested_type (struct type *parent_type,
+@@ -461,9 +607,8 @@ cp_lookup_nested_type (struct type *parent_type,
  	   lookup_symbol_namespace works when looking them up.  */
  
  	const char *parent_name = TYPE_TAG_NAME (parent_type);
@@ -2334,7 +2364,7 @@ index d2d8f2e..5805a30 100644
  							 block,
  							 VAR_DOMAIN);
  	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-@@ -709,7 +824,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
+@@ -709,7 +854,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
  
    memcpy (name_copy, name, len);
    name_copy[len] = '\0';
@@ -2343,7 +2373,7 @@ index d2d8f2e..5805a30 100644
  
    if (sym == NULL)
      {
-@@ -749,7 +864,7 @@ lookup_possible_namespace_symbol (const char *name)
+@@ -749,7 +894,7 @@ lookup_possible_namespace_symbol (const char *name)
        struct symbol *sym;
  
        sym = lookup_block_symbol (get_possible_namespace_block (objfile),
@@ -2474,7 +2504,7 @@ index f12d785..ca10007 100644
  _initialize_cp_support (void)
  {
 diff --git a/gdb/cp-support.h b/gdb/cp-support.h
-index b5a5c5f..022f102 100644
+index b5a5c5f..3f48f98 100644
 --- a/gdb/cp-support.h
 +++ b/gdb/cp-support.h
 @@ -38,15 +38,33 @@ struct demangle_component;
@@ -2547,7 +2577,7 @@ index b5a5c5f..022f102 100644
  					  struct using_direct *next);
  
  extern void cp_initialize_namespace (void);
-@@ -97,15 +124,19 @@ extern void cp_set_block_scope (const struct symbol *symbol,
+@@ -97,15 +124,20 @@ extern void cp_set_block_scope (const struct symbol *symbol,
  extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol);
  
  extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
@@ -2559,7 +2589,8 @@ index b5a5c5f..022f102 100644
 +                                         const char *name,
 +                                         const struct block *block,
 +                                         const domain_enum domain,
-+                                         int declaration_only);
++                                         int declaration_only,
++                                         int search_parents);
 +
  extern struct symbol *cp_lookup_symbol_namespace (const char *namespace,
 -						  const char *name,
@@ -3458,7 +3489,7 @@ index 4984f31..fcf1b5d 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dwarf2-frame.c b/gdb/dwarf2-frame.c
-index 427f58f..392a1b4 100644
+index 427f58f..e66f007 100644
 --- a/gdb/dwarf2-frame.c
 +++ b/gdb/dwarf2-frame.c
 @@ -38,6 +38,7 @@
@@ -3483,7 +3514,7 @@ index 427f58f..392a1b4 100644
  no_get_tls_address (void *baton, CORE_ADDR offset)
  {
    internal_error (__FILE__, __LINE__,
-@@ -363,14 +371,16 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
+@@ -363,14 +371,22 @@ execute_stack_op (gdb_byte *exp, ULONGEST len, int addr_size,
    ctx->read_reg = read_reg;
    ctx->read_mem = read_mem;
    ctx->get_frame_base = no_get_frame_base;
@@ -3497,11 +3528,17 @@ index 427f58f..392a1b4 100644
 -  if (ctx->in_reg)
 +  if (ctx->location == DWARF_VALUE_REGISTER)
      result = read_reg (this_frame, result);
-+  /* FIXME */
++  else if (ctx->location != DWARF_VALUE_MEMORY)
++    {
++      /* This is actually invalid DWARF, but if we ever do run across
++	 it somehow, we might as well support it.  So, instead, report
++	 it as unimplemented.  */
++      error (_("Not implemented: computing unwound register using explicit value operator"));
++    }
  
    do_cleanups (old_chain);
  
-@@ -1250,6 +1260,16 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
+@@ -1250,6 +1266,16 @@ dwarf2_frame_base_sniffer (struct frame_info *this_frame)
  
    return NULL;
  }
@@ -3518,7 +3555,7 @@ index 427f58f..392a1b4 100644
  
  const struct objfile_data *dwarf2_frame_objfile_data;
  
-@@ -1539,6 +1559,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
+@@ -1539,6 +1565,14 @@ dwarf2_frame_find_fde (CORE_ADDR *pc)
        CORE_ADDR offset;
        CORE_ADDR seek_pc;
  
@@ -3547,7 +3584,7 @@ index b203661..dd03d59 100644
 +
  #endif /* dwarf2-frame.h */
 diff --git a/gdb/dwarf2expr.c b/gdb/dwarf2expr.c
-index 2721065..228eae7 100644
+index 2721065..0644b46 100644
 --- a/gdb/dwarf2expr.c
 +++ b/gdb/dwarf2expr.c
 @@ -125,8 +125,7 @@ dwarf_expr_fetch (struct dwarf_expr_context *ctx, int n)
@@ -3578,7 +3615,7 @@ index 2721065..228eae7 100644
  }
  
  /* Evaluate the expression at ADDR (LEN bytes long) using the context
-@@ -287,6 +292,21 @@ signed_address_type (struct gdbarch *gdbarch, int addr_size)
+@@ -287,6 +292,23 @@ signed_address_type (struct gdbarch *gdbarch, int addr_size)
      }
  }
  
@@ -3589,7 +3626,9 @@ index 2721065..228eae7 100644
 +static void
 +require_composition (gdb_byte *op_ptr, gdb_byte *op_end, const char *op_name)
 +{
-+  /* FIXME: DW_OP_GNU_uninit?  */
++  /* It seems like DW_OP_GNU_uninit should be handled here.  However,
++     it doesn't seem to make sense for DW_OP_*_value, and it was not
++     checked at the other place that this function is called.  */
 +  if (op_ptr != op_end && *op_ptr != DW_OP_piece && *op_ptr != DW_OP_bit_piece)
 +    error (_("DWARF-2 expression error: `%s' operations must be "
 +	     "used either alone or in conjuction with DW_OP_piece "
@@ -3600,7 +3639,7 @@ index 2721065..228eae7 100644
  /* The engine for the expression evaluator.  Using the context in CTX,
     evaluate the expression between OP_PTR and OP_END.  */
  
-@@ -295,8 +315,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -295,8 +317,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  		  gdb_byte *op_ptr, gdb_byte *op_end)
  {
    enum bfd_endian byte_order = gdbarch_byte_order (ctx->gdbarch);
@@ -3610,7 +3649,7 @@ index 2721065..228eae7 100644
    ctx->initialized = 1;  /* Default is initialized.  */
  
    if (ctx->recursion_depth > ctx->max_recursion_depth)
-@@ -436,20 +455,36 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -436,20 +457,36 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  		   "used either alone or in conjuction with DW_OP_piece."));
  
  	  result = op - DW_OP_reg0;
@@ -3635,7 +3674,7 @@ index 2721065..228eae7 100644
 +	  {
 +	    ULONGEST len;
 +	    op_ptr = read_uleb128 (op_ptr, op_end, &len);
-+	    if (op_ptr + len >= op_end)
++	    if (op_ptr + len > op_end)
 +	      error (_("DW_OP_implicit_value: too few bytes available."));
 +	    ctx->len = len;
 +	    ctx->data = op_ptr;
@@ -3653,14 +3692,17 @@ index 2721065..228eae7 100644
  	case DW_OP_breg0:
  	case DW_OP_breg1:
  	case DW_OP_breg2:
-@@ -514,11 +549,12 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -513,12 +550,15 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+                specific this_base method.  */
  	    (ctx->get_frame_base) (ctx->baton, &datastart, &datalen);
  	    dwarf_expr_eval (ctx, datastart, datalen);
++	    if (ctx->location == DWARF_VALUE_LITERAL
++		|| ctx->location == DWARF_VALUE_STACK)
++	      error (_("Not implemented: computing frame base using explicit value operator"));
  	    result = dwarf_expr_fetch (ctx, 0);
 -	    if (ctx->in_reg)
 +	    if (ctx->location == DWARF_VALUE_REGISTER)
  	      result = (ctx->read_reg) (ctx->baton, result);
-+	    /* FIXME: other DWARF_VALUE_*?? */
  	    result = result + offset;
  	    ctx->stack_len = before_stack_len;
 -	    ctx->in_reg = 0;
@@ -3668,7 +3710,7 @@ index 2721065..228eae7 100644
  	  }
  	  break;
  	case DW_OP_dup:
-@@ -716,6 +752,10 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -716,6 +756,10 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  	  }
  	  break;
  
@@ -3679,7 +3721,7 @@ index 2721065..228eae7 100644
  	case DW_OP_GNU_push_tls_address:
  	  /* Variable is at a constant offset in the thread-local
  	  storage block into the objfile for the current thread and
-@@ -754,12 +794,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -754,12 +798,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  
              /* Record the piece.  */
              op_ptr = read_uleb128 (op_ptr, op_end, &size);
@@ -3698,7 +3740,7 @@ index 2721065..228eae7 100644
            }
            goto no_push;
  
-@@ -771,6 +812,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -771,6 +816,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  	  ctx->initialized = 0;
  	  goto no_push;
  
@@ -18820,7 +18862,7 @@ index eb35369..dfd8c8c 100644
  	  {
  	    printf_filtered ("Global symbol `");
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index c88156a..9c102c0 100644
+index c88156a..75b907f 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -42,6 +42,7 @@
@@ -19128,7 +19170,7 @@ index c88156a..9c102c0 100644
 +      if (language == language_cplus )
 +        {
 +          sym = cp_lookup_symbol_imports (block_scope (block_iterator), name,
-+                                          block_iterator, domain, 1);
++                                          block_iterator, domain, 1, 1);
 +
 +          if (sym != NULL)
 +            return sym;
@@ -22507,6 +22549,129 @@ index 0000000..ebc898f
 +
 +gdb_test "print xx" "= 999"
 +
+diff --git a/gdb/testsuite/gdb.cp/namespace-stress.cc b/gdb/testsuite/gdb.cp/namespace-stress.cc
+new file mode 100644
+index 0000000..f34083e
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-stress.cc
+@@ -0,0 +1,60 @@
++
++namespace A{ int x; }
++namespace B{ int x; }
++namespace C{ int x; }
++namespace D{ int x; }
++namespace E{ int x; }
++namespace F{ int x; }
++namespace G{ int x; }
++namespace H{ int x; }
++namespace I{ int x; }
++namespace J{ int x; }
++namespace K{ int x; }
++namespace L{ int x; }
++namespace M{ int x; }
++namespace N{ int x; }
++namespace O{ int x; }
++namespace P{ int x; }
++namespace Q{ int x; }
++namespace R{ int x; }
++namespace S{ int x; }
++namespace T{ int x; }
++namespace U{ int x; }
++namespace V{ int x; }
++namespace W{ int x; }
++namespace X{ int x; }
++namespace Y{ int x; }
++namespace Z{ int x; }
++
++
++int main(){
++
++  using namespace A;
++  using namespace B;
++  using namespace C;
++  using namespace D;
++  using namespace E;
++  using namespace F;
++  using namespace G;
++  using namespace H;
++  using namespace I;
++  using namespace J;
++  using namespace K;
++  using namespace L;
++  using namespace M;
++  using namespace N;
++  using namespace O;
++  using namespace P;
++  using namespace Q;
++  using namespace R;
++  using namespace S;
++  using namespace T;
++  using namespace U;
++  using namespace V;
++  using namespace W;
++  using namespace X;
++  using namespace Y;
++  using namespace Z;
++
++  return 0;
++}
+\ No newline at end of file
+diff --git a/gdb/testsuite/gdb.cp/namespace-stress.exp b/gdb/testsuite/gdb.cp/namespace-stress.exp
+new file mode 100644
+index 0000000..1806523
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-stress.exp
+@@ -0,0 +1,50 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile namespace-stress
++set srcfile ${testfile}.cc
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1;
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++if ![runto_main] then {
++    perror "couldn't run to breakpoint main"
++    continue
++}
++
++############################################
++# Test that the search can fail efficiently 
++
++gdb_test "print y" "No symbol \"y\" in current context."
 diff --git a/gdb/testsuite/gdb.cp/namespace-using.cc b/gdb/testsuite/gdb.cp/namespace-using.cc
 index 4786fd5..8ff5622 100644
 --- a/gdb/testsuite/gdb.cp/namespace-using.cc
@@ -25322,6 +25487,37 @@ index 4b02e50..faa9172 100644
  	"get children of anone"
  
  
+diff --git a/gdb/testsuite/gdb.mi/mi-var-invalidate.exp b/gdb/testsuite/gdb.mi/mi-var-invalidate.exp
+index 05d46fa..4b95674 100644
+--- a/gdb/testsuite/gdb.mi/mi-var-invalidate.exp
++++ b/gdb/testsuite/gdb.mi/mi-var-invalidate.exp
+@@ -72,7 +72,7 @@ mi_runto main
+ 
+ # Check local variable is "invalid".
+ mi_gdb_test "-var-update linteger" \
+-	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"invalid\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"invalid\",has_more=\"0\"\}\\\]" \
+ 	"linteger not anymore in scope due to binary changes"
+ 
+ mi_gdb_test "-var-info-type linteger" \
+@@ -97,7 +97,7 @@ mi_delete_breakpoints
+ mi_gdb_load ${binfile2}
+ # Check local variable are "invalid"
+ mi_gdb_test "-var-update linteger" \
+-	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"invalid\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"linteger\",in_scope=\"invalid\",has_more=\"0\"\}\\\]" \
+ 	"linteger not valid anymore due to binary changes"
+ 
+ mi_gdb_test "-var-info-type linteger" \
+@@ -106,7 +106,7 @@ mi_gdb_test "-var-info-type linteger" \
+ 
+ # Check global variable are still correct.
+ mi_gdb_test "-var-update global_simple" \
+-	"\\^done,changelist=\\\[\{name=\"global_simple\",in_scope=\"invalid\"\}\\\]" \
++	"\\^done,changelist=\\\[\{name=\"global_simple\",in_scope=\"invalid\",has_more=\"0\"\}\\\]" \
+ 	"global_simple not anymore in scope due to binary changes"
+ 
+ mi_gdb_test "-var-info-type global_simple" \
 diff --git a/gdb/testsuite/gdb.mi/mi2-var-block.exp b/gdb/testsuite/gdb.mi/mi2-var-block.exp
 index 6bcfea3..9b3d08f 100644
 --- a/gdb/testsuite/gdb.mi/mi2-var-block.exp
@@ -26342,10 +26538,10 @@ index 0000000..d444554
 +gdb_test "python print t0" "\\<gdb.InferiorThread object at 0x\[\[:xdigit:\]\]+>" "verify InferiorThread object"
 +gdb_test "python print 'result =', t0.num" " = \[0-9\]+" "test Inferior.num"
 diff --git a/gdb/testsuite/gdb.python/python-mi.exp b/gdb/testsuite/gdb.python/python-mi.exp
-index 3258810..018c6a2 100644
+index 3258810..7791775 100644
 --- a/gdb/testsuite/gdb.python/python-mi.exp
 +++ b/gdb/testsuite/gdb.python/python-mi.exp
-@@ -48,23 +48,42 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
+@@ -48,23 +48,53 @@ mi_gdb_test "python execfile ('${srcdir}/${subdir}/${testfile}.py')" ""
  mi_continue_to_line [gdb_get_line_number {MI breakpoint here} ${testfile}.c] \
    "step to breakpoint"
  
@@ -26362,6 +26558,17 @@ index 3258810..018c6a2 100644
 +mi_delete_varobj container "delete varobj"
 +
 +mi_gdb_test "-enable-pretty-printing" ""
++
++mi_create_varobj_checked string string_1 \
++    "struct string_repr" \
++    "create string_1 varobj"
++
++mi_gdb_test "-data-evaluate-expression \"string_1 = string_2\"" ".*" \
++    "assign string_1 from string_2"
++
++mi_gdb_test "-var-update string" \
++    "\\^done,changelist=\\\[{name=\"string\",in_scope=\"true\",type_changed=\"false\",has_more=\"0\"}\\\]" \
++    "update string varobj after assignment"
 +
 +mi_create_dynamic_varobj container c \
 +  "create container varobj"
@@ -26396,7 +26603,7 @@ index 3258810..018c6a2 100644
  
  mi_gdb_test "-var-set-visualizer container None" \
    "\\^done" \
-@@ -78,19 +97,88 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
+@@ -78,19 +108,88 @@ mi_gdb_test "-var-set-visualizer container gdb.default_visualizer" \
    "\\^done" \
    "choose default visualizer"
  
@@ -26492,7 +26699,7 @@ index 3258810..018c6a2 100644
  mi_continue_to_line \
      [gdb_get_line_number {Another MI breakpoint} ${testfile}.c] \
 diff --git a/gdb/testsuite/gdb.python/python-prettyprint.c b/gdb/testsuite/gdb.python/python-prettyprint.c
-index 3cafc48..5fbd534 100644
+index 3cafc48..adf66b5 100644
 --- a/gdb/testsuite/gdb.python/python-prettyprint.c
 +++ b/gdb/testsuite/gdb.python/python-prettyprint.c
 @@ -15,6 +15,8 @@
@@ -26504,7 +26711,7 @@ index 3cafc48..5fbd534 100644
  struct s
  {
    int a;
-@@ -148,6 +150,11 @@ void do_nothing(void)
+@@ -148,6 +150,14 @@ void do_nothing(void)
    c = 23;			/* Another MI breakpoint */
  }
  
@@ -26513,10 +26720,13 @@ index 3cafc48..5fbd534 100644
 +  char *s;
 +};
 +
++struct string_repr string_1 = { { "one" } };
++struct string_repr string_2 = { { "two" } };
++
  int
  main ()
  {
-@@ -155,11 +162,15 @@ main ()
+@@ -155,11 +165,15 @@ main ()
    struct ss  ssa[2];
    string x = make_string ("this is x");
    zzz_type c = make_container ("container");
@@ -26532,7 +26742,7 @@ index 3cafc48..5fbd534 100644
  
    struct ns  ns;
    ns.null_str = "embedded\0null\0string";
-@@ -193,6 +204,11 @@ main ()
+@@ -193,6 +207,11 @@ main ()
    add_item (&c, 72);
  
  #ifdef MI
@@ -29116,7 +29326,7 @@ index 6f6b756..b9ca650 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index fbe8ff8..a730095 100644
+index fbe8ff8..490ca33 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
 @@ -26,9 +26,12 @@
@@ -29758,20 +29968,35 @@ index fbe8ff8..a730095 100644
  	{
  	  /* Try to compare the values.  That requires that both
  	     values are non-lazy.  */
-@@ -1310,6 +1561,8 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+@@ -1310,74 +1561,53 @@ install_new_value (struct varobj *var, struct value *value, int initial)
    if (var->value != NULL && var->value != value)
      value_free (var->value);
    var->value = value;
+-  if (var->print_value)
+-    xfree (var->print_value);
+-  var->print_value = print_value;
 +  if (value != NULL)
 +    value_incref (value);
-   if (var->print_value)
-     xfree (var->print_value);
-   var->print_value = print_value;
-@@ -1319,65 +1572,32 @@ install_new_value (struct varobj *var, struct value *value, int initial)
+   if (value && value_lazy (value) && intentionally_not_fetched)
+     var->not_fetched = 1;
+   else
      var->not_fetched = 0;
    var->updated = 0;
  
 +  install_new_value_visualizer (var);
++
++  /* If we installed a pretty-printer, re-compare the printed version
++     to see if the variable changed.  */
++  if (var->pretty_printer)
++    {
++      xfree (print_value);
++      print_value = value_get_print_value (var->value, var->format, var);
++      if (!var->print_value || strcmp (var->print_value, print_value) != 0)
++	changed = 1;
++    }
++  if (var->print_value)
++    xfree (var->print_value);
++  var->print_value = print_value;
 +
    gdb_assert (!var->value || value_type (var->value));
  
@@ -29850,7 +30075,7 @@ index fbe8ff8..a730095 100644
  }
  
  void 
-@@ -1395,31 +1615,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
+@@ -1395,31 +1625,19 @@ varobj_set_visualizer (struct varobj *var, const char *visualizer)
    make_cleanup_py_decref (globals);
  
    constructor = PyRun_String (visualizer, Py_eval_input, globals, globals);
@@ -29888,7 +30113,7 @@ index fbe8ff8..a730095 100644
  
    do_cleanups (back_to);
  #else
-@@ -1530,44 +1738,60 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
+@@ -1530,44 +1748,63 @@ VEC(varobj_update_result) *varobj_update (struct varobj **varp, int explicit)
  
        /* We probably should not get children of a varobj that has a
  	 pretty-printer, but for which -var-list-children was never
@@ -29918,11 +30143,14 @@ index fbe8ff8..a730095 100644
 +		 it as unchanged -- presumably, such varobj is not yet
 +		 expanded in the UI, so we need not bother getting
 +		 it.  */
-+	      if (varobj_has_more (v, 0))
-+		continue;
++	      if (!varobj_has_more (v, 0))
++		{
++		  update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
++		  if (varobj_has_more (v, 0))
++		    r.changed = 1;
++		}
 +
-+	      update_dynamic_varobj_children (v, NULL, NULL, &dummy, 0, 0);
-+	      if (varobj_has_more (v, 0))
++	      if (r.changed)
 +		VEC_safe_push (varobj_update_result, result, &r);
 +
 +	      continue;
@@ -29967,7 +30195,7 @@ index fbe8ff8..a730095 100644
  	      continue;
  	    }
  	}
-@@ -1855,7 +2079,12 @@ new_variable (void)
+@@ -1855,7 +2092,12 @@ new_variable (void)
    var->frozen = 0;
    var->not_fetched = 0;
    var->children_requested = 0;
@@ -29980,7 +30208,7 @@ index fbe8ff8..a730095 100644
  
    return var;
  }
-@@ -1885,7 +2114,10 @@ free_variable (struct varobj *var)
+@@ -1885,7 +2127,10 @@ free_variable (struct varobj *var)
    if (var->pretty_printer)
      {
        struct cleanup *cleanup = varobj_ensure_python_env (var);
@@ -29992,7 +30220,7 @@ index fbe8ff8..a730095 100644
        do_cleanups (cleanup);
      }
  #endif
-@@ -1918,6 +2150,18 @@ make_cleanup_free_variable (struct varobj *var)
+@@ -1918,6 +2163,18 @@ make_cleanup_free_variable (struct varobj *var)
    return make_cleanup (do_free_variable_cleanup, var);
  }
  
@@ -30011,7 +30239,7 @@ index fbe8ff8..a730095 100644
  /* This returns the type of the variable. It also skips past typedefs
     to return the real type of the variable.
  
-@@ -2132,6 +2376,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
+@@ -2132,6 +2389,8 @@ value_of_root (struct varobj **var_handle, int *type_changed)
        else
  	{
  	  tmp_var->obj_name = xstrdup (var->obj_name);
@@ -30020,7 +30248,7 @@ index fbe8ff8..a730095 100644
  	  varobj_delete (var, NULL, 0);
  
  	  install_variable (tmp_var);
-@@ -2166,7 +2412,11 @@ static char *
+@@ -2166,7 +2425,11 @@ static char *
  my_value_of_variable (struct varobj *var, enum varobj_display_formats format)
  {
    if (var->root->is_valid)
@@ -30033,7 +30261,7 @@ index fbe8ff8..a730095 100644
    else
      return NULL;
  }
-@@ -2189,43 +2439,51 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
+@@ -2189,43 +2452,51 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
      struct cleanup *back_to = varobj_ensure_python_env (var);
      PyObject *value_formatter = var->pretty_printer;
  
@@ -30116,7 +30344,7 @@ index fbe8ff8..a730095 100644
        }
      do_cleanups (back_to);
    }
-@@ -2954,10 +3212,7 @@ cplus_describe_child (struct varobj *parent, int index,
+@@ -2954,10 +3225,7 @@ cplus_describe_child (struct varobj *parent, int index,
  	    *cname = xstrdup (TYPE_FIELD_NAME (type, index));
  
  	  if (cvalue && value)
@@ -30128,7 +30356,7 @@ index fbe8ff8..a730095 100644
  
  	  if (ctype)
  	    {
-@@ -3163,6 +3418,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+@@ -3163,6 +3431,19 @@ java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
    return cplus_value_of_variable (var, format);
  }
  
@@ -30148,7 +30376,7 @@ index fbe8ff8..a730095 100644
  /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them
     with an arbitrary caller supplied DATA pointer.  */
  
-@@ -3180,6 +3448,43 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
+@@ -3180,6 +3461,43 @@ all_root_varobjs (void (*func) (struct varobj *var, void *data), void *data)
        (*func) (var_root->rootvar, data);
      }
  }
