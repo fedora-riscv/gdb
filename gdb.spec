@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090818
+Version: 6.8.50.20090910
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -218,8 +218,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.8.50.20090818 snapshot fixups.
-Patch232: gdb-6.8.50.20090818-upstream.patch
+# Backported post gdb-6.8.50.20090910 snapshot fixups.
+#Patch232: gdb-6.8.50.20090910-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -363,9 +363,6 @@ Patch375: gdb-readline-6.0.patch
 # Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
 Patch378: gdb-bz515434-qsort_cmp.patch
 
-# Revert bitfields regression (BZ 520129).
-Patch380: gdb-bz520129-drow-bitfields.patch
-
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -450,7 +447,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -555,7 +552,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch375 -p1
 %patch378 -p1
-%patch380 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -829,6 +825,12 @@ fi
 %endif
 
 %changelog
+* Thu Sep 10 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090910-1
+- Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090910
+- archer-jankratochvil-fedora12 commit: 941eb487a42933e442cb4d11344cda96ecb8a04d
+  - [next-over-throw] Fix exceptions thrown during next (Tom Tromey).
+  - [bp_location-accel] Do not (much) slow down on 500+ breakpoints (me).
+
 * Thu Sep  3 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090818-8
 - archer-jankratochvil-fedora12 commit: a081d2f12945e9468edd5f4341d3e945bd0fefe9
   - [expr] Fix too slow lookups in large C++ programs (Sami Wagiaalla).
