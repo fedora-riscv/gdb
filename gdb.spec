@@ -14,7 +14,7 @@ Version: 6.8.91.20090917
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -53,6 +53,10 @@ Source2: gdb-orphanripper.c
 
 # Man page for gstack(1).
 Source3: gdb-gstack.man
+
+# libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
+%define libstdcxxpython libstdc++-v3-python-r151798
+Source4: %{libstdcxxpython}.tar.xz
 
 # Work around out-of-date dejagnu that does not have KFAIL
 Patch1: gdb-6.3-rh-dummykfail-20041202.patch
@@ -357,6 +361,9 @@ Patch360: gdb-6.8-bz457187-largefile-test.patch
 # Fix compatibility of --with-system-readline and readline-6.0+.
 Patch375: gdb-readline-6.0.patch
 
+# Fix python pretty printers lookup on x86_64.
+Patch376: libstdc++-v3-python-common-prefix.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -367,6 +374,8 @@ BuildRequires: rpm-devel
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
+# Temporarily before it gets moved to libstdc++.rpm
+BuildRequires: libstdc++
 %endif	# 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
@@ -429,6 +438,9 @@ This package provides a program that allows you to run GDB on a different machin
 # version-release name.
 
 %setup -q -n %{gdb_src}
+
+# libstdc++ pretty printers.
+xz -dc %{SOURCE4} | tar xf -
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
@@ -544,6 +556,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch360 -p1
 %patch375 -p1
+%patch376 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -741,6 +754,22 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
+%if 0%{!?_without_python:1}
+# Temporarily now:
+for LIB in lib lib64;do
+  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
+  mkdir -p $LIBPATH
+  # basename is being run only for the native (non-biarch) file.
+  sed -e 's,@pythondir@,%{python_sitelib}/gdb,'			\
+      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
+      < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
+      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+done
+test ! -e $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
+      $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+%endif	# 0%{!?_without_python:1}
+
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -818,6 +847,9 @@ fi
 %endif
 
 %changelog
+* Thu Sep 17 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090917-2
+- Include bundled libstdc++ python; it will be in libstdc++-devel since gcc-4.5.
+
 * Thu Sep 17 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090917-1
 - Upgrade to the FSF GDB gdb-7.0 branch and snapshot: 6.8.91.20090917
 - archer-jankratochvil-fedora12 commit: 16f3f01cc2cbc15283462eaabdfcde92cf42cdc6
