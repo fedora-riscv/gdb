@@ -10,7 +10,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.50.20090910
+Version: 6.8.91.20090917
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -18,7 +18,7 @@ Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
-Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -148,9 +148,6 @@ Patch163: gdb-6.3-inheritancetest-20050726.patch
 
 # Add readnever option
 Patch164: gdb-6.3-readnever-20050907.patch
-
-# Fix frame pointer for ia64 sigtramp frame
-Patch166: gdb-6.3-ia64-sigtramp-fp-20050926.patch
 
 # Fix ia64 gdb problem with user-specified SIGILL handling
 Patch169: gdb-6.3-ia64-sigill-20051115.patch
@@ -360,9 +357,6 @@ Patch360: gdb-6.8-bz457187-largefile-test.patch
 # Fix compatibility of --with-system-readline and readline-6.0+.
 Patch375: gdb-readline-6.0.patch
 
-# Temporarily disable assertion checks crashing in qsort_cmp (BZ 515434).
-Patch378: gdb-bz515434-qsort_cmp.patch
-
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -479,7 +473,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch162 -p1
 %patch163 -p1
 %patch164 -p1
-%patch166 -p1
 %patch169 -p1
 %patch170 -p1
 %patch176 -p1
@@ -551,7 +544,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch360 -p1
 %patch375 -p1
-%patch378 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -811,6 +803,7 @@ fi
 %{python_sitelib}/gdb
 %endif	# 0%{!?_without_python:1}
 %endif	# 0%{!?_with_upstream:1}
+%{_datadir}/gdb
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 %{_infodir}/gdbint.info*
@@ -825,6 +818,11 @@ fi
 %endif
 
 %changelog
+* Thu Sep 17 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090917-1
+- Upgrade to the FSF GDB gdb-7.0 branch and snapshot: 6.8.91.20090917
+- archer-jankratochvil-fedora12 commit: 16f3f01cc2cbc15283462eaabdfcde92cf42cdc6
+- Drop the qsort_cmp workaround as resolved in FSF GDB now (BZ 515434).
+
 * Thu Sep 10 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090910-1
 - Upgrade to the FSF GDB gdb-6.8.50 snapshot: 6.8.50.20090910
 - archer-jankratochvil-fedora12 commit: 941eb487a42933e442cb4d11344cda96ecb8a04d
