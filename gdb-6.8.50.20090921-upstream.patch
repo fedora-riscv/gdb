@@ -1,0 +1,965 @@
+===================================================================
+RCS file: /cvs/src/src/gdb/ChangeLog,v
+retrieving revision 1.10874.2.11
+retrieving revision 1.10874.2.12
+diff -u -r1.10874.2.11 -r1.10874.2.12
+--- src/gdb/ChangeLog	2009/09/19 16:36:08	1.10874.2.11
++++ src/gdb/ChangeLog	2009/09/21 06:57:02	1.10874.2.12
+@@ -1,3 +1,47 @@
++2009-09-21  Hui Zhu  <teawater@gmail.com>
++	    Michael Snyder  <msnyder@vmware.com>
++
++	* amd64-linux-tdep.c (amd64_all_but_ip_registers_record): New
++	function.
++	(amd64_linux_syscall_record): Call
++	amd64_all_but_ip_registers_record if syscall is
++	sys_rt_sigreturn.
++	(AMD64_LINUX_redzone, AMD64_LINUX_xstate,
++	AMD64_LINUX_frame_size): New macros.
++	(amd64_linux_record_signal): New function.
++	(amd64_linux_init_abi): Call set_gdbarch_process_record_signal.
++
++2009-09-21  Hui Zhu  <teawater@gmail.com>
++	    Michael Snyder  <msnyder@vmware.com>
++
++	* i386-linux-tdep.c (i386_all_but_ip_registers_record): New
++	function.
++	(i386_linux_intx80_sysenter_record): Call
++	i386_all_but_ip_registers_record if syscall is sys_sigreturn
++	or sys_rt_sigreturn.
++	(I386_LINUX_xstate, I386_LINUX_frame_size): New macros.
++	(i386_linux_record_signal): New function.
++	(i386_linux_init_abi): Call set_gdbarch_process_record_signal.
++
++2009-09-21  Hui Zhu  <teawater@gmail.com>
++	    Michael Snyder  <msnyder@vmware.com>
++
++	* record.c (record_end_entry): New struct.
++	(record_type): Add end.
++	(record_arch_list_add_end): Set rec->u.end.sigval to
++	TARGET_SIGNAL_0.
++	(record_message_args): New struct.
++	(record_message): Call gdbarch_process_record_signal.
++	(do_record_message): Add argument "signal".
++	(record_resume): Ditto.
++	(record_wait): Ditto.  Check record_list->u.end.sigval
++	in replay mode.
++
++2009-09-21  Hui Zhu  <teawater@gmail.com>
++	    Michael Snyder  <msnyder@vmware.com>
++
++	* gdbarch.sh (process_record_signal): New interface.
++
+ 2009-09-19  Maxim Grigoriev  <maxim2405@gmail.com>
+ 
+ 	* xtensa-tdep.c (call0_analyze_prologue): Replace INT_MAX by UNIT_MAX.
+===================================================================
+RCS file: /cvs/src/src/gdb/gdbarch.sh,v
+retrieving revision 1.496
+retrieving revision 1.496.2.1
+diff -u -r1.496 -r1.496.2.1
+--- src/gdb/gdbarch.sh	2009/09/15 03:30:05	1.496
++++ src/gdb/gdbarch.sh	2009/09/21 06:57:02	1.496.2.1
+@@ -709,6 +709,10 @@
+ # Return -1 if something goes wrong, 0 otherwise.
+ M:int:process_record:struct regcache *regcache, CORE_ADDR addr:regcache, addr
+ 
++# Save process state after a signal.
++# Return -1 if something goes wrong, 0 otherwise.
++M:int:process_record_signal:struct regcache *regcache, enum target_signal signal:regcache, signal
++
+ # Signal translation: translate inferior's signal (host's) number into
+ # GDB's representation.
+ m:enum target_signal:target_signal_from_host:int signo:signo::default_target_signal_from_host::0
+===================================================================
+RCS file: /cvs/src/src/gdb/gdbarch.c,v
+retrieving revision 1.453
+retrieving revision 1.453.2.1
+diff -u -r1.453 -r1.453.2.1
+--- src/gdb/gdbarch.c	2009/09/15 03:30:05	1.453
++++ src/gdb/gdbarch.c	2009/09/21 06:57:02	1.453.2.1
+@@ -240,6 +240,7 @@
+   gdbarch_static_transform_name_ftype *static_transform_name;
+   int sofun_address_maybe_missing;
+   gdbarch_process_record_ftype *process_record;
++  gdbarch_process_record_signal_ftype *process_record_signal;
+   gdbarch_target_signal_from_host_ftype *target_signal_from_host;
+   gdbarch_target_signal_to_host_ftype *target_signal_to_host;
+   gdbarch_get_siginfo_type_ftype *get_siginfo_type;
+@@ -378,6 +379,7 @@
+   0,  /* static_transform_name */
+   0,  /* sofun_address_maybe_missing */
+   0,  /* process_record */
++  0,  /* process_record_signal */
+   default_target_signal_from_host,  /* target_signal_from_host */
+   default_target_signal_to_host,  /* target_signal_to_host */
+   0,  /* get_siginfo_type */
+@@ -635,6 +637,7 @@
+   /* Skip verify of static_transform_name, has predicate */
+   /* Skip verify of sofun_address_maybe_missing, invalid_p == 0 */
+   /* Skip verify of process_record, has predicate */
++  /* Skip verify of process_record_signal, has predicate */
+   /* Skip verify of target_signal_from_host, invalid_p == 0 */
+   /* Skip verify of target_signal_to_host, invalid_p == 0 */
+   /* Skip verify of get_siginfo_type, has predicate */
+@@ -971,6 +974,12 @@
+                       "gdbarch_dump: process_record = <%s>\n",
+                       host_address_to_string (gdbarch->process_record));
+   fprintf_unfiltered (file,
++                      "gdbarch_dump: gdbarch_process_record_signal_p() = %d\n",
++                      gdbarch_process_record_signal_p (gdbarch));
++  fprintf_unfiltered (file,
++                      "gdbarch_dump: process_record_signal = <%s>\n",
++                      host_address_to_string (gdbarch->process_record_signal));
++  fprintf_unfiltered (file,
+                       "gdbarch_dump: ps_regnum = %s\n",
+                       plongest (gdbarch->ps_regnum));
+   fprintf_unfiltered (file,
+@@ -3307,6 +3316,30 @@
+   gdbarch->process_record = process_record;
+ }
+ 
++int
++gdbarch_process_record_signal_p (struct gdbarch *gdbarch)
++{
++  gdb_assert (gdbarch != NULL);
++  return gdbarch->process_record_signal != NULL;
++}
++
++int
++gdbarch_process_record_signal (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal)
++{
++  gdb_assert (gdbarch != NULL);
++  gdb_assert (gdbarch->process_record_signal != NULL);
++  if (gdbarch_debug >= 2)
++    fprintf_unfiltered (gdb_stdlog, "gdbarch_process_record_signal called\n");
++  return gdbarch->process_record_signal (gdbarch, regcache, signal);
++}
++
++void
++set_gdbarch_process_record_signal (struct gdbarch *gdbarch,
++                                   gdbarch_process_record_signal_ftype process_record_signal)
++{
++  gdbarch->process_record_signal = process_record_signal;
++}
++
+ enum target_signal
+ gdbarch_target_signal_from_host (struct gdbarch *gdbarch, int signo)
+ {
+===================================================================
+RCS file: /cvs/src/src/gdb/gdbarch.h,v
+retrieving revision 1.403
+retrieving revision 1.403.2.1
+diff -u -r1.403 -r1.403.2.1
+--- src/gdb/gdbarch.h	2009/09/15 03:30:05	1.403
++++ src/gdb/gdbarch.h	2009/09/21 06:57:02	1.403.2.1
+@@ -822,6 +822,15 @@
+ extern int gdbarch_process_record (struct gdbarch *gdbarch, struct regcache *regcache, CORE_ADDR addr);
+ extern void set_gdbarch_process_record (struct gdbarch *gdbarch, gdbarch_process_record_ftype *process_record);
+ 
++/* Save process state after a signal.
++   Return -1 if something goes wrong, 0 otherwise. */
++
++extern int gdbarch_process_record_signal_p (struct gdbarch *gdbarch);
++
++typedef int (gdbarch_process_record_signal_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
++extern int gdbarch_process_record_signal (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
++extern void set_gdbarch_process_record_signal (struct gdbarch *gdbarch, gdbarch_process_record_signal_ftype *process_record_signal);
++
+ /* Signal translation: translate inferior's signal (host's) number into
+    GDB's representation. */
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/record.c,v
+retrieving revision 1.17
+retrieving revision 1.17.2.1
+diff -u -r1.17 -r1.17.2.1
+--- src/gdb/record.c	2009/09/08 00:50:42	1.17
++++ src/gdb/record.c	2009/09/21 06:57:03	1.17.2.1
+@@ -59,6 +59,11 @@
+   gdb_byte *val;
+ };
+ 
++struct record_end_entry
++{
++  enum target_signal sigval;
++};
++
+ enum record_type
+ {
+   record_end = 0,
+@@ -77,6 +82,8 @@
+     struct record_reg_entry reg;
+     /* mem */
+     struct record_mem_entry mem;
++    /* end */
++    struct record_end_entry end;
+   } u;
+ };
+ 
+@@ -314,6 +321,7 @@
+   rec->prev = NULL;
+   rec->next = NULL;
+   rec->type = record_end;
++  rec->u.end.sigval = TARGET_SIGNAL_0;
+ 
+   record_arch_list_add (rec);
+ 
+@@ -360,11 +368,17 @@
+   record_list_release (record_arch_list_tail);
+ }
+ 
++struct record_message_args {
++  struct regcache *regcache;
++  enum target_signal signal;
++};
++
+ static int
+ record_message (void *args)
+ {
+   int ret;
+-  struct regcache *regcache = args;
++  struct record_message_args *myargs = args;
++  struct gdbarch *gdbarch = get_regcache_arch (myargs->regcache);
+   struct cleanup *old_cleanups = make_cleanup (record_message_cleanups, 0);
+ 
+   record_arch_list_head = NULL;
+@@ -373,9 +387,44 @@
+   /* Check record_insn_num.  */
+   record_check_insn_num (1);
+ 
+-  ret = gdbarch_process_record (get_regcache_arch (regcache),
+-				regcache,
+-				regcache_read_pc (regcache));
++  /* If gdb sends a signal value to target_resume,
++     save it in the 'end' field of the previous instruction.
++
++     Maybe process record should record what really happened,
++     rather than what gdb pretends has happened.
++
++     So if Linux delivered the signal to the child process during
++     the record mode, we will record it and deliver it again in
++     the replay mode.
++
++     If user says "ignore this signal" during the record mode, then
++     it will be ignored again during the replay mode (no matter if
++     the user says something different, like "deliver this signal"
++     during the replay mode).
++
++     User should understand that nothing he does during the replay
++     mode will change the behavior of the child.  If he tries,
++     then that is a user error.
++
++     But we should still deliver the signal to gdb during the replay,
++     if we delivered it during the recording.  Therefore we should
++     record the signal during record_wait, not record_resume.  */
++  if (record_list != &record_first)    /* FIXME better way to check */
++    {
++      gdb_assert (record_list->type == record_end);
++      record_list->u.end.sigval = myargs->signal;
++    }
++
++  if (myargs->signal == TARGET_SIGNAL_0
++      || !gdbarch_process_record_signal_p (gdbarch))
++    ret = gdbarch_process_record (gdbarch,
++				  myargs->regcache,
++				  regcache_read_pc (myargs->regcache));
++  else
++    ret = gdbarch_process_record_signal (gdbarch,
++					 myargs->regcache,
++					 myargs->signal);
++
+   if (ret > 0)
+     error (_("Process record: inferior program stopped."));
+   if (ret < 0)
+@@ -396,9 +445,14 @@
+ }
+ 
+ static int
+-do_record_message (struct regcache *regcache)
++do_record_message (struct regcache *regcache,
++		   enum target_signal signal)
+ {
+-  return catch_errors (record_message, regcache, NULL, RETURN_MASK_ALL);
++  struct record_message_args args;
++
++  args.regcache = regcache;
++  args.signal = signal;
++  return catch_errors (record_message, &args, NULL, RETURN_MASK_ALL);
+ }
+ 
+ /* Set to 1 if record_store_registers and record_xfer_partial
+@@ -520,13 +574,13 @@
+ 
+ static void
+ record_resume (struct target_ops *ops, ptid_t ptid, int step,
+-               enum target_signal siggnal)
++               enum target_signal signal)
+ {
+   record_resume_step = step;
+ 
+   if (!RECORD_IS_REPLAY)
+     {
+-      if (do_record_message (get_current_regcache ()))
++      if (do_record_message (get_current_regcache (), signal))
+         {
+           record_resume_error = 0;
+         }
+@@ -536,7 +590,7 @@
+           return;
+         }
+       record_beneath_to_resume (record_beneath_to_resume_ops, ptid, 1,
+-                                siggnal);
++                                signal);
+     }
+ }
+ 
+@@ -611,15 +665,16 @@
+ 	      ret = record_beneath_to_wait (record_beneath_to_wait_ops,
+ 					    ptid, status, options);
+ 
++	      /* Is this a SIGTRAP?  */
+ 	      if (status->kind == TARGET_WAITKIND_STOPPED
+ 		  && status->value.sig == TARGET_SIGNAL_TRAP)
+ 		{
+-		  /* Check if there is a breakpoint.  */
++		  /* Yes -- check if there is a breakpoint.  */
+ 		  registers_changed ();
+ 		  tmp_pc = regcache_read_pc (get_current_regcache ());
+ 		  if (breakpoint_inserted_here_p (tmp_pc))
+ 		    {
+-		      /* There is a breakpoint.  */
++		      /* There is a breakpoint.  GDB will want to stop.  */
+ 		      CORE_ADDR decr_pc_after_break =
+ 			gdbarch_decr_pc_after_break
+ 			(get_regcache_arch (get_current_regcache ()));
+@@ -631,8 +686,12 @@
+ 		    }
+ 		  else
+ 		    {
+-		      /* There is not a breakpoint.  */
+-		      if (!do_record_message (get_current_regcache ()))
++		      /* There is not a breakpoint, and gdb is not
++		         stepping, therefore gdb will not stop.
++			 Therefore we will not return to gdb.
++		         Record the insn and resume.  */
++		      if (!do_record_message (get_current_regcache (),
++					      TARGET_SIGNAL_0))
+ 			{
+                           break;
+ 			}
+@@ -827,6 +886,10 @@
+ 					   gdbarch_decr_pc_after_break (gdbarch));
+ 		      continue_flag = 0;
+ 		    }
++		  /* Check target signal */
++		  if (record_list->u.end.sigval != TARGET_SIGNAL_0)
++		    /* FIXME: better way to check */
++		    continue_flag = 0;
+ 		}
+ 	    }
+ 
+@@ -851,6 +914,9 @@
+ replay_out:
+       if (record_get_sig)
+ 	status->value.sig = TARGET_SIGNAL_INT;
++      else if (record_list->u.end.sigval != TARGET_SIGNAL_0)
++	/* FIXME: better way to check */
++	status->value.sig = record_list->u.end.sigval;
+       else
+ 	status->value.sig = TARGET_SIGNAL_TRAP;
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/i386-linux-tdep.c,v
+retrieving revision 1.68
+retrieving revision 1.68.2.1
+diff -u -r1.68 -r1.68.2.1
+--- src/gdb/i386-linux-tdep.c	2009/09/15 03:30:06	1.68
++++ src/gdb/i386-linux-tdep.c	2009/09/21 06:57:03	1.68.2.1
+@@ -358,7 +358,32 @@
+   regcache_cooked_write_unsigned (regcache, I386_LINUX_ORIG_EAX_REGNUM, -1);
+ }
+ 
+-static struct linux_record_tdep i386_linux_record_tdep;
++/* Record all registers but IP register for process-record.  */
++
++static int
++i386_all_but_ip_registers_record (struct regcache *regcache)
++{
++  if (record_arch_list_add_reg (regcache, I386_EAX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_ECX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_EDX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_EBX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_ESP_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_EBP_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_ESI_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_EDI_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, I386_EFLAGS_REGNUM))
++    return -1;
++
++  return 0;
++}
+ 
+ /* i386_canonicalize_syscall maps from the native i386 Linux set
+    of syscall ids into a canonical set of syscall ids used by
+@@ -383,6 +408,8 @@
+ 
+    Return -1 if something wrong.  */
+ 
++static struct linux_record_tdep i386_linux_record_tdep;
++
+ static int
+ i386_linux_intx80_sysenter_record (struct regcache *regcache)
+ {
+@@ -402,6 +429,14 @@
+       return -1;
+     }
+ 
++  if (syscall_gdb == gdb_sys_sigreturn
++      || syscall_gdb == gdb_sys_rt_sigreturn)
++   {
++     if (i386_all_but_ip_registers_record (regcache))
++       return -1;
++     return 0;
++   }
++
+   ret = record_linux_system_call (syscall_gdb, regcache,
+ 				  &i386_linux_record_tdep);
+   if (ret)
+@@ -413,6 +448,40 @@
+ 
+   return 0;
+ }
++
++#define I386_LINUX_xstate	270
++#define I386_LINUX_frame_size	732
++
++int
++i386_linux_record_signal (struct gdbarch *gdbarch,
++                          struct regcache *regcache,
++                          enum target_signal signal)
++{
++  ULONGEST esp;
++
++  if (i386_all_but_ip_registers_record (regcache))
++    return -1;
++
++  if (record_arch_list_add_reg (regcache, I386_EIP_REGNUM))
++    return -1;
++
++  /* Record the change in the stack.  */
++  regcache_raw_read_unsigned (regcache, I386_ESP_REGNUM, &esp);
++  /* This is for xstate.
++     sp -= sizeof (struct _fpstate);  */
++  esp -= I386_LINUX_xstate;
++  /* This is for frame_size.
++     sp -= sizeof (struct rt_sigframe);  */
++  esp -= I386_LINUX_frame_size;
++  if (record_arch_list_add_mem (esp,
++                                I386_LINUX_xstate + I386_LINUX_frame_size))
++    return -1;
++
++  if (record_arch_list_add_end ())
++    return -1;
++
++  return 0;
++}
+ 
+ 
+ static LONGEST
+@@ -529,6 +598,7 @@
+   tdep->sc_num_regs = ARRAY_SIZE (i386_linux_sc_reg_offset);
+ 
+   set_gdbarch_process_record (gdbarch, i386_process_record);
++  set_gdbarch_process_record_signal (gdbarch, i386_linux_record_signal);
+ 
+   /* Initialize the i386_linux_record_tdep.  */
+   /* These values are the size of the type that will be used in a system
+===================================================================
+RCS file: /cvs/src/src/gdb/amd64-linux-tdep.c,v
+retrieving revision 1.29
+retrieving revision 1.29.2.1
+diff -u -r1.29 -r1.29.2.1
+--- src/gdb/amd64-linux-tdep.c	2009/09/15 03:30:04	1.29
++++ src/gdb/amd64-linux-tdep.c	2009/09/21 06:57:03	1.29.2.1
+@@ -289,16 +289,48 @@
+   regcache_cooked_write_unsigned (regcache, AMD64_LINUX_ORIG_RAX_REGNUM, -1);
+ }
+ 
+-/* Parse the arguments of current system call instruction and record
+-   the values of the registers and memory that will be changed into
+-   "record_arch_list".  This instruction is "syscall".
+-
+-   Return -1 if something wrong.  */
++/* Record all registers but IP register for process-record.  */
+ 
+-static struct linux_record_tdep amd64_linux_record_tdep;
++static int
++amd64_all_but_ip_registers_record (struct regcache *regcache)
++{
++  if (record_arch_list_add_reg (regcache, AMD64_RAX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RCX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RDX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RBX_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RSP_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RBP_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RSI_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_RDI_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R8_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R9_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R10_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R11_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R12_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R13_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R14_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_R15_REGNUM))
++    return -1;
++  if (record_arch_list_add_reg (regcache, AMD64_EFLAGS_REGNUM))
++    return -1;
+ 
+-#define RECORD_ARCH_GET_FS	0x1003
+-#define RECORD_ARCH_GET_GS	0x1004
++  return 0;
++}
+ 
+ /* amd64_canonicalize_syscall maps from the native amd64 Linux set 
+    of syscall ids into a canonical set of syscall ids used by 
+@@ -1111,6 +1143,17 @@
+   }
+ }
+ 
++/* Parse the arguments of current system call instruction and record
++   the values of the registers and memory that will be changed into
++   "record_arch_list".  This instruction is "syscall".
++
++   Return -1 if something wrong.  */
++
++static struct linux_record_tdep amd64_linux_record_tdep;
++
++#define RECORD_ARCH_GET_FS	0x1003
++#define RECORD_ARCH_GET_GS	0x1004
++
+ static int
+ amd64_linux_syscall_record (struct regcache *regcache)
+ {
+@@ -1120,27 +1163,39 @@
+ 
+   regcache_raw_read_unsigned (regcache, AMD64_RAX_REGNUM, &syscall_native);
+ 
+-  syscall_gdb = amd64_canonicalize_syscall (syscall_native);
+-
+-  if (syscall_native == amd64_sys_arch_prctl) 
++  switch (syscall_native)
+     {
+-      ULONGEST arg3;
+-
+-      regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg3,
+-				  &arg3);
+-      if (arg3 == RECORD_ARCH_GET_FS || arg3 == RECORD_ARCH_GET_GS)
+-      {
+-	CORE_ADDR addr;
+-
+-	regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg2,
+-				    &addr);
+-	if (record_arch_list_add_mem (addr, 
+-				      amd64_linux_record_tdep.size_ulong))
+-	  return -1;
+-      }
+-      goto record_regs;
++    case amd64_sys_rt_sigreturn:
++      if (amd64_all_but_ip_registers_record (regcache))
++        return -1;
++      return 0;
++      break;
++
++    case amd64_sys_arch_prctl:
++      if (syscall_native == amd64_sys_arch_prctl)
++        {
++          ULONGEST arg3;
++
++          regcache_raw_read_unsigned (regcache, amd64_linux_record_tdep.arg3,
++                                      &arg3);
++          if (arg3 == RECORD_ARCH_GET_FS || arg3 == RECORD_ARCH_GET_GS)
++            {
++	      CORE_ADDR addr;
++
++	      regcache_raw_read_unsigned (regcache,
++                                          amd64_linux_record_tdep.arg2,
++                                          &addr);
++	      if (record_arch_list_add_mem (addr,
++                                            amd64_linux_record_tdep.size_ulong))
++                return -1;
++            }
++          goto record_regs;
++        }
++      break;
+     }
+ 
++  syscall_gdb = amd64_canonicalize_syscall (syscall_native);
++
+   if (syscall_gdb < 0)
+     {
+       printf_unfiltered (_("Process record and replay target doesn't "
+@@ -1163,6 +1218,44 @@
+   if (record_arch_list_add_reg (regcache, AMD64_R11_REGNUM))
+     return -1;
+ 
++  return 0;
++}
++
++#define AMD64_LINUX_redzone    128
++#define AMD64_LINUX_xstate     512
++#define AMD64_LINUX_frame_size 560
++
++int
++amd64_linux_record_signal (struct gdbarch *gdbarch,
++                           struct regcache *regcache,
++                           enum target_signal signal)
++{
++  ULONGEST rsp;
++
++  if (amd64_all_but_ip_registers_record (regcache))
++    return -1;
++
++  if (record_arch_list_add_reg (regcache, AMD64_RIP_REGNUM))
++    return -1;
++
++  /* Record the change in the stack.  */
++  regcache_raw_read_unsigned (regcache, AMD64_RSP_REGNUM, &rsp);
++  /* redzone
++     sp -= 128; */
++  rsp -= AMD64_LINUX_redzone;
++  /* This is for xstate.
++     sp -= sizeof (struct _fpstate);  */
++  rsp -= AMD64_LINUX_xstate;
++  /* This is for frame_size.
++     sp -= sizeof (struct rt_sigframe);  */
++  rsp -= AMD64_LINUX_frame_size;
++  if (record_arch_list_add_mem (rsp, AMD64_LINUX_redzone
++                                     + AMD64_LINUX_xstate
++                                     + AMD64_LINUX_frame_size))
++    return -1;
++
++  if (record_arch_list_add_end ())
++    return -1;
+ 
+   return 0;
+ }
+@@ -1218,6 +1311,7 @@
+   set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
+ 
+   set_gdbarch_process_record (gdbarch, i386_process_record);
++  set_gdbarch_process_record_signal (gdbarch, amd64_linux_record_signal);
+ 
+   /* Initialize the amd64_linux_record_tdep.  */
+   /* These values are the size of the type that will be used in a system
+===================================================================
+RCS file: /cvs/src/src/gdb/ChangeLog,v
+retrieving revision 1.10874.2.12
+retrieving revision 1.10874.2.13
+diff -u -r1.10874.2.12 -r1.10874.2.13
+--- src/gdb/ChangeLog	2009/09/21 06:57:02	1.10874.2.12
++++ src/gdb/ChangeLog	2009/09/21 10:19:59	1.10874.2.13
+@@ -1,3 +1,8 @@
++2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* python/py-value.c (valpy_getitem): Test value before allowing
++	subscript operation.
++
+ 2009-09-21  Hui Zhu  <teawater@gmail.com>
+ 	    Michael Snyder  <msnyder@vmware.com>
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/python/py-value.c,v
+retrieving revision 1.1
+retrieving revision 1.1.2.1
+diff -u -r1.1 -r1.1.2.1
+--- src/gdb/python/py-value.c	2009/09/09 17:45:40	1.1
++++ src/gdb/python/py-value.c	2009/09/21 10:20:00	1.1.2.1
+@@ -324,7 +324,18 @@
+ 	     type.  */
+ 	  struct value *idx = convert_value_from_python (key);
+ 	  if (idx != NULL)
+-	    res_val = value_subscript (tmp, value_as_long (idx));
++	    {
++	      /* Check the value's type is something that can be accessed via
++		 a subscript.  */
++	      struct type *type;
++	      tmp = coerce_ref (tmp);
++	      type = check_typedef (value_type (tmp));
++	      if (TYPE_CODE (type) != TYPE_CODE_ARRAY
++		  && TYPE_CODE (type) != TYPE_CODE_PTR)
++		  error( _("Cannot subscript requested type"));
++	      else
++		res_val = value_subscript (tmp, value_as_long (idx));
++	    }
+ 	}
+     }
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/testsuite/ChangeLog,v
+retrieving revision 1.1960
+retrieving revision 1.1960.2.1
+diff -u -r1.1960 -r1.1960.2.1
+--- src/gdb/testsuite/ChangeLog	2009/09/15 18:51:25	1.1960
++++ src/gdb/testsuite/ChangeLog	2009/09/21 10:20:00	1.1960.2.1
+@@ -1,3 +1,10 @@
++2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* gdb.python/py-value.exp (test_subscript_regression): New
++	function.  Test for invalid subscripts.
++	* gdb.python/py-value.c (main): Add test array, and pointer to it.
++	(ptr_ref): New function.
++
+ 2009-09-15  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* lib/mi-support.exp (mi_create_varobj): Update.
+===================================================================
+RCS file: /cvs/src/src/gdb/testsuite/gdb.python/py-value.c,v
+retrieving revision 1.1
+retrieving revision 1.1.2.1
+diff -u -r1.1 -r1.1.2.1
+--- src/gdb/testsuite/gdb.python/py-value.c	2009/09/09 17:45:42	1.1
++++ src/gdb/testsuite/gdb.python/py-value.c	2009/09/21 10:20:00	1.1.2.1
+@@ -37,6 +37,13 @@
+ 
+ enum e evalue = TWO;
+ 
++#ifdef __cplusplus
++void ptr_ref(int*& rptr_int)
++{
++  return; /* break to inspect pointer by reference. */
++}
++#endif
++
+ int
+ main (int argc, char *argv[])
+ {
+@@ -46,10 +53,18 @@
+   PTR x = &s;
+   char st[17] = "divide et impera";
+   char nullst[17] = "divide\0et\0impera";
++  int a[3] = {1,2,3};
++  int *p = a;
++  int i = 2;
++  int *ptr_i = &i;
+ 
+   s.a = 3;
+   s.b = 5;
+   u.a = 7;
+ 
++#ifdef __cplusplus
++  ptr_ref(ptr_i);
++#endif
++
+   return 0;      /* break to inspect struct and union */
+ }
+===================================================================
+RCS file: /cvs/src/src/gdb/testsuite/gdb.python/py-value.exp,v
+retrieving revision 1.1
+retrieving revision 1.1.2.1
+diff -u -r1.1 -r1.1.2.1
+--- src/gdb/testsuite/gdb.python/py-value.exp	2009/09/09 17:45:42	1.1
++++ src/gdb/testsuite/gdb.python/py-value.exp	2009/09/21 10:20:00	1.1.2.1
+@@ -292,6 +292,75 @@
+     "print value's type"
+ }
+ 
++# Regression test for invalid subscript operations.  The bug was that
++# the type of the value was not being checked before allowing a
++# subscript operation to proceed.
++
++proc test_subscript_regression {lang} {
++
++ global srcdir subdir srcfile binfile testfile hex
++ if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug $lang"] != "" } {
++     untested "Couldn't compile ${srcfile} in $lang mode"
++     return -1
++ }
++
++ # Start with a fresh gdb.
++ gdb_exit
++ gdb_start
++ gdb_reinitialize_dir $srcdir/$subdir
++ gdb_load ${binfile}
++
++ if ![runto_main ] then {
++     perror "couldn't run to breakpoint"
++     return
++ }
++
++ if {$lang == "c++"} {
++     gdb_breakpoint [gdb_get_line_number "break to inspect pointer by reference"]
++     gdb_continue_to_breakpoint "break to inspect pointer by reference"
++
++     gdb_py_test_silent_cmd "print rptr_int" \
++	 "Obtain address" 1
++     gdb_py_test_silent_cmd "python rptr = gdb.history(0)" \
++	 "Obtains value from GDB" 1
++     gdb_test "python print rptr\[0\]" "2" "Check pointer passed as reference"
++ }
++
++ gdb_breakpoint [gdb_get_line_number "break to inspect struct and union"]
++ gdb_continue_to_breakpoint "break to inspect struct and union"
++
++ gdb_py_test_silent_cmd "python intv = gdb.Value(1)" \
++     "Create a value for subscript test" 1
++ gdb_py_test_silent_cmd "python stringv = gdb.Value(\"foo\")" \
++     "Create a value for subscript test" 1
++
++ # Try to access an int with a subscript.  This should fail.
++ gdb_test "python print intv" "1" "Baseline print of a Python value"
++ gdb_test "python print intv\[0\]" "RuntimeError: Cannot subscript requested type.*" \
++     "Attempt to access an integer with a subscript"
++
++ # Try to access a string with a subscript.  This should pass.
++ gdb_test "python print stringv" "foo." "Baseline print of a Python value"
++ gdb_test "python print stringv\[0\]" "f." "Attempt to access a string with a subscript"
++
++ # Try to access an int array via a pointer with a subscript.  This should pass.
++ gdb_py_test_silent_cmd "print p" "Build pointer to array" 1
++ gdb_py_test_silent_cmd "python pointer = gdb.history(0)" "" 1
++ gdb_test "python print pointer\[0\]" "1" "Access array via pointer with int subscript"
++ gdb_test "python print pointer\[intv\]" "2" "Access array via pointer with value subscript"
++
++ # Try to access a single dimension array with a subscript to the
++ # result.  This should fail.
++ gdb_test "python print pointer\[intv\]\[0\]" "RuntimeError: Cannot subscript requested type.*" \
++     "Attempt to access an integer with a subscript"
++
++ # Lastly, test subscript access to an array with multiple
++ # dimensions.  This should pass.
++ gdb_py_test_silent_cmd "print {\"fu \",\"foo\",\"bar\"}" "Build array" 1
++ gdb_py_test_silent_cmd "python marray = gdb.history(0)" "" 1
++ gdb_test "python print marray\[1\]\[2\]" "o." "Test multiple subscript"
++}
++
+ # Start with a fresh gdb.
+ 
+ gdb_exit
+@@ -322,3 +391,8 @@
+ 
+ test_value_in_inferior
+ test_value_after_death
++
++# The following test recompiles the binary to test either C or C++
++# values. 
++test_subscript_regression "c++"
++test_subscript_regression "c"
+===================================================================
+RCS file: /cvs/src/src/gdb/ChangeLog,v
+retrieving revision 1.10874.2.13
+retrieving revision 1.10874.2.14
+diff -u -r1.10874.2.13 -r1.10874.2.14
+--- src/gdb/ChangeLog	2009/09/21 10:19:59	1.10874.2.13
++++ src/gdb/ChangeLog	2009/09/21 10:25:29	1.10874.2.14
+@@ -1,5 +1,12 @@
+ 2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
+ 
++	PR python/10633
++
++	* c-lang.c (c_printstr): Do not loop past  options->print_max when
++	iterating with wchar_iterate.
++
++2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
++
+ 	* python/py-value.c (valpy_getitem): Test value before allowing
+ 	subscript operation.
+ 
+===================================================================
+RCS file: /cvs/src/src/gdb/c-lang.c,v
+retrieving revision 1.75
+retrieving revision 1.75.4.1
+diff -u -r1.75 -r1.75.4.1
+--- src/gdb/c-lang.c	2009/07/10 10:35:16	1.75
++++ src/gdb/c-lang.c	2009/09/21 10:25:29	1.75.4.1
+@@ -459,7 +459,7 @@
+ 	 single character in isolation.  This makes the code simpler
+ 	 and probably does the sensible thing in the majority of
+ 	 cases.  */
+-      while (num_chars == 1)
++      while (num_chars == 1 && things_printed < options->print_max)
+ 	{
+ 	  /* Count the number of repetitions.  */
+ 	  unsigned int reps = 0;
+===================================================================
+RCS file: /cvs/src/src/gdb/testsuite/ChangeLog,v
+retrieving revision 1.1960.2.1
+retrieving revision 1.1960.2.2
+diff -u -r1.1960.2.1 -r1.1960.2.2
+--- src/gdb/testsuite/ChangeLog	2009/09/21 10:20:00	1.1960.2.1
++++ src/gdb/testsuite/ChangeLog	2009/09/21 10:25:29	1.1960.2.2
+@@ -1,5 +1,13 @@
+ 2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
+ 
++	PR python/10633
++
++	* gdb.python/py-prettyprint.exp (gdb_py_test_silent_cmd): New
++	Function.
++	(run_lang_tests): Add print elements test.
++
++2009-09-21  Phil Muldoon  <pmuldoon@redhat.com>
++
+ 	* gdb.python/py-value.exp (test_subscript_regression): New
+ 	function.  Test for invalid subscripts.
+ 	* gdb.python/py-value.c (main): Add test array, and pointer to it.
+===================================================================
+RCS file: /cvs/src/src/gdb/testsuite/gdb.python/py-prettyprint.exp,v
+retrieving revision 1.1
+retrieving revision 1.1.2.1
+diff -u -r1.1 -r1.1.2.1
+--- src/gdb/testsuite/gdb.python/py-prettyprint.exp	2009/09/09 17:45:42	1.1
++++ src/gdb/testsuite/gdb.python/py-prettyprint.exp	2009/09/21 10:25:30	1.1.2.1
+@@ -35,6 +35,17 @@
+     -re "$gdb_prompt $"	{}
+ }
+ 
++# Run a command in GDB, and report a failure if a Python exception is thrown.
++# If report_pass is true, report a pass if no exception is thrown.
++proc gdb_py_test_silent_cmd {cmd name report_pass} {
++  global gdb_prompt
++
++  gdb_test_multiple $cmd $name {
++      -re "Traceback.*$gdb_prompt $"  { fail $name }
++      -re "$gdb_prompt $"	      { if $report_pass { pass $name } }
++  }
++}
++
+ proc run_lang_tests {lang} {
+     global srcdir subdir srcfile binfile testfile hex
+     if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug $lang"] != "" } {
+@@ -79,6 +90,11 @@
+ 	gdb_test "print derived" \
+ 	    " = \{.*<Vbase1> = pp class name: Vbase1.*<Vbase2> = \{.*<VirtualTest> = pp value variable is: 1,.*members of Vbase2:.*_vptr.Vbase2 = $hex.*<Vbase3> = \{.*members of Vbase3.*members of Derived:.*value = 2.*"
+ 	gdb_test "print ns " "\"embedded\\\\000null\\\\000string\""
++	gdb_py_test_silent_cmd "set print elements 3" "" 1
++	gdb_test "print ns" "emb\.\.\.."
++	gdb_py_test_silent_cmd "set print elements 10" "" 1
++	gdb_test "print ns" "embedded\\\\000n\.\.\.."
++	gdb_py_test_silent_cmd "set print elements 200" "" 1
+     }
+ 
+     gdb_test "print x" " = $hex \"this is x\""

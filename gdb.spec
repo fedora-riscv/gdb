@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.91.20090917
+Version: 6.8.91.20090921
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -219,8 +219,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.8.50.20090910 snapshot fixups.
-#Patch232: gdb-6.8.50.20090910-upstream.patch
+# Backported post gdb-6.8.50.20090991 snapshot fixups.
+Patch232: gdb-6.8.50.20090921-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -453,7 +453,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -847,6 +847,11 @@ fi
 %endif
 
 %changelog
+* Mon Sep 21 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090921-1
+- Upgrade to the FSF GDB gdb-7.0 snapshot: 6.8.91.20090921
+- archer-jankratochvil-fedora12 commit: 0d5c38dd89050c0ee1cf049656f177c170d675d4
+  - [expr] Check has_stack_frames before calling find_pc_line (Sami Wagiaalla).
+
 * Thu Sep 17 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090917-2
 - Include bundled libstdc++ python; it will be in libstdc++-devel since gcc-4.5.
 
