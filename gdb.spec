@@ -14,7 +14,7 @@ Version: 6.8.91.20090925
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -847,6 +847,9 @@ fi
 %endif
 
 %changelog
+* Fri Sep 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090925-2
+- Fix buildid-loading libs w/matching name but different build-id (BZ 524572).
+
 * Fri Sep 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090925-1
 - Upgrade to the FSF GDB gdb-7.0 snapshot: 6.8.91.20090925
 - archer-jankratochvil-fedora12 commit: 4338ea85c798007c32594032f602db9fd230eba9
