@@ -14,7 +14,7 @@ Version: 6.8.91.20090925
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -364,6 +364,9 @@ Patch375: gdb-readline-6.0.patch
 # Fix python pretty printers lookup on x86_64.
 Patch376: libstdc++-v3-python-common-prefix.patch
 
+# New test for step-resume breakpoint placed in multiple threads at once.
+Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -557,6 +560,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch375 -p1
 %patch376 -p1
+%patch381 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -847,6 +851,9 @@ fi
 %endif
 
 %changelog
+* Sun Sep 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090925-3
+- New test for step-resume breakpoint placed in multiple threads at once.
+
 * Fri Sep 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090925-2
 - Fix buildid-loading libs w/matching name but different build-id (BZ 524572).
 
