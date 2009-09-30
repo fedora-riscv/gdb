@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.91.20090925
+Version: 6.8.91.20090930
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -374,7 +374,6 @@ BuildRequires: readline-devel
 #Requires: rpm-libs
 BuildRequires: rpm-devel
 %if 0%{!?_without_python:1}
-%{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 Requires: python-libs
 BuildRequires: python-devel
 # Temporarily before it gets moved to libstdc++.rpm
@@ -612,7 +611,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--mandir=%{_mandir}				\
 	--infodir=%{_infodir}				\
 	--with-gdb-datadir=%{_datadir}/gdb		\
-	--with-pythondir=%{python_sitelib}		\
+	--with-pythondir=%{_datadir}/gdb/python		\
 	--enable-gdb-build-warnings=,-Wno-unused	\
 %ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparcv9 sparc64
 	--disable-werror				\
@@ -764,14 +763,14 @@ for LIB in lib lib64;do
   LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
   mkdir -p $LIBPATH
   # basename is being run only for the native (non-biarch) file.
-  sed -e 's,@pythondir@,%{python_sitelib}/gdb,'			\
+  sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
       -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
       < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
       > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
 done
-test ! -e $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
-      $RPM_BUILD_ROOT%{python_sitelib}/gdb/libstdcxx
+      $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 %endif	# 0%{!?_without_python:1}
 
 # Remove the files that are part of a gdb build but that are owned and
@@ -832,9 +831,6 @@ fi
 %{_bindir}/pstack
 %{_mandir}/*/gstack.1*
 %{_mandir}/*/pstack.1*
-%if 0%{!?_without_python:1}
-%{python_sitelib}/gdb
-%endif	# 0%{!?_without_python:1}
 %endif	# 0%{!?_with_upstream:1}
 %{_datadir}/gdb
 %{_infodir}/annotate.info*
@@ -851,6 +847,11 @@ fi
 %endif
 
 %changelog
+* Wed Sep 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090930-1
+- Fix broken python "help()" command "modules" (BZ 526552).
+- Upgrade to the FSF GDB gdb-7.0 snapshot: 6.8.91.20090930
+- archer-jankratochvil-fedora12 commit: 7cb860f03e2437c97239334ebe240d06f45723e0
+
 * Sun Sep 27 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090925-3
 - New test for step-resume breakpoint placed in multiple threads at once.
 
