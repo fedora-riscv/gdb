@@ -14,7 +14,7 @@ Version: 6.8.91.20090930
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -847,6 +847,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090930-2
+- Bump release.
+
 * Wed Sep 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090930-1
 - Fix broken python "help()" command "modules" (BZ 526552).
 - Upgrade to the FSF GDB gdb-7.0 snapshot: 6.8.91.20090930
