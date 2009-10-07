@@ -10,11 +10,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 6.8.91.20090930
+Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -367,6 +367,9 @@ Patch376: libstdc++-v3-python-common-prefix.patch
 # New test for step-resume breakpoint placed in multiple threads at once.
 Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 
+# Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
+Patch382: gdb-core-open-vdso-warning.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -560,6 +563,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch375 -p1
 %patch376 -p1
 %patch381 -p1
+%patch382 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -847,6 +851,11 @@ fi
 %endif
 
 %changelog
+* Wed Oct  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-1
+- Formal upgrade to the final FSF GDB release gdb-7.0.
+- Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
+- archer-jankratochvil-fedora12 commit: ce4ead356654b951a49ca78d81ebfff95e758bf5
+
 * Wed Sep 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.91.20090930-2
 - Bump release.
 
