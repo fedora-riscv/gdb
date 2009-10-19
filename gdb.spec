@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -386,7 +386,10 @@ BuildRequires: libstdc++
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc fpc glibc-static
+BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc glibc-static
+%if 0%{!?rhel:1}
+BuildRequires: fpc
+%endif
 # Ensure the devel libraries are installed for both multilib arches.
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
 # Copied from gcc-4.1.2-32
@@ -851,6 +854,9 @@ fi
 %endif
 
 %changelog
+* Mon Oct 19 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-2
+- Sync the .spec with RHEL/CentOS without EPEL, do not BuildRequires: fpc there.
+
 * Wed Oct  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-1
 - Formal upgrade to the final FSF GDB release gdb-7.0.
 - Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
