@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -124,10 +124,6 @@ Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 
 # Fix printing of inherited members
 Patch148: gdb-6.3-inheritance-20050324.patch
-
-# Print a warning when the separate debug info's CRC doesn't match.
-Patch150: gdb-6.3-test-sepcrc-20050402.patch
-Patch151: gdb-6.3-sepcrc-20050402.patch
 
 # Do not issue warning message about first page of storage for ia64 gcore
 Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
@@ -370,6 +366,11 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 Patch382: gdb-core-open-vdso-warning.patch
 
+# Support multiple directories for `set debug-file-directory' (BZ 528668).
+Patch383: gdb-bz528668-symfile-sepcrc.patch
+Patch384: gdb-bz528668-symfile-cleanup.patch
+Patch385: gdb-bz528668-symfile-multi.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -463,6 +464,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 #patch232 -p1
 %patch349 -p1
+%patch383 -p1
+%patch384 -p1
+%patch385 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -483,8 +487,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch142 -p1
 %patch145 -p1
 %patch148 -p1
-%patch150 -p1
-%patch151 -p1
 %patch153 -p1
 %patch157 -p1
 %patch158 -p1
@@ -854,6 +856,9 @@ fi
 %endif
 
 %changelog
+* Thu Oct 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-3
+- Support multiple directories for `set debug-file-directory' (BZ 528668).
+
 * Mon Oct 19 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-2
 - Sync the .spec with RHEL/CentOS without EPEL, do not BuildRequires: fpc there.
 
