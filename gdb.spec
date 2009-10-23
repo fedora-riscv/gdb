@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 5%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -56,7 +56,7 @@ Source3: gdb-gstack.man
 
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
 %define libstdcxxpython libstdc++-v3-python-r151798
-Source4: %{libstdcxxpython}.tar.xz
+Source4: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
 Patch1: gdb-6.3-rh-dummykfail-20041202.patch
@@ -449,7 +449,7 @@ This package provides a program that allows you to run GDB on a different machin
 %setup -q -n %{gdb_src}
 
 # libstdc++ pretty printers.
-xz -dc %{SOURCE4} | tar xf -
+tar xjf %{SOURCE4}
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
@@ -642,7 +642,14 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 %else
 	--without-python				\
 %endif
+$(: Workaround rpm.org#76, BZ 508193 on recent OSes. )	\
+$(: RHEL-5 was the last not providing %{dist}. )	\
+$(: RHEL-5 librpm has incompatible API. )		\
+%if 0%{!?dist:1}
+	--without-rpm					\
+%else
 	--with-rpm=librpm.so.0				\
+%endif
 %ifarch ia64
 	--with-libunwind				\
 %else
@@ -865,6 +872,10 @@ fi
 %endif
 
 %changelog
+* Fri Oct 23 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-5
+- Make the package buildable on RHEL-5/CentOS-5 (without librpm there).
+- archer-jankratochvil-fedora12 commit: 5b73ea6a0f74e63db3b504792fc1d37f548bdf5c
+
 * Fri Oct 23 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-4
 - Fix rpm --excludedocs (BZ 515998).
 
