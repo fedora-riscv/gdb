@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 4%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -421,7 +421,7 @@ Requires: libunwind >= 0.99-0.1.frysk20070405cvs
 BuildRequires: prelink
 %endif
 %endif
- 
+
 Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
 
@@ -814,17 +814,26 @@ rm -rf $RPM_BUILD_ROOT
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
 
-/sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
-/sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-/sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
-/sbin/install-info --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
+# For --excludedocs:
+if [ -e %{_infodir}/gdb.info.gz ]
+then
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
+fi
 
 %preun
-if [ $1 = 0 ]; then
-	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
-	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
-	/sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
+if [ $1 = 0 ]
+then
+  # For --excludedocs:
+  if [ -e %{_infodir}/gdb.info.gz ]
+  then
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
+  fi
 fi
 
 %files
@@ -856,6 +865,9 @@ fi
 %endif
 
 %changelog
+* Fri Oct 23 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-4
+- Fix rpm --excludedocs (BZ 515998).
+
 * Thu Oct 22 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-3
 - Support multiple directories for `set debug-file-directory' (BZ 528668).
 
