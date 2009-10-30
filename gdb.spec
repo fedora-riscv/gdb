@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -215,8 +215,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-6.8.50.20090991 snapshot fixups.
-#Patch232: gdb-6.8.50.20090921-upstream.patch
+# Backported post gdb-7.0 fixups.
+Patch232: gdb-7.0-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -377,6 +377,8 @@ BuildRequires: readline-devel
 # dlopen() no longer makes rpm-libs a mandatory dependency.
 #Requires: rpm-libs
 BuildRequires: rpm-devel
+Requires: zlib
+BuildRequires: zlib-devel
 %if 0%{!?_without_python:1}
 Requires: python-libs
 BuildRequires: python-devel
@@ -462,7 +464,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch383 -p1
 %patch384 -p1
@@ -668,6 +670,8 @@ $(: RHEL-5 librpm has incompatible API. )		\
 make %{?_smp_mflags}
 make %{?_smp_mflags} info
 
+grep '#define HAVE_ZLIB_H 1' gdb/config.h
+
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
 
@@ -872,6 +876,10 @@ fi
 %endif
 
 %changelog
+* Fri Oct 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-6
+- Fix missing zlib-devel BuildRequires to support compressed DWARF sections.
+- Include post-7.0 FSF GDB fixes.
+
 * Fri Oct 23 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-5
 - Make the package buildable on RHEL-5/CentOS-5 (without librpm there).
 - archer-jankratochvil-fedora12 commit: 5b73ea6a0f74e63db3b504792fc1d37f548bdf5c

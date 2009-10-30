@@ -1,0 +1,264 @@
+### ./gdb/ChangeLog	6 Oct 2009 16:32:30 -0000	1.10874.2.46
+### ./gdb/ChangeLog	22 Oct 2009 20:31:36 -0000	1.10874.2.52
+## -1,3 +1,33 @@
++2009-10-22  Paul Pluzhnikov  <ppluzhnikov@google.com>
++
++	PR gdb/10819
++	* dwarf2-frame.c (find_cie): Don't call bsearch on empty cie_table.
++	* objfiles.c (find_pc_section): Likewise.
++	(update_section_map): Don't allocate empty table.
++	
++2009-10-19  Don Lee  <don.lee@sunplusct.com>
++
++	* score-tdep.c: Delete some simulator dependent codes.
++	* score-tdep.h: Delete some simulator dependent macro definitions.
++
++2008-10-16  Steven G. Kargl  <kargl@gcc.gnu.org>  (tiny patch)
++
++	* amd64fbsd-nat.c (amd64fbsd_supply_pcb): Conditionally compile in
++	support for pcb->pcb_{fs,ds,es,gs} on FreeBSD older than 8.0.
++
++2009-10-08  Paul Pluzhnikov  <ppluzhnikov@google.com>
++
++	PR gdb/10457
++	* elfread.c (elf_symtab_read): Don't use alloca in a loop.
++	
++2009-10-06  Joel Brobecker  <brobecker@adacore.com>
++
++	* version.in: Set version to 7.0.0.20091006-cvs.
++
++2009-10-06  Joel Brobecker  <brobecker@adacore.com>
++
++	GDB 7.0 released.
++
+ 2009-10-06  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	* NEWS: Change "Changes since GDB 6.8" into "Changes in GDB 7.0".
+--- ./gdb/amd64fbsd-nat.c	3 Jan 2009 05:57:50 -0000	1.22
++++ ./gdb/amd64fbsd-nat.c	17 Oct 2009 04:19:19 -0000	1.22.4.1
+@@ -95,6 +95,7 @@ static int amd64fbsd32_r_reg_offset[I386
+ 
+ #include <sys/types.h>
+ #include <machine/pcb.h>
++#include <osreldate.h>
+ 
+ #include "bsd-kvm.h"
+ 
+@@ -123,10 +124,12 @@ amd64fbsd_supply_pcb (struct regcache *r
+   regcache_raw_supply (regcache, 13, &pcb->pcb_r13);
+   regcache_raw_supply (regcache, 14, &pcb->pcb_r14);
+   regcache_raw_supply (regcache, 15, &pcb->pcb_r15);
++#if (__FreeBSD_version <  800075)
+   regcache_raw_supply (regcache, AMD64_DS_REGNUM, &pcb->pcb_ds);
+   regcache_raw_supply (regcache, AMD64_ES_REGNUM, &pcb->pcb_es);
+   regcache_raw_supply (regcache, AMD64_FS_REGNUM, &pcb->pcb_fs);
+   regcache_raw_supply (regcache, AMD64_GS_REGNUM, &pcb->pcb_gs);
++#endif
+ 
+   return 1;
+ }
+--- ./gdb/dwarf2-frame.c	15 Sep 2009 16:20:53 -0000	1.99
++++ ./gdb/dwarf2-frame.c	22 Oct 2009 20:31:36 -0000	1.99.2.1
+@@ -1525,6 +1525,14 @@ find_cie (struct dwarf2_cie_table *cie_t
+ {
+   struct dwarf2_cie **p_cie;
+ 
++  /* The C standard (ISO/IEC 9899:TC2) requires the BASE argument to
++     bsearch be non-NULL.  */
++  if (cie_table->entries == NULL)
++    {
++      gdb_assert (cie_table->num_entries == 0);
++      return NULL;
++    }
++
+   p_cie = bsearch (&cie_pointer, cie_table->entries, cie_table->num_entries,
+                    sizeof (cie_table->entries[0]), bsearch_cie_cmp);
+   if (p_cie != NULL)
+--- ./gdb/elfread.c	30 Apr 2009 21:59:03 -0000	1.77
++++ ./gdb/elfread.c	8 Oct 2009 17:42:10 -0000	1.77.4.1
+@@ -535,7 +535,7 @@ elf_symtab_read (struct objfile *objfile
+ 
+ 	      if (len > 4 && strcmp (sym->name + len - 4, "@plt") == 0)
+ 		{
+-		  char *base_name = alloca (len - 4 + 1);
++		  char *base_name = xmalloc (len - 4 + 1);
+ 		  struct minimal_symbol *mtramp;
+ 
+ 		  memcpy (base_name, sym->name, len - 4);
+@@ -543,6 +543,7 @@ elf_symtab_read (struct objfile *objfile
+ 		  mtramp = record_minimal_symbol (base_name, symaddr,
+ 						  mst_solib_trampoline,
+ 						  sym->section, objfile);
++		  xfree (base_name);
+ 		  if (mtramp)
+ 		    {
+ 		      MSYMBOL_SIZE (mtramp) = MSYMBOL_SIZE (msym);
+--- ./gdb/objfiles.c	18 Sep 2009 17:39:36 -0000	1.96.2.1
++++ ./gdb/objfiles.c	22 Oct 2009 20:31:36 -0000	1.96.2.2
+@@ -1045,6 +1045,14 @@ update_section_map (struct obj_section *
+     if (insert_section_p (objfile->obfd, s->the_bfd_section))
+       alloc_size += 1;
+ 
++  /* This happens on detach/attach (e.g. in gdb.base/attach.exp).  */
++  if (alloc_size == 0)
++    {
++      *pmap = NULL;
++      *pmap_size = 0;
++      return;
++    }
++
+   map = xmalloc (alloc_size * sizeof (*map));
+ 
+   i = 0;
+@@ -1105,6 +1113,14 @@ find_pc_section (CORE_ADDR pc)
+       objfiles_changed_p = 0;
+     }
+ 
++  /* The C standard (ISO/IEC 9899:TC2) requires the BASE argument to
++     bsearch be non-NULL.  */
++  if (sections == NULL)
++    {
++      gdb_assert (num_sections == 0);
++      return NULL;
++    }
++
+   sp = (struct obj_section **) bsearch (&pc, sections, num_sections,
+ 					sizeof (*sections), bsearch_cmp);
+   if (sp != NULL)
+--- ./gdb/score-tdep.c	6 Aug 2009 10:28:38 -0000	1.21
++++ ./gdb/score-tdep.c	19 Oct 2009 09:02:18 -0000	1.21.2.1
+@@ -56,58 +56,6 @@ struct score_frame_cache
+ 
+ static int target_mach = bfd_mach_score7;
+ 
+-#if WITH_SIM
+-int
+-score_target_can_use_watch (int type, int cnt, int othertype)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_can_use_watch (type, cnt);
+-  return (*current_target.to_can_use_hw_breakpoint) (type, cnt, othertype);
+-}
+-
+-int
+-score_stopped_by_watch (void)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_stopped_by_watch ();
+-  return (*current_target.to_stopped_by_watchpoint) ();
+-}
+-
+-int
+-score_target_insert_watchpoint (CORE_ADDR addr, int len, int type)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_add_watch (addr, len, type);
+-  return (*current_target.to_insert_watchpoint) (addr, len, type); 
+-}
+-
+-int
+-score_target_remove_watchpoint (CORE_ADDR addr, int len, int type)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_del_watch (addr, len, type);
+-  return (*current_target.to_remove_watchpoint) (addr, len, type); 
+-}
+-
+-int
+-score_target_insert_hw_breakpoint (struct gdbarch *gdbarch,
+-				   struct bp_target_info * bp_tgt)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_add_hardbp (bp_tgt->placed_address);
+-  return (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt);
+-}
+-
+-int
+-score_target_remove_hw_breakpoint (struct gdbarch *gdbarch,
+-				   struct bp_target_info * bp_tgt)
+-{
+-  if (strcmp (current_target.to_shortname, "sim") == 0)
+-      return soc_gh_del_hardbp (bp_tgt->placed_address);
+-  return (*current_target.to_remove_hw_breakpoint) (gdbarch, bp_tgt); 
+-}
+-#endif
+-
+ static struct type *
+ score_register_type (struct gdbarch *gdbarch, int regnum)
+ {
+--- ./gdb/score-tdep.h	6 Aug 2009 10:28:38 -0000	1.6
++++ ./gdb/score-tdep.h	19 Oct 2009 09:02:18 -0000	1.6.2.1
+@@ -85,68 +85,4 @@ struct pt_regs {
+ 
+ typedef struct pt_regs elf_gregset_t;
+ 
+-#ifdef WITH_SIM
+-
+-#include <breakpoint.h>
+-
+-int soc_gh_can_use_watch(int type, int cnt);
+-int soc_gh_add_watch(unsigned int addr, int len, int type);
+-int soc_gh_del_watch(unsigned int addr, int len, int type);
+-int soc_gh_stopped_by_watch(void);
+-int soc_gh_add_hardbp(unsigned int addr); 
+-int soc_gh_del_hardbp(unsigned int addr); 
+-
+-int score_target_can_use_watch(int type, int cnt, int ot);
+-int score_stopped_by_watch(void);
+-int score_target_insert_watchpoint (CORE_ADDR addr, int len, int type);
+-int score_target_remove_watchpoint (CORE_ADDR addr, int len, int type);
+-int score_target_insert_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info * bp_tgt);
+-int score_target_remove_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info * bp_tgt);
+-
+-#define TARGET_HAS_HARDWARE_WATCHPOINTS
+-
+-#ifdef TARGET_CAN_USE_HARDWARE_WATCHPOINT
+-#undef TARGET_CAN_USE_HARDWARE_WATCHPOINT
+-
+-#define TARGET_CAN_USE_HARDWARE_WATCHPOINT(type, cnt, ot) \
+-    score_target_can_use_watch(type, cnt, ot)
+-#endif
+-
+-#ifdef STOPPED_BY_WATCHPOINT
+-#undef STOPPED_BY_WATCHPOINT
+-
+-#define STOPPED_BY_WATCHPOINT(w) \
+-    score_stopped_by_watch()
+-#endif
+-
+-#ifdef target_insert_watchpoint
+-#undef target_insert_watchpoint
+-
+-#define target_insert_watchpoint(addr, len, type) \
+-    score_target_insert_watchpoint (addr, len, type)
+-#endif
+-
+-#ifdef target_remove_watchpoint
+-#undef target_remove_watchpoint
+-
+-#define target_remove_watchpoint(addr, len, type) \
+-    score_target_remove_watchpoint (addr, len, type)
+-#endif
+-
+-#ifdef target_insert_hw_breakpoint
+-#undef target_insert_hw_breakpoint
+-
+-#define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
+-    score_target_insert_hw_breakpoint (gdbarch, bp_tgt)
+-#endif
+-
+-#ifdef target_remove_hw_breakpoint
+-#undef target_remove_hw_breakpoint
+-
+-#define target_remove_hw_breakpoint(gdbarch, bp_tgt) \
+-    score_target_remove_hw_breakpoint (gdbarch, bp_tgt)
+-#endif
+-
+-#endif /* WITH_SIM */
+-
+ #endif /* SCORE_TDEP_H */
+### ./gdb/version.in	6 Oct 2009 16:25:13 -0000	1.2997.2.26
+### ./gdb/version.in	30 Oct 2009 00:00:33 -0000	1.2997.2.51
+## -1 +1 @@
+-7.0
++7.0.0.20091030-cvs
