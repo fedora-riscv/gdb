@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -371,6 +371,12 @@ Patch383: gdb-bz528668-symfile-sepcrc.patch
 Patch384: gdb-bz528668-symfile-cleanup.patch
 Patch385: gdb-bz528668-symfile-multi.patch
 
+# Support GNU IFUNCs - indirect functions (BZ 539590).
+Patch387: gdb-bz539590-gnu-ifunc.patch
+
+# Fix bp conditionals [bp_location-accel] regression (Phil Muldoon, BZ 538626).
+Patch388: gdb-bz538626-bp_location-accel-bp-cond.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -571,6 +577,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch376 -p1
 %patch381 -p1
 %patch382 -p1
+%patch387 -p1
+%patch388 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -876,6 +884,11 @@ fi
 %endif
 
 %changelog
+* Wed Nov 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-7.fc12
+- Support GNU IFUNCs - indirect functions (BZ 539590).
+- Fix bp conditionals [bp_location-accel] regression (Phil Muldoon, BZ 538626).
+- Fix missed breakpoint location [bp_location-accel] regression (upstream).
+
 * Fri Oct 30 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-6
 - Fix missing zlib-devel BuildRequires to support compressed DWARF sections.
 - Include post-7.0 FSF GDB fixes.

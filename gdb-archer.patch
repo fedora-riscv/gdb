@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 5b73ea6a0f74e63db3b504792fc1d37f548bdf5c
+commit b125345fb36abbb9bd00128e2093dc636a859da5
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -463,7 +463,7 @@ index 53e7371..d373f8a 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 811cdfb..b0bf314 100644
+index 811cdfb..0f35101 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -61,6 +61,7 @@
@@ -684,14 +684,14 @@ index 811cdfb..b0bf314 100644
 +
 +  /* Find BC_L which is a leftmost element which may affect BUF content.  It is
 +     safe to report lower value but a failure to report higher one.  */
-+
+ 
+-  ALL_BP_LOCATIONS (b)
 +  bc_l = 0;
 +  bc_r = bp_location_count;
 +  while (bc_l + 1 < bc_r)
 +    {
 +      struct bp_location *b;
- 
--  ALL_BP_LOCATIONS (b)
++
 +      bc = (bc_l + bc_r) / 2;
 +      b = bp_location[bc];
 +
@@ -1553,7 +1553,7 @@ index 811cdfb..b0bf314 100644
  /* If SHOULD_INSERT is false, do not insert any breakpoint locations
     into the inferior, only remove already-inserted locations that no
     longer should be inserted.  Functions that delete a breakpoint or
-@@ -7777,49 +7951,66 @@ static void
+@@ -7777,49 +7951,78 @@ static void
  update_global_location_list (int should_insert)
  {
    struct breakpoint *b;
@@ -1625,11 +1625,11 @@ index 811cdfb..b0bf314 100644
      {
 -      /* Tells if 'loc' is found amoung the new locations.  If not, we
 +      struct bp_location *old_loc = *old_locp;
++      struct bp_location **loc2p;
 +
 +      /* Tells if 'old_loc' is found amoung the new locations.  If not, we
  	 have to free it.  */
--      int found_object = 0;
-+      int found_object;
+       int found_object = 0;
        /* Tells if the location should remain inserted in the target.  */
        int keep_in_target = 0;
        int removed = 0;
@@ -1643,13 +1643,24 @@ index 811cdfb..b0bf314 100644
 +      /* Skip LOCP entries which will definitely never be needed.  Stop either
 +	 at or being the one matching OLD_LOC.  */
 +      while (locp < bp_location + bp_location_count
-+	     && bp_location_compare (*locp, old_loc) < 0)
++	     && (*locp)->address < old_loc->address)
 +	locp++;
-+      found_object = locp < bp_location + bp_location_count && *locp == old_loc;
++
++      for (loc2p = locp;
++	   (loc2p < bp_location + bp_location_count
++	    && (*loc2p)->address == old_loc->address);
++	   loc2p++)
++	{
++	  if (*loc2p == old_loc)
++	    {
++	      found_object = 1;
++	      break;
++	    }
++	}
  
        /* If this location is no longer present, and inserted, look if there's
  	 maybe a new location at the same address.  If so, mark that one 
-@@ -7827,11 +8018,11 @@ update_global_location_list (int should_insert)
+@@ -7827,11 +8030,11 @@ update_global_location_list (int should_insert)
  	 don't have a time window where a breakpoint at certain location is not
  	 inserted.  */
  
@@ -1663,7 +1674,7 @@ index 811cdfb..b0bf314 100644
  	    {
  	      /* The location is still present in the location list, and still
  		 should be inserted.  Don't do anything.  */
-@@ -7842,37 +8033,46 @@ update_global_location_list (int should_insert)
+@@ -7842,37 +8045,46 @@ update_global_location_list (int should_insert)
  	      /* The location is either no longer present, or got disabled.
  		 See if there's another location at the same address, in which 
  		 case we don't need to remove this one from the target.  */
@@ -1685,24 +1696,24 @@ index 811cdfb..b0bf314 100644
 +
 +	      if (breakpoint_address_is_meaningful (old_loc->owner))
 +		{
-+		  struct bp_location **loc2p;
-+
 +		  for (loc2p = locp;
-+		       loc2p < bp_location + bp_location_count
-+		       && (*loc2p)->address == old_loc->address;
++		       (loc2p < bp_location + bp_location_count
++			&& (*loc2p)->address == old_loc->address);
 +		       loc2p++)
 +		    {
 +		      struct bp_location *loc2 = *loc2p;
 +
-+		      /* For the sake of should_be_inserted.
-+			 Duplicates check below will fix up this later.  */
-+		      loc2->duplicate = 0;
-+		      if (loc2 != old_loc && should_be_inserted (loc2))
-+			{		  
-+			  loc2->inserted = 1;
-+			  loc2->target_info = old_loc->target_info;
-+			  keep_in_target = 1;
-+			  break;
++			{
++			  /* For the sake of should_be_inserted.
++			     Duplicates check below will fix up this later.  */
++			  loc2->duplicate = 0;
++			  if (loc2 != old_loc && should_be_inserted (loc2))
++			    {
++			      loc2->inserted = 1;
++			      loc2->target_info = old_loc->target_info;
++			      keep_in_target = 1;
++			      break;
++			    }
 +			}
 +		    }
 +		}
@@ -1728,7 +1739,7 @@ index 811cdfb..b0bf314 100644
  		}
  	      removed = 1;
  	    }
-@@ -7894,19 +8094,59 @@ update_global_location_list (int should_insert)
+@@ -7894,19 +8106,59 @@ update_global_location_list (int should_insert)
  		 longer need to keep this breakpoint.  This is just a
  		 heuristic, but if it's wrong, we'll report unexpected SIGTRAP,
  		 which is usability issue, but not a correctness problem.  */
@@ -1794,7 +1805,7 @@ index 811cdfb..b0bf314 100644
      }
  
    if (breakpoints_always_inserted_mode () && should_insert
-@@ -8083,6 +8323,7 @@ delete_command (char *arg, int from_tty)
+@@ -8083,6 +8335,7 @@ delete_command (char *arg, int from_tty)
  	    && b->type != bp_thread_event
  	    && b->type != bp_overlay_event
  	    && b->type != bp_longjmp_master
@@ -1802,7 +1813,7 @@ index 811cdfb..b0bf314 100644
  	    && b->number >= 0)
  	  {
  	    breaks_to_delete = 1;
-@@ -8102,6 +8343,7 @@ delete_command (char *arg, int from_tty)
+@@ -8102,6 +8355,7 @@ delete_command (char *arg, int from_tty)
  		&& b->type != bp_jit_event
  		&& b->type != bp_overlay_event
  		&& b->type != bp_longjmp_master
@@ -1810,7 +1821,7 @@ index 811cdfb..b0bf314 100644
  		&& b->number >= 0)
  	      delete_breakpoint (b);
  	  }
-@@ -8404,6 +8646,7 @@ breakpoint_re_set_one (void *bint)
+@@ -8404,6 +8658,7 @@ breakpoint_re_set_one (void *bint)
  	 reset later by breakpoint_re_set.  */
      case bp_overlay_event:
      case bp_longjmp_master:
@@ -1818,7 +1829,7 @@ index 811cdfb..b0bf314 100644
        delete_breakpoint (b);
        break;
  
-@@ -8427,6 +8670,8 @@ breakpoint_re_set_one (void *bint)
+@@ -8427,6 +8682,8 @@ breakpoint_re_set_one (void *bint)
      case bp_longjmp:
      case bp_longjmp_resume:
      case bp_jit_event:
@@ -1827,7 +1838,7 @@ index 811cdfb..b0bf314 100644
        break;
      }
  
-@@ -8462,6 +8707,7 @@ breakpoint_re_set (void)
+@@ -8462,6 +8719,7 @@ breakpoint_re_set (void)
    create_longjmp_master_breakpoint ("_longjmp");
    create_longjmp_master_breakpoint ("siglongjmp");
    create_longjmp_master_breakpoint ("_siglongjmp");
@@ -1835,7 +1846,7 @@ index 811cdfb..b0bf314 100644
  }
  
  /* Reset the thread number of this breakpoint:
-@@ -9327,6 +9573,22 @@ all_tracepoints ()
+@@ -9327,6 +9585,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -1858,7 +1869,7 @@ index 811cdfb..b0bf314 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -9850,4 +10112,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -9850,4 +10124,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
