@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -884,6 +884,10 @@ fi
 %endif
 
 %changelog
+* Thu Dec  3 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-8.fc12
+- Fix slowness/hang when printing some variables (Sami Wagiaalla, BZ 541093).
+- archer-jankratochvil-fedora12 commit: 6817a81cd411acc9579f04dcc105e9bce72859ff
+
 * Wed Nov 25 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-7.fc12
 - Support GNU IFUNCs - indirect functions (BZ 539590).
 - Fix bp conditionals [bp_location-accel] regression (Phil Muldoon, BZ 538626).

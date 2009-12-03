@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit b125345fb36abbb9bd00128e2093dc636a859da5
+commit 6817a81cd411acc9579f04dcc105e9bce72859ff
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -3113,7 +3113,7 @@ index 62800b8..97d587b 100644
  			{ $$ = $1.comp;
  			  if ($2) $$ = fill_comp (DEMANGLE_COMPONENT_LOCAL_NAME, $$, $2); }
 diff --git a/gdb/cp-namespace.c b/gdb/cp-namespace.c
-index d2d8f2e..af0ba28 100644
+index d2d8f2e..db26a01 100644
 --- a/gdb/cp-namespace.c
 +++ b/gdb/cp-namespace.c
 @@ -36,14 +36,17 @@ static struct using_direct *cp_copy_usings (struct using_direct *using,
@@ -3293,7 +3293,7 @@ index d2d8f2e..af0ba28 100644
        if (sym != NULL)
  	return sym;
      }
-@@ -320,25 +377,87 @@ lookup_namespace_scope (const char *name,
+@@ -320,25 +377,98 @@ lookup_namespace_scope (const char *name,
    namespace = alloca (scope_len + 1);
    strncpy (namespace, scope, scope_len);
    namespace[scope_len] = '\0';
@@ -3330,6 +3330,16 @@ index d2d8f2e..af0ba28 100644
 +    }
 +}
 +
++/* Used for cleanups to reset the "searched" flag incase
++   of an error.  */
++
++static void
++reset_directive_searched (void *data)
++{
++  struct using_direct *direct = data;
++  direct->searched = 0;
++}
++
 +/* Search for NAME by applying all import statements belonging
 +   to BLOCK which are applicable in SCOPE. If DECLARATION_ONLY the search
 +   is restricted to using declarations.
@@ -3362,11 +3372,11 @@ index d2d8f2e..af0ba28 100644
 -			    const struct block *block,
 -			    const domain_enum domain)
 +cp_lookup_symbol_imports (const char *scope,
-+                            const char *name,
-+                            const struct block *block,
-+                            const domain_enum domain,
-+                            int declaration_only,
-+                            int search_parents)
++                          const char *name,
++                          const struct block *block,
++                          const domain_enum domain,
++                          int declaration_only,
++                          int search_parents)
  {
 -  const struct using_direct *current;
 -  struct symbol *sym;
@@ -3374,6 +3384,7 @@ index d2d8f2e..af0ba28 100644
 +  struct symbol *sym = NULL;
 +  int directive_match;
 +  int current_line;
++  struct cleanup *searched_cleanup;
 +
 +  if(!declaration_only)
 +    /* First, try to find the symbol in the given namespace.  */
@@ -3393,7 +3404,7 @@ index d2d8f2e..af0ba28 100644
       names to the namespace we're searching in, see if we can find a
       match by applying them.  */
  
-@@ -346,39 +465,74 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -346,39 +476,78 @@ cp_lookup_symbol_namespace (const char *namespace,
         current != NULL;
         current = current->next)
      {
@@ -3416,6 +3427,8 @@ index d2d8f2e..af0ba28 100644
 -					    block,
 -					    domain);
 +	  current->searched = 1;
++	  searched_cleanup = make_cleanup (reset_directive_searched, current);
++
 +	  /* If there is an import of a single declaration, compare the imported
 +	     declaration with the sought out name. If there is a match pass
 +	     current->import_src as NAMESPACE to direct the search towards the
@@ -3424,23 +3437,25 @@ index d2d8f2e..af0ba28 100644
 +	    {
 +	    if (strcmp (name, current->declaration) == 0)
 +	      {
-+	        sym = cp_lookup_symbol_in_namespace (current->import_src,
-+	                                          name,
-+	                                          block,
-+	                                          domain);
++	      sym = cp_lookup_symbol_in_namespace (current->import_src,
++	                                           name,
++	                                           block,
++	                                           domain);
 +	      }
++
++	    current->searched = 0;
++	    if (sym)
++	      return sym;
++
++	    continue;
 +	    }
 +	   
 +	  if (declaration_only)
-+            {
-+              current->searched = 0;
-+              if (sym)
-+                {
-+                  return sym;
-+                } else {
-+                  continue;
-+                }
-+            }
++	    {
++	    current->searched = 0;
++	    discard_cleanups (searched_cleanup);
++	    continue;
++	    }
 +
 +	  if (strcmp (name, current->alias) == 0)
 +	    /* If the import is creating an alias and the alias matches the
@@ -3448,26 +3463,25 @@ index d2d8f2e..af0ba28 100644
 +	       search towards the aliased namespace */
 +	    {
 +	    sym = cp_lookup_symbol_in_namespace (scope,
-+	                                      current->import_src,
-+	                                      block,
-+	                                      domain);
++	                                         current->import_src,
++	                                         block,
++	                                         domain);
 +	    } else if (strcmp ("", current->alias) == 0){
 +	    /* If this import statement creates no alias, pass current->inner as
 +	       NAMESPACE to direct the search towards the imported namespace. */
 +	      sym = cp_lookup_symbol_imports (current->import_src,
-+		                                name,
-+		                                block,
-+		                                domain,
-+		                                0,
-+		                                0);
++	                                      name,
++	                                      block,
++	                                      domain,
++	                                      0,
++	                                      0);
 +	    }
 +
 +	  current->searched = 0;
++	  discard_cleanups (searched_cleanup);
++
  	  if (sym != NULL)
--	    return sym;
-+	    {
-+	      return sym;
-+	    }
+ 	    return sym;
  	}
      }
  
@@ -3496,7 +3510,7 @@ index d2d8f2e..af0ba28 100644
  }
  
  /* Look up NAME in BLOCK's static block and in global blocks.  If
-@@ -388,17 +542,15 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -388,17 +557,15 @@ cp_lookup_symbol_namespace (const char *namespace,
  
  static struct symbol *
  lookup_symbol_file (const char *name,
@@ -3515,7 +3529,7 @@ index d2d8f2e..af0ba28 100644
    if (anonymous_namespace)
      {
        /* Symbols defined in anonymous namespaces have external linkage
-@@ -408,12 +560,11 @@ lookup_symbol_file (const char *name,
+@@ -408,12 +575,11 @@ lookup_symbol_file (const char *name,
        const struct block *global_block = block_global_block (block);
        
        if (global_block != NULL)
@@ -3530,7 +3544,7 @@ index d2d8f2e..af0ba28 100644
      }
  
    if (sym != NULL)
-@@ -434,6 +585,7 @@ lookup_symbol_file (const char *name,
+@@ -434,6 +600,7 @@ lookup_symbol_file (const char *name,
        sym = lookup_possible_namespace_symbol (name);
        if (sym != NULL)
  	return sym;
@@ -3538,7 +3552,7 @@ index d2d8f2e..af0ba28 100644
      }
  
    return NULL;
-@@ -461,9 +613,8 @@ cp_lookup_nested_type (struct type *parent_type,
+@@ -461,9 +628,8 @@ cp_lookup_nested_type (struct type *parent_type,
  	   lookup_symbol_namespace works when looking them up.  */
  
  	const char *parent_name = TYPE_TAG_NAME (parent_type);
@@ -3549,7 +3563,7 @@ index d2d8f2e..af0ba28 100644
  							 block,
  							 VAR_DOMAIN);
  	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-@@ -709,7 +860,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
+@@ -709,7 +875,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
  
    memcpy (name_copy, name, len);
    name_copy[len] = '\0';
@@ -3558,7 +3572,7 @@ index d2d8f2e..af0ba28 100644
  
    if (sym == NULL)
      {
-@@ -749,7 +900,7 @@ lookup_possible_namespace_symbol (const char *name)
+@@ -749,7 +915,7 @@ lookup_possible_namespace_symbol (const char *name)
        struct symbol *sym;
  
        sym = lookup_block_symbol (get_possible_namespace_block (objfile),
@@ -23262,6 +23276,162 @@ index 0000000..5543757
 +
 +setup_kfail "gdb/10541" "*-*-*"
 +gdb_test "print G::GF::FE::ex" "= 9999"
+diff --git a/gdb/testsuite/gdb.cp/namespace-stress-declarations.cc b/gdb/testsuite/gdb.cp/namespace-stress-declarations.cc
+new file mode 100644
+index 0000000..173e49b
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-stress-declarations.cc
+@@ -0,0 +1,93 @@
++int a;
++int b;
++int c;
++int d;
++int e;
++int f;
++int g;
++int h;
++int i;
++int j;
++int k;
++int l;
++int m;
++int n;
++int o;
++int p;
++int q;
++int r;
++int s;
++int t;
++int u;
++int v;
++int w;
++int x;
++int y;
++int z;
++
++namespace A
++{
++  int xyz;
++
++  using ::a;
++  using ::b;
++  using ::c;
++  using ::d;
++  using ::e;
++  using ::f;
++  using ::g;
++  using ::h;
++  using ::i;
++  using ::j;
++  using ::k;
++  using ::l;
++  using ::m;
++  using ::n;
++  using ::o;
++  using ::p;
++  using ::q;
++  using ::r;
++  using ::s;
++  using ::t;
++  using ::u;
++  using ::v;
++  using ::w;
++  using ::x;
++  using ::y;
++  using ::z;
++
++}
++
++using A::a;
++using A::b;
++using A::c;
++using A::d;
++using A::e;
++using A::f;
++using A::g;
++using A::h;
++using A::i;
++using A::j;
++using A::k;
++using A::l;
++using A::m;
++using A::n;
++using A::o;
++using A::p;
++using A::q;
++using A::r;
++using A::s;
++using A::t;
++using A::u;
++using A::v;
++using A::w;
++using A::x;
++using A::y;
++using A::z;
++
++using namespace A;
++
++int main ()
++{
++  return 0;
++}
+\ No newline at end of file
+diff --git a/gdb/testsuite/gdb.cp/namespace-stress-declarations.exp b/gdb/testsuite/gdb.cp/namespace-stress-declarations.exp
+new file mode 100644
+index 0000000..f22a14e
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/namespace-stress-declarations.exp
+@@ -0,0 +1,50 @@
++# Copyright 2008 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++set prms_id 0
++set bug_id 0
++
++set testfile namespace-stress-declarations
++set srcfile ${testfile}.cc
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++if [get_compiler_info ${binfile}] {
++    return -1;
++}
++
++# Get things started.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++if ![runto_main] then {
++    perror "couldn't run to breakpoint main"
++    continue
++}
++
++############################################
++# Test that the search can fail efficiently 
++
++gdb_test "print fakex" "No symbol \"fakex\" in current context."
 diff --git a/gdb/testsuite/gdb.cp/namespace-stress.cc b/gdb/testsuite/gdb.cp/namespace-stress.cc
 new file mode 100644
 index 0000000..f34083e
@@ -25457,10 +25627,10 @@ index 495ae45..d08d7a4 100644
  		set command "next"
 diff --git a/gdb/testsuite/gdb.java/jnpe.exp b/gdb/testsuite/gdb.java/jnpe.exp
 new file mode 100644
-index 0000000..74d4d58
+index 0000000..e71391e
 --- /dev/null
 +++ b/gdb/testsuite/gdb.java/jnpe.exp
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,77 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -25483,10 +25653,10 @@ index 0000000..74d4d58
 +load_lib "java.exp"
 +
 +set testfile "jnpe"
-+set srcfile ${srcdir}/$subdir/${testfile}.java
++set srcfile ${testfile}.java
 +set binfile ${objdir}/${subdir}/${testfile}
-+if  { [compile_java_from_source ${srcfile} ${binfile} "-g"] != "" } {
-+    untested "Couldn't compile ${srcfile}"
++if  { [compile_java_from_source ${srcdir}/$subdir/${srcfile} ${binfile} "-g"] != "" } {
++    untested "Couldn't compile ${srcdir}/$subdir/${srcfile}"
 +    return -1
 +}
 +
@@ -25504,7 +25674,7 @@ index 0000000..74d4d58
 +gdb_test "break $testfile.java:$line" ""
 +
 +gdb_test "run" \
-+  "Current language.*java" \
++  "// break here.*" \
 +  "run java next-over-throw"
 +
 +# See whether we have the needed unwinder hooks.
@@ -25513,9 +25683,10 @@ index 0000000..74d4d58
 +    -re "= .*_Unwind_DebugHook.*\r\n$gdb_prompt $" {
 +	pass "check for unwinder hook in java"
 +    }
-+    -re "No symbol .* in current context.\r\n$gdb_prompt $" {
++    -re "No symbol .* in current context.?\r\n$gdb_prompt $" {
 +	# Pass the test so we don't get bogus fails in the results.
-+	pass "check for unwinder hook in java"
++	setup_xfail *-*-*
++	fail "check for unwinder hook in java"
 +	set ok 0
 +    }
 +}
@@ -25528,14 +25699,18 @@ index 0000000..74d4d58
 +  "SIGSEGV.*fault" \
 +  "disable SIGSEGV for next-over-NPE"
 +
-+# We sometimes stop at line 37, not line 35.  This seems to be a gcj
-+# oddity -- another next will solve it.
++# The line where we stop differ according to gcj; check just we did not already
++# execute the catch point.
++
 +gdb_test "next" \
-+  "3\[57\].*" \
++  "" \
 +  "next over NPE"
++
++gdb_breakpoint [gdb_get_line_number "catch point"]
++gdb_continue_to_breakpoint "catch point" ".*// catch point.*"
 diff --git a/gdb/testsuite/gdb.java/jnpe.java b/gdb/testsuite/gdb.java/jnpe.java
 new file mode 100644
-index 0000000..ffca3ab
+index 0000000..3524830
 --- /dev/null
 +++ b/gdb/testsuite/gdb.java/jnpe.java
 @@ -0,0 +1,38 @@
@@ -25573,7 +25748,7 @@ index 0000000..ffca3ab
 +      }
 +    catch (NullPointerException n)
 +      {
-+	System.out.println ("success");
++	System.out.println ("success"); // catch point
 +      }
 +  }
 +}
