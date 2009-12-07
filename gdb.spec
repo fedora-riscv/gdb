@@ -14,7 +14,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 9%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -92,13 +92,11 @@ Patch118: gdb-6.3-gstack-20050411.patch
 
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
-Patch124: gdb-6.3-pie-20050110.patch
+Patch124: gdb-archer-pie.patch
+Patch389: gdb-archer-pie-addons.patch
 
 # Get selftest working with sep-debug-info
 Patch125: gdb-6.3-test-self-20050110.patch
-
-# Fix for non-threaded watchpoints.
-Patch128: gdb-6.3-nonthreaded-wp-20050117.patch
 
 # Test support of multiple destructors just like multiple constructors
 Patch133: gdb-6.3-test-dtorfix-20050121.patch
@@ -377,6 +375,12 @@ Patch387: gdb-bz539590-gnu-ifunc.patch
 # Fix bp conditionals [bp_location-accel] regression (Phil Muldoon, BZ 538626).
 Patch388: gdb-bz538626-bp_location-accel-bp-cond.patch
 
+# Fix callback-mode readline-6.0 regression for CTRL-C.
+Patch390: gdb-readline-6.0-signal.patch
+
+# Fix syscall restarts for amd64->i386 biarch.
+Patch391: gdb-x86_64-i386-syscall-restart.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -475,6 +479,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch383 -p1
 %patch384 -p1
 %patch385 -p1
+%patch124 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -486,7 +491,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch118 -p1
 %patch122 -p1
 %patch125 -p1
-%patch128 -p1
 %patch133 -p1
 %patch136 -p1
 %patch140 -p1
@@ -579,7 +583,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch382 -p1
 %patch387 -p1
 %patch388 -p1
-%patch124 -p1
+%patch389 -p1
+%patch390 -p1
+%patch391 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -884,6 +890,16 @@ fi
 %endif
 
 %changelog
+* Mon Dec  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-9.fc12
+- Replace the PIE (Position Indepdent Executable) support patch by a new one.
+- Drop gdb-6.3-nonthreaded-wp-20050117.patch as fuzzy + redundant.
+- Fix callback-mode readline-6.0 regression for CTRL-C.
+- Fix syscall restarts for amd64->i386 biarch.
+- Various testsuite results stability fixes.
+- Fix crash on reading stabs on 64bit (BZ 537837).
+- archer-jankratochvil-fedora12 commit: 16276c1aad1366b92e687c72cab30192280e1906
+- archer-jankratochvil-pie-fedora12 ct: 2ae60b5156d43aabfe5757940eaf7b4370fb05d2
+
 * Thu Dec  3 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-8.fc12
 - Fix slowness/hang when printing some variables (Sami Wagiaalla, BZ 541093).
 - archer-jankratochvil-fedora12 commit: 6817a81cd411acc9579f04dcc105e9bce72859ff
