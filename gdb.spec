@@ -4,6 +4,18 @@
 # --with upstream: No Fedora specific patches get applied.
 # --without python: No python support.
 
+# RHEL-5 was the last not providing `/etc/rpm/macros.dist'.
+%if 0%{!?dist:1}
+%define rhel 5
+%define dist .el5
+%define el5 1
+%define gnat_version 4.1
+%define gcj_version 7rh
+%else
+%define gnat_version 4.4
+%define gcj_version 10
+%endif
+
 Summary: A GNU source-level debugger for C, C++, Java and other languages
 Name: gdb%{?_with_debug:-debug}
 
@@ -14,7 +26,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{?dist}
+Release: 10%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -372,7 +384,7 @@ Patch385: gdb-bz528668-symfile-multi.patch
 # Support GNU IFUNCs - indirect functions (BZ 539590).
 Patch387: gdb-bz539590-gnu-ifunc.patch
 
-# Fix bp conditionals [bp_location-accel] regression (Phil Muldoon, BZ 538626).
+# Fix bp conditionals [bp_location-accel] regression (BZ 538626).
 Patch388: gdb-bz538626-bp_location-accel-bp-cond.patch
 
 # Fix callback-mode readline-6.0 regression for CTRL-C.
@@ -380,6 +392,9 @@ Patch390: gdb-readline-6.0-signal.patch
 
 # Fix syscall restarts for amd64->i386 biarch.
 Patch391: gdb-x86_64-i386-syscall-restart.patch
+
+# Fix stepping with OMP parallel Fortran sections (BZ 533176).
+Patch392: gdb-bz533176-fortran-omp-step.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -400,8 +415,15 @@ BuildRequires: libstdc++
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc glibc-static
+# Prelink is broken on sparcv9/sparc64
+%ifnarch sparcv9 sparc64
+BuildRequires: prelink
+%endif
 %if 0%{!?rhel:1}
 BuildRequires: fpc
+%endif
+%if 0%{?el5:1}
+BuildRequires: gcc44 gcc44-gfortran
 %endif
 # Ensure the devel libraries are installed for both multilib arches.
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
@@ -409,16 +431,18 @@ BuildRequires: fpc
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
 %ifarch %{multilib_64_archs} ppc
-BuildRequires: %{_exec_prefix}/lib64/libgnat-4.4.so %{_exec_prefix}/lib/libgnat-4.4.so
+BuildRequires: %{_exec_prefix}/lib64/libgnat-%{gnat_version}.so %{_exec_prefix}/lib/libgnat-%{gnat_version}.so
 %endif
 %endif
 %ifarch %{multilib_64_archs} sparc sparcv9 ppc
 BuildRequires: /lib/libc.so.6 %{_exec_prefix}/lib/libc.so /lib64/libc.so.6 %{_exec_prefix}/lib64/libc.so
 BuildRequires: /lib/libgcc_s.so.1 /lib64/libgcc_s.so.1
 BuildRequires: %{_exec_prefix}/lib/libstdc++.so.6 %{_exec_prefix}/lib64/libstdc++.so.6
-BuildRequires: %{_exec_prefix}/lib64/libgcj.so.10 %{_exec_prefix}/lib/libgcj.so.10
+BuildRequires: %{_exec_prefix}/lib64/libgcj.so.%{gcj_version} %{_exec_prefix}/lib/libgcj.so.%{gcj_version}
 # multilib glibc-static is open Bug 488472:
-#BuildRequires: %{_exec_prefix}/lib64/libc.a %{_exec_prefix}/lib/libc.a
+%if 0%{?el5:1}
+BuildRequires: %{_exec_prefix}/lib64/libc.a %{_exec_prefix}/lib/libc.a
+%endif
 # for gcc-java:
 BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 %endif
@@ -427,11 +451,6 @@ BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 %ifarch ia64
 BuildRequires: libunwind-devel >= 0.99-0.1.frysk20070405cvs
 Requires: libunwind >= 0.99-0.1.frysk20070405cvs
-%else
-# Prelink is broken on sparcv9/sparc64
-%ifnarch sparcv9 sparc64
-BuildRequires: prelink
-%endif
 %endif
 
 Requires(post): /sbin/install-info
@@ -479,6 +498,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch383 -p1
 %patch384 -p1
 %patch385 -p1
+%patch388 -p1
 %patch124 -p1
 %patch1 -p1
 %patch3 -p1
@@ -582,10 +602,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch381 -p1
 %patch382 -p1
 %patch387 -p1
-%patch388 -p1
 %patch389 -p1
 %patch390 -p1
 %patch391 -p1
+%patch392 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -594,6 +614,8 @@ find -name "*.orig" | xargs rm -f
 
 # Change the version that gets printed at GDB startup, so it is Fedora
 # specific.
+# Fedora (%{version}-%{release})
+# Red Hat Enterprise Linux (%{version}-%{release})
 cat > gdb/version.in << _FOO
 Fedora (%{version}-%{release})
 _FOO
@@ -659,9 +681,8 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--without-python				\
 %endif
 $(: Workaround rpm.org#76, BZ 508193 on recent OSes. )	\
-$(: RHEL-5 was the last not providing %{dist}. )	\
 $(: RHEL-5 librpm has incompatible API. )		\
-%if 0%{!?dist:1}
+%if 0%{?el5:1}
 	--without-rpm					\
 %else
 	--with-rpm=librpm.so.0				\
@@ -890,6 +911,13 @@ fi
 %endif
 
 %changelog
+* Mon Dec 14 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-10.fc12
+- Make gdb-6.3-rh-testversion-20041202.patch to accept both RHEL and Fedora GDB.
+- Adjust BuildRequires for Fedora-12, RHEL-6 and RHEL-5 builds.
+- [vla] Fix compatibility of dynamic arrays with iFort (BZ 514287).
+- Fix stepping through OMP parallel Fortran sections (BZ 533176).
+- New fix of bp conditionals [bp_location-accel] regression (BZ 538626).
+
 * Mon Dec  7 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-9.fc12
 - Replace the PIE (Position Indepdent Executable) support patch by a new one.
 - Drop gdb-6.3-nonthreaded-wp-20050117.patch as fuzzy + redundant.
