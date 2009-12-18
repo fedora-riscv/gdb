@@ -8,12 +8,15 @@
 %if 0%{!?dist:1}
 %define rhel 5
 %define dist .el5
+%endif
+# RHEL-5 Brew does not set it.
+%if "%{dist}" == ".el5"
 %define el5 1
-%define gnat_version 4.1
-%define gcj_version 7rh
-%else
-%define gnat_version 4.4
-%define gcj_version 10
+%endif
+# RHEL-5 ppc* python .so files are shipped only as ppc but gdb is ppc64 there.
+# Brew builds it fine as its ppc64 buildroot has full ppc64 package set.
+%if 0%{?el5:1}
+%define _without_python 1
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages
@@ -106,6 +109,7 @@ Patch118: gdb-6.3-gstack-20050411.patch
 Patch122: gdb-6.3-test-pie-20050107.patch
 Patch124: gdb-archer-pie.patch
 Patch389: gdb-archer-pie-addons.patch
+Patch394: gdb-archer-pie-addons-keep-disabled.patch
 
 # Get selftest working with sep-debug-info
 Patch125: gdb-6.3-test-self-20050110.patch
@@ -396,6 +400,9 @@ Patch391: gdb-x86_64-i386-syscall-restart.patch
 # Fix stepping with OMP parallel Fortran sections (BZ 533176).
 Patch392: gdb-bz533176-fortran-omp-step.patch
 
+# Use gfortran44 when running the testsuite on RHEL-5.
+Patch393: gdb-rhel5-fortran44.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -411,13 +418,27 @@ BuildRequires: python-devel
 BuildRequires: libstdc++
 %endif	# 0%{!?_without_python:1}
 
+%if 0%{!?el5:1}
+%define gnat_version 4.4
+%define gcj_version 10
+%else
+%define gnat_version 4.1
+%define gcj_version 7rh
+%endif
+
 %if 0%{?_with_testsuite:1}
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc glibc-static
-# Prelink is broken on sparcv9/sparc64
+BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
+%if 0%{!?el5:1}
+BuildRequires: glibc-static
+%endif
+# Copied from prelink-0.4.2-3.fc13.
+%ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
+# Prelink is broken on sparcv9/sparc64.
 %ifnarch sparcv9 sparc64
 BuildRequires: prelink
+%endif
 %endif
 %if 0%{!?rhel:1}
 BuildRequires: fpc
@@ -427,7 +448,7 @@ BuildRequires: gcc44 gcc44-gfortran
 %endif
 # Ensure the devel libraries are installed for both multilib arches.
 %define multilib_64_archs sparc64 ppc64 s390x x86_64
-# Copied from gcc-4.1.2-32
+# Copied from gcc-4.1.2-32.
 %ifarch %{ix86} x86_64 ia64 ppc alpha
 BuildRequires: gcc-gnat
 %ifarch %{multilib_64_archs} ppc
@@ -449,8 +470,13 @@ BuildRequires: %{_exec_prefix}/lib64/libz.so %{_exec_prefix}/lib/libz.so
 %endif
 
 %ifarch ia64
+%if 0%{!?el5:1}
 BuildRequires: libunwind-devel >= 0.99-0.1.frysk20070405cvs
 Requires: libunwind >= 0.99-0.1.frysk20070405cvs
+%else
+BuildRequires: libunwind >= 0.96-3
+Requires: libunwind >= 0.96-3
+%endif
 %endif
 
 Requires(post): /sbin/install-info
@@ -606,6 +632,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch390 -p1
 %patch391 -p1
 %patch392 -p1
+# Always verify its applicability.
+%patch393 -p1
+%if 0%{!?el5:1}
+%patch393 -p1 -R
+%endif
+%patch394 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -719,7 +751,7 @@ echo ====================TESTSUITE DISABLED=========================
 %else
 echo ====================TESTING=========================
 cd gdb
-gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
+gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
 # Need to use a single --ignore option, second use overrides first.
 # No `%{?_smp_mflags}' here as it may race.
 # WARNING: can't generate a core file - core tests suppressed - check ulimit
@@ -776,8 +808,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
-  # FIXME: Temporary F12 disable: ./orphanripper
-  make %{?_smp_mflags} -k $CHECK || :
+  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
 )
 for t in sum log
 do
@@ -911,6 +942,16 @@ fi
 %endif
 
 %changelog
+* Fri Dec 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-11.fc12
+- [pie] Fix general ppc64 regression due to a function descriptors bug.
+- [pie] Fix also keeping breakpoints disabled in PIE mode.
+- Import upstream <tab>-completion crash fix.
+- Drop some unused patches from the repository.
+- More RHEL-5 build compatibility updates.
+  - Use gfortran44 when running the testsuite on RHEL-5.
+  - Disable python there due to insufficient ppc multilib.
+- Fix orphanripper hangs and thus enable it again.
+
 * Mon Dec 14 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-10.fc12
 - Make gdb-6.3-rh-testversion-20041202.patch to accept both RHEL and Fedora GDB.
 - Adjust BuildRequires for Fedora-12, RHEL-6 and RHEL-5 builds.
