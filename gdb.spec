@@ -16,7 +16,9 @@
 # RHEL-5 ppc* python .so files are shipped only as ppc but gdb is ppc64 there.
 # Brew builds it fine as its ppc64 buildroot has full ppc64 package set.
 %if 0%{?el5:1}
+%ifarch ppc ppc64
 %define _without_python 1
+%endif
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages
@@ -29,7 +31,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{dist}
+Release: 12%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -401,7 +403,17 @@ Patch391: gdb-x86_64-i386-syscall-restart.patch
 Patch392: gdb-bz533176-fortran-omp-step.patch
 
 # Use gfortran44 when running the testsuite on RHEL-5.
-Patch393: gdb-rhel5-fortran44.patch
+Patch393: gdb-rhel5-gcc44.patch
+
+# Disable warning messages new for gdb-6.8+ for RHEL-5 backward compatibility.
+# Workaround RHEL-5 kernels for detaching SIGSTOPped processes (BZ 498595).
+Patch335: gdb-rhel5-compat.patch
+
+# Fix backward compatibility with G++ 4.1 namespaces "::".
+Patch395: gdb-empty-namespace.patch
+
+# Fix regression on re-setting the single ppc watchpoint slot.
+Patch396: gdb-ppc-hw-watchpoint-twice.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -412,7 +424,11 @@ BuildRequires: rpm-devel
 Requires: zlib
 BuildRequires: zlib-devel
 %if 0%{!?_without_python:1}
+%if 0%{!?el5:1}
 Requires: python-libs
+%else
+Requires: python
+%endif
 BuildRequires: python-devel
 # Temporarily before it gets moved to libstdc++.rpm
 BuildRequires: libstdc++
@@ -634,10 +650,14 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch392 -p1
 # Always verify its applicability.
 %patch393 -p1
+%patch335 -p1
 %if 0%{!?el5:1}
 %patch393 -p1 -R
+%patch335 -p1 -R
 %endif
 %patch394 -p1
+%patch395 -p1
+%patch396 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -706,6 +726,8 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--disable-rpath					\
 	--with-system-readline				\
 	--with-expat					\
+$(: ppc64 host build crashes on /usr/lib/libexpat.so )	\
+	--without-libexpat-prefix			\
 	--enable-tui					\
 %if 0%{!?_without_python:1}
 	--with-python					\
@@ -808,7 +830,12 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
 %endif	# 0%{!?_with_upstream:1}
 
-  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
+  ./orphanripper make %{?_smp_mflags} -k $CHECK \
+$(: Serialize the output to keep the order for regression checks. ) \
+%if 0%{?el5:1}
+    RUNTESTFLAGS="--tool gdb" \
+%endif
+    || :
 )
 for t in sum log
 do
@@ -942,6 +969,19 @@ fi
 %endif
 
 %changelog
+* Mon Dec 21 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-12.fc12
+- Workaround build on native ppc64 host.
+- More RHEL-5 compatibility updates.
+  - Disable warning messages new for gdb-6.8+ for RHEL-5 backward compatibility.
+  - Workaround RHEL-5 kernels for detaching SIGSTOPped processes (BZ 498595).
+  - Serialize the testsuite output to keep the order for regression checks.
+  - Re-enable python for all non-ppc* arches.
+  - More gcc44 stack exceptions when running the testsuite on RHEL-5.
+- Fix backward compatibility with G++ 4.1 namespaces "::".
+- Fix regression on re-setting the single ppc watchpoint slot.
+- Update snapshot of FSF gdb-7.0.x branch.
+  - Backport fix of dcache invalidation locking up GDB on ppc64 targets.
+
 * Fri Dec 18 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-11.fc12
 - [pie] Fix general ppc64 regression due to a function descriptors bug.
 - [pie] Fix also keeping breakpoints disabled in PIE mode.
