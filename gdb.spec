@@ -8,17 +8,22 @@
 %if 0%{!?dist:1}
 %define rhel 5
 %define dist .el5
-%endif
-# RHEL-5 Brew does not set it.
-%if "%{dist}" == ".el5"
 %define el5 1
 %endif
+# RHEL-5 Brew does not set %{el5}.
+%if "%{dist}" == ".el5"
 # RHEL-5 ppc* python .so files are shipped only as ppc but gdb is ppc64 there.
 # Brew builds it fine as its ppc64 buildroot has full ppc64 package set.
-%if 0%{?el5:1}
-%ifarch ppc ppc64
+# Make this conditional so that Brew-built GDB has no python on any arch but
+# GDB rebuilt on native non-ppc64 host does have it.
+%if 0%{!?el5:1}
+%define _without_python 1
+%else
+%ifarch ppc64
 %define _without_python 1
 %endif
+%endif
+%define el5 1
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Java and other languages
@@ -31,7 +36,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{dist}
+Release: 13%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -415,6 +420,9 @@ Patch395: gdb-empty-namespace.patch
 # Fix regression on re-setting the single ppc watchpoint slot.
 Patch396: gdb-ppc-hw-watchpoint-twice.patch
 
+# Fix regression by python on ia64 due to stale current frame.
+Patch397: gdb-follow-child-stale-parent.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -658,6 +666,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch394 -p1
 %patch395 -p1
 %patch396 -p1
+%patch397 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -969,6 +978,11 @@ fi
 %endif
 
 %changelog
+* Mon Dec 21 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-13.fc12
+- [pie] Fix a race in testcase gdb.base/valgrind-db-attach.exp.
+- Fix regression by python on ia64 due to stale current frame.
+- Disable python iff RHEL-5 && (Brew || ppc64).
+
 * Mon Dec 21 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-12.fc12
 - Workaround build on native ppc64 host.
 - More RHEL-5 compatibility updates.
