@@ -36,7 +36,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{dist}
+Release: 14%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -978,6 +978,9 @@ fi
 %endif
 
 %changelog
+* Thu Dec 24 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-14.fc12
+- testsuite: Fix constructortest.exp and expand-sals.exp for gcc-4.4.2-20.fc12.
+
 * Mon Dec 21 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-13.fc12
 - [pie] Fix a race in testcase gdb.base/valgrind-db-attach.exp.
 - Fix regression by python on ia64 due to stale current frame.
