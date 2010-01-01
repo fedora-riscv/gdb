@@ -36,7 +36,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?_with_upstream:.upstream}%{dist}
+Release: 15%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -318,8 +318,8 @@ Patch309: gdb-6.3-mapping-zero-inode-test.patch
 # Test a crash on `focus cmd', `focus prev' commands.
 Patch311: gdb-6.3-focus-cmd-prev-test.patch
 
-# Test crash on a sw watchpoint condition getting out of the scope.
-Patch314: gdb-6.3-watchpoint-cond-gone-test.patch
+# Fix error on a sw watchpoint active at function epilogue (hit on s390x).
+Patch314: gdb-watchpoint-cond-gone.patch
 
 # Test various forms of threads tracking across exec() (BZ 442765).
 Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
@@ -422,6 +422,9 @@ Patch396: gdb-ppc-hw-watchpoint-twice.patch
 
 # Fix regression by python on ia64 due to stale current frame.
 Patch397: gdb-follow-child-stale-parent.patch
+
+# testsuite: Fix false MI "unknown output after running" regression.
+Patch398: gdb-testsuite-unknown-output.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -667,6 +670,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch395 -p1
 %patch396 -p1
 %patch397 -p1
+%patch398 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -978,6 +982,13 @@ fi
 %endif
 
 %changelog
+* Fri Jan  1 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-15.fc12
+- Fix error on a sw watchpoint active at function epilogue (hit on s390x).
+- testsuite: Fix false MI "unknown output after running" regression.
+- testsuite: Update ia64-sigtramp.exp for recent GDB.
+- Implement bt-clone-stop.exp fix also for ia64.
+- testsuite: Upstream condbreak.exp results stability fix (Daniel Jacobowitz).
+
 * Thu Dec 24 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-14.fc12
 - testsuite: Fix constructortest.exp and expand-sals.exp for gcc-4.4.2-20.fc12.
 
