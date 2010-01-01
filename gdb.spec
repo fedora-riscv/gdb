@@ -982,7 +982,7 @@ fi
 %endif
 
 %changelog
-* Fri Jan  1 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-15.fc12
+* Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-15.fc12
 - Fix error on a sw watchpoint active at function epilogue (hit on s390x).
 - testsuite: Fix false MI "unknown output after running" regression.
 - testsuite: Update ia64-sigtramp.exp for recent GDB.
