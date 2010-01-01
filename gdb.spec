@@ -36,7 +36,7 @@ Version: 7.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{dist}
+Release: 16%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -61,11 +61,13 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64 < 5.3.91
 %endif
 
+%if 0%{!?el5:1}
 %if 0%{!?_with_upstream:1}
 # The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
 Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
 %endif	# 0%{!?_with_upstream:1}
+%endif	# 0%{!?el5:1}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -429,9 +431,11 @@ Patch398: gdb-testsuite-unknown-output.patch
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
+%if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs a mandatory dependency.
 #Requires: rpm-libs
 BuildRequires: rpm-devel
+%endif	# 0%{!?el5:1}
 Requires: zlib
 BuildRequires: zlib-devel
 %if 0%{!?_without_python:1}
@@ -514,6 +518,7 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
+%if 0%{!?el5:1}
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
 Group: Development/Debuggers
@@ -524,6 +529,7 @@ Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
 This package provides a program that allows you to run GDB on a different machine than the one which is running the program being debugged.
+%endif	# 0%{!?el5:1}
 
 %prep
 
@@ -920,8 +926,10 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
+%if 0%{!?el5:1}
 ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
+%endif	# 0%{!?el5:1}
 %endif	# 0%{!?_with_upstream:1}
 
 %clean
@@ -963,9 +971,11 @@ fi
 %{_mandir}/*/gdbtui.1*
 %if 0%{!?_with_upstream:1}
 %{_bindir}/gstack
-%{_bindir}/pstack
 %{_mandir}/*/gstack.1*
+%if 0%{!?el5:1}
+%{_bindir}/pstack
 %{_mandir}/*/pstack.1*
+%endif	# 0%{!?el5:1}
 %endif	# 0%{!?_with_upstream:1}
 %{_datadir}/gdb
 %{_infodir}/annotate.info*
@@ -976,12 +986,21 @@ fi
 # don't include the files in include, they are part of binutils
 
 %ifnarch sparcv9 
+%if 0%{!?el5:1}
 %files gdbserver
+%endif
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
 %endif
 
 %changelog
+* Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-16.fc12
+- More RHEL-5 compatibility updates.
+  - Disable the build-id support by default.
+  - Bundle back gdbserver to the base gdb package.
+  - Remove bundled pstack.
+  - Drop the BuildRequires of rpm-devel.
+
 * Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-15.fc12
 - Fix error on a sw watchpoint active at function epilogue (hit on s390x).
 - testsuite: Fix false MI "unknown output after running" regression.
