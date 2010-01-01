@@ -32,7 +32,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3 
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0
+Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -428,6 +428,9 @@ Patch397: gdb-follow-child-stale-parent.patch
 # testsuite: Fix false MI "unknown output after running" regression.
 Patch398: gdb-testsuite-unknown-output.patch
 
+# Fix regression of gdb-7.0.1 not preserving typedef of a field.
+Patch399: gdb-field-check_typedef-revert.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -677,6 +680,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch396 -p1
 %patch397 -p1
 %patch398 -p1
+%patch399 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -994,6 +998,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-17.fc12
+- Formal upgrade to the FSF GDB release gdb-7.0.1.
+  - Fix regression of gdb-7.0.1 not preserving typedef of a field.
+
 * Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0-16.fc12
 - More RHEL-5 compatibility updates.
   - Disable the build-id support by default.
