@@ -1,0 +1,154 @@
+http://sourceware.org/ml/gdb-patches/2009-12/msg00364.html
+Subject: [patch] related_breakpoint stale ref crash fix
+
+Hi,
+
+getting occasional random:
+ PASS: gdb.threads/local-watch-wrong-thread.exp: local watchpoint still triggers
+ PASS: gdb.threads/local-watch-wrong-thread.exp: let thread_function0 return
+ PASS: gdb.threads/local-watch-wrong-thread.exp: breakpoint on thread_function0's caller
+-PASS: gdb.threads/local-watch-wrong-thread.exp: local watchpoint automatically deleted
++ERROR: Process no longer exists
++UNRESOLVED: gdb.threads/local-watch-wrong-thread.exp: local watchpoint automatically deleted
+
+It is even reproducible on HEAD using "input" file below and:
+	valgrind ../gdb -nx <input
+
+(gdb) (gdb) Breakpoint 6 at 0x400685: file ./gdb.threads/local-watch-wrong-thread.c, line 47.
+(gdb) ==31759== Invalid write of size 4
+==31759==    at 0x601A11: bpstat_check_breakpoint_conditions (breakpoint.c:3482)
+==31759==    by 0x601C70: bpstat_stop_status (breakpoint.c:3596)
+==31759==    by 0x65D228: handle_inferior_event (infrun.c:3589)
+==31759==    by 0x65A563: wait_for_inferior (infrun.c:2281)
+==31759==    by 0x659AA0: proceed (infrun.c:1883)
+==31759==    by 0x65300B: continue_1 (infcmd.c:668)
+==31759==    by 0x653282: continue_command (infcmd.c:760)
+==31759==    by 0x5C51D8: do_cfunc (cli-decode.c:67)
+==31759==    by 0x5C824F: cmd_func (cli-decode.c:1738)
+==31759==    by 0x48335A: execute_command (top.c:450)
+==31759==    by 0x67273E: command_handler (event-top.c:511)
+==31759==    by 0x672E53: command_line_handler (event-top.c:736)
+==31759==  Address 0xbbdc950 is 240 bytes inside a block of size 336 free'd
+==31759==    at 0x4A04D72: free (vg_replace_malloc.c:325)
+==31759==    by 0x486E4B: xfree (utils.c:1286)
+==31759==    by 0x60BC35: delete_breakpoint (breakpoint.c:8708)
+==31759==    by 0x60BDAF: delete_command (breakpoint.c:8765)
+==31759==    by 0x5C51D8: do_cfunc (cli-decode.c:67)
+==31759==    by 0x5C824F: cmd_func (cli-decode.c:1738)
+==31759==    by 0x48335A: execute_command (top.c:450)
+==31759==    by 0x67273E: command_handler (event-top.c:511)
+==31759==    by 0x672E53: command_line_handler (event-top.c:736)
+==31759==    by 0x672FCF: gdb_readline2 (event-top.c:817)
+==31759==    by 0x6725F7: stdin_event_handler (event-top.c:433)
+==31759==    by 0x670CDE: handle_file_event (event-loop.c:812)
+==31759== 
+
+Watchpoint 4 deleted because the program has left the block in
+which its expression is valid.
+
+
+There is already automatic deletion of RELATED_BREAKPOINT in
+map_breakpoint_numbers but "delete breakpoints" (for all the breakpoints)
+calls delete_breakpoint from delete_command directly without calling
+map_breakpoint_numbers and it does not delete the associated
+bp_watchpoint_scope.
+
+I find the attached patch is right for delete_breakpoint itself as such
+function should not leave stale references in the leftover data structures.
+How well could be other code cleaned up with this patch in place I have not
+targeted by this patch.
+
+
+The existing code expects accessibility of freed memory and discusses the
+current stale references problem:
+
+void
+delete_breakpoint (struct breakpoint *bpt)
+[...]
+  /* Has this bp already been deleted?  This can happen because multiple
+     lists can hold pointers to bp's.  bpstat lists are especial culprits.
+
+     One example of this happening is a watchpoint's scope bp.  When the
+     scope bp triggers, we notice that the watchpoint is out of scope, and
+     delete it.  We also delete its scope bp.  But the scope bp is marked
+     "auto-deleting", and is already on a bpstat.  That bpstat is then
+     checked for auto-deleting bp's, which are deleted.
+
+     A real solution to this problem might involve reference counts in bp's,
+     and/or giving them pointers back to their referencing bpstat's, and
+     teaching delete_breakpoint to only free a bp's storage when no more
+     references were extent.  A cheaper bandaid was chosen.  */
+  if (bpt->type == bp_none)
+    return;
+[...]
+  bpt->type = bp_none;
+
+  xfree (bpt);
+}
+
+
+While fixing this part may be difficult I find the attached patch easy enough
+fixing the IMO currently most common crash due to it.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+"input":
+set height 0
+set width 0
+set confirm no
+file ../testsuite/gdb.threads/local-watch-wrong-thread
+set can-use-hw-watchpoints 1
+break main
+run
+break local-watch-wrong-thread.c:36
+continue
+delete breakpoints
+watch *myp
+continue
+delete breakpoints
+echo MAKE watch\n
+watch *myp if trigger != 0
+echo MAKE break\n
+break local-watch-wrong-thread.c:60
+info break
+continue
+echo DELETE five\n
+delete 5
+set trigger=1
+continue
+set *myp=0
+break local-watch-wrong-thread.c:47
+continue
+
+
+
+2009-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (delete_breakpoint <bpt->related_breakpoint != NULL>):
+	New.
+
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -8649,6 +8649,16 @@ delete_breakpoint (struct breakpoint *bpt)
+   if (bpt->type == bp_none)
+     return;
+ 
++  /* At least avoid this stale reference until the reference counting of
++     breakpoints gets resolved.  */
++  if (bpt->related_breakpoint != NULL)
++    {
++      gdb_assert (bpt->related_breakpoint->related_breakpoint == bpt);
++      bpt->related_breakpoint->disposition = disp_del_at_next_stop;
++      bpt->related_breakpoint->related_breakpoint = NULL;
++      bpt->related_breakpoint = NULL;
++    }
++
+   observer_notify_breakpoint_deleted (bpt->number);
+ 
+   if (breakpoint_chain == bpt)
+

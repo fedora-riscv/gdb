@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?_with_upstream:.upstream}%{dist}
+Release: 18%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -429,7 +429,10 @@ Patch397: gdb-follow-child-stale-parent.patch
 Patch398: gdb-testsuite-unknown-output.patch
 
 # Fix regression of gdb-7.0.1 not preserving typedef of a field.
-Patch399: gdb-field-check_typedef-revert.patch
+Patch399: gdb-bitfield-check_typedef.patch
+
+# Fix related_breakpoint stale ref crash.
+Patch400: gdb-stale-related_breakpoint.patch
 
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
@@ -681,6 +684,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch397 -p1
 %patch398 -p1
 %patch399 -p1
+%patch400 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -998,6 +1002,10 @@ fi
 %endif
 
 %changelog
+* Sat Jan  2 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-18.fc12
+- Fix regression of gdb-7.0 (from 6.8) crashing on typedefed bitfields.
+- Fix related_breakpoint stale ref crash.
+
 * Fri Jan  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-17.fc12
 - Formal upgrade to the FSF GDB release gdb-7.0.1.
   - Fix regression of gdb-7.0.1 not preserving typedef of a field.
