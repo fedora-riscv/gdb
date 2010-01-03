@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{dist}
+Release: 19%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1002,6 +1002,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-19.fc12
+- testsuite: Fixup false FAILs for gdb.cp/constructortest.exp.
+
 * Sat Jan  2 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-18.fc12
 - Fix regression of gdb-7.0 (from 6.8) crashing on typedefed bitfields.
 - Fix related_breakpoint stale ref crash.
