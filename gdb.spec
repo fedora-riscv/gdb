@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{dist}
+Release: 21%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1006,6 +1006,10 @@ fi
 %endif
 
 %changelog
+* Thu Jan  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-21.fc12
+- [vla] Fix regression on fields of structs in internal vars (BZ 553338).
+- archer-jankratochvil-fedora12 commit: 6e73988f653ba986e8742f208f17ec084292cbd5
+
 * Thu Jan  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-20.fc12
 - Fix crash reading broken stabs (it377671).
 

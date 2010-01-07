@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 200516d5be8a1cab02f0b18d607d1c1fb9cfa3e7
+commit 6e73988f653ba986e8742f208f17ec084292cbd5
 
 branch `archer' - the merge of branches:
 archer-tromey-call-frame-cfa
@@ -21827,6 +21827,64 @@ index d76cc36..496ff18 100644
  # test help stack
  test_class_help "stack" {
      "Examining the stack\..*\[\r\n\]+"
+diff --git a/gdb/testsuite/gdb.base/internal-var-field-address.c b/gdb/testsuite/gdb.base/internal-var-field-address.c
+new file mode 100644
+index 0000000..eeb7b85
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/internal-var-field-address.c
+@@ -0,0 +1,20 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++struct {
++  int field;
++} staticstruct = { 1 };
+diff --git a/gdb/testsuite/gdb.base/internal-var-field-address.exp b/gdb/testsuite/gdb.base/internal-var-field-address.exp
+new file mode 100644
+index 0000000..6d82e73
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/internal-var-field-address.exp
+@@ -0,0 +1,26 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++set test internal-var-field-address
++set binfile ${test}.x
++if  { [gdb_compile "${srcdir}/${subdir}/${test}.c" "${objdir}/${subdir}/${binfile}" object {debug}] != "" } {
++    untested "Couldn't compile test program"
++    return -1
++}
++
++clean_restart $binfile
++
++gdb_test {set $varstruct = staticstruct}
++gdb_test {p $varstruct.field} " = 1"
 diff --git a/gdb/testsuite/gdb.base/lineno-makeup-func.c b/gdb/testsuite/gdb.base/lineno-makeup-func.c
 new file mode 100644
 index 0000000..1a0220e
@@ -29155,7 +29213,7 @@ index cbb5d94..f9634ea 100644
  	  ++reps;
  	  ++rep1;
 diff --git a/gdb/value.c b/gdb/value.c
-index 589e03b..66013b7 100644
+index 589e03b..62003fa 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -37,8 +37,10 @@
@@ -29239,18 +29297,20 @@ index 589e03b..66013b7 100644
    if (VALUE_LVAL (whole) == lval_computed)
      {
        struct lval_funcs *funcs = whole->location.computed.funcs;
-@@ -776,6 +799,10 @@ set_value_component_location (struct value *component, struct value *whole)
+@@ -776,6 +799,12 @@ set_value_component_location (struct value *component, struct value *whole)
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
 +
 +  addr = value_raw_address (component);
 +  object_address_get_data (value_type (whole), &addr);
-+  set_value_address (component, addr);
++  if (component->lval != lval_internalvar
++      && component->lval != lval_internalvar_component)
++    set_value_address (component, addr);
  }
  
  
-@@ -906,6 +933,29 @@ show_values (char *num_exp, int from_tty)
+@@ -906,6 +935,29 @@ show_values (char *num_exp, int from_tty)
        num_exp[1] = '\0';
      }
  }
@@ -29280,7 +29340,7 @@ index 589e03b..66013b7 100644
  
  /* Internal variables.  These are variables within the debugger
     that hold values assigned by debugger commands.
-@@ -1381,6 +1431,40 @@ call_internal_function (struct gdbarch *gdbarch,
+@@ -1381,6 +1433,40 @@ call_internal_function (struct gdbarch *gdbarch,
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -29321,7 +29381,7 @@ index 589e03b..66013b7 100644
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -1428,11 +1512,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
+@@ -1428,11 +1514,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
  		    htab_t copied_types)
  {
    if (TYPE_OBJFILE (value->type) == objfile)
@@ -29335,7 +29395,7 @@ index 589e03b..66013b7 100644
  						 copied_types);
  }
  
-@@ -1447,13 +1530,13 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
+@@ -1447,13 +1532,13 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
      case INTERNALVAR_INTEGER:
        if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
  	var->u.integer.type
@@ -29351,7 +29411,7 @@ index 589e03b..66013b7 100644
        break;
  
      case INTERNALVAR_VALUE:
-@@ -1855,6 +1938,8 @@ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
+@@ -1855,6 +1940,8 @@ value_change_enclosing_type (struct value *val, struct type *new_encl_type)
      val->contents =
        (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
  
@@ -29360,7 +29420,7 @@ index 589e03b..66013b7 100644
    val->enclosing_type = new_encl_type;
    return val;
  }
-@@ -1919,6 +2004,8 @@ value_primitive_field (struct value *arg1, int offset,
+@@ -1919,6 +2006,8 @@ value_primitive_field (struct value *arg1, int offset,
  	  memcpy (value_contents_all_raw (v), value_contents_all_raw (arg1),
  		  TYPE_LENGTH (value_enclosing_type (arg1)));
  	}
@@ -29369,7 +29429,7 @@ index 589e03b..66013b7 100644
        v->type = type;
        v->offset = value_offset (arg1);
        v->embedded_offset = (offset + value_embedded_offset (arg1)
-@@ -2177,6 +2264,42 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
+@@ -2177,6 +2266,42 @@ pack_long (gdb_byte *buf, struct type *type, LONGEST num)
  }
  
  
@@ -29412,7 +29472,7 @@ index 589e03b..66013b7 100644
  /* Convert C numbers into newly allocated values.  */
  
  struct value *
-@@ -2190,6 +2313,19 @@ value_from_longest (struct type *type, LONGEST num)
+@@ -2190,6 +2315,19 @@ value_from_longest (struct type *type, LONGEST num)
  }
  
  
@@ -29432,7 +29492,7 @@ index 589e03b..66013b7 100644
  /* Create a value representing a pointer of type TYPE to the address
     ADDR.  */
  struct value *
-@@ -2348,4 +2484,8 @@ VARIABLE is already initialized."));
+@@ -2348,4 +2486,8 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);
