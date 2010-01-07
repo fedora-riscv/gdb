@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?_with_upstream:.upstream}%{dist}
+Release: 20%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -434,6 +434,9 @@ Patch399: gdb-bitfield-check_typedef.patch
 # Fix related_breakpoint stale ref crash.
 Patch400: gdb-stale-related_breakpoint.patch
 
+# Fix crash reading broken stabs (it377671).
+Patch401: gdb-stabs-read_args.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -685,6 +688,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch398 -p1
 %patch399 -p1
 %patch400 -p1
+%patch401 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej"	# Should not happen.
@@ -1002,6 +1006,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-20.fc12
+- Fix crash reading broken stabs (it377671).
+
 * Sun Jan  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-19.fc12
 - testsuite: Fixup false FAILs for gdb.cp/constructortest.exp.
 
