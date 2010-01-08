@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{dist}
+Release: 23%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -439,21 +439,6 @@ Patch400: gdb-stale-related_breakpoint.patch
 # Fix crash reading broken stabs (it377671).
 Patch401: gdb-stabs-read_args.patch
 
-# Ensure the devel libraries are installed for both multilib arches.
-%define bits_local %{?_isa}
-%define bits_other %{?_isa}
-%ifarch s390x
-%define bits_other (%{__isa_name}-31)
-%else #!s390x
-%ifarch ppc
-%define bits_other (%{__isa_name}-64)
-%else #!ppc
-%ifarch sparc64 ppc64 s390x x86_64
-%define bits_other (%{__isa_name}-32)
-%endif #sparc64 ppc64 s390x x86_64
-%endif #!ppc
-%endif #!s390x
-
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -472,10 +457,28 @@ Requires: python%{?_isa}
 %endif
 BuildRequires: python-devel%{?_isa}
 # Temporarily before python files get moved to libstdc++.rpm
-BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
+# libstdc++%{bits_other} is not present in Koji, the .spec script generating
+# gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
+BuildRequires: libstdc++%{?_isa}
 %endif # 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
+
+# Ensure the devel libraries are installed for both multilib arches.
+%define bits_local %{?_isa}
+%define bits_other %{?_isa}
+%ifarch s390x
+%define bits_other (%{__isa_name}-31)
+%else #!s390x
+%ifarch ppc
+%define bits_other (%{__isa_name}-64)
+%else #!ppc
+%ifarch sparc64 ppc64 s390x x86_64
+%define bits_other (%{__isa_name}-32)
+%endif #sparc64 ppc64 s390x x86_64
+%endif #!ppc
+%endif #!s390x
+
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
@@ -509,7 +512,8 @@ BuildRequires: glibc-static%{bits_other}
 %endif
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
-%endif
+
+%endif # 0%{?_with_testsuite:1}
 
 %ifarch ia64
 %if 0%{!?el5:1}
@@ -1009,6 +1013,9 @@ fi
 %endif
 
 %changelog
+* Fri Jan  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-23.fc12
+- Workaround missing libstdc++%%{bits_other} in Koji.
+
 * Fri Jan  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-22.fc12
 - Comply with new package review:
   - Fix .spec Source as this is not a snapshot now.
