@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?_with_upstream:.upstream}%{dist}
+Release: 24%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -512,6 +512,7 @@ BuildRequires: glibc-static%{bits_other}
 %endif
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
+BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
 
 %endif # 0%{?_with_testsuite:1}
 
@@ -1013,6 +1014,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-24.fc12
+- testsuite: BuildRequires also valgrind.
+
 * Fri Jan  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-23.fc12
 - Workaround missing libstdc++%%{bits_other} in Koji.
 
