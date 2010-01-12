@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?_with_upstream:.upstream}%{dist}
+Release: 25%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1014,6 +1014,10 @@ fi
 %endif
 
 %changelog
+* Tue Jan 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-25.fc12
+- non-librpm missing debuginfo yumcommand now prints also --disablerepo='*'
+  to save some bandwidth by yum (Robin Green, BZ 554152).
+
 * Sun Jan 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-24.fc12
 - testsuite: BuildRequires also valgrind.
 
