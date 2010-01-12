@@ -276,12 +276,16 @@ static int spawn (char **argv, int timeout)
 
   assert (signal_chld_hit != 0);
 
+  /* Do not unset O_NONBLOCK as a stale child (the whole purpose of this
+     program) having open its output pty would block us in read_out.  */
+#if 0
   i = fcntl (amaster, F_SETFL, O_RDONLY /* !O_NONBLOCK */);
   if (i != 0)
     {
       perror ("fcntl (amaster, F_SETFL, O_RDONLY /* !O_NONBLOCK */)");
       exit (EXIT_FAILURE);
     }
+#endif
 
   while (read_out (amaster));
 

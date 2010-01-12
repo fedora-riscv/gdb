@@ -1,0 +1,69 @@
+http://sourceware.org/ml/gdb-patches/2009-12/msg00473.html
+Subject: [patch] testsuite: false MI "unknown output after running" regression
+
+Hi,
+
+the attached patch will turn the results this way:
+-KFAIL: gdb.mi/mi-until.exp: until after while loop (unknown output after running) (PRMS: gdb/2104)
++KFAIL: gdb.mi/mi-until.exp: until after while loop (stopped at wrong place) (PRMS: gdb/2104)
+-XFAIL: gdb.mi/mi-watch.exp: sw: watchpoint trigger (unknown output after running)
++XFAIL: gdb.mi/mi-watch.exp: sw: watchpoint trigger (stopped at wrong place)
+-KFAIL: gdb.mi/mi2-until.exp: until after while loop (unknown output after running) (PRMS: gdb/2104)
++KFAIL: gdb.mi/mi2-until.exp: until after while loop (stopped at wrong place) (PRMS: gdb/2104)
+-XFAIL: gdb.mi/mi2-watch.exp: sw: watchpoint trigger (unknown output after running)
++XFAIL: gdb.mi/mi2-watch.exp: sw: watchpoint trigger (stopped at wrong place)
+
+This is a fix of KFAIL-kind regression due to:
+commit 26d086d741fb1bb0eee9d50e0bafa7c5e388023f
+Re: [RFA] fix *stopped for CLI commands
+http://sourceware.org/ml/gdb-patches/2009-02/msg00278.html
+http://sourceware.org/ml/gdb-cvs/2009-02/msg00084.html
+part:
+gdb/testsuite/
+2009-02-14  Vladimir Prus  <vladimir@codesourcery.com>
+	* lib/mi-support.exp (mi_expect_stop): Adjust the order of fields.
+	(mi_expect_interrupt): Likewise.
+	* gdb.mi/mi-cli.exp: Check that "step" results in proper *stopped
+	response.
+
+re-wdiff-ed for your convenience as:
+    verbose -log "mi_expect_stop: expecting: \\*stopped,${r}${a}${bn}[-thread-id=\"$decimal\",stopped-threads=$any,-]frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"$line\"\}$after_stopped{+,thread-id=\"$decimal\",stopped-threads=$any+}\r\n($thread_selected_re)?$prompt_re"
+	-re "\\*stopped,${r}${a}${bn}[-thread-id=\"$decimal\",stopped-threads=$any,-]frame=\{addr=\"$hex\",func=\"$func\",args=$args,file=\"$any$file\",fullname=\"${fullname_syntax}$file\",line=\"($line)\"\}$after_stopped{+,thread-id=\"$decimal\",stopped-threads=$any+}\r\n($thread_selected_re)?$prompt_re" {
+	-re "\\*stopped,${r}${a}${bn}[-thread-id=\"$decimal\",stopped-threads=$any,-]frame=\{addr=\"$hex\",func=\"$any\",args=\[\\\[\{\]$any\[\\\]\}\],file=\"$any\",fullname=\"${fullname_syntax}$any\",line=\"\[0-9\]*\"\}[-$any-]{+thread-id=\"$decimal\",stopped-threads=$any+}\r\n$prompt_re" {
+
+FYI there is: set any "\[^\n\]*"
+
+"stopped at wrong place" is the right kind of KFAIL/XFAIL (tested
+gcc-4.1.2-46.el5_4.1.x86_64 and gcc-4.4.2-20.fc12.x86_64) as discussed
+in PR gdb/2104.
+
+In the last case there is missing comma (,) after the former patch above.
+
+$after_stopped was IMO missing there even before.  It is in use only by
+gdb.mi/mi-simplerun.exp and gdb.mi/mi2-simplerun.exp.  Also fixed below.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+gdb/testsuite/
+2009-12-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/mi-support.exp (mi_expect_stop <stopped at wrong place>): Insert
+	missing $after_stopped and comma (,) expectation.
+
+--- a/gdb/testsuite/lib/mi-support.exp
++++ b/gdb/testsuite/lib/mi-support.exp
+@@ -1038,7 +1038,7 @@ proc mi_expect_stop { reason func args file line extra test } {
+ 	    pass "$test"
+             return $expect_out(2,string)
+ 	}
+-	-re "\\*stopped,${r}${a}${bn}frame=\{addr=\"$hex\",func=\"$any\",args=\[\\\[\{\]$any\[\\\]\}\],file=\"$any\",fullname=\"${fullname_syntax}$any\",line=\"\[0-9\]*\"\}thread-id=\"$decimal\",stopped-threads=$any\r\n$prompt_re" {
++	-re "\\*stopped,${r}${a}${bn}frame=\{addr=\"$hex\",func=\"$any\",args=\[\\\[\{\]$any\[\\\]\}\],file=\"$any\",fullname=\"${fullname_syntax}$any\",line=\"\[0-9\]*\"\}$after_stopped,thread-id=\"$decimal\",stopped-threads=$any\r\n$prompt_re" {
+             verbose -log "got $expect_out(buffer)"
+ 	    fail "$test (stopped at wrong place)"
+ 	    return -1
+

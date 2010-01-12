@@ -1,0 +1,231 @@
+http://sourceware.org/ml/gdb-patches/2009-12/msg00394.html
+Subject: [patch] Fix watchpoint-at-epilogue 7.0 regression (s390x)
+
+Hi,
+
+attached testcase regressed 6.8->7.0 on some s390x systems.
+
+At the moment PC is at epilogue (after frame pointer got destroyed and PC is
+still in the calleed function) we must not try any unwinding as it can try to
+unwind a garbage.
+
+Correct way would be to implement epilogue unwinder (such as
+amd64_epilogue_frame_unwind or i386_epilogue_frame_unwind ones) but it would
+not be so easy on s390x as it would need full prologue-analyzer: After SP gets
+restored there can be various instructions before the last jump - GDB needs to
+interpret the jump to find the register value where it is going to jump to.
+00000048279aa09c <round_and_return>:
+[...]
+  48279aa1b8: eb 6f f0 d0 00 04 lmg  %r6,%r15,208(%r15)
+  48279aa1be: 50 32 10 00       st   %r3,0(%r2,%r1)	# SP (%r15) is gone hone
+  48279aa1c2: b3 74 00 00       lzer %r0
+  48279aa1c6: 07 f4             br   %r4		# %r4 is the target
+[...]
+
+Just an easy fix is to be more careful and do not try any unwinding if we find
+PC is in the epilogue (previous instruction modifies SP=%r15).
+
+It is even a performance optimization and I see no regression risk there.
+
+The specific s390x error is:
+#0  throw_error (error=MEMORY_ERROR, fmt=0x8042676a "Cannot access memory at address %s") at exceptions.c:415
+#1  in memory_error (status=5, memaddr=0) at corefile.c:220
+#2  in read_memory (memaddr=0, myaddr=0x3ffffc7f7f0 "", len=8) at corefile.c:238
+#3  in read_memory_unsigned_integer (memaddr=0, len=8, byte_order=BFD_ENDIAN_BIG) at corefile.c:321
+#4  in s390_backchain_frame_unwind_cache (this_frame=0x80608958, info=0x80608a08) at s390-tdep.c:1525
+#5  in s390_frame_unwind_cache (this_frame=0x80608958, this_prologue_cache=0x80608970) at s390-tdep.c:1572
+#6  in s390_frame_this_id (this_frame=0x80608958, this_prologue_cache=0x80608970, this_id=0x806089b8) at s390-tdep.c:1583
+#7  in get_frame_id (fi=0x80608958) at frame.c:335
+#8  in frame_find_by_id (id={stack_addr = 4398044824952, code_addr = 2147484952, special_addr = 0, stack_addr_p = 1, code_addr_p = 1, special_addr_p = 0, inline_depth = 0}) at frame.c:587 
+#9  in watchpoint_check (p=0x8095bbc0) at breakpoint.c:3203
+#10 in catch_errors (func=0x801262c0 <watchpoint_check>, func_args=0x8095bbc0, errstring=0x80a26410 "Error evaluating expression for watchpoint 3\n", mask=6) at exceptions.c:510
+#11 in bpstat_check_watchpoint (bs=0x8095bbc0) at breakpoint.c:3404
+#12 in bpstat_stop_status (aspace=0x8061fcb0, bp_addr=2147485040, ptid={pid = 17372, lwp = 17372, tid = 0}) at breakpoint.c:3594
+#13 in handle_inferior_event (ecs=0x3ffffc80520) at infrun.c:3588
+
+I did not analyze why 6.8 did not error out, the GDB code is similar there.
+
+No regressions on:
+{x86_64,x86_64-m32,i686}-fedora12-linux-gnu (CVS HEAD GDB)
+s390x-rhel48-linux-gnu (CVS HEAD GDB)
+s390-rhel48-linux-gnu (CVS HEAD GDB)
+s390x-rhel54-linux-gnu (Fedora 12 GDB)
+s390-rhel54-linux-gnu (Fedora 12 GDB)
+
+
+Thanks,
+Jan
+
+
+gdb/
+2009-12-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (watchpoint_check): Check the call
+	gdbarch_in_function_epilogue_p before calling frame_find_by_id.
+	Extend the comment.
+
+gdb/testsuite/
+2009-12-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/watchpoint-cond-gone.exp, gdb.base/watchpoint-cond-gone.c,
+	gdb.base/watchpoint-cond-gone-stripped.c: New.
+
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -3200,6 +3200,17 @@ watchpoint_check (void *p)
+       struct gdbarch *frame_arch = get_frame_arch (frame);
+       CORE_ADDR frame_pc = get_frame_pc (frame);
+ 
++      /* in_function_epilogue_p() returns a non-zero value if we're still
++	 in the function but the stack frame has already been invalidated.
++	 Since we can't rely on the values of local variables after the
++	 stack has been destroyed, we are treating the watchpoint in that
++	 state as `not changed' without further checking.  Don't mark
++	 watchpoints as changed if the current frame is in an epilogue -
++	 even if they are in some other frame, our view of the stack
++	 is likely to be wrong and frame_find_by_id could error out.  */
++      if (gdbarch_in_function_epilogue_p (frame_arch, frame_pc))
++	return WP_VALUE_NOT_CHANGED;
++
+       fr = frame_find_by_id (b->watchpoint_frame);
+       within_current_scope = (fr != NULL);
+ 
+@@ -3216,17 +3227,6 @@ watchpoint_check (void *p)
+ 	    within_current_scope = 0;
+ 	}
+ 
+-      /* in_function_epilogue_p() returns a non-zero value if we're still
+-	 in the function but the stack frame has already been invalidated.
+-	 Since we can't rely on the values of local variables after the
+-	 stack has been destroyed, we are treating the watchpoint in that
+-	 state as `not changed' without further checking.  Don't mark
+-	 watchpoints as changed if the current frame is in an epilogue -
+-	 even if they are in some other frame, our view of the stack
+-	 is likely to be wrong.  */
+-      if (gdbarch_in_function_epilogue_p (frame_arch, frame_pc))
+-	return WP_VALUE_NOT_CHANGED;
+-
+       if (within_current_scope)
+ 	/* If we end up stopping, the current frame will get selected
+ 	   in normal_stop.  So this call to select_frame won't affect
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/watchpoint-cond-gone-stripped.c
+@@ -0,0 +1,23 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
++
++void
++jumper (void (*jumpto) (void))
++{
++  (*jumpto) ();
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/watchpoint-cond-gone.c
+@@ -0,0 +1,37 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++ 
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
++
++extern void jumper (void (*jumpto) (void));
++
++static void
++func (void)
++{
++  volatile int c;
++
++  c = 5;
++  c = 10;	/* watchpoint-here */
++  c = 20;
++}
++
++int
++main (void)
++{
++  jumper (func);
++
++  return 0;
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/watchpoint-cond-gone.exp
+@@ -0,0 +1,51 @@
++# Copyright 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++set testfile "watchpoint-cond-gone"
++set srcfile ${testfile}.c
++set srcfilestripped ${testfile}-stripped.c
++set objfilestripped ${objdir}/${subdir}/${testfile}-stripped.o
++set binfile ${objdir}/${subdir}/${testfile}
++
++# We need to generate a function without DWARF to crash older GDB.
++# Stepping into a dynamic function trampoline or stepping out of MAIN may work
++# but it is not a reliable FAIL case.
++
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfilestripped}" "${objfilestripped}" object {}] != ""
++      || [gdb_compile "${srcdir}/${subdir}/${srcfile} ${objfilestripped}" "${binfile}" executable {debug}] != "" } {
++    gdb_suppress_entire_file "Testcase compile failed, so all tests in this file will automatically fail."
++}
++
++clean_restart ${testfile}
++
++# Problem does not occur otherwise.
++gdb_test "set can-use-hw-watchpoints 0"
++
++if ![runto_main] {
++    return -1
++}
++
++gdb_breakpoint [gdb_get_line_number "watchpoint-here"]
++gdb_continue_to_breakpoint "Place to set the watchpoint"
++
++# The condition `c == 30' is the subject being tested.
++gdb_test "watch c if c == 30" "" "Place the watchpoint"
++
++# We may stay either in the function itself or only at the first instruction of
++# its caller depending on the epilogue unwinder (or valid epilogue CFI) presence.
++gdb_test "finish" \
++	 "Watchpoint .* deleted because the program has left the block in.*which its expression is valid..*in (jumper|func).*" \
++	 "Catch the no longer valid watchpoint"
+

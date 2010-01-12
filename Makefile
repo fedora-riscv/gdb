@@ -1,5 +1,5 @@
 # Makefile for source rpm: gdb
-# $Id: Makefile,v 1.3 2007/10/15 18:46:45 notting Exp $
+# $Id: Makefile,v 1.4 2009/11/26 01:53:59 notting Exp $
 NAME := gdb
 SPECFILE = $(firstword $(wildcard *.spec))
 

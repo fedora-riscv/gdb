@@ -1,0 +1,65 @@
+gdb/linux-nat.c:
+- Workaround RHEL-5 kernels for detaching SIGSTOPped processes (BZ 498595).
+
+--- gdb-6.8/gdb-orig/symfile.c	2008-08-21 00:06:50.000000000 +0200
++++ gdb-6.8/gdb/symfile.c	2008-08-21 22:31:00.000000000 +0200
+@@ -1456,8 +1456,10 @@ find_separate_debug_file (struct objfile
+       /* Prevent looping on a stripped .debug file.  */
+       if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
+         {
++#if 0 /* RHEL-5 backward behavior compatibility.  */
+ 	  warning (_("\"%s\": separate debug info file has no debug info"),
+ 		   build_id_name);
++#endif
+ 	  xfree (build_id_name);
+ 	}
+       else if (build_id_name != NULL)
+--- ./gdb/corelow.c	2010-01-01 16:04:34.000000000 +0100
++++ ./gdb/corelow.c	2010-01-01 16:06:26.000000000 +0100
+@@ -277,7 +277,7 @@ add_to_thread_list (bfd *abfd, asection 
+     inferior_ptid = ptid;			 /* Yes, make it current */
+ }
+ 
+-static int build_id_core_loads = 1;
++static int build_id_core_loads = 0;
+ 
+ static void
+ build_id_locate_exec (int from_tty)
+--- ./gdb/symfile.c	2010-01-01 16:04:35.000000000 +0100
++++ ./gdb/symfile.c	2010-01-01 16:06:12.000000000 +0100
+@@ -1249,7 +1249,7 @@ symbol_file_clear (int from_tty)
+ #define BUILD_ID_VERBOSE_NONE 0
+ #define BUILD_ID_VERBOSE_FILENAMES 1
+ #define BUILD_ID_VERBOSE_BINARY_PARSE 2
+-static int build_id_verbose = BUILD_ID_VERBOSE_FILENAMES;
++static int build_id_verbose = BUILD_ID_VERBOSE_NONE;
+ static void
+ show_build_id_verbose (struct ui_file *file, int from_tty,
+ 		       struct cmd_list_element *c, const char *value)
+--- gdb-7.0-orig/gdb/linux-nat.c	2009-12-19 20:53:46.000000000 +0100
++++ gdb-7.0/gdb/linux-nat.c	2009-12-19 20:55:02.000000000 +0100
+@@ -1604,8 +1604,22 @@ GPT: lwp %s had signal %s, but it is in 
+ 	*status = lp->status;
+     }
+ 
+-  if (*status == 0 && GET_PID (lp->ptid) == pid_was_stopped)
+-    *status = W_STOPCODE (SIGSTOP);
++  /* Workaround RHEL-5 kernel which has unreliable PTRACE_DETACH, SIGSTOP (that
++     many TIDs are left unstopped).  See RH Bug 496732.  */
++  if (GET_PID (lp->ptid) == pid_was_stopped)
++    {
++      int err;
++
++      errno = 0;
++      err = kill_lwp (GET_LWP (lp->ptid), SIGSTOP);
++      if (debug_linux_nat)
++	{
++	  fprintf_unfiltered (gdb_stdlog,
++			      "SC:  lwp kill %d %s\n",
++			      err,
++			      errno ? safe_strerror (errno) : "ERRNO-OK");
++	}
++    }
+ 
+   return 0;
+ }

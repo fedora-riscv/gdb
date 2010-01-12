@@ -1,0 +1,229 @@
+
+
+
+http://sourceware.org/ml/gdb-patches/2009-11/msg00388.html
+http://sourceware.org/ml/gdb-cvs/2009-11/msg00156.html
+Subject: [patch] Fix crash on reading stabs
+
+Hi,
+
+there is a crash on reading stabs fpc binary:
+	https://bugzilla.redhat.com/show_bug.cgi?id=537837
+
+Program received signal SIGSEGV, Segmentation fault.
+0x000000000069db3d in read_dbx_symtab (objfile=0x1daf5f0) at dbxread.c:1369
+1369              if ((namestring[0] == '-' && namestring[1] == 'l')
+
+(gdb) p/x nlist.n_strx
+$7 = 0xfffffff8
+(gdb) p sizeof(nlist.n_strx)
+$10 = 8
+
+Below the patch context is:
+    namestring = (nlist->n_strx + file_string_table_offset
+                  + DBX_STRINGTAB (objfile));
+
+so IMO the `(unsigned)' cast is excessive as it does not match the expression
+below.  Such cast is there since the GDB "Initial revision" (1999).
+
+`n_strx' type:
+struct internal_nlist
+{
+  unsigned long n_strx;                 /* Index into string table of name.  */
+...
+};
+
+Regression tested on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu which does not
+mean anything with the default DWARF debug info.  It was hanging for stabs so
+tried just a large part of gdb.base/*.exp on x86_64-m32 - `unix/-gstabs+/-m32'.
+
+If it isn't obviously approved please feel free to drop it as one should not
+use STABS in the first place.
+
+
+Regards,
+Jan
+
+
+gdb/
+2009-11-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dbxread.c (set_namestring): Remove cast to unsigned.  Check N_STRX
+	overflow.
+
+--- a/gdb/dbxread.c
++++ b/gdb/dbxread.c
+@@ -965,8 +965,9 @@ set_namestring (struct objfile *objfile, const struct internal_nlist *nlist)
+ {
+   char *namestring;
+ 
+-  if (((unsigned) nlist->n_strx + file_string_table_offset)
+-      >= DBX_STRINGTAB_SIZE (objfile))
++  if (nlist->n_strx + file_string_table_offset
++      >= DBX_STRINGTAB_SIZE (objfile)
++      || nlist->n_strx + file_string_table_offset < nlist->n_strx)
+     {
+       complaint (&symfile_complaints, _("bad string table offset in symbol %d"),
+ 		 symnum);
+
+
+
+Re: [RFA] Fix "show convenience" test
+http://sourceware.org/ml/gdb-patches/2009-09/msg00565.html
+http://sourceware.org/ml/gdb-cvs/2009-09/msg00099.html
+
+### src/gdb/testsuite/ChangeLog	2009/09/15 18:51:25	1.1960
+### src/gdb/testsuite/ChangeLog	2009/09/17 17:49:46	1.1961
+## -1,3 +1,7 @@
++2009-09-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
++
++	* gdb.base/default.exp: Fix "show convenience".
++
+ 2009-09-15  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* lib/mi-support.exp (mi_create_varobj): Update.
+--- src/gdb/testsuite/gdb.base/default.exp	2009/08/13 14:58:27	1.31
++++ src/gdb/testsuite/gdb.base/default.exp	2009/09/17 17:49:46	1.32
+@@ -598,7 +598,7 @@
+ #test show confirm
+ gdb_test "show confirm" "Whether to confirm potentially dangerous operations is o\[a-z\]*." "show confirm"
+ #test show convenience
+-gdb_test "show convenience" "No debugger convenience variables now defined.(\[^\r\n\]*\[\r\n\])+Convenience variables have names starting with \".\";(\[^\r\n\]*\[\r\n\])+use \"set\" as in \"set .foo = 5\" to define them." "show convenience"
++gdb_test "show convenience" "\\\$_siginfo = void" "show convenience"
+ #test show directories
+ gdb_test "show directories" "Source directories searched: .cdir\[:;\].cwd" "show directories"
+ #test show editing
+### src/gdb/doc/ChangeLog	2009/09/15 18:51:24	1.953
+### src/gdb/doc/ChangeLog	2009/09/17 17:49:46	1.954
+## -1,3 +1,8 @@
++2009-09-17  Paul Pluzhnikov  <ppluzhnikov@google.com>
++
++	* gdb.texinfo (convenince variables): Mention
++	$_siginfo could be empty.
++	
+ 2009-09-15  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* gdb.texinfo (GDB/MI Variable Objects): Document
+--- src/gdb/doc/gdb.texinfo	2009/09/15 18:51:25	1.624
++++ src/gdb/doc/gdb.texinfo	2009/09/17 17:49:46	1.625
+@@ -7819,8 +7819,10 @@
+ 
+ @item $_siginfo
+ @vindex $_siginfo@r{, convenience variable}
+-The variable @code{$_siginfo} is bound to extra signal information
+-inspection (@pxref{extra signal information}).
++The variable @code{$_siginfo} contains extra signal information
++(@pxref{extra signal information}).  Note that @code{$_siginfo}
++could be empty, if the application has not yet received any signals.
++For example, it will be empty before you execute the @code{run} command.
+ @end table
+ 
+ On HP-UX systems, if you refer to a function or variable name that
+
+
+
+http://sourceware.org/ml/gdb-cvs/2009-12/msg00128.html
+
+### src/gdb/testsuite/ChangeLog	2009/12/23 23:18:08	1.2054
+### src/gdb/testsuite/ChangeLog	2009/12/24 21:57:06	1.2055
+## -1,3 +1,10 @@
++2009-12-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix compatibility with G++-4.5.
++	* gdb.cp/expand-sals.cc (main): Remove the "exit-line" comment.
++	* gdb.cp/expand-sals.exp: Remove breakpoint on "exit-line".
++	(uncaught return): Remove.
++
+ 2009-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 	    Phil Muldoon  <pmuldoon@redhat.com>
+ 
+--- src/gdb/testsuite/gdb.cp/expand-sals.cc	2009/05/11 15:05:56	1.1
++++ src/gdb/testsuite/gdb.cp/expand-sals.cc	2009/12/24 21:57:06	1.2
+@@ -49,5 +49,5 @@
+   A a;
+   B b;
+ 
+-  return 0;	/* exit-line */
++  return 0;
+ }
+--- src/gdb/testsuite/gdb.cp/expand-sals.exp	2009/05/11 15:05:56	1.1
++++ src/gdb/testsuite/gdb.cp/expand-sals.exp	2009/12/24 21:57:06	1.2
+@@ -23,8 +23,6 @@
+     return -1
+ }
+ 
+-gdb_breakpoint [gdb_get_line_number "exit-line"]
+-
+ gdb_breakpoint [gdb_get_line_number "func-line"]
+ gdb_continue_to_breakpoint "func" ".*func-line.*"
+ 
+@@ -52,7 +50,3 @@
+ 	 "bt from A"
+ 
+ gdb_continue_to_breakpoint "next caller func" ".*func-line.*"
+-
+-# Verify GDB really could not catch any other breakpoint location.
+-
+-gdb_continue_to_breakpoint "uncaught return" ".*exit-line.*"
+
+
+
+http://sourceware.org/ml/gdb-cvs/2009-11/msg00213.html
+
+[ cut ]
+
+--- src/gdb/testsuite/gdb.base/condbreak.exp	2009/01/03 05:58:03	1.13
++++ src/gdb/testsuite/gdb.base/condbreak.exp	2009/11/25 20:43:29	1.14
+@@ -207,10 +207,10 @@
+ setup_xfail hppa2.0w-*-* 11512CLLbs
+ send_gdb "continue\n"
+ gdb_expect {
+-    -re "Continuing\\..*Breakpoint \[0-9\]+, marker2 \\(a=43\\) at .*$srcfile1:($bp_location8|$bp_location9).*($bp_location8|$bp_location9)\[\t \]+.*" {
++    -re "Continuing\\..*Breakpoint \[0-9\]+, marker2 \\(a=43\\) at .*$srcfile1:($bp_location8|$bp_location9).*($bp_location8|$bp_location9)\[\t \]+.*$gdb_prompt $" {
+ 	pass "run until breakpoint at marker2"
+     }
+-    -re "Continuing\\..*Breakpoint \[0-9\]+, $hex in marker2 \\(a=43\\) at .*$srcfile1:($bp_location8|$bp_location9).*($bp_location8|$bp_location9)\[\t \]+.*" {
++    -re "Continuing\\..*Breakpoint \[0-9\]+, $hex in marker2 \\(a=43\\) at .*$srcfile1:($bp_location8|$bp_location9).*($bp_location8|$bp_location9)\[\t \]+.*$gdb_prompt $" {
+ 	xfail "run until breakpoint at marker2"
+     }
+     -re "$gdb_prompt $" {
+
+
+
+Fix for gfortran-4.1:
+  -PASS: gdb.mi/mi-var-child-f.exp: mi runto MAIN__
+  +FAIL: gdb.mi/mi-var-child-f.exp: mi runto MAIN__ (unknown output after running)
+
+RFC: Move language-changed message to verbose
+http://sourceware.org/ml/gdb-patches/2009-11/msg00031.html
+http://sourceware.org/ml/gdb-cvs/2009-11/msg00034.html
+
+### src/gdb/ChangeLog	2009/11/05 19:53:03	1.11030
+### src/gdb/ChangeLog	2009/11/05 20:43:52	1.11031
+## -1,3 +1,8 @@
++2009-11-05  Daniel Jacobowitz  <dan@codesourcery.com>
++
++	* top.c (execute_command): Select a frame before checking the current
++	language.  Only output a message if verbose.
++
+ 2009-11-05  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* symtab.h (SYMBOL_SET_LINKAGE_NAME): Update comment.
+--- src/gdb/top.c	2009/10/19 09:51:42	1.172
++++ src/gdb/top.c	2009/11/05 20:43:52	1.173
+@@ -457,10 +457,13 @@
+ 
+     }
+ 
+-  /* Tell the user if the language has changed (except first time).  */
++  /* Tell the user if the language has changed (except first time).
++     First make sure that a new frame has been selected, in case this
++     command or the hooks changed the program state.  */
++  deprecated_safe_get_selected_frame ();
+   if (current_language != expected_language)
+     {
+-      if (language_mode == language_mode_auto)
++      if (language_mode == language_mode_auto && info_verbose)
+ 	{
+ 	  language_info (1);	/* Print what changed.  */
+ 	}

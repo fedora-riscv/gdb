@@ -1,0 +1,317 @@
+http://sourceware.org/ml/gdb-patches/2009-12/msg00180.html
+Subject: [patch] Fix a regression by me on breakpoint-cond-infcall
+
+Hi,
+
+GDB has now a regression since:
+	Re: [patch] Performance optimize large bp_location count
+	http://sourceware.org/ml/gdb-patches/2009-10/msg00632.html
+	=
+	2009-10-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	Performance optimize large bp_location count.
+
+on breakpoints with conditions calling inferior.
+
+Bringing the code back to the state before my acceleration patch.
+
+The code before already assumed no breakpoints or their bp_locations can
+change across the inferior call which should be true - trying to do some:
+	break a if b()
+	break b
+	command 1
+	delete 2
+	end
+or similar cannot work as inside "if b()" evaluation no breakpoints can be
+added or removed.
+
+update_global_location_list also does not removed/add `struct bp_location's
+themselves but only pointers to them in the bp_location array.  As the new
+iteration no longer uses the bp_location array it is no longer a problem.
+
+Original problem was found by and fixed differently by Phil Muldoon.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+gdb/
+2009-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (bpstat_stop_status): Iterate using ALL_BREAKPOINTS and
+	the B->LOC list.  Remove gdb_assert on B.  Change bp_hardware_watchpoint
+	continue to break.  Remove variable update_locations.  Remove HIT_COUNT
+	increment protection by an ENABLE_STATE check.  Inline the delayed
+	update_global_location_list call.
+
+gdb/testsuite/
+2009-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.base/condbreak.exp: Put breakpoint on marker3 and marker4.
+	(bp_location13, bp_location14, bp_location17, bp_location18)
+	(marker3_proto, marker4_proto): New variables.
+	(breakpoint info): Update output.
+	(run until breakpoint at marker3, run until breakpoint at marker4): New
+	tests.
+
+[ Backported for F-12.  ]
+
+--- ./gdb/breakpoint.c	2009-12-14 00:25:55.000000000 +0100
++++ ./gdb/breakpoint.c	2009-12-14 00:32:32.000000000 +0100
+@@ -3298,93 +3298,93 @@ bpstat_stop_status (CORE_ADDR bp_addr, p
+   /* Pointer to the last thing in the chain currently.  */
+   bpstat bs = root_bs;
+   int ix;
+-  int need_remove_insert, update_locations = 0;
++  int need_remove_insert;
+ 
+-  ALL_BP_LOCATIONS (bl, blp_tmp)
+-  {
+-    bpstat bs_prev = bs;
++  /* ALL_BP_LOCATIONS iteration would break across
++     update_global_location_list possibly executed by
++     bpstat_check_breakpoint_conditions's inferior call.  */
+ 
+-    b = bl->owner;
+-    gdb_assert (b);
+-    if (!breakpoint_enabled (b) && b->enable_state != bp_permanent)
+-      continue;
+-
+-    /* For hardware watchpoints, we look only at the first location.
+-       The watchpoint_check function will work on entire expression,
+-       not the individual locations.  For read watchopints, the
+-       watchpoints_triggered function have checked all locations
+-       alrea
+-     */
+-    if (b->type == bp_hardware_watchpoint && bl != b->loc)
+-      continue;
+-
+-    if (!bpstat_check_location (bl, bp_addr))
+-      continue;
+-
+-    /* Come here if it's a watchpoint, or if the break address matches */
+-
+-    bs = bpstat_alloc (bl, bs);	/* Alloc a bpstat to explain stop */
+-    gdb_assert (bs_prev->next == bs);
+-
+-    /* Assume we stop.  Should we find watchpoint that is not actually
+-       triggered, or if condition of breakpoint is false, we'll reset
+-       'stop' to 0.  */
+-    bs->stop = 1;
+-    bs->print = 1;
++  ALL_BREAKPOINTS (b)
++    {
++      if (!breakpoint_enabled (b) && b->enable_state != bp_permanent)
++	continue;
+ 
+-    if (!bpstat_check_watchpoint (bs))
+-      {
+-	/* Ensure bpstat_explains_signal stays false if this BL could not be
+-	   the cause of this trap.  */
++      for (bl = b->loc; bl != NULL; bl = bl->next)
++	{
++	  bpstat bs_prev = bs;
++
++	  /* For hardware watchpoints, we look only at the first location.
++	     The watchpoint_check function will work on entire expression,
++	     not the individual locations.  For read watchopints, the
++	     watchpoints_triggered function have checked all locations
++	     alrea
++	   */
++	  if (b->type == bp_hardware_watchpoint && bl != b->loc)
++	    break;
+ 
+-	gdb_assert (bs->print_it == print_it_noop);
+-	gdb_assert (!bs->stop);
+-	xfree (bs);
+-	bs = bs_prev;
+-	bs->next = NULL;
+-	continue;
+-      }
++	  if (!bpstat_check_location (bl, bp_addr))
++	    continue;
+ 
+-    if (b->type == bp_thread_event || b->type == bp_overlay_event
+-	|| b->type == bp_longjmp_master || b->type == bp_exception_master)
+-      /* We do not stop for these.  */
+-      bs->stop = 0;
+-    else
+-      bpstat_check_breakpoint_conditions (bs, ptid);
+-  
+-    if (bs->stop)
+-      {
+-	if (b->enable_state != bp_disabled)
+-	  ++(b->hit_count);
++	  /* Come here if it's a watchpoint, or if the break address matches */
+ 
+-	/* We will stop here */
+-	if (b->disposition == disp_disable)
+-	  {
+-	    if (b->enable_state != bp_permanent)
+-	      b->enable_state = bp_disabled;
+-	    update_locations = 1;
+-	  }
+-	if (b->silent)
+-	  bs->print = 0;
+-	bs->commands = b->commands;
+-	if (bs->commands
+-	    && (strcmp ("silent", bs->commands->line) == 0
+-		|| (xdb_commands && strcmp ("Q", bs->commands->line) == 0)))
+-	  {
+-	    bs->commands = bs->commands->next;
+-	    bs->print = 0;
+-	  }
+-	bs->commands = copy_command_lines (bs->commands);
+-      }
++	  bs = bpstat_alloc (bl, bs);	/* Alloc a bpstat to explain stop */
++	  gdb_assert (bs_prev->next == bs);
+ 
+-    /* Print nothing for this entry if we dont stop or if we dont print.  */
+-    if (bs->stop == 0 || bs->print == 0)
+-      bs->print_it = print_it_noop;
+-  }
++	  /* Assume we stop.  Should we find watchpoint that is not actually
++	     triggered, or if condition of breakpoint is false, we'll reset
++	     'stop' to 0.  */
++	  bs->stop = 1;
++	  bs->print = 1;
+ 
+-  /* Delay this call which would break the ALL_BP_LOCATIONS iteration above.  */
+-  if (update_locations)
+-    update_global_location_list (0);
++	  if (!bpstat_check_watchpoint (bs))
++	    {
++	      /* Ensure bpstat_explains_signal stays false if this BL could not be
++		 the cause of this trap.  */
++
++	      gdb_assert (bs->print_it == print_it_noop);
++	      gdb_assert (!bs->stop);
++	      xfree (bs);
++	      bs = bs_prev;
++	      bs->next = NULL;
++	      continue;
++	    }
++
++	  if (b->type == bp_thread_event || b->type == bp_overlay_event
++	      || b->type == bp_longjmp_master || b->type == bp_exception_master)
++	    /* We do not stop for these.  */
++	    bs->stop = 0;
++	  else
++	    bpstat_check_breakpoint_conditions (bs, ptid);
++	
++	  if (bs->stop)
++	    {
++	      ++(b->hit_count);
++
++	      /* We will stop here */
++	      if (b->disposition == disp_disable)
++		{
++		  if (b->enable_state != bp_permanent)
++		    b->enable_state = bp_disabled;
++		  update_global_location_list (0);
++		}
++	      if (b->silent)
++		bs->print = 0;
++	      bs->commands = b->commands;
++	      if (bs->commands
++		  && (strcmp ("silent", bs->commands->line) == 0
++		      || (xdb_commands && strcmp ("Q", bs->commands->line) == 0)))
++		{
++		  bs->commands = bs->commands->next;
++		  bs->print = 0;
++		}
++	      bs->commands = copy_command_lines (bs->commands);
++	    }
++
++	  /* Print nothing for this entry if we dont stop or if we dont print.  */
++	  if (bs->stop == 0 || bs->print == 0)
++	    bs->print_it = print_it_noop;
++	}
++    }
+ 
+   for (ix = 0; VEC_iterate (bp_location_p, moribund_locations, ix, loc); ++ix)
+     {
+--- ./gdb/testsuite/gdb.base/condbreak.exp	2009-01-03 06:58:03.000000000 +0100
++++ ./gdb/testsuite/gdb.base/condbreak.exp	2009-12-14 00:27:21.000000000 +0100
+@@ -68,8 +68,12 @@ set bp_location1  [gdb_get_line_number "
+ set bp_location6  [gdb_get_line_number "set breakpoint 6 here"]
+ set bp_location8  [gdb_get_line_number "set breakpoint 8 here" $srcfile1]
+ set bp_location9  [gdb_get_line_number "set breakpoint 9 here" $srcfile1]
++set bp_location13 [gdb_get_line_number "set breakpoint 13 here" $srcfile1]
++set bp_location14 [gdb_get_line_number "set breakpoint 14 here" $srcfile1]
+ set bp_location15 [gdb_get_line_number "set breakpoint 15 here" $srcfile1]
+ set bp_location16 [gdb_get_line_number "set breakpoint 16 here" $srcfile1]
++set bp_location17 [gdb_get_line_number "set breakpoint 17 here" $srcfile1]
++set bp_location18 [gdb_get_line_number "set breakpoint 18 here" $srcfile1]
+ 
+ #
+ # test break at function
+@@ -110,15 +114,29 @@ gdb_test "break marker2 if (a==43)" \
+     "Breakpoint.*at.* file .*$srcfile1, line.*"
+ 
+ #
++# Check break involving inferior function call.
++# Ensure there is at least one additional breakpoint with higher VMA.
++#
++gdb_test "break marker3 if (multi_line_if_conditional(1,1,1)==0)" \
++    "Breakpoint.*at.* file .*$srcfile1, line.*"
++gdb_test "break marker4" \
++    "Breakpoint.*at.* file .*$srcfile1, line.*"
++
++#
+ # check to see what breakpoints are set
+ #
+ 
+ if {$hp_aCC_compiler} {
+     set marker1_proto "\\(void\\)"
+     set marker2_proto "\\(int\\)"
++    # Not checked.
++    set marker3_proto "\\(char \\*, char \\*\\)"
++    set marker4_proto "\\(long\\)"
+ } else {
+     set marker1_proto ""
+     set marker2_proto ""
++    set marker3_proto ""
++    set marker4_proto ""
+ }
+ 
+ gdb_test "info break" \
+@@ -129,7 +147,10 @@ gdb_test "info break" \
+ \[0-9\]+\[\t \]+breakpoint     keep y.* in main at .*$srcfile:$bp_location1.*
+ \[\t \]+stop only if \\(1==1\\).*
+ \[0-9\]+\[\t \]+breakpoint     keep y.* in marker2$marker2_proto at .*$srcfile1:($bp_location8|$bp_location9).*
+-\[\t \]+stop only if \\(a==43\\).*" \
++\[\t \]+stop only if \\(a==43\\).*
++\[0-9\]+\[\t \]+breakpoint     keep y.* in marker3$marker3_proto at .*$srcfile1:($bp_location17|$bp_location18).*
++\[\t \]+stop only if \\(multi_line_if_conditional\\(1,1,1\\)==0\\).*
++\[0-9\]+\[\t \]+breakpoint     keep y.* in marker4$marker4_proto at .*$srcfile1:($bp_location13|$bp_location14).*" \
+     "breakpoint info"
+ 
+ 
+@@ -220,3 +241,23 @@ gdb_expect {
+ 	fail "(timeout) run until breakpoint at marker2"
+     }
+ }
++
++set test "run until breakpoint at marker3"
++gdb_test_multiple "continue" $test {
++    -re "Continuing\\..*Breakpoint \[0-9\]+, marker3 \\(a=$hex \"stack\", b=$hex \"trace\"\\) at .*$srcfile1:($bp_location17|$bp_location18).*($bp_location17|$bp_location18)\[\t \]+.*$gdb_prompt $" {
++	pass $test
++    }
++    -re "Continuing\\..*Breakpoint \[0-9\]+, $hex in marker3 \\(a=$hex \"stack\", b=$hex \"trace\"\\) at .*$srcfile1:($bp_location17|$bp_location18).*($bp_location17|$bp_location18)\[\t \]+.*$gdb_prompt $" {
++	xfail $test
++    }
++}
++
++set test "run until breakpoint at marker4"
++gdb_test_multiple "continue" $test {
++    -re "Continuing\\..*Breakpoint \[0-9\]+, marker4 \\(d=177601976\\) at .*$srcfile1:($bp_location13|$bp_location14).*($bp_location13|$bp_location14)\[\t \]+.*$gdb_prompt $" {
++	pass $test
++    }
++    -re "Continuing\\..*Breakpoint \[0-9\]+, $hex in marker4 \\(d=177601976\\) at .*$srcfile1:($bp_location13|$bp_location14).*($bp_location13|$bp_location14)\[\t \]+.*$gdb_prompt $" {
++	xfail $test
++    }
++}
