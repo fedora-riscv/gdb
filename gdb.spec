@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{dist}
+Release: 26%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -439,6 +439,9 @@ Patch400: gdb-stale-related_breakpoint.patch
 # Fix crash reading broken stabs (it377671).
 Patch401: gdb-stabs-read_args.patch
 
+# Fix crash while executing python code.
+Patch402: gdb-python-cplus-crash.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -696,6 +699,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch399 -p1
 %patch400 -p1
 %patch401 -p1
+%patch402 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1014,6 +1018,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 14 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-26.fc12
+- Fix crash while executing python code.
+
 * Tue Jan 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-25.fc12
 - non-librpm missing debuginfo yumcommand now prints also --disablerepo='*'
   to save some bandwidth by yum (Robin Green, BZ 554152).
