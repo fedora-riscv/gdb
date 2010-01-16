@@ -1,10 +1,10 @@
-gdb/
-2009-12-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Fix compatibility with G++-4.1.
-	* dwarf2read.c (partial_die_parent_scope): New variable PARENT_NAME.
-	Ignore parent namespaces with name "::".
-	(physname_prefix_1): Ignore namespaces with name "::".
+###gdb/
+###2009-12-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+###
+###	Fix compatibility with G++-4.1.
+###	* dwarf2read.c (partial_die_parent_scope): New variable PARENT_NAME.
+###	Ignore parent namespaces with name "::".
+###	(physname_prefix_1): Ignore namespaces with name "::".
 
 gdb/testsuite/
 2009-12-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -12,39 +12,39 @@ gdb/testsuite/
 	* gdb.dwarf2/dw2-empty-namespace.exp, gdb.dwarf2/dw2-empty-namespace.S:
 	New.
 
---- a/gdb/dwarf2read.c
-+++ b/gdb/dwarf2read.c
-@@ -2355,11 +2355,18 @@ partial_die_parent_scope (struct partial_die_info *pdi,
-       || parent->tag == DW_TAG_interface_type
-       || parent->tag == DW_TAG_union_type)
-     {
-+      char *parent_name = parent->name;
-+
-+      /* G++ 4.1 produced DW_TAG_namespace with DW_AT_name "::".  */
-+      if (parent->tag == DW_TAG_namespace && parent_name != NULL
-+          && strcmp (parent_name, "::") == 0)
-+	parent_name = NULL;
-+
-       if (grandparent_scope == NULL)
--	parent->scope = parent->name;
-+	parent->scope = parent_name;
-       else
- 	parent->scope = typename_concat (&cu->comp_unit_obstack, grandparent_scope,
--					 parent->name, cu);
-+					 parent_name, cu);
-     }
-   else if (parent->tag == DW_TAG_enumeration_type)
-     /* Enumerators should not get the name of the enumeration as a prefix.  */
-@@ -9008,6 +9015,9 @@ physname_prefix_1 (struct ui_file *buf, struct die_info *die,
- 	  name = dwarf2_name (die, cu);
- 	  if (name == NULL)
- 	    name = "(anonymous namespace)";
-+	  /* G++ 4.1 produced DW_TAG_namespace with DW_AT_name "::".  */
-+	  else if (strcmp (name, "::") == 0)
-+	    name = NULL;
- 	  break;
- 
- 	case DW_TAG_class_type:
+###--- a/gdb/dwarf2read.c
+###+++ b/gdb/dwarf2read.c
+###@@ -2355,11 +2355,18 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+###       || parent->tag == DW_TAG_interface_type
+###       || parent->tag == DW_TAG_union_type)
+###     {
+###+      char *parent_name = parent->name;
+###+
+###+      /* G++ 4.1 produced DW_TAG_namespace with DW_AT_name "::".  */
+###+      if (parent->tag == DW_TAG_namespace && parent_name != NULL
+###+          && strcmp (parent_name, "::") == 0)
+###+	parent_name = NULL;
+###+
+###       if (grandparent_scope == NULL)
+###-	parent->scope = parent->name;
+###+	parent->scope = parent_name;
+###       else
+### 	parent->scope = typename_concat (&cu->comp_unit_obstack, grandparent_scope,
+###-					 parent->name, cu);
+###+					 parent_name, cu);
+###     }
+###   else if (parent->tag == DW_TAG_enumeration_type)
+###     /* Enumerators should not get the name of the enumeration as a prefix.  */
+###@@ -9008,6 +9015,9 @@ physname_prefix_1 (struct ui_file *buf, struct die_info *die,
+### 	  name = dwarf2_name (die, cu);
+### 	  if (name == NULL)
+### 	    name = "(anonymous namespace)";
+###+	  /* G++ 4.1 produced DW_TAG_namespace with DW_AT_name "::".  */
+###+	  else if (strcmp (name, "::") == 0)
+###+	    name = NULL;
+### 	  break;
+### 
+### 	case DW_TAG_class_type:
 --- /dev/null
 +++ b/gdb/testsuite/gdb.dwarf2/dw2-empty-namespace.S
 @@ -0,0 +1,108 @@

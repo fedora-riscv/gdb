@@ -41,6 +41,7 @@
 #include <assert.h>
 #include <pty.h>
 #include <poll.h>
+#include <sys/stat.h>
 
 #define LENGTH(x) (sizeof (x) / sizeof (*(x)))
 
@@ -86,6 +87,8 @@ static int read_out (int amaster)
     return 0;
   /* Weird but at least after POLLHUP we get EIO instead of just EOF.  */
   if (buf_got == -1 && errno == EIO)
+    return 0;
+  if (buf_got == -1 && errno == EAGAIN)
     return 0;
   if (buf_got < 0)
     {

@@ -32,17 +32,17 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.1
+Version: 7.0.50.20100116
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{dist}
+Release: 1%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -118,7 +118,7 @@ Patch118: gdb-6.3-gstack-20050411.patch
 
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
-Patch124: gdb-archer-pie.patch
+Patch124: gdb-archer-pie-0315-breakpoint_address_match.patch
 Patch389: gdb-archer-pie-addons.patch
 Patch394: gdb-archer-pie-addons-keep-disabled.patch
 
@@ -240,8 +240,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 # Testcase for exec() from threaded program (BZ 202689).
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
-# Backported post gdb-7.0 fixups.
-Patch232: gdb-7.0-upstream.patch
+# Backported fixups post the source tarball.
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -376,11 +376,7 @@ Patch349: gdb-archer.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
-Patch352: gdb-6.8-bz457187-largefile.patch
 Patch360: gdb-6.8-bz457187-largefile-test.patch
-
-# Fix compatibility of --with-system-readline and readline-6.0+.
-Patch375: gdb-readline-6.0.patch
 
 # Fix python pretty printers lookup on x86_64.
 Patch376: libstdc++-v3-python-common-prefix.patch
@@ -391,16 +387,8 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 Patch382: gdb-core-open-vdso-warning.patch
 
-# Support multiple directories for `set debug-file-directory' (BZ 528668).
-Patch383: gdb-bz528668-symfile-sepcrc.patch
-Patch384: gdb-bz528668-symfile-cleanup.patch
-Patch385: gdb-bz528668-symfile-multi.patch
-
 # Support GNU IFUNCs - indirect functions (BZ 539590).
 Patch387: gdb-bz539590-gnu-ifunc.patch
-
-# Fix bp conditionals [bp_location-accel] regression (BZ 538626).
-Patch388: gdb-bz538626-bp_location-accel-bp-cond.patch
 
 # Fix callback-mode readline-6.0 regression for CTRL-C.
 Patch390: gdb-readline-6.0-signal.patch
@@ -421,23 +409,30 @@ Patch335: gdb-rhel5-compat.patch
 # Fix backward compatibility with G++ 4.1 namespaces "::".
 Patch395: gdb-empty-namespace.patch
 
-# Fix regression on re-setting the single ppc watchpoint slot.
-Patch396: gdb-ppc-hw-watchpoint-twice.patch
-
 # Fix regression by python on ia64 due to stale current frame.
 Patch397: gdb-follow-child-stale-parent.patch
-
-# testsuite: Fix false MI "unknown output after running" regression.
-Patch398: gdb-testsuite-unknown-output.patch
-
-# Fix regression of gdb-7.0.1 not preserving typedef of a field.
-Patch399: gdb-bitfield-check_typedef.patch
 
 # Fix related_breakpoint stale ref crash.
 Patch400: gdb-stale-related_breakpoint.patch
 
-# Fix crash reading broken stabs (it377671).
-Patch401: gdb-stabs-read_args.patch
+# Workaround ccache making lineno non-zero for command-line definitions.
+Patch403: gdb-ccache-workaround.patch
+
+# Implement `info common' for Fortran.
+Patch404: gdb-fortran-common-reduce.patch
+Patch405: gdb-fortran-common.patch
+
+# Fix Fortran logical-kind=8 (BZ 465310).
+Patch406: gdb-fortran-logical8.patch
+
+# Testcase for "Do not make up line information" fix by Daniel Jacobowitz.
+Patch407: gdb-lineno-makeup-test.patch
+
+# Test power7 ppc disassembly.
+Patch408: gdb-ppc-power7-test.patch
+
+# Fix tracepoint.c compilation warnings.
+Patch409: gdb-tracepoint-warning.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -568,12 +563,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
-%patch383 -p1
-%patch384 -p1
-%patch385 -p1
-%patch388 -p1
 %patch124 -p1
 %patch1 -p1
 %patch3 -p1
@@ -670,17 +661,26 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch337 -p1
 %patch343 -p1
 %patch348 -p1
-%patch352 -p1
 %patch360 -p1
-%patch375 -p1
 %patch376 -p1
 %patch381 -p1
 %patch382 -p1
 %patch387 -p1
-%patch389 -p1
 %patch390 -p1
 %patch391 -p1
 %patch392 -p1
+%patch395 -p1
+%patch397 -p1
+%patch400 -p1
+%patch403 -p1
+%patch404 -p1
+%patch405 -p1
+%patch389 -p1
+%patch394 -p1
+%patch406 -p1
+%patch407 -p1
+%patch408 -p1
+%patch409 -p1
 # Always verify its applicability.
 %patch393 -p1
 %patch335 -p1
@@ -688,14 +688,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch393 -p1 -R
 %patch335 -p1 -R
 %endif
-%patch394 -p1
-%patch395 -p1
-%patch396 -p1
-%patch397 -p1
-%patch398 -p1
-%patch399 -p1
-%patch400 -p1
-%patch401 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -777,7 +769,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?el5:1}
 	--without-rpm						\
 %else
-	--with-rpm=librpm.so.0					\
+	--with-rpm=librpm.so.1					\
 %endif
 %ifarch ia64
 	--with-libunwind					\
@@ -1014,6 +1006,14 @@ fi
 %endif
 
 %changelog
+* Sat Jan 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100116-1.fc13
+- Upgrade to the FSF GDB snapshot: 7.0.50.20100116
+- archer-jankratochvil-fedora13 commit: 81810a20b2d2c3bf18e151de3cddfc96445b3c46
+- [expr-cumulative] Archer branch is missing in this release.
+- Update rpm.org#76 workaround for rpm-4.8 using librpm.so.1.
+- Dissect archer-jankratochvil-misc into Patch403...Patch408.
+- Some regressions exist in this release.
+
 * Tue Jan 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-25.fc12
 - non-librpm missing debuginfo yumcommand now prints also --disablerepo='*'
   to save some bandwidth by yum (Robin Green, BZ 554152).

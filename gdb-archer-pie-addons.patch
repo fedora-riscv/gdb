@@ -1,6 +1,8 @@
---- a/gdb/dwarf2read.c
-+++ b/gdb/dwarf2read.c
-@@ -5754,7 +5754,12 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+Index: gdb-7.0.50.20100115/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/dwarf2read.c	2010-01-15 21:41:32.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/dwarf2read.c	2010-01-15 21:42:19.000000000 +0100
+@@ -5821,7 +5821,12 @@ read_common_block (struct die_info *die,
  {
    struct attribute *attr;
    struct symbol *sym;
@@ -14,15 +16,15 @@
  
    attr = dwarf2_attr (die, DW_AT_location, cu);
    if (attr)
-@@ -5763,6 +5768,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5830,6 +5835,7 @@ read_common_block (struct die_info *die,
        if (attr_form_is_block (attr))
- 	{
- 	  base = decode_locdesc (DW_BLOCK (attr), cu);
+         {
+           base = decode_locdesc (DW_BLOCK (attr), cu);
 +	  base_p = 1;
- 	}
+         }
        else if (attr_form_is_section_offset (attr))
- 	{
-@@ -5824,12 +5830,15 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+         {
+@@ -5891,12 +5897,15 @@ read_common_block (struct die_info *die,
  	      else
  		dwarf2_complex_location_expr_complaint ();
  
@@ -40,7 +42,7 @@
  	  else
  	    SET_FIELD_PHYSNAME (*field, SYMBOL_LINKAGE_NAME (sym));
  	  FIELD_TYPE (*field) = SYMBOL_TYPE (sym);
-@@ -5843,7 +5852,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5910,7 +5919,7 @@ read_common_block (struct die_info *die,
  
        sym = new_symbol (die, type, cu);
        /* SYMBOL_VALUE_ADDRESS never gets used as all its fields are static.  */
@@ -49,17 +51,19 @@
  
        set_die_type (die, type, cu);
      }
---- a/gdb/exec.c
-+++ b/gdb/exec.c
-@@ -32,6 +32,7 @@
- #include "exec.h"
- #include "observer.h"
+Index: gdb-7.0.50.20100115/gdb/exec.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/exec.c	2010-01-15 21:35:14.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/exec.c	2010-01-15 21:47:19.000000000 +0100
+@@ -34,6 +34,7 @@
  #include "arch-utils.h"
+ #include "gdbthread.h"
+ #include "progspace.h"
 +#include "solib.h"
  
  #include <fcntl.h>
  #include "readline/readline.h"
-@@ -220,6 +221,10 @@ exec_file_attach (char *filename, int from_tty)
+@@ -225,6 +226,10 @@ exec_file_attach (char *filename, int fr
        char *scratch_pathname;
        int scratch_chan;
        struct target_section *sections = NULL, *sections_end = NULL;
@@ -70,7 +74,7 @@
  
        scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, filename,
  		   write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
-@@ -288,12 +293,23 @@ exec_file_attach (char *filename, int from_tty)
+@@ -293,12 +298,23 @@ exec_file_attach (char *filename, int fr
  		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
  	}
  
@@ -94,19 +98,37 @@
 -      set_gdbarch_from_file (exec_bfd);
 -
        /* Add the executable's sections to the current address spaces'
- 	 list of sections.  */
-       add_target_sections (sections, sections_end);
---- a/gdb/gdbtypes.h
-+++ b/gdb/gdbtypes.h
-@@ -966,6 +966,7 @@ extern void allocate_cplus_struct_type (struct type *);
+ 	 list of sections.  This possibly pushes the exec_ops
+ 	 target.  */
+Index: gdb-7.0.50.20100115/gdb/gdbtypes.h
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/gdbtypes.h	2010-01-15 21:35:16.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/gdbtypes.h	2010-01-15 21:44:24.000000000 +0100
+@@ -406,6 +406,7 @@ enum type_instance_flag_value
+ enum field_loc_kind
+   {
+     FIELD_LOC_KIND_BITPOS,	/* bitpos */
++    /* This address is unrelocated by the objfile's ANOFFSET.  */
+     FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
+     FIELD_LOC_KIND_PHYSNAME	/* physname */
+   };
+@@ -582,6 +583,7 @@ struct main_type
+ 	   is the location (in the target) of the static field.
+ 	   Otherwise, physname is the mangled label of the static field. */
+ 
++	/* This address is unrelocated by the objfile's ANOFFSET.  */
+ 	CORE_ADDR physaddr;
+ 	char *physname;
+       }
+@@ -1100,6 +1102,7 @@ extern void allocate_gnat_aux_type (stru
  #define FIELD_LOC_KIND(thisfld) ((thisfld).loc_kind)
  #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
  #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
 +/* This address is unrelocated by the objfile's ANOFFSET.  */
  #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
- #define FIELD_DWARF_BLOCK(thisfld) ((thisfld).loc.dwarf_block)
  #define SET_FIELD_BITPOS(thisfld, bitpos)			\
-@@ -974,6 +975,7 @@ extern void allocate_cplus_struct_type (struct type *);
+   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
+@@ -1107,6 +1110,7 @@ extern void allocate_gnat_aux_type (stru
  #define SET_FIELD_PHYSNAME(thisfld, name)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSNAME,		\
     FIELD_STATIC_PHYSNAME (thisfld) = (name))
@@ -114,17 +136,19 @@
  #define SET_FIELD_PHYSADDR(thisfld, addr)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
     FIELD_STATIC_PHYSADDR (thisfld) = (addr))
-@@ -989,6 +991,7 @@ extern void allocate_cplus_struct_type (struct type *);
+@@ -1119,6 +1123,7 @@ extern void allocate_gnat_aux_type (stru
  #define TYPE_FIELD_LOC_KIND(thistype, n) FIELD_LOC_KIND (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
 +/* This address is unrelocated by the objfile's ANOFFSET.  */
  #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
- #define TYPE_FIELD_DWARF_BLOCK(thistype, n) FIELD_DWARF_BLOCK (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
---- a/gdb/jv-lang.c
-+++ b/gdb/jv-lang.c
-@@ -416,7 +416,8 @@ java_link_class_type (struct gdbarch *gdbarch,
+ #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
+Index: gdb-7.0.50.20100115/gdb/jv-lang.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/jv-lang.c	2010-01-15 21:35:13.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/jv-lang.c	2010-01-15 21:41:58.000000000 +0100
+@@ -416,7 +416,8 @@ java_link_class_type (struct gdbarch *gd
  
    fields = NULL;
    nfields--;			/* First set up dummy "class" field. */
@@ -134,7 +158,7 @@
    TYPE_FIELD_NAME (type, nfields) = "class";
    TYPE_FIELD_TYPE (type, nfields) = value_type (clas);
    SET_TYPE_FIELD_PRIVATE (type, nfields);
-@@ -462,7 +463,8 @@ java_link_class_type (struct gdbarch *gdbarch,
+@@ -462,7 +463,8 @@ java_link_class_type (struct gdbarch *gd
  	  SET_TYPE_FIELD_PROTECTED (type, i);
  	}
        if (accflags & 0x0008)	/* ACC_STATIC */
@@ -144,22 +168,13 @@
        else
  	TYPE_FIELD_BITPOS (type, i) = 8 * boffset;
        if (accflags & 0x8000)	/* FIELD_UNRESOLVED_FLAG */
---- a/gdb/solib-svr4.c
-+++ b/gdb/solib-svr4.c
-@@ -1672,15 +1672,20 @@ static CORE_ADDR
- svr4_exec_displacement (void)
- {
-   int found;
-+  /* ENTRY_POINT is a possible function descriptor - before
-+     a call to gdbarch_convert_from_func_ptr_addr.  */
-   CORE_ADDR entry_point;
- 
-   if (exec_bfd == NULL)
-     return 0;
- 
+Index: gdb-7.0.50.20100115/gdb/solib-svr4.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/solib-svr4.c	2010-01-15 21:35:16.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/solib-svr4.c	2010-01-15 21:44:55.000000000 +0100
+@@ -1689,7 +1689,10 @@ svr4_exec_displacement (void)
    if (target_auxv_search (&current_target, AT_ENTRY, &entry_point) == 1)
--    return entry_point - exec_entry_point (exec_bfd, &current_target);
-+    return entry_point - bfd_get_start_address (exec_bfd);
+     return entry_point - bfd_get_start_address (exec_bfd);
  
 -  return svr4_static_exec_displacement ();
 +  if (!ptid_equal (inferior_ptid, null_ptid))
@@ -169,7 +184,7 @@
  }
  
  /* Relocate the main executable.  This function should be called upon
-@@ -1632,7 +1635,7 @@ svr4_exec_displacement (void)
+@@ -1700,7 +1703,7 @@ svr4_exec_displacement (void)
  static void
  svr4_relocate_main_executable (void)
  {
@@ -178,7 +193,7 @@
  
    /* Even if DISPLACEMENT is 0 still try to relocate it as this is a new
       difference of in-memory vs. in-file addresses and we could already
-@@ -1975,6 +1978,7 @@ _initialize_svr4_solib (void)
+@@ -2054,6 +2057,7 @@ _initialize_svr4_solib (void)
    svr4_so_ops.free_so = svr4_free_so;
    svr4_so_ops.clear_solib = svr4_clear_solib;
    svr4_so_ops.solib_create_inferior_hook = svr4_solib_create_inferior_hook;
@@ -186,9 +201,11 @@
    svr4_so_ops.special_symbol_handling = svr4_special_symbol_handling;
    svr4_so_ops.current_sos = svr4_current_sos;
    svr4_so_ops.open_symbol_file_object = open_symbol_file_object;
---- a/gdb/solib.c
-+++ b/gdb/solib.c
-@@ -1014,6 +1014,19 @@ solib_create_inferior_hook (int from_tty)
+Index: gdb-7.0.50.20100115/gdb/solib.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/solib.c	2010-01-15 21:35:16.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/solib.c	2010-01-15 21:41:58.000000000 +0100
+@@ -1037,6 +1037,19 @@ solib_create_inferior_hook (int from_tty
    ops->solib_create_inferior_hook (from_tty);
  }
  
@@ -208,9 +225,11 @@
  /* GLOBAL FUNCTION
  
     in_solib_dynsym_resolve_code -- check to see if an address is in
---- a/gdb/solib.h
-+++ b/gdb/solib.h
-@@ -43,6 +43,8 @@ extern int solib_read_symbols (struct so_list *, int);
+Index: gdb-7.0.50.20100115/gdb/solib.h
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/solib.h	2010-01-08 23:52:04.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/solib.h	2010-01-15 21:42:36.000000000 +0100
+@@ -44,6 +44,8 @@ extern int solib_read_symbols (struct so
  
  extern void solib_create_inferior_hook (int from_tty);
  
@@ -218,10 +237,12 @@
 +
  /* If ADDR lies in a shared library, return its name.  */
  
- extern char *solib_name_from_address (CORE_ADDR);
---- a/gdb/solist.h
-+++ b/gdb/solist.h
-@@ -89,6 +89,9 @@ struct target_so_ops
+ extern char *solib_name_from_address (struct program_space *, CORE_ADDR);
+Index: gdb-7.0.50.20100115/gdb/solist.h
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/solist.h	2010-01-08 23:52:04.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/solist.h	2010-01-15 21:41:58.000000000 +0100
+@@ -92,6 +92,9 @@ struct target_so_ops
      /* Target dependent code to run after child process fork.  */
      void (*solib_create_inferior_hook) (int from_tty);
  
@@ -231,9 +252,11 @@
      /* Do additional symbol handling, lookup, etc. after symbols
         for a shared object have been loaded.  */
      void (*special_symbol_handling) (void);
---- a/gdb/symfile.c
-+++ b/gdb/symfile.c
-@@ -873,15 +873,36 @@ syms_from_objfile (struct objfile *objfile,
+Index: gdb-7.0.50.20100115/gdb/symfile.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/symfile.c	2010-01-15 21:35:14.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/symfile.c	2010-01-15 21:41:58.000000000 +0100
+@@ -832,15 +832,36 @@ syms_from_objfile (struct objfile *objfi
       if an error occurs during symbol reading.  */
    old_chain = make_cleanup_free_objfile (objfile);
  
@@ -277,9 +300,11 @@
      }
  
    /* Now either addrs or offsets is non-zero.  */
---- a/gdb/value.c
-+++ b/gdb/value.c
-@@ -1890,7 +1890,8 @@ value_static_field (struct type *type, int fieldno)
+Index: gdb-7.0.50.20100115/gdb/value.c
+===================================================================
+--- gdb-7.0.50.20100115.orig/gdb/value.c	2010-01-15 21:35:13.000000000 +0100
++++ gdb-7.0.50.20100115/gdb/value.c	2010-01-15 21:41:58.000000000 +0100
+@@ -1897,7 +1897,8 @@ value_static_field (struct type *type, i
    if (TYPE_FIELD_LOC_KIND (type, fieldno) == FIELD_LOC_KIND_PHYSADDR)
      {
        retval = value_at (TYPE_FIELD_TYPE (type, fieldno),
@@ -289,7 +314,7 @@
      }
    else
      {
-@@ -1920,7 +1921,8 @@ value_static_field (struct type *type, int fieldno)
+@@ -1927,7 +1928,8 @@ value_static_field (struct type *type, i
   	}
        if (retval && VALUE_LVAL (retval) == lval_memory)
  	SET_FIELD_PHYSADDR (TYPE_FIELD (type, fieldno),
@@ -299,14 +324,3 @@
      }
    return retval;
  }
---- gdb-7.0/gdb/testsuite/gdb.base/valgrind-db-attach.exp-orig	2009-12-21 16:50:42.000000000 +0100
-+++ gdb-7.0/gdb/testsuite/gdb.base/valgrind-db-attach.exp	2009-12-21 16:51:24.000000000 +0100
-@@ -67,6 +67,8 @@ gdb_test_multiple "" $test {
-     }
- }
- 
-+gdb_test "" "" "eat first prompt"
-+
- # Initialization from default_gdb_start.
- gdb_test "set height 0"
- gdb_test "set width 0"
