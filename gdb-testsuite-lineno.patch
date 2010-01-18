@@ -1,0 +1,152 @@
+http://sourceware.org/ml/gdb-patches/2010-01/msg00461.html
+Subject: [patch] testsuite: Fix misplaced line numbers
+
+Hi,
+
+commit 7a82dfb2a9be66f0230229642cbee54ebda3b0da
+Author: Joel Brobecker <brobecker@gnat.com>
+Date:   Fri Jan 1 07:31:28 2010 +0000
+
+    Update copyright year in most headers.
+    
+    Automatic update by copyright.sh.
+
+regressed:
+
+-PASS: gdb.mi/mi-break.exp: run to breakpoint with ignore count
++FAIL: gdb.mi/mi-break.exp: run to breakpoint with ignore count (stopped at wrong place)
+-PASS: gdb.mi/mi-cli.exp: continue to callee4
++FAIL: gdb.mi/mi-cli.exp: continue to callee4 (stopped at wrong place)
+-PASS: gdb.mi/mi-cli.exp: check *stopped from CLI command
++FAIL: gdb.mi/mi-cli.exp: check *stopped from CLI command (stopped at wrong place)
+-PASS: gdb.mi/mi2-cli.exp: continue to callee4
++FAIL: gdb.mi/mi2-cli.exp: continue to callee4 (stopped at wrong place)
+
+due to:
+
+#--- a/gdb/testsuite/gdb.mi/basics.c
+#+++ b/gdb/testsuite/gdb.mi/basics.c
+#@@ -1,4 +1,5 @@
+#-/* Copyright 1999, 2000, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
+#+/* Copyright 1999, 2000, 2004, 2007, 2008, 2009, 2010
+#+Free Software Foundation, Inc.
+
+
+Tested on x86_64-fedora12-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+2010-01-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi-break.exp (set line_callme_head, set line_callme_body): New.
+	(test_ignore_count): Declare line_callme_body global.
+	(run to breakpoint with ignore count): Use line_callme_body.
+	* gdb.mi/mi-cli.exp (set line_main_head, set line_main_body)
+	(set line_main_hello, set line_main_return): Reindent.
+	(set line_callee4_head, set line_callee4_body, set line_callee4_next):
+	New.
+	(continue to callee4): Use line_callee4_body.
+	(check *stopped from CLI command): Use line_callee4_next.
+	* gdb.mi/mi2-cli.exp (set line_main_head, set line_main_body)
+	(set line_main_hello, set line_main_return): Reindent.
+	(set line_callee4_head, set line_callee4_body): New.
+	(continue to callee4): Use line_callee4_body.
+
+--- a/gdb/testsuite/gdb.mi/mi-break.exp
++++ b/gdb/testsuite/gdb.mi/mi-break.exp
+@@ -56,6 +56,8 @@ set line_callee1_head  [gdb_get_line_number "callee1 ("]
+ set line_callee1_body  [expr $line_callee1_head + 2]
+ set line_main_head     [gdb_get_line_number "main ("]
+ set line_main_body     [expr $line_main_head + 2]
++set line_callme_head   [gdb_get_line_number "callme ("]
++set line_callme_body   [expr $line_callme_head + 2]
+ 
+ set fullname "fullname=\"${fullname_syntax}${srcfile}\""
+ 
+@@ -152,6 +154,7 @@ proc test_rbreak_creation_and_listing {} {
+ 
+ proc test_ignore_count {} {
+     global mi_gdb_prompt
++    global line_callme_body
+ 
+     mi_gdb_test "-break-insert -i 1 callme" \
+         "\\^done.*ignore=\"1\".*" \
+@@ -159,7 +162,7 @@ proc test_ignore_count {} {
+ 
+     mi_run_cmd
+ 
+-    mi_expect_stop "breakpoint-hit" "callme" "\{name=\"i\",value=\"2\"\}" ".*basics.c" "52" \
++    mi_expect_stop "breakpoint-hit" "callme" "\{name=\"i\",value=\"2\"\}" ".*basics.c" $line_callme_body \
+         {"" "disp=\"keep\"" } "run to breakpoint with ignore count"
+ }
+ 
+--- a/gdb/testsuite/gdb.mi/mi-cli.exp
++++ b/gdb/testsuite/gdb.mi/mi-cli.exp
+@@ -63,10 +63,13 @@ mi_gdb_test "-interpreter-exec console \"file $binfile\"" \
+ 
+ mi_run_to_main
+ 
+-set line_main_head   [gdb_get_line_number "main ("]
+-set line_main_body   [expr $line_main_head + 2]
+-set line_main_hello  [gdb_get_line_number "Hello, World!"]
+-set line_main_return [expr $line_main_hello + 2]
++set line_main_head    [gdb_get_line_number "main ("]
++set line_main_body    [expr $line_main_head + 2]
++set line_main_hello   [gdb_get_line_number "Hello, World!"]
++set line_main_return  [expr $line_main_hello + 2]
++set line_callee4_head [gdb_get_line_number "callee4 ("]
++set line_callee4_body [expr $line_callee4_head + 2]
++set line_callee4_next [expr $line_callee4_body + 1]
+ 
+ mi_gdb_test "-interpreter-exec console \"set args foobar\"" \
+   {\^done} \
+@@ -97,7 +100,7 @@ mi_gdb_test "-interpreter-exec console \"list\"" \
+   ".*\~\"$line_main_body\[\\\\t \]*callee1.*;\\\\n\".*\\^done" \
+   "-interpreter-exec console \"list\""
+ 
+-mi_execute_to "exec-continue" "breakpoint-hit" "callee4" "" ".*basics.c" "28" \
++mi_execute_to "exec-continue" "breakpoint-hit" "callee4" "" ".*basics.c" $line_callee4_body \
+     { "" "disp=\"keep\"" } "continue to callee4"
+ 
+ # NOTE: cagney/2003-02-03: Not yet.
+@@ -155,7 +158,7 @@ if {$async} {
+     set reason ""
+ }
+ 
+-mi_execute_to "interpreter-exec console step" $reason "callee4" "" ".*basics.c" "29" \
++mi_execute_to "interpreter-exec console step" $reason "callee4" "" ".*basics.c" $line_callee4_next \
+     "" "check *stopped from CLI command"
+ 
+ # NOTE: cagney/2003-02-03: Not yet.
+--- a/gdb/testsuite/gdb.mi/mi2-cli.exp
++++ b/gdb/testsuite/gdb.mi/mi2-cli.exp
+@@ -63,10 +63,12 @@ mi_gdb_test "-interpreter-exec console \"file $binfile\"" \
+ 
+ mi_run_to_main
+ 
+-set line_main_head   [gdb_get_line_number "main ("]
+-set line_main_body   [expr $line_main_head + 2]
+-set line_main_hello  [gdb_get_line_number "Hello, World!"]
+-set line_main_return [expr $line_main_hello + 2]
++set line_main_head    [gdb_get_line_number "main ("]
++set line_main_body    [expr $line_main_head + 2]
++set line_main_hello   [gdb_get_line_number "Hello, World!"]
++set line_main_return  [expr $line_main_hello + 2]
++set line_callee4_head [gdb_get_line_number "callee4 ("]
++set line_callee4_body [expr $line_callee4_head + 2]
+ 
+ mi_gdb_test "-interpreter-exec console \"set args foobar\"" \
+   {\^done} \
+@@ -97,7 +100,7 @@ mi_gdb_test "-interpreter-exec console \"list\"" \
+   ".*\~\"$line_main_body\[\\\\t \]*callee1.*;\\\\n\".*\\^done" \
+   "-interpreter-exec console \"list\""
+ 
+-mi_execute_to "exec-continue" "breakpoint-hit" "callee4" "" ".*basics.c" "28" \
++mi_execute_to "exec-continue" "breakpoint-hit" "callee4" "" ".*basics.c" $line_callee4_body \
+     { "" "disp=\"keep\"" } \
+     "continue to callee4"
+ 
+

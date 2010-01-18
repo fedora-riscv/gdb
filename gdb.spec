@@ -32,7 +32,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.50.20100116
+Version: 7.0.50.20100118
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -81,7 +81,7 @@ Source2: gdb-orphanripper.c
 Source3: gdb-gstack.man
 
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%define libstdcxxpython libstdc++-v3-python-r151798
+%define libstdcxxpython libstdc++-v3-python-r155978
 Source4: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
@@ -378,9 +378,6 @@ Patch349: gdb-archer.patch
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
 Patch360: gdb-6.8-bz457187-largefile-test.patch
 
-# Fix python pretty printers lookup on x86_64.
-Patch376: libstdc++-v3-python-common-prefix.patch
-
 # New test for step-resume breakpoint placed in multiple threads at once.
 Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 
@@ -431,8 +428,8 @@ Patch407: gdb-lineno-makeup-test.patch
 # Test power7 ppc disassembly.
 Patch408: gdb-ppc-power7-test.patch
 
-# Fix tracepoint.c compilation warnings.
-Patch409: gdb-tracepoint-warning.patch
+# [patch] testsuite: Fix misplaced line numbers
+Patch410: gdb-testsuite-lineno.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -662,7 +659,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch343 -p1
 %patch348 -p1
 %patch360 -p1
-%patch376 -p1
 %patch381 -p1
 %patch382 -p1
 %patch387 -p1
@@ -680,7 +676,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch406 -p1
 %patch407 -p1
 %patch408 -p1
-%patch409 -p1
+%patch410 -p1
 # Always verify its applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1006,6 +1002,10 @@ fi
 %endif
 
 %changelog
+* Tue Jan 19 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100118-1.fc13
+- Upgrade to the FSF GDB snapshot: 7.0.50.20100118
+- Upgrade libstdc++-v3-python to r155978 (Phil Muldoon).
+
 * Sat Jan 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100116-1.fc13
 - Upgrade to the FSF GDB snapshot: 7.0.50.20100116
 - archer-jankratochvil-fedora13 commit: 81810a20b2d2c3bf18e151de3cddfc96445b3c46
