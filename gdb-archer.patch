@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit ccde1530479cc966374351038057b9dda90aa251
+commit 21e418c04290aa5d2e75543d31fe3fe5d70d6d41
 
 branch `archer' - the merge of branches:
 archer-tromey-delayed-symfile
@@ -8076,10 +8076,18 @@ index aaefb03..c274572 100644
  						 const domain_enum);
  
 diff --git a/gdb/linespec.c b/gdb/linespec.c
-index 74902b6..a9b4f1e 100644
+index 74902b6..4e54a3a 100644
 --- a/gdb/linespec.c
 +++ b/gdb/linespec.c
-@@ -50,8 +50,6 @@ extern char *operator_chars (char *, char **);
+@@ -40,6 +40,7 @@
+ #include "interps.h"
+ #include "mi/mi-cmds.h"
+ #include "target.h"
++#include <ctype.h>
+ 
+ /* We share this one with symtab.c, but it is not exported widely. */
+ 
+@@ -50,8 +51,6 @@ extern char *operator_chars (char *, char **);
  static void initialize_defaults (struct symtab **default_symtab,
  				 int *default_line);
  
@@ -8088,7 +8096,7 @@ index 74902b6..a9b4f1e 100644
  static struct symtabs_and_lines decode_indirect (char **argptr);
  
  static char *locate_first_half (char **argptr, int *is_quote_enclosed);
-@@ -688,9 +686,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -688,9 +687,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
    struct symtab *file_symtab = NULL;
  
    char *copy;
@@ -8098,7 +8106,7 @@ index 74902b6..a9b4f1e 100644
    /* This says whether or not something in *ARGPTR is quoted with
       completer_quotes (i.e. with single quotes).  */
    int is_quoted;
-@@ -711,12 +706,9 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -711,12 +707,9 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
    if (**argptr == '*')
      return decode_indirect (argptr);
  
@@ -8114,7 +8122,7 @@ index 74902b6..a9b4f1e 100644
  
    /* Check to see if it's a multipart linespec (with colons or
       periods).  */
-@@ -732,10 +724,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -732,10 +725,7 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
    /* Check if this is an Objective-C method (anything that starts with
       a '+' or '-' and a '[').  */
    if (is_objc_method_format (p))
@@ -8126,7 +8134,7 @@ index 74902b6..a9b4f1e 100644
  
    /* Check if the symbol could be an Objective-C selector.  */
  
-@@ -749,11 +738,11 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -749,11 +739,11 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
  
    /* Does it look like there actually were two parts?  */
  
@@ -8140,7 +8148,7 @@ index 74902b6..a9b4f1e 100644
        /* Is it a C++ or Java compound data structure?
  	 The check on p[1] == ':' is capturing the case of "::",
  	 since p[0]==':' was checked above.  
-@@ -762,48 +751,31 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -762,48 +752,31 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
  	 can return now. */
  	
        if (p[0] == '.' || p[1] == ':')
@@ -8205,7 +8213,7 @@ index 74902b6..a9b4f1e 100644
  
    /* file_symtab is specified file's symtab, or 0 if no file specified.
       arg no longer contains the file name.  */
-@@ -838,10 +810,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -838,10 +811,6 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
        /* allow word separators in method names for Obj-C */
        p = skip_quoted_chars (*argptr, NULL, "");
      }
@@ -8216,14 +8224,20 @@ index 74902b6..a9b4f1e 100644
    else
      {
        p = skip_quoted (*argptr);
-@@ -851,6 +819,15 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
+@@ -851,6 +820,21 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
    if (*p == '<')
      p = find_template_name_end (p);
  
 +  /* Keep method overload information.  */
 +  q = strchr (p, '(');
 +  if (q != NULL)
-+    p = strrchr (q, ')') + 1;
++    {
++      /* Ignore '(' used after " if".  */
++      while (q > p && isspace (q[-1]))
++	q--;
++      if (!(q >= p + 3 && strncmp (&q[-2], "if", 2) == 0 && isspace (q[-3])))
++	p = strrchr (q, ')') + 1;
++    }
 +
 +  /* Make sure we keep important kewords like "const" */
 +  if (strncmp (p, " const", 6) == 0)
@@ -8232,7 +8246,7 @@ index 74902b6..a9b4f1e 100644
    copy = (char *) alloca (p - *argptr + 1);
    memcpy (copy, *argptr, p - *argptr);
    copy[p - *argptr] = '\0';
-@@ -926,44 +903,6 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
+@@ -926,44 +910,6 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
      }
  }
  
@@ -8277,7 +8291,7 @@ index 74902b6..a9b4f1e 100644
  
  
  /* Decode arg of the form *PC.  */
-@@ -1264,7 +1203,8 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
+@@ -1264,7 +1210,8 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
        /* PASS2: p2->"::fun", p->":fun" */
  
        /* Move pointer ahead to next double-colon.  */
@@ -8287,7 +8301,7 @@ index 74902b6..a9b4f1e 100644
  	{
  	  if (current_language->la_language == language_cplus)
  	    p += cp_validate_operator (p);
-@@ -1342,8 +1282,10 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
+@@ -1342,8 +1289,10 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
        else
  	{
  	  /* At this point argptr->"fun".  */
@@ -8299,7 +8313,7 @@ index 74902b6..a9b4f1e 100644
  	    p++;
  	  /* At this point p->"".  String ended.  */
  	  /* Nope, C++ operators could have spaces in them
-@@ -1355,6 +1297,19 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
+@@ -1355,6 +1304,19 @@ decode_compound (char **argptr, int funfirstline, char ***canonical,
  	      /* The above loop has already swallowed "operator".  */
  	      p += cp_validate_operator (p - 8) - 8;
  	    }
@@ -8319,7 +8333,7 @@ index 74902b6..a9b4f1e 100644
  	}
  
        /* Allocate our own copy of the substring between argptr and
-@@ -1509,8 +1464,39 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
+@@ -1509,8 +1471,39 @@ find_method (int funfirstline, char ***canonical, char *saved_arg,
      }
    if (i1 > 0)
      {
@@ -8361,7 +8375,7 @@ index 74902b6..a9b4f1e 100644
        return decode_line_2 (sym_arr, i1, funfirstline, canonical);
      }
    else
-@@ -1815,7 +1801,7 @@ symbol_found (int funfirstline, char ***canonical, char *copy,
+@@ -1815,7 +1808,7 @@ symbol_found (int funfirstline, char ***canonical, char *copy,
  	{
  	  struct blockvector *bv = BLOCKVECTOR (SYMBOL_SYMTAB (sym));
  	  struct block *b = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);

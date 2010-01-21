@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{dist}
+Release: 2%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -998,6 +998,10 @@ fi
 %endif
 
 %changelog
+* Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-2.fc13
+- archer-jankratochvil-fedora13 commit: 21e418c04290aa5d2e75543d31fe3fe5d70d6d41
+- [expr-cumulative] Fix "break expr if (cond)" regression.
+
 * Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-1.fc13
 - Upgrade to the FSF GDB snapshot: 7.0.50.20100121
 - archer-jankratochvil-fedora13 commit: ccde1530479cc966374351038057b9dda90aa251
