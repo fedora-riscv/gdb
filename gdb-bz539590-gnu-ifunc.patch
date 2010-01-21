@@ -1,41 +1,65 @@
-gdb/
-2009-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+http://sourceware.org/gdb/wiki/ProjectArcher
+http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
-	Transparent GNU-IFUNCs support.
-	* elfread.c (record_minimal_symbol): Apply also for mst_text_gnu_ifunc.
-	(elf_symtab_read): Set also mst_text_gnu_ifunc.
-	* gdbtypes.c (init_type): Support TYPE_FLAG_GNU_IFUNC.
-	(gdbtypes_post_init): Initialize builtin_func_func_ptr.
-	(objfile_type): Initialize nodebug_text_gnu_ifunc_symbol.
-	* gdbtypes.h (enum type_flag_value <TYPE_FLAG_GNU_IFUNC>)
-	(TYPE_GNU_IFUNC, struct main_type <flag_gnu_ifunc>)
-	(struct builtin_type <builtin_func_func_ptr>)
-	(struct objfile_type <nodebug_text_gnu_ifunc_symbol>): New.
-	* infcall.c (find_function_addr <TYPE_GNU_IFUNC (ftype)>): New.
-	* minsyms.c (lookup_minimal_symbol_text, prim_record_minimal_symbol)
-	(find_solib_trampoline_target): Support also mst_text_gnu_ifunc.
-	(in_gnu_ifunc_stub): New.
-	* parse.c (write_exp_msymbol <mst_text_gnu_ifunc>): New.
-	* solib-svr4.c (svr4_in_dynsym_resolve_code): Call also
-	in_gnu_ifunc_stub.
-	* symmisc.c (dump_msymbols <mst_text_gnu_ifunc>): New.
-	* symtab.c (search_symbols): Support also mst_text_gnu_ifunc.
-	* symtab.h (enum minimal_symbol_type <mst_text_gnu_ifunc>)
-	(in_gnu_ifunc_stub): New.
-	* linespec.c: Include infcall.h.
-	(minsym_found <MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc>): New.
+GIT snapshot:
+commit 791165df07fd22d381def1318954c389a606f81a
 
-gdb/testsuite/
-2009-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+archer-jankratochvil-ifunc
 
-	Transparent GNU-IFUNCs support.
-	* gdb.base/gnu-ifunc-lib.c, gdb.base/gnu-ifunc.c,
-	gdb.base/gnu-ifunc.exp: New.
-
-Index: gdb-7.0/gdb/elfread.c
+Index: gdb-7.0.1/gdb/alpha-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/elfread.c	2009-11-25 10:24:45.000000000 +0100
-+++ gdb-7.0/gdb/elfread.c	2009-11-25 10:25:50.000000000 +0100
+--- gdb-7.0.1.orig/gdb/alpha-linux-tdep.c	2009-07-02 19:25:52.000000000 +0200
++++ gdb-7.0.1/gdb/alpha-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -25,6 +25,7 @@
+ #include "symtab.h"
+ #include "regset.h"
+ #include "regcache.h"
++#include "linux-tdep.h"
+ 
+ #include "alpha-tdep.h"
+ 
+@@ -235,6 +236,9 @@ alpha_linux_init_abi (struct gdbarch_inf
+ 
+   set_gdbarch_regset_from_core_section
+     (gdbarch, alpha_linux_regset_from_core_section);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/amd64-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/amd64-linux-tdep.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/amd64-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -1557,6 +1557,9 @@ amd64_linux_init_abi (struct gdbarch_inf
+   amd64_linux_record_tdep.arg6 = AMD64_R9_REGNUM;
+ 
+   tdep->i386_syscall_record = amd64_linux_syscall_record;
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ 
+Index: gdb-7.0.1/gdb/arm-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/arm-linux-tdep.c	2009-07-31 01:05:03.000000000 +0200
++++ gdb-7.0.1/gdb/arm-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -873,6 +873,9 @@ arm_linux_init_abi (struct gdbarch_info 
+   set_gdbarch_displaced_step_free_closure (gdbarch,
+ 					   simple_displaced_step_free_closure);
+   set_gdbarch_displaced_step_location (gdbarch, displaced_step_at_entry_point);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/elfread.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/elfread.c	2010-01-21 20:45:21.000000000 +0100
++++ gdb-7.0.1/gdb/elfread.c	2010-01-21 20:46:30.000000000 +0100
 @@ -168,7 +168,8 @@ record_minimal_symbol (char *name, CORE_
  {
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
@@ -58,10 +82,80 @@ Index: gdb-7.0/gdb/elfread.c
  		}
  	      else if ((sym->name[0] == '.' && sym->name[1] == 'L')
  		       || ((sym->flags & BSF_LOCAL)
-Index: gdb-7.0/gdb/gdbtypes.c
+Index: gdb-7.0.1/gdb/frv-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/gdbtypes.c	2009-11-25 10:24:47.000000000 +0100
-+++ gdb-7.0/gdb/gdbtypes.c	2009-11-25 10:24:56.000000000 +0100
+--- gdb-7.0.1.orig/gdb/frv-linux-tdep.c	2009-07-02 19:25:53.000000000 +0200
++++ gdb-7.0.1/gdb/frv-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -31,6 +31,7 @@
+ #include "frame-unwind.h"
+ #include "regset.h"
+ #include "gdb_string.h"
++#include "linux-tdep.h"
+ 
+ /* Define the size (in bytes) of an FR-V instruction.  */
+ static const int frv_instr_size = 4;
+@@ -485,7 +486,21 @@ frv_linux_regset_from_core_section (stru
+   return NULL;
+ }
+ 
+-
++static CORE_ADDR
++frv_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++				      CORE_ADDR addr,
++				      struct target_ops *targ)
++{
++  CORE_ADDR pc = frv_convert_from_func_ptr_addr (gdbarch, addr, targ);
++  CORE_ADDR resolved;
++
++  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++  if (resolved != pc)
++    pc = frv_convert_from_func_ptr_addr (gdbarch, resolved, targ);
++
++  return pc;
++}
++
+ static void
+ frv_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+ {
+@@ -493,6 +508,10 @@ frv_linux_init_abi (struct gdbarch_info 
+   frame_unwind_append_unwinder (gdbarch, &frv_linux_sigtramp_frame_unwind); 
+   set_gdbarch_regset_from_core_section (gdbarch,
+                                         frv_linux_regset_from_core_section);
++
++  if (frv_abi (gdbarch) == FRV_ABI_FDPIC)
++    set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  frv_linux_convert_from_func_ptr_addr);
+ }
+ 
+ static enum gdb_osabi
+Index: gdb-7.0.1/gdb/frv-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/frv-tdep.c	2009-07-02 19:25:53.000000000 +0200
++++ gdb-7.0.1/gdb/frv-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -1169,7 +1169,7 @@ find_func_descr (struct gdbarch *gdbarch
+   return descr;
+ }
+ 
+-static CORE_ADDR
++CORE_ADDR
+ frv_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
+                                 struct target_ops *targ)
+ {
+Index: gdb-7.0.1/gdb/frv-tdep.h
+===================================================================
+--- gdb-7.0.1.orig/gdb/frv-tdep.h	2009-01-03 06:57:51.000000000 +0100
++++ gdb-7.0.1/gdb/frv-tdep.h	2010-01-21 20:45:32.000000000 +0100
+@@ -118,3 +118,6 @@ CORE_ADDR frv_fetch_objfile_link_map (st
+ struct target_so_ops;
+ extern struct target_so_ops frv_so_ops;
+ 
++CORE_ADDR frv_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					  CORE_ADDR addr,
++					  struct target_ops *targ);
+Index: gdb-7.0.1/gdb/gdbtypes.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/gdbtypes.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/gdbtypes.c	2010-01-21 20:45:32.000000000 +0100
 @@ -1904,6 +1904,8 @@ init_type (enum type_code code, int leng
      TYPE_NOTTEXT (type) = 1;
    if (flags & TYPE_FLAG_FIXED_INSTANCE)
@@ -75,8 +169,8 @@ Index: gdb-7.0/gdb/gdbtypes.c
      = lookup_pointer_type (builtin_type->builtin_void);
    builtin_type->builtin_func_ptr
      = lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
-+  builtin_type->builtin_func_func_ptr
-+    = lookup_pointer_type (lookup_function_type (builtin_type->builtin_func_ptr));
++  builtin_type->builtin_func_func
++    = lookup_function_type (builtin_type->builtin_func_ptr);
  
    /* This type represents a GDB internal function.  */
    builtin_type->internal_fn
@@ -92,10 +186,10 @@ Index: gdb-7.0/gdb/gdbtypes.c
    objfile_type->nodebug_data_symbol
      = init_type (TYPE_CODE_INT,
  		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-Index: gdb-7.0/gdb/gdbtypes.h
+Index: gdb-7.0.1/gdb/gdbtypes.h
 ===================================================================
---- gdb-7.0.orig/gdb/gdbtypes.h	2009-11-25 10:24:48.000000000 +0100
-+++ gdb-7.0/gdb/gdbtypes.h	2009-11-25 10:25:17.000000000 +0100
+--- gdb-7.0.1.orig/gdb/gdbtypes.h	2010-01-21 20:45:23.000000000 +0100
++++ gdb-7.0.1/gdb/gdbtypes.h	2010-01-21 20:45:32.000000000 +0100
 @@ -187,6 +187,7 @@ enum type_flag_value
    TYPE_FLAG_FIXED_INSTANCE = (1 << 15),
    TYPE_FLAG_STUB_SUPPORTED = (1 << 16),
@@ -129,9 +223,9 @@ Index: gdb-7.0/gdb/gdbtypes.h
       (*) () can server as a generic function pointer.  */
    struct type *builtin_func_ptr;
  
-+  /* `pointer to function returning pointer to function (returning void)' type.
++  /* `function returning pointer to function (returning void)' type.
 +     The final void return type is not significant for it.  */
-+  struct type *builtin_func_func_ptr;
++  struct type *builtin_func_func;
 +
  
    /* Special-purpose types.  */
@@ -144,77 +238,239 @@ Index: gdb-7.0/gdb/gdbtypes.h
    struct type *nodebug_data_symbol;
    struct type *nodebug_unknown_symbol;
    struct type *nodebug_tls_symbol;
-Index: gdb-7.0/gdb/infcall.c
+Index: gdb-7.0.1/gdb/hppa-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/infcall.c	2009-11-25 10:24:45.000000000 +0100
-+++ gdb-7.0/gdb/infcall.c	2009-11-25 10:24:56.000000000 +0100
-@@ -286,6 +286,27 @@ find_function_addr (struct value *functi
-   else
-     error (_("Invalid data type for function to be called."));
+--- gdb-7.0.1.orig/gdb/hppa-linux-tdep.c	2009-07-02 19:25:54.000000000 +0200
++++ gdb-7.0.1/gdb/hppa-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -31,6 +31,7 @@
+ #include "regset.h"
+ #include "regcache.h"
+ #include "hppa-tdep.h"
++#include "linux-tdep.h"
  
-+  if (TYPE_GNU_IFUNC (ftype))
-+    {
-+      struct type *func_func_ptr;
+ #include "elf/common.h"
+ 
+@@ -512,7 +513,21 @@ hppa_linux_regset_from_core_section (str
+ 
+   return NULL;
+ }
+-
 +
-+      funaddr += gdbarch_deprecated_function_start_offset (gdbarch);
++static CORE_ADDR
++hppa32_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					 CORE_ADDR addr,
++					 struct target_ops *targ)
++{
++  CORE_ADDR pc = hppa32_convert_from_func_ptr_addr (gdbarch, addr, targ);
++  CORE_ADDR resolved;
 +
-+      /* Cast FUNADDR to drop TYPE_GNU_IFUNC and being able to call gnu-ifunc
-+	 FUNADDR without causing deadlock by this block of code.  */
++  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++  if (resolved != pc)
++    pc = hppa32_convert_from_func_ptr_addr (gdbarch, resolved, targ);
 +
-+      func_func_ptr = builtin_type (gdbarch)->builtin_func_func_ptr;
-+      function = value_from_pointer (func_func_ptr, funaddr);
++  return pc;
++}
+ 
+ /* Forward declarations.  */
+ extern initialize_file_ftype _initialize_hppa_linux_tdep;
+@@ -554,6 +569,10 @@ hppa_linux_init_abi (struct gdbarch_info
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
 +
-+      /* gnu-ifuncs have no arguments.  */
-+      function = call_function_by_hand (function, 0, NULL);
-+
-+      funaddr = value_as_address (function);
-+
-+      /* This is `int' as the return type of the final function.  */
-+      value_type = TYPE_TARGET_TYPE (value_type);
-+    }
-+
-   if (retval_type != NULL)
-     *retval_type = value_type;
-   return funaddr + gdbarch_deprecated_function_start_offset (gdbarch);
-Index: gdb-7.0/gdb/linespec.c
++  if (tdep->bytes_per_address == 4)
++    set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++				       hppa32_linux_convert_from_func_ptr_addr);
+ }
+ 
+ void
+Index: gdb-7.0.1/gdb/hppa-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/linespec.c	2009-11-25 10:24:45.000000000 +0100
-+++ gdb-7.0/gdb/linespec.c	2009-11-25 10:24:56.000000000 +0100
-@@ -40,6 +40,7 @@
- #include "interps.h"
- #include "mi/mi-cmds.h"
- #include "target.h"
+--- gdb-7.0.1.orig/gdb/hppa-tdep.c	2009-09-13 18:28:28.000000000 +0200
++++ gdb-7.0.1/gdb/hppa-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -1247,7 +1247,7 @@ hppa64_return_value (struct gdbarch *gdb
+ }
+ 
+ 
+-static CORE_ADDR
++CORE_ADDR
+ hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
+ 				   struct target_ops *targ)
+ {
+Index: gdb-7.0.1/gdb/hppa-tdep.h
+===================================================================
+--- gdb-7.0.1.orig/gdb/hppa-tdep.h	2009-07-02 19:25:54.000000000 +0200
++++ gdb-7.0.1/gdb/hppa-tdep.h	2010-01-21 20:45:32.000000000 +0100
+@@ -246,4 +246,8 @@ extern int hppa_in_solib_call_trampoline
+ 					  CORE_ADDR pc, char *name);
+ extern CORE_ADDR hppa_skip_trampoline_code (struct frame_info *, CORE_ADDR pc);
+ 
++extern CORE_ADDR hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++						    CORE_ADDR addr,
++						    struct target_ops *targ);
++
+ #endif  /* hppa-tdep.h */
+Index: gdb-7.0.1/gdb/i386-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/i386-linux-tdep.c	2009-09-21 08:57:03.000000000 +0200
++++ gdb-7.0.1/gdb/i386-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -798,6 +798,9 @@ i386_linux_init_abi (struct gdbarch_info
+                                   i386_linux_get_syscall_number);
+ 
+   set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/ia64-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/ia64-linux-tdep.c	2009-07-02 19:25:55.000000000 +0200
++++ gdb-7.0.1/gdb/ia64-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -26,6 +26,7 @@
+ #include "osabi.h"
+ #include "solib-svr4.h"
+ #include "symtab.h"
++#include "linux-tdep.h"
+ 
+ /* The sigtramp code is in a non-readable (executable-only) region
+    of memory called the ``gate page''.  The addresses in question
+@@ -139,6 +140,9 @@ ia64_linux_init_abi (struct gdbarch_info
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/infcall.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/infcall.c	2010-01-21 20:45:21.000000000 +0100
++++ gdb-7.0.1/gdb/infcall.c	2010-01-21 20:45:32.000000000 +0100
+@@ -252,9 +252,17 @@ find_function_addr (struct value *functi
+       if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
+ 	  || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
+ 	{
+-	  funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
+-							&current_target);
+-	  value_type = TYPE_TARGET_TYPE (ftype);
++	  CORE_ADDR funaddr2;
++
++	  funaddr2 = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
++							 &current_target);
++
++	  /* If TYPE_GNU_IFUNC is currently not resolvable keep its type.  */
++	  if (funaddr2 != funaddr || !TYPE_GNU_IFUNC (ftype))
++	    {
++	      funaddr = funaddr2;
++	      value_type = TYPE_TARGET_TYPE (ftype);
++	    }
+ 	}
+     }
+   else if (code == TYPE_CODE_INT)
+Index: gdb-7.0.1/gdb/linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/linux-tdep.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/linux-tdep.c	2010-01-21 20:47:02.000000000 +0100
+@@ -20,6 +20,9 @@
+ #include "defs.h"
+ #include "gdbtypes.h"
+ #include "linux-tdep.h"
++#include "value.h"
 +#include "infcall.h"
++#include "target.h"
  
- /* We share this one with symtab.c, but it is not exported widely. */
+ /* This function is suitable for architectures that don't
+    extend/override the standard siginfo structure.  */
+@@ -134,3 +136,43 @@ linux_get_siginfo_type (struct gdbarch *
  
-@@ -1875,6 +1876,22 @@ minsym_found (int funfirstline, struct m
-   pc = gdbarch_convert_from_func_ptr_addr (gdbarch,
-                                            values.sals[0].pc,
-                                            &current_target);
+   return siginfo_type;
+ }
 +
-+  /* Call gnu-ifunc to resolve breakpoint at its returned function.  */
-+  if (MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc)
-+    {
-+      struct type *func_func_ptr;
-+      struct value *function;
++/* Call gnu-ifunc to resolve breakpoint at its returned function.  */
 +
-+      func_func_ptr = builtin_type (gdbarch)->builtin_func_func_ptr;
-+      function = value_from_pointer (func_func_ptr, pc);
++CORE_ADDR
++linux_convert_from_func_and_ptr (struct gdbarch *gdbarch, CORE_ADDR func_ptr,
++                                 CORE_ADDR pc)
++{
++  struct type *func_func_type = builtin_type (gdbarch)->builtin_func_func;
++  struct minimal_symbol *msymbol;
++  struct value *function, *address;
 +
-+      /* gnu-ifuncs have no arguments.  */
-+      function = call_function_by_hand (function, 0, NULL);
++  if (!target_has_execution)
++    return pc;
 +
-+      pc = value_as_address (function);
-+    }
++  msymbol = lookup_minimal_symbol_by_pc (func_ptr);
++  if (msymbol == NULL)
++    return pc;
++  if (MSYMBOL_TYPE (msymbol) != mst_text_gnu_ifunc)
++    return pc;
 +
-   if (pc != values.sals[0].pc)
-     values.sals[0] = find_pc_sect_line (pc, NULL, 0);
- 
-Index: gdb-7.0/gdb/minsyms.c
++  /* Not at the gnu-ifunc entry point?  */
++  if (SYMBOL_VALUE_ADDRESS (msymbol) != func_ptr)
++    return pc;
++
++  function = allocate_value (func_func_type);
++  set_value_address (function, pc);
++
++  /* gnu-ifuncs have no arguments.  FUNCTION is the code instruction address
++     while ADDRESS is a function descriptor.  */
++  address = call_function_by_hand (function, 0, NULL);
++
++  return value_as_address (address);
++}
++
++CORE_ADDR
++linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
++				  struct target_ops *targ)
++{
++  return linux_convert_from_func_and_ptr (gdbarch, addr, addr);
++}
+Index: gdb-7.0.1/gdb/linux-tdep.h
 ===================================================================
---- gdb-7.0.orig/gdb/minsyms.c	2009-11-25 10:24:47.000000000 +0100
-+++ gdb-7.0/gdb/minsyms.c	2009-11-25 10:24:56.000000000 +0100
+--- gdb-7.0.1.orig/gdb/linux-tdep.h	2009-02-06 23:59:00.000000000 +0100
++++ gdb-7.0.1/gdb/linux-tdep.h	2010-01-21 20:45:32.000000000 +0100
+@@ -22,4 +22,11 @@
+ 
+ struct type *linux_get_siginfo_type (struct gdbarch *);
+ 
++CORE_ADDR linux_convert_from_func_and_ptr (struct gdbarch *gdbarch,
++					   CORE_ADDR func_ptr, CORE_ADDR pc);
++
++CORE_ADDR linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					    CORE_ADDR addr,
++					    struct target_ops *targ);
++
+ #endif /* linux-tdep.h */
+Index: gdb-7.0.1/gdb/m32r-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/m32r-linux-tdep.c	2009-01-03 06:57:52.000000000 +0100
++++ gdb-7.0.1/gdb/m32r-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -30,6 +30,7 @@
+ #include "gdb_string.h"
+ 
+ #include "glibc-tdep.h"
++#include "linux-tdep.h"
+ #include "solib-svr4.h"
+ #include "symtab.h"
+ 
+@@ -422,6 +423,9 @@ m32r_linux_init_abi (struct gdbarch_info
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/minsyms.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/minsyms.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/minsyms.c	2010-01-21 20:45:32.000000000 +0100
 @@ -331,8 +331,9 @@ lookup_minimal_symbol_text (const char *
  	       msymbol = msymbol->hash_next)
  	    {
@@ -262,10 +518,54 @@ Index: gdb-7.0/gdb/minsyms.c
  	    && strcmp (SYMBOL_LINKAGE_NAME (msymbol),
  		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
  	  return SYMBOL_VALUE_ADDRESS (msymbol);
-Index: gdb-7.0/gdb/parse.c
+Index: gdb-7.0.1/gdb/mips-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/parse.c	2009-11-25 10:24:47.000000000 +0100
-+++ gdb-7.0/gdb/parse.c	2009-11-25 10:26:16.000000000 +0100
+--- gdb-7.0.1.orig/gdb/mips-linux-tdep.c	2009-07-02 19:25:55.000000000 +0200
++++ gdb-7.0.1/gdb/mips-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -38,6 +38,7 @@
+ #include "target-descriptions.h"
+ #include "mips-linux-tdep.h"
+ #include "glibc-tdep.h"
++#include "linux-tdep.h"
+ 
+ static struct target_so_ops mips_svr4_so_ops;
+ 
+@@ -1225,6 +1226,9 @@ mips_linux_init_abi (struct gdbarch_info
+ 	tdesc_numbered_register (feature, tdesc_data, MIPS_RESTART_REGNUM,
+ 				 "restart");
+     }
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/mn10300-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/mn10300-linux-tdep.c	2009-02-22 02:02:19.000000000 +0100
++++ gdb-7.0.1/gdb/mn10300-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -32,6 +32,7 @@
+ #include "frame.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include <stdlib.h>
+ 
+@@ -718,6 +719,9 @@ am33_linux_init_osabi (struct gdbarch_in
+ 
+   tramp_frame_prepend_unwinder (gdbarch, &am33_linux_sigframe);
+   tramp_frame_prepend_unwinder (gdbarch, &am33_linux_rt_sigframe);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/parse.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/parse.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/parse.c	2010-01-21 20:45:32.000000000 +0100
 @@ -517,6 +517,11 @@ write_exp_msymbol (struct minimal_symbol
  	write_exp_elt_type (objfile_type (objfile)->nodebug_text_symbol);
        break;
@@ -278,11 +578,45 @@ Index: gdb-7.0/gdb/parse.c
      case mst_data:
      case mst_file_data:
      case mst_bss:
-Index: gdb-7.0/gdb/solib-svr4.c
+Index: gdb-7.0.1/gdb/ppc-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/solib-svr4.c	2009-11-25 10:24:49.000000000 +0100
-+++ gdb-7.0/gdb/solib-svr4.c	2009-11-25 10:26:41.000000000 +0100
-@@ -1242,7 +1242,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR p
+--- gdb-7.0.1.orig/gdb/ppc-linux-tdep.c	2009-09-15 05:30:06.000000000 +0200
++++ gdb-7.0.1/gdb/ppc-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -48,6 +48,7 @@
+ #include "arch-utils.h"
+ #include "spu-tdep.h"
+ #include "xml-syscall.h"
++#include "linux-tdep.h"
+ 
+ #include "features/rs6000/powerpc-32l.c"
+ #include "features/rs6000/powerpc-altivec32l.c"
+@@ -672,8 +673,19 @@ ppc64_linux_convert_from_func_ptr_addr (
+       res = bfd_get_section_contents (s->bfd, s->the_bfd_section,
+ 				      &buf, addr - s->addr, 8);
+       if (res != 0)
+-	return extract_unsigned_integer (buf, 8, byte_order)
+-		- bfd_section_vma (s->bfd, s->the_bfd_section) + s->addr;
++	{
++	  CORE_ADDR pc, resolved;
++	  
++	  pc = extract_unsigned_integer (buf, 8, byte_order)
++	       - bfd_section_vma (s->bfd, s->the_bfd_section) + s->addr;
++
++	  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++	  if (resolved != pc)
++	    pc = ppc64_linux_convert_from_func_ptr_addr (gdbarch, resolved,
++							 targ);
++
++	  return pc;
++	}
+    }
+ 
+   return addr;
+Index: gdb-7.0.1/gdb/solib-svr4.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/solib-svr4.c	2010-01-21 20:45:23.000000000 +0100
++++ gdb-7.0.1/gdb/solib-svr4.c	2010-01-21 20:46:04.000000000 +0100
+@@ -1250,7 +1250,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR p
  {
    return ((pc >= interp_text_sect_low && pc < interp_text_sect_high)
  	  || (pc >= interp_plt_sect_low && pc < interp_plt_sect_high)
@@ -292,10 +626,54 @@ Index: gdb-7.0/gdb/solib-svr4.c
  }
  
  /* Given an executable's ABFD and target, compute the entry-point
-Index: gdb-7.0/gdb/symmisc.c
+Index: gdb-7.0.1/gdb/sparc-linux-tdep.c
 ===================================================================
---- gdb-7.0.orig/gdb/symmisc.c	2009-11-25 10:24:47.000000000 +0100
-+++ gdb-7.0/gdb/symmisc.c	2009-11-25 10:24:56.000000000 +0100
+--- gdb-7.0.1.orig/gdb/sparc-linux-tdep.c	2009-07-02 19:25:58.000000000 +0200
++++ gdb-7.0.1/gdb/sparc-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -32,6 +32,7 @@
+ #include "symtab.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include "sparc-tdep.h"
+ 
+@@ -279,6 +280,9 @@ sparc32_linux_init_abi (struct gdbarch_i
+   dwarf2_append_unwinders (gdbarch);
+ 
+   set_gdbarch_write_pc (gdbarch, sparc_linux_write_pc);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+Index: gdb-7.0.1/gdb/sparc64-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/sparc64-linux-tdep.c	2009-07-02 19:25:58.000000000 +0200
++++ gdb-7.0.1/gdb/sparc64-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -31,6 +31,7 @@
+ #include "symtab.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include "sparc64-tdep.h"
+ 
+@@ -244,6 +245,9 @@ sparc64_linux_init_abi (struct gdbarch_i
+   tdep->step_trap = sparc64_linux_step_trap;
+ 
+   set_gdbarch_write_pc (gdbarch, sparc64_linux_write_pc);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ 
+Index: gdb-7.0.1/gdb/symmisc.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/symmisc.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/symmisc.c	2010-01-21 20:45:32.000000000 +0100
 @@ -287,6 +287,9 @@ dump_msymbols (struct objfile *objfile, 
  	case mst_text:
  	  ms_type = 'T';
@@ -306,11 +684,11 @@ Index: gdb-7.0/gdb/symmisc.c
  	case mst_solib_trampoline:
  	  ms_type = 'S';
  	  break;
-Index: gdb-7.0/gdb/symtab.c
+Index: gdb-7.0.1/gdb/symtab.c
 ===================================================================
---- gdb-7.0.orig/gdb/symtab.c	2009-11-25 10:24:47.000000000 +0100
-+++ gdb-7.0/gdb/symtab.c	2009-11-25 10:24:56.000000000 +0100
-@@ -3155,7 +3155,7 @@ search_symbols (char *regexp, domain_enu
+--- gdb-7.0.1.orig/gdb/symtab.c	2010-01-21 20:45:22.000000000 +0100
++++ gdb-7.0.1/gdb/symtab.c	2010-01-21 20:45:32.000000000 +0100
+@@ -3160,7 +3160,7 @@ search_symbols (char *regexp, domain_enu
    {mst_file_data, mst_solib_trampoline, mst_abs, mst_unknown};
    static enum minimal_symbol_type types4[]
    =
@@ -319,10 +697,10 @@ Index: gdb-7.0/gdb/symtab.c
    enum minimal_symbol_type ourtype;
    enum minimal_symbol_type ourtype2;
    enum minimal_symbol_type ourtype3;
-Index: gdb-7.0/gdb/symtab.h
+Index: gdb-7.0.1/gdb/symtab.h
 ===================================================================
---- gdb-7.0.orig/gdb/symtab.h	2009-11-25 10:24:45.000000000 +0100
-+++ gdb-7.0/gdb/symtab.h	2009-11-25 10:24:56.000000000 +0100
+--- gdb-7.0.1.orig/gdb/symtab.h	2010-01-21 20:45:21.000000000 +0100
++++ gdb-7.0.1/gdb/symtab.h	2010-01-21 20:45:32.000000000 +0100
 @@ -275,6 +275,8 @@ enum minimal_symbol_type
  {
    mst_unknown = 0,		/* Unknown type, the default */
@@ -341,11 +719,11 @@ Index: gdb-7.0/gdb/symtab.h
  extern struct minimal_symbol
    *lookup_minimal_symbol_by_pc_section (CORE_ADDR, struct obj_section *);
  
-Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
+Index: gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc-lib.c	2009-11-25 10:24:56.000000000 +0100
-@@ -0,0 +1,45 @@
++++ gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc-lib.c	2010-01-21 20:45:32.000000000 +0100
+@@ -0,0 +1,54 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
 +   Copyright 2009 Free Software Foundation, Inc.
@@ -368,6 +746,12 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
 +typedef int (*final_t) (int arg);
 +
 +static int
++init_stub (int arg)
++{
++  return 0;
++}
++
++static int
 +final (int arg)
 +{
 +  return arg + 1;
@@ -379,6 +763,8 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
 +gnu_ifunc_pre (void)
 +{
 +  assert (!gnu_ifunc_initialized);
++
++  gnu_ifunc_initialized = 1;
 +}
 +
 +final_t gnu_ifuncX (void) asm ("gnu_ifunc");
@@ -387,14 +773,15 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
 +final_t
 +gnu_ifuncX (void)
 +{
-+  gnu_ifunc_initialized = 1;
-+
-+  return final;
++  if (!gnu_ifunc_initialized)
++    return init_stub;
++  else
++    return final;
 +}
-Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.c
+Index: gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.c	2009-11-25 10:24:56.000000000 +0100
++++ gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc.c	2010-01-21 20:45:32.000000000 +0100
 @@ -0,0 +1,36 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -432,11 +819,11 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.c
 +
 +  return 0;	/* break-at-exit */
 +}
-Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.exp
+Index: gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.exp	2009-11-25 10:24:56.000000000 +0100
-@@ -0,0 +1,72 @@
++++ gdb-7.0.1/gdb/testsuite/gdb.base/gnu-ifunc.exp	2010-01-21 20:45:32.000000000 +0100
+@@ -0,0 +1,115 @@
 +# Copyright (C) 2009 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -464,7 +851,14 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.exp
 +set libsrc ${libfile}.c
 +set lib_so ${objdir}/${subdir}/${libfile}.so
 +
++set lib_nodebug_so_base ${libfile}-nodebug.so
++set lib_nodebug_so ${objdir}/${subdir}/${lib_nodebug_so_base}
++
++# {debug} provides DWARF symbol gnu_ifuncX confusing the ELF symbol
++# gnu_ifunc during address->symbol resolution for printing the symbol.
++# Still we need it here for "step"ping into the function.
 +set lib_opts [list debug]
++set lib_nodebug_opts [list]
 +set exec_opts [list debug shlib=$lib_so]
 +
 +if [get_compiler_info ${binfile}] {
@@ -487,7 +881,8 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.exp
 +    return 1;
 +}
 +
-+gdb_breakpoint [gdb_get_line_number "break-at-nextcall"]
++# The "if" condition is artifical to test regression of a format patch.
++gdb_breakpoint "[gdb_get_line_number "break-at-nextcall"] if i && gnu_ifunc (i) != 42"
 +
 +gdb_breakpoint [gdb_get_line_number "break-at-call"]
 +gdb_continue_to_breakpoint "break-at-call" ".*break-at-call.*"
@@ -502,10 +897,67 @@ Index: gdb-7.0/gdb/testsuite/gdb.base/gnu-ifunc.exp
 +
 +# Test GDB will not break before the final chosen implementation.
 +
-+gdb_continue_to_breakpoint "break-at-nextcall" ".*break-at-nextcall.*"
++# Also test a format patch regression:
++# Continuing.
++# Error in testing breakpoint condition:
++# Attempt to take address of value not located in memory.
++# 
++# Breakpoint 2, main () at ./gdb.base/gnu-ifunc.c:33
++
++gdb_test "continue" "Continuing.\r\n\r\nBreakpoint .* (at|in) .*break-at-nextcall.*" \
++	 "continue to break-at-nextcall"
 +
 +gdb_breakpoint "gnu_ifunc"
 +
 +gdb_continue_to_breakpoint "nextcall gnu_ifunc"
 +
-+gdb_test "frame" "#0 +final \\(.*" "nextcall gnu_ifunc skipped"
++gdb_test "frame" "#0 +(0x\[0-9a-f\]+ in +)?final \\(.*" "nextcall gnu_ifunc skipped"
++
++
++# Compare the two different addresses:
++
++gdb_test "p gnu_ifunc" " = {<text variable, no debug info>} 0x\[0-9a-f\]+ <final>" "p gnu_ifunc executing"
++gdb_test "info sym gnu_ifunc" "final in section .*" "info sym gnu_ifunc executing"
++
++set test "info addr gnu_ifunc"
++gdb_test_multiple $test $test {
++    -re "Symbol \"gnu_ifunc\" is at (0x\[0-9a-f\]+) in .*$gdb_prompt $" {
++	pass $test
++    }
++}
++gdb_test "info sym $expect_out(1,string)" "gnu_ifunc in section .*" "info sym <gnu_ifunc-address>"
++
++# <*gnu_ifunc> would be an incorrect resolution from DW_AT_MIPS_linkage_name.
++# We do not use {debug} build option for this purpose.
++
++if { [gdb_compile_shlib ${srcdir}/${subdir}/$libsrc $lib_nodebug_so $lib_nodebug_opts] != ""} {
++    untested "Could not compile either $libsrc."
++    return -1
++}
++
++clean_restart $lib_nodebug_so_base
++
++gdb_test "p gnu_ifunc" " = {<text gnu-ifunc variable, no debug info>} 0x\[0-9a-f\]+ <gnu_ifunc>" "p gnu_ifunc not executing without debug"
++gdb_test "info sym gnu_ifunc" "gnu_ifunc in section .*" "info sym gnu_ifunc not executing without debug"
+Index: gdb-7.0.1/gdb/xtensa-linux-tdep.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/xtensa-linux-tdep.c	2009-02-22 02:02:20.000000000 +0100
++++ gdb-7.0.1/gdb/xtensa-linux-tdep.c	2010-01-21 20:45:32.000000000 +0100
+@@ -22,6 +22,7 @@
+ 
+ #include "solib-svr4.h"
+ #include "symtab.h"
++#include "linux-tdep.h"
+ 
+ /* OS specific initialization of gdbarch.  */
+ 
+@@ -30,6 +31,9 @@ xtensa_linux_init_abi (struct gdbarch_in
+ {
+   set_solib_svr4_fetch_link_map_offsets
+     (gdbarch, svr4_ilp32_fetch_link_map_offsets);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
