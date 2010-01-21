@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{dist}
+Release: 3%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -428,6 +428,9 @@ Patch411: gdb-solib-display.patch
 # Revert: Add -Wunused-function to compile flags.
 Patch412: gdb-unused-revert.patch
 
+# Revert FSF GDB gdbserver tracepoints as incomplete now.
+Patch413: gdb-gdbserver-tracepoint-revert.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -673,6 +676,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch408 -p1
 %patch411 -p1
 %patch412 -p1
+%patch413 -p1
 # Always verify its applicability.
 %patch393 -p1
 %patch335 -p1
@@ -998,6 +1002,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-3.fc13
+- Revert FSF GDB gdbserver tracepoints as incomplete now.
+
 * Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-2.fc13
 - archer-jankratochvil-fedora13 commit: 21e418c04290aa5d2e75543d31fe3fe5d70d6d41
 - [expr-cumulative] Fix "break expr if (cond)" regression.
