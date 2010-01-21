@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?_with_upstream:.upstream}%{dist}
+Release: 28%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1018,6 +1018,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-28.fc12
+- GNU IFUNCs compilation fixup for ppc*.
+
 * Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-27.fc12
 - Fix GNU IFUNCs - indirect functions - support (BZ 539590).
 
