@@ -32,11 +32,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.50.20100118
+Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{dist}
+Release: 1%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -322,9 +322,6 @@ Patch309: gdb-6.3-mapping-zero-inode-test.patch
 # Test a crash on `focus cmd', `focus prev' commands.
 Patch311: gdb-6.3-focus-cmd-prev-test.patch
 
-# Fix error on a sw watchpoint active at function epilogue (hit on s390x).
-Patch314: gdb-watchpoint-cond-gone.patch
-
 # Test various forms of threads tracking across exec() (BZ 442765).
 Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
 
@@ -403,9 +400,6 @@ Patch393: gdb-rhel5-gcc44.patch
 # Workaround RHEL-5 kernels for detaching SIGSTOPped processes (BZ 498595).
 Patch335: gdb-rhel5-compat.patch
 
-# Fix backward compatibility with G++ 4.1 namespaces "::".
-Patch395: gdb-empty-namespace.patch
-
 # Fix regression by python on ia64 due to stale current frame.
 Patch397: gdb-follow-child-stale-parent.patch
 
@@ -428,8 +422,11 @@ Patch407: gdb-lineno-makeup-test.patch
 # Test power7 ppc disassembly.
 Patch408: gdb-ppc-power7-test.patch
 
-# [patch] testsuite: Fix misplaced line numbers
-Patch410: gdb-testsuite-lineno.patch
+# Fix solib-display.exp crash
+Patch411: gdb-solib-display.patch
+
+# Revert: Add -Wunused-function to compile flags.
+Patch412: gdb-unused-revert.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -641,7 +638,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch304 -p1
 %patch309 -p1
 %patch311 -p1
-%patch314 -p1
 %patch315 -p1
 %patch317 -p1
 %patch318 -p1
@@ -665,7 +661,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch390 -p1
 %patch391 -p1
 %patch392 -p1
-%patch395 -p1
 %patch397 -p1
 %patch400 -p1
 %patch403 -p1
@@ -676,7 +671,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch406 -p1
 %patch407 -p1
 %patch408 -p1
-%patch410 -p1
+%patch411 -p1
+%patch412 -p1
 # Always verify its applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1002,6 +998,11 @@ fi
 %endif
 
 %changelog
+* Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-1.fc13
+- Upgrade to the FSF GDB snapshot: 7.0.50.20100121
+- archer-jankratochvil-fedora13 commit: ccde1530479cc966374351038057b9dda90aa251
+- [expr-cumulative] Archer branch is now included.
+
 * Tue Jan 19 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100118-2.fc13
 - Fix false PASS->FAIL of gdb.arch/i386-biarch-core.exp.
 
