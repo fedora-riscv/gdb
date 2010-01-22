@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{dist}
+Release: 4%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -45,6 +45,7 @@ Group: Development/Debuggers
 Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
+ExcludeArch: ia64
 
 # For our convenience
 %define gdb_src gdb-%{version}
@@ -431,6 +432,9 @@ Patch412: gdb-unused-revert.patch
 # Revert FSF GDB gdbserver tracepoints as incomplete now.
 Patch413: gdb-gdbserver-tracepoint-revert.patch
 
+# It may crash here but it is not understood why.
+Patch414: gdb-archer-pie-assert-temp-workaround.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -459,6 +463,7 @@ BuildRequires: libstdc++%{?_isa}
 # Ensure the devel libraries are installed for both multilib arches.
 %define bits_local %{?_isa}
 %define bits_other %{?_isa}
+%if 0%{!?el5:1}
 %ifarch s390x
 %define bits_other (%{__isa_name}-31)
 %else #!s390x
@@ -470,6 +475,7 @@ BuildRequires: libstdc++%{?_isa}
 %endif #sparc64 ppc64 s390x x86_64
 %endif #!ppc
 %endif #!s390x
+%endif #!el5
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
@@ -497,14 +503,17 @@ BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 BuildRequires: libgcj%{bits_local} libgcj%{bits_other}
+%if 0%{!?el5:1}
 BuildRequires: glibc-static%{bits_local}
-# multilib glibc-static is open Bug 488472:
-%if 0%{?el5:1}
-BuildRequires: glibc-static%{bits_other}
 %endif
+# multilib glibc-static is open Bug 488472:
+#BuildRequires: glibc-static%{bits_other}
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
+# Copied from valgrind-3.5.0-1.
+%ifarch %{ix86} x86_64 ppc ppc64
 BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
+%endif
 
 %endif # 0%{?_with_testsuite:1}
 
@@ -678,6 +687,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch412 -p1
 %patch413 -p1
 # Always verify its applicability.
+%patch414 -p1
+%if 0%{!?rhel:1}
+%patch414 -p1 -R
+%endif
 %patch393 -p1
 %patch335 -p1
 %if 0%{!?el5:1}
@@ -1002,6 +1015,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-4.fc13
+- Adjust BuildRequires for RHELs, add ExcludeArch on ia64.
+- Disable one PIE-introduced assertion on RHELs.
+
 * Thu Jan 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-3.fc13
 - Revert FSF GDB gdbserver tracepoints as incomplete now.
 
