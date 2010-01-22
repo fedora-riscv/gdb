@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{dist}
+Release: 5%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -345,6 +345,8 @@ Patch324: gdb-6.8-glibc-headers-compat.patch
 Patch326: gdb-6.8-tui-singlebinary.patch
 
 # Support transparent debugging of inlined functions for an optimized code.
+# Disable break-by-name on inlined functions due to a regression on parameters
+# of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
 Patch350: gdb-6.8-inlining-addon.patch
 Patch328: gdb-6.8-inlining-by-name.patch
 
@@ -658,7 +660,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch324 -p1
 %patch326 -p1
 %patch350 -p1
-%patch328 -p1
+###patch328 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
@@ -1015,6 +1017,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-5.fc13
+- Disable break-by-name on inlined functions due to a regression on parameters
+  of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
+
 * Fri Jan 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-4.fc13
 - Adjust BuildRequires for RHELs, add ExcludeArch on ia64.
 - Disable one PIE-introduced assertion on RHELs.
