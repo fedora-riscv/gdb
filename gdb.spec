@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{dist}
+Release: 7%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1018,6 +1018,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-7.fc13
+- Update gdb.arch/powerpc-power7.exp for current binutils HEAD.
+
 * Fri Jan 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-6.fc13
 - Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
 - Fix gdb.arch/powerpc-power7.exp compatibility.
