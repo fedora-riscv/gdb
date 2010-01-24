@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{dist}
+Release: 8%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -242,7 +242,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -572,7 +572,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch124 -p1
 %patch1 -p1
@@ -1018,6 +1018,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-8.fc13
+- testsuite: Fix gdb.arch/i386-bp_permanent.exp regression
+
 * Sun Jan 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-7.fc13
 - Update gdb.arch/powerpc-power7.exp for current binutils HEAD.
 
