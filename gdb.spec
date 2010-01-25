@@ -36,7 +36,7 @@ Version: 7.0.50.20100121
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{dist}
+Release: 9%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -287,6 +287,7 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 Patch274: gdb-6.6-buildid-locate.patch
 Patch353: gdb-6.6-buildid-locate-rpm.patch
+Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 Patch282: gdb-6.7-charsign-test.patch
@@ -641,6 +642,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch271 -p1
 %patch274 -p1
 %patch353 -p1
+%patch415 -p1
 %patch282 -p1
 %patch284 -p1
 %patch287 -p1
@@ -1018,6 +1020,9 @@ fi
 %endif
 
 %changelog
+* Mon Jan 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-9.fc13
+- Enable loading a core file just as a single argument to /usr/bin/gdb.
+
 * Sun Jan 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-8.fc13
 - testsuite: Fix gdb.arch/i386-bp_permanent.exp regression
 
