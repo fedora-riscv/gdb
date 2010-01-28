@@ -32,11 +32,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.50.20100121
+Version: 7.0.50.20100128
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{dist}
+Release: 10%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -242,7 +242,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -386,9 +386,6 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 Patch382: gdb-core-open-vdso-warning.patch
 
-# Support GNU IFUNCs - indirect functions (BZ 539590).
-Patch387: gdb-bz539590-gnu-ifunc.patch
-
 # Fix callback-mode readline-6.0 regression for CTRL-C.
 Patch390: gdb-readline-6.0-signal.patch
 
@@ -427,14 +424,8 @@ Patch407: gdb-lineno-makeup-test.patch
 # Test power7 ppc disassembly.
 Patch408: gdb-ppc-power7-test.patch
 
-# Fix solib-display.exp crash
-Patch411: gdb-solib-display.patch
-
 # Revert: Add -Wunused-function to compile flags.
 Patch412: gdb-unused-revert.patch
-
-# Revert FSF GDB gdbserver tracepoints as incomplete now.
-Patch413: gdb-gdbserver-tracepoint-revert.patch
 
 # It may crash here but it is not understood why.
 Patch414: gdb-archer-pie-assert-temp-workaround.patch
@@ -573,7 +564,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch124 -p1
 %patch1 -p1
@@ -642,7 +633,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch271 -p1
 %patch274 -p1
 %patch353 -p1
-%patch415 -p1
 %patch282 -p1
 %patch284 -p1
 %patch287 -p1
@@ -674,7 +664,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch381 -p1
 %patch382 -p1
-%patch387 -p1
 %patch390 -p1
 %patch391 -p1
 %patch392 -p1
@@ -688,16 +677,20 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch406 -p1
 %patch407 -p1
 %patch408 -p1
-%patch411 -p1
 %patch412 -p1
-%patch413 -p1
-# Always verify its applicability.
 %patch414 -p1
-%if 0%{!?rhel:1}
-%patch414 -p1 -R
-%endif
+%patch415 -p1
 %patch393 -p1
 %patch335 -p1
+# Patch414: gdb-archer-pie-assert-temp-workaround.patch
+# It may crash here but it is not understood why.
+# Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
+# Currently disabled for RHEL as it is a new experimental feature not present
+# in FSF GDB and possibly affecting new user scripts.
+%if 0%{!?rhel:1}
+%patch414 -p1 -R
+%patch415 -p1 -R
+%endif
 %if 0%{!?el5:1}
 %patch393 -p1 -R
 %patch335 -p1 -R
@@ -1020,6 +1013,14 @@ fi
 %endif
 
 %changelog
+* Thu Jan 28 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-10.fc13
+- Upgrade to the FSF GDB snapshot: 7.0.50.20100128
+- archer-jankratochvil-fedora13 commit: 39c5a8b75fad3acd7204903db5dee025055a4594
+  - Fix a regression on "AAA::ALPHA" test due to a merge from FSF GDB.
+- Fix a regression of previous release due to false identification as core file.
+- Move ifunc .patch into the GIT-managed archer-jankratochvil-fedora13 branch.
+- Update gdb.pie/corefile.exp from 2007-01-26 FSF GDB commit by Andreas Schwab.
+
 * Mon Jan 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100121-9.fc13
 - Enable loading a core file just as a single argument to /usr/bin/gdb.
 

@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 21e418c04290aa5d2e75543d31fe3fe5d70d6d41
+commit 39c5a8b75fad3acd7204903db5dee025055a4594
 
 branch `archer' - the merge of branches:
 archer-tromey-delayed-symfile
@@ -12,6 +12,7 @@ archer-jankratochvil-fortran-module
 archer-jankratochvil-watchpoint
 archer-jankratochvil-vla
 archer-keiths-expr-cumulative
+archer-jankratochvil-ifunc
 
 
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
@@ -257,6 +258,28 @@ index 40b70ab..b291d40 100644
    ada_op_name,
    ada_dump_subexp_body,
    ada_evaluate_subexp
+diff --git a/gdb/alpha-linux-tdep.c b/gdb/alpha-linux-tdep.c
+index 3c71f2f..bbfe5a1 100644
+--- a/gdb/alpha-linux-tdep.c
++++ b/gdb/alpha-linux-tdep.c
+@@ -26,6 +26,7 @@
+ #include "symtab.h"
+ #include "regset.h"
+ #include "regcache.h"
++#include "linux-tdep.h"
+ 
+ #include "alpha-tdep.h"
+ 
+@@ -236,6 +237,9 @@ alpha_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+ 
+   set_gdbarch_regset_from_core_section
+     (gdbarch, alpha_linux_regset_from_core_section);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/amd64-linux-nat.c b/gdb/amd64-linux-nat.c
 index 5c9e558..55a1873 100644
 --- a/gdb/amd64-linux-nat.c
@@ -290,6 +313,34 @@ index 5c9e558..55a1873 100644
    i386_set_debug_register_length (8);
  
    /* Override the GNU/Linux inferior startup hook.  */
+diff --git a/gdb/amd64-linux-tdep.c b/gdb/amd64-linux-tdep.c
+index 01cc1ce..2a0fa84 100644
+--- a/gdb/amd64-linux-tdep.c
++++ b/gdb/amd64-linux-tdep.c
+@@ -1481,6 +1481,9 @@ amd64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   amd64_linux_record_tdep.arg6 = AMD64_R9_REGNUM;
+ 
+   tdep->i386_syscall_record = amd64_linux_syscall_record;
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ 
+diff --git a/gdb/arm-linux-tdep.c b/gdb/arm-linux-tdep.c
+index 661a5bd..dc91ab1 100644
+--- a/gdb/arm-linux-tdep.c
++++ b/gdb/arm-linux-tdep.c
+@@ -907,6 +907,9 @@ arm_linux_init_abi (struct gdbarch_info info,
+   set_gdbarch_displaced_step_free_closure (gdbarch,
+ 					   simple_displaced_step_free_closure);
+   set_gdbarch_displaced_step_location (gdbarch, displaced_step_at_entry_point);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/ax-gdb.c b/gdb/ax-gdb.c
 index 5776bb0..6099e99 100644
 --- a/gdb/ax-gdb.c
@@ -381,7 +432,7 @@ index 7eedb6c..b147826 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index d404ee7..2be397f 100644
+index 0d55862..9258c6a 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -61,6 +61,7 @@
@@ -671,7 +722,7 @@ index d404ee7..2be397f 100644
  	    /* We do not stop for these.  */
  	    bs->stop = 0;
  	  else
-@@ -3827,6 +3902,7 @@ bpstat_what (bpstat bs)
+@@ -3826,6 +3901,7 @@ bpstat_what (bpstat bs)
    struct bpstat_what retval;
  
    retval.call_dummy = 0;
@@ -679,7 +730,7 @@ index d404ee7..2be397f 100644
    for (; bs != NULL; bs = bs->next)
      {
        enum class bs_class = no_effect;
-@@ -3873,10 +3949,15 @@ bpstat_what (bpstat bs)
+@@ -3872,10 +3948,15 @@ bpstat_what (bpstat bs)
  	    bs_class = no_effect;
  	  break;
  	case bp_longjmp:
@@ -695,7 +746,7 @@ index d404ee7..2be397f 100644
  	  break;
  	case bp_step_resume:
  	  if (bs->stop)
-@@ -3899,6 +3980,7 @@ bpstat_what (bpstat bs)
+@@ -3898,6 +3979,7 @@ bpstat_what (bpstat bs)
  	case bp_thread_event:
  	case bp_overlay_event:
  	case bp_longjmp_master:
@@ -703,7 +754,7 @@ index d404ee7..2be397f 100644
  	  bs_class = bp_nostop;
  	  break;
  	case bp_catchpoint:
-@@ -4043,6 +4125,8 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4042,6 +4124,8 @@ print_one_breakpoint_location (struct breakpoint *b,
      {bp_access_watchpoint, "acc watchpoint"},
      {bp_longjmp, "longjmp"},
      {bp_longjmp_resume, "longjmp resume"},
@@ -712,7 +763,7 @@ index d404ee7..2be397f 100644
      {bp_step_resume, "step resume"},
      {bp_watchpoint_scope, "watchpoint scope"},
      {bp_call_dummy, "call dummy"},
-@@ -4050,6 +4134,7 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4049,6 +4133,7 @@ print_one_breakpoint_location (struct breakpoint *b,
      {bp_thread_event, "thread events"},
      {bp_overlay_event, "overlay events"},
      {bp_longjmp_master, "longjmp master"},
@@ -720,7 +771,7 @@ index d404ee7..2be397f 100644
      {bp_catchpoint, "catchpoint"},
      {bp_tracepoint, "tracepoint"},
      {bp_fast_tracepoint, "fast tracepoint"},
-@@ -4174,6 +4259,8 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4173,6 +4258,8 @@ print_one_breakpoint_location (struct breakpoint *b,
        case bp_finish:
        case bp_longjmp:
        case bp_longjmp_resume:
@@ -729,7 +780,7 @@ index d404ee7..2be397f 100644
        case bp_step_resume:
        case bp_watchpoint_scope:
        case bp_call_dummy:
-@@ -4181,6 +4268,7 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4180,6 +4267,7 @@ print_one_breakpoint_location (struct breakpoint *b,
        case bp_thread_event:
        case bp_overlay_event:
        case bp_longjmp_master:
@@ -737,7 +788,7 @@ index d404ee7..2be397f 100644
        case bp_tracepoint:
        case bp_fast_tracepoint:
        case bp_jit_event:
-@@ -4819,6 +4907,8 @@ allocate_bp_location (struct breakpoint *bpt)
+@@ -4818,6 +4906,8 @@ allocate_bp_location (struct breakpoint *bpt)
      case bp_finish:
      case bp_longjmp:
      case bp_longjmp_resume:
@@ -746,7 +797,7 @@ index d404ee7..2be397f 100644
      case bp_step_resume:
      case bp_watchpoint_scope:
      case bp_call_dummy:
-@@ -4827,6 +4917,7 @@ allocate_bp_location (struct breakpoint *bpt)
+@@ -4826,6 +4916,7 @@ allocate_bp_location (struct breakpoint *bpt)
      case bp_overlay_event:
      case bp_jit_event:
      case bp_longjmp_master:
@@ -754,7 +805,7 @@ index d404ee7..2be397f 100644
        loc->loc_type = bp_loc_software_breakpoint;
        break;
      case bp_hardware_breakpoint:
-@@ -5013,8 +5104,7 @@ make_breakpoint_permanent (struct breakpoint *b)
+@@ -5012,8 +5103,7 @@ make_breakpoint_permanent (struct breakpoint *b)
  }
  
  /* Call this routine when stepping and nexting to enable a breakpoint
@@ -764,7 +815,7 @@ index d404ee7..2be397f 100644
  
  void
  set_longjmp_breakpoint (int thread)
-@@ -5027,10 +5117,11 @@ set_longjmp_breakpoint (int thread)
+@@ -5026,10 +5116,11 @@ set_longjmp_breakpoint (int thread)
       clones of those and enable them for the requested thread.  */
    ALL_BREAKPOINTS_SAFE (b, temp)
      if (b->pspace == current_program_space
@@ -778,7 +829,7 @@ index d404ee7..2be397f 100644
  	clone->thread = thread;
        }
  }
-@@ -5042,7 +5133,7 @@ delete_longjmp_breakpoint (int thread)
+@@ -5041,7 +5132,7 @@ delete_longjmp_breakpoint (int thread)
    struct breakpoint *b, *temp;
  
    ALL_BREAKPOINTS_SAFE (b, temp)
@@ -787,7 +838,7 @@ index d404ee7..2be397f 100644
        {
  	if (b->thread == thread)
  	  delete_breakpoint (b);
-@@ -6117,6 +6208,8 @@ mention (struct breakpoint *b)
+@@ -6116,6 +6207,8 @@ mention (struct breakpoint *b)
        case bp_finish:
        case bp_longjmp:
        case bp_longjmp_resume:
@@ -796,7 +847,7 @@ index d404ee7..2be397f 100644
        case bp_step_resume:
        case bp_call_dummy:
        case bp_watchpoint_scope:
-@@ -6125,6 +6218,7 @@ mention (struct breakpoint *b)
+@@ -6124,6 +6217,7 @@ mention (struct breakpoint *b)
        case bp_overlay_event:
        case bp_jit_event:
        case bp_longjmp_master:
@@ -804,7 +855,7 @@ index d404ee7..2be397f 100644
  	break;
        }
  
-@@ -7509,6 +7603,7 @@ struct until_break_command_continuation_args
+@@ -7508,6 +7602,7 @@ struct until_break_command_continuation_args
  {
    struct breakpoint *breakpoint;
    struct breakpoint *breakpoint2;
@@ -812,7 +863,7 @@ index d404ee7..2be397f 100644
  };
  
  /* This function is called by fetch_inferior_event via the
-@@ -7523,6 +7618,7 @@ until_break_command_continuation (void *arg)
+@@ -7522,6 +7617,7 @@ until_break_command_continuation (void *arg)
    delete_breakpoint (a->breakpoint);
    if (a->breakpoint2)
      delete_breakpoint (a->breakpoint2);
@@ -820,7 +871,7 @@ index d404ee7..2be397f 100644
  }
  
  void
-@@ -7534,6 +7630,8 @@ until_break_command (char *arg, int from_tty, int anywhere)
+@@ -7533,6 +7629,8 @@ until_break_command (char *arg, int from_tty, int anywhere)
    struct breakpoint *breakpoint;
    struct breakpoint *breakpoint2 = NULL;
    struct cleanup *old_chain;
@@ -829,7 +880,7 @@ index d404ee7..2be397f 100644
  
    clear_proceed_status ();
  
-@@ -7572,6 +7670,9 @@ until_break_command (char *arg, int from_tty, int anywhere)
+@@ -7571,6 +7669,9 @@ until_break_command (char *arg, int from_tty, int anywhere)
  
    old_chain = make_cleanup_delete_breakpoint (breakpoint);
  
@@ -839,7 +890,7 @@ index d404ee7..2be397f 100644
    /* Keep within the current frame, or in frames called by the current
       one.  */
  
-@@ -7584,6 +7685,10 @@ until_break_command (char *arg, int from_tty, int anywhere)
+@@ -7583,6 +7684,10 @@ until_break_command (char *arg, int from_tty, int anywhere)
  					      frame_unwind_caller_id (frame),
  					      bp_until);
        make_cleanup_delete_breakpoint (breakpoint2);
@@ -850,7 +901,7 @@ index d404ee7..2be397f 100644
      }
  
    proceed (-1, TARGET_SIGNAL_DEFAULT, 0);
-@@ -7600,6 +7705,7 @@ until_break_command (char *arg, int from_tty, int anywhere)
+@@ -7599,6 +7704,7 @@ until_break_command (char *arg, int from_tty, int anywhere)
  
        args->breakpoint = breakpoint;
        args->breakpoint2 = breakpoint2;
@@ -858,7 +909,7 @@ index d404ee7..2be397f 100644
  
        discard_cleanups (old_chain);
        add_continuation (inferior_thread (),
-@@ -8785,6 +8891,7 @@ delete_command (char *arg, int from_tty)
+@@ -8784,6 +8890,7 @@ delete_command (char *arg, int from_tty)
  	    && b->type != bp_thread_event
  	    && b->type != bp_overlay_event
  	    && b->type != bp_longjmp_master
@@ -866,7 +917,7 @@ index d404ee7..2be397f 100644
  	    && b->number >= 0)
  	  {
  	    breaks_to_delete = 1;
-@@ -8804,6 +8911,7 @@ delete_command (char *arg, int from_tty)
+@@ -8803,6 +8910,7 @@ delete_command (char *arg, int from_tty)
  		&& b->type != bp_jit_event
  		&& b->type != bp_overlay_event
  		&& b->type != bp_longjmp_master
@@ -874,7 +925,7 @@ index d404ee7..2be397f 100644
  		&& b->number >= 0)
  	      delete_breakpoint (b);
  	  }
-@@ -9114,6 +9222,7 @@ breakpoint_re_set_one (void *bint)
+@@ -9113,6 +9221,7 @@ breakpoint_re_set_one (void *bint)
  	 reset later by breakpoint_re_set.  */
      case bp_overlay_event:
      case bp_longjmp_master:
@@ -882,7 +933,7 @@ index d404ee7..2be397f 100644
        delete_breakpoint (b);
        break;
  
-@@ -9136,6 +9245,8 @@ breakpoint_re_set_one (void *bint)
+@@ -9135,6 +9244,8 @@ breakpoint_re_set_one (void *bint)
      case bp_step_resume:
      case bp_longjmp:
      case bp_longjmp_resume:
@@ -891,7 +942,7 @@ index d404ee7..2be397f 100644
      case bp_jit_event:
        break;
      }
-@@ -9178,6 +9289,7 @@ breakpoint_re_set (void)
+@@ -9177,6 +9288,7 @@ breakpoint_re_set (void)
    create_longjmp_master_breakpoint ("_longjmp");
    create_longjmp_master_breakpoint ("siglongjmp");
    create_longjmp_master_breakpoint ("_siglongjmp");
@@ -899,7 +950,7 @@ index d404ee7..2be397f 100644
  }
  
  /* Reset the thread number of this breakpoint:
-@@ -10173,6 +10285,22 @@ all_tracepoints ()
+@@ -10172,6 +10284,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -922,7 +973,7 @@ index d404ee7..2be397f 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -10717,4 +10845,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -10716,4 +10844,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
@@ -978,7 +1029,7 @@ index 6b373a3..59aa412 100644
  extern struct breakpoint *get_tracepoint (int num);
  
 diff --git a/gdb/c-exp.y b/gdb/c-exp.y
-index 8e00979..92efb39 100644
+index 8e00979..b86fc8e 100644
 --- a/gdb/c-exp.y
 +++ b/gdb/c-exp.y
 @@ -418,6 +418,24 @@ exp     :       exp '(' nonempty_typelist ')' const_or_volatile
@@ -1021,7 +1072,22 @@ index 8e00979..92efb39 100644
  			  sym =
  			    lookup_symbol (name, (const struct block *) NULL,
  					   VAR_DOMAIN, (int *) NULL);
-@@ -2033,6 +2052,13 @@ static int last_was_structop;
+@@ -1298,6 +1317,14 @@ name_not_typename :	NAME
+    context where only a name could occur, this might be useful.
+   	|	NAME_OR_INT
+  */
++	|	operator
++			{
++			  $$.stoken = $1;
++			  $$.sym = lookup_symbol ($1.ptr,
++						  expression_context_block,
++						  VAR_DOMAIN,
++						  &$$.is_a_field_of_this);
++			}
+ 	;
+ 
+ %%
+@@ -2033,6 +2060,13 @@ static int last_was_structop;
  static int
  yylex (void)
  {
@@ -1035,7 +1101,7 @@ index 8e00979..92efb39 100644
    int c;
    int namelen;
    unsigned int i;
-@@ -2041,9 +2067,19 @@ yylex (void)
+@@ -2041,9 +2075,19 @@ yylex (void)
    char *copy;
  
    last_was_structop = 0;
@@ -1057,7 +1123,7 @@ index 8e00979..92efb39 100644
    /* Check if this is a macro invocation that we need to expand.  */
    if (! scanning_macro_expansion ())
      {
-@@ -2079,10 +2115,19 @@ yylex (void)
+@@ -2079,10 +2123,19 @@ yylex (void)
  	    && parse_language->la_language != language_cplus)
  	  break;
  
@@ -1077,7 +1143,7 @@ index 8e00979..92efb39 100644
  	return tokentab2[i].token;
        }
  
-@@ -2111,6 +2156,8 @@ yylex (void)
+@@ -2111,6 +2164,8 @@ yylex (void)
          return 0;
  
      case ' ':
@@ -1086,7 +1152,7 @@ index 8e00979..92efb39 100644
      case '\t':
      case '\n':
        lexptr++;
-@@ -2268,11 +2315,13 @@ yylex (void)
+@@ -2268,11 +2323,13 @@ yylex (void)
      error ("Invalid character '%c' in expression.", c);
  
    /* It's a name.  See how long it is.  */
@@ -1100,7 +1166,7 @@ index 8e00979..92efb39 100644
        /* Template parameter lists are part of the name.
  	 FIXME: This mishandles `print $a<4&&$a>3'.  */
  
-@@ -2357,14 +2406,29 @@ yylex (void)
+@@ -2357,14 +2414,29 @@ yylex (void)
       currently as names of types; NAME for other symbols.
       The caller is not constrained to care about the distinction.  */
    {
@@ -1131,7 +1197,7 @@ index 8e00979..92efb39 100644
      /* Call lookup_symtab, not lookup_partial_symtab, in case there are
         no psymtabs (coff, xcoff, or some future change to blow away the
         psymtabs once once symbols are read).  */
-@@ -2423,6 +2487,7 @@ yylex (void)
+@@ -2423,6 +2495,7 @@ yylex (void)
      yylval.ssym.is_a_field_of_this = is_a_field_of_this;
      if (in_parse_field && *lexptr == '\0')
        saw_name_at_eof = 1;
@@ -1299,7 +1365,7 @@ index ebde876..907b275 100644
  #undef RELOC_SRCDIR
  
 diff --git a/gdb/configure b/gdb/configure
-index 4980106..be69488 100755
+index d444b08..d4ced89 100755
 --- a/gdb/configure
 +++ b/gdb/configure
 @@ -676,6 +676,8 @@ REPORT_BUGS_TO
@@ -1414,7 +1480,7 @@ index 4980106..be69488 100755
  
    # Flags needed to compile Python code (taken from python-config --cflags).
 diff --git a/gdb/configure.ac b/gdb/configure.ac
-index a756a2d..b44e21d 100644
+index 8da6867..8e39254 100644
 --- a/gdb/configure.ac
 +++ b/gdb/configure.ac
 @@ -108,6 +108,51 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
@@ -1492,7 +1558,7 @@ index 81f6a5d..097db65 100644
  			{ $$ = $1.comp;
  			  if ($2) $$ = fill_comp (DEMANGLE_COMPONENT_LOCAL_NAME, $$, $2); }
 diff --git a/gdb/cp-namespace.c b/gdb/cp-namespace.c
-index 04b665b..21e013a 100644
+index 8ca9c20..21e013a 100644
 --- a/gdb/cp-namespace.c
 +++ b/gdb/cp-namespace.c
 @@ -34,14 +34,17 @@
@@ -1556,7 +1622,7 @@ index 04b665b..21e013a 100644
     Set its next member in the linked list to NEXT; allocate all memory
     using xmalloc.  It copies the strings, so NAME can be a temporary
     string.  */
-@@ -207,14 +215,21 @@ cp_is_anonymous (const char *namespace)
+@@ -207,13 +215,19 @@ cp_is_anonymous (const char *namespace)
  struct using_direct *
  cp_add_using (const char *dest,
                const char *src,
@@ -1576,11 +1642,9 @@ index 04b665b..21e013a 100644
 +  retval->declaration = savestring (declaration, strlen (declaration));
 +  retval->line_number = line_number;
    retval->next = next;
-+  retval->searched = 0;
+   retval->searched = 0;
  
-   return retval;
- }
-@@ -229,12 +244,48 @@ cp_add_using (const char *dest,
+@@ -230,19 +244,100 @@ cp_add_using (const char *dest,
  
  struct symbol *
  cp_lookup_symbol_nonlocal (const char *name,
@@ -1588,15 +1652,17 @@ index 04b665b..21e013a 100644
  			   const struct block *block,
  			   const domain_enum domain)
  {
--  return lookup_namespace_scope (name, linkage_name, block, domain,
--				 block_scope (block), 0);
+-  struct symbol *sym;
 +  struct symbol *sym; 
-+  const char *scope = block_scope (block);
-+
+   const char *scope = block_scope (block);
+ 
+-  sym = lookup_namespace_scope (name, linkage_name, block, domain, scope, 0);
 +  sym = lookup_namespace_scope (name, block, domain, scope, 0);
-+  if (sym != NULL)
-+    return sym;
-+
+   if (sym != NULL)
+     return sym;
+ 
+-  return cp_lookup_symbol_namespace (scope, name, linkage_name, block, domain,
+-                                     1);
 +  return cp_lookup_symbol_namespace(scope, name, block, domain);
 +}
 +
@@ -1629,78 +1695,101 @@ index 04b665b..21e013a 100644
 +    }
 +
 +  return NULL;
- }
- 
- /* Lookup NAME at namespace scope (or, in C terms, in static and
-@@ -252,9 +303,8 @@ cp_lookup_symbol_nonlocal (const char *name,
-    "A::x", and if that call fails, then the first call looks for
-    "x".  */
- 
--static struct symbol *
++}
++
++/* Lookup NAME at namespace scope (or, in C terms, in static and
++   global variables).  SCOPE is the namespace that the current
++   function is defined within; only consider namespaces whose length
++   is at least SCOPE_LEN.  Other arguments are as in
++   cp_lookup_symbol_nonlocal.
++
++   For example, if we're within a function A::B::f and looking for a
++   symbol x, this will get called with NAME = "x", SCOPE = "A::B", and
++   SCOPE_LEN = 0.  It then calls itself with NAME and SCOPE the same,
++   but with SCOPE_LEN = 1.  And then it calls itself with NAME and
++   SCOPE the same, but with SCOPE_LEN = 4.  This third call looks for
++   "A::B::x"; if it doesn't find it, then the second call looks for
++   "A::x", and if that call fails, then the first call looks for
++   "x".  */
++
 +struct symbol *
- lookup_namespace_scope (const char *name,
--			const char *linkage_name,
- 			const struct block *block,
- 			const domain_enum domain,
- 			const char *scope,
-@@ -276,8 +326,7 @@ lookup_namespace_scope (const char *name,
- 	  new_scope_len += 2;
- 	}
-       new_scope_len += cp_find_first_component (scope + new_scope_len);
--      sym = lookup_namespace_scope (name, linkage_name, block,
--				    domain, scope, new_scope_len);
++lookup_namespace_scope (const char *name,
++			const struct block *block,
++			const domain_enum domain,
++			const char *scope,
++			int scope_len)
++{
++  char *namespace;
++
++  if (scope[scope_len] != '\0')
++    {
++      /* Recursively search for names in child namespaces first.  */
++
++      struct symbol *sym;
++      int new_scope_len = scope_len;
++
++      /* If the current scope is followed by "::", skip past that.  */
++      if (new_scope_len != 0)
++	{
++	  gdb_assert (scope[new_scope_len] == ':');
++	  new_scope_len += 2;
++	}
++      new_scope_len += cp_find_first_component (scope + new_scope_len);
 +      sym = lookup_namespace_scope (name, block, domain, scope, new_scope_len);
-       if (sym != NULL)
- 	return sym;
-     }
-@@ -288,25 +337,98 @@ lookup_namespace_scope (const char *name,
-   namespace = alloca (scope_len + 1);
-   strncpy (namespace, scope, scope_len);
-   namespace[scope_len] = '\0';
--  return cp_lookup_symbol_namespace (namespace, name, linkage_name,
--				     block, domain);
++      if (sym != NULL)
++	return sym;
++    }
++
++  /* Okay, we didn't find a match in our children, so look for the
++     name in the current namespace.  */
++
++  namespace = alloca (scope_len + 1);
++  strncpy (namespace, scope, scope_len);
++  namespace[scope_len] = '\0';
 +  return cp_lookup_symbol_in_namespace (namespace, name,block, domain);
  }
  
--/* Look up NAME in the C++ namespace NAMESPACE, applying the using
--   directives that are active in BLOCK.  Other arguments are as in
-+/* Look up NAME in the C++ namespace NAMESPACE. Other arguments are as in
-    cp_lookup_symbol_nonlocal.  */
+ /* Look up NAME in the C++ namespace NAMESPACE. Other arguments are as in
+@@ -250,25 +345,24 @@ cp_lookup_symbol_nonlocal (const char *name,
  
-+static struct symbol *
-+cp_lookup_symbol_in_namespace (const char *namespace,
+ static struct symbol *
+ cp_lookup_symbol_in_namespace (const char *namespace,
+-                               const char *name,
+-                               const char *linkage_name,
+-                               const struct block *block,
+-                               const domain_enum domain)
 +			       const char *name,
 +			       const struct block *block,
 +			       const domain_enum domain)
-+{
+ {
 +
-+  if (namespace[0] == '\0')
-+    {
+   if (namespace[0] == '\0')
+     {
+-      return lookup_symbol_file (name, linkage_name, block,
+-                                 domain, 0);
 +      return lookup_symbol_file (name, block,domain, 0);
-+    }
-+  else
-+    {
+     }
+   else
+     {
+-      char *concatenated_name = alloca (strlen (namespace) + 2 +
+-                                        strlen (name+ 1));
 +      char *concatenated_name
 +	= alloca (strlen (namespace) + 2 + strlen (name) + 1);
-+      strcpy (concatenated_name, namespace);
-+      strcat (concatenated_name, "::");
-+      strcat (concatenated_name, name);
+       strcpy (concatenated_name, namespace);
+       strcat (concatenated_name, "::");
+       strcat (concatenated_name, name);
+-      return lookup_symbol_file (concatenated_name, linkage_name,
+-                                 block, domain,cp_is_anonymous (namespace));
 +      return lookup_symbol_file (concatenated_name, block, domain,
 +				cp_is_anonymous (namespace));
-+    }
-+}
-+
-+/* Used for cleanups to reset the "searched" flag incase
-+   of an error.  */
-+
-+static void
-+reset_directive_searched (void *data)
-+{
-+  struct using_direct *direct = data;
-+  direct->searched = 0;
-+}
-+
-+/* Search for NAME by applying all import statements belonging
+     }
+ }
+ 
+@@ -283,9 +377,17 @@ reset_directive_searched (void *data)
+ }
+ 
+ /* Search for NAME by applying all import statements belonging
+-   to BLOCK which are applicable in SCOPE.
 +   to BLOCK which are applicable in SCOPE. If DECLARATION_ONLY the search
 +   is restricted to using declarations.
 +   Example:
@@ -1710,68 +1799,71 @@ index 04b665b..21e013a 100644
 +     }
 +     using A::x;
 +
-+   If SEARCH_PARENTS the search will include imports which are applicable in
+    If SEARCH_PARENTS the search will include imports which are applicable in
+-   parents of SCOPE.
 +   parents of scopes.
-+   Example:
-+
-+     namespace A{
-+       using namespace X;
-+       namespace B{
-+         using namespace Y;
-+       }
-+     }
-+
-+   If SCOPE is "A::B" and SEARCH_PARENTS is true the imports of namespaces X
-+   and Y will be considered. If SEARCH_PARENTS is false only the import of Y
-+   is considered.  */
-+
- struct symbol *
--cp_lookup_symbol_namespace (const char *namespace,
--			    const char *name,
--			    const char *linkage_name,
--			    const struct block *block,
--			    const domain_enum domain)
-+cp_lookup_symbol_imports (const char *scope,
-+                          const char *name,
-+                          const struct block *block,
-+                          const domain_enum domain,
+    Example:
+ 
+      namespace A{
+@@ -299,26 +401,33 @@ reset_directive_searched (void *data)
+    and Y will be considered. If SEARCH_PARENTS is false only the import of Y
+    is considered.  */
+ 
+-static struct symbol *
++struct symbol *
+ cp_lookup_symbol_imports (const char *scope,
+                           const char *name,
+-                          const char *linkage_name,
+                           const struct block *block,
+                           const domain_enum domain,
+-                          const int search_parents)
 +                          int declaration_only,
 +                          int search_parents)
  {
--  const struct using_direct *current;
+   struct using_direct *current;
 -  struct symbol *sym;
-+  struct using_direct *current;
+-  int len;
 +  struct symbol *sym = NULL;
-+  int directive_match;
+   int directive_match;
 +  int current_line;
-+  struct cleanup *searched_cleanup;
-+
+   struct cleanup *searched_cleanup;
+ 
+-  /* First, try to find the symbol in the given namespace.  */
+-  sym = cp_lookup_symbol_in_namespace (scope, name, linkage_name, block,
+-                                       domain);
+-  if (sym != NULL)
 +  if(!declaration_only)
 +    /* First, try to find the symbol in the given namespace.  */
 +    sym = cp_lookup_symbol_in_namespace (scope, name, block, domain);
- 
--  /* First, go through the using directives.  If any of them add new
-+  if ( sym != NULL)
-+    return sym;
 +
++  if ( sym != NULL)
+     return sym;
+ 
 +  if (has_stack_frames ())
 +    current_line = find_pc_line (get_frame_pc (get_selected_frame (NULL)),
 +                                              0).line;
 +  else
 +    current_line = 0;
 +
-+  /* Go through the using directives.  If any of them add new
+   /* Go through the using directives.  If any of them add new
       names to the namespace we're searching in, see if we can find a
       match by applying them.  */
- 
-@@ -314,39 +436,78 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -327,123 +436,78 @@ cp_lookup_symbol_imports (const char *scope,
         current != NULL;
         current = current->next)
      {
--      if (strcmp (namespace, current->import_dest) == 0)
+-      len = strlen (current->import_dest);
+-      directive_match = (search_parents
+-                         ? (strncmp (scope, current->import_dest,
+-                                     strlen (current->import_dest)) == 0
+-                            && (len == 0
+-                                || scope[len] == ':' || scope[len] == '\0'))
+-                         : strcmp (scope, current->import_dest) == 0);
+-
 +  
-+      /* If the import destination is the current scope or one of its ancestors then
-+         it is applicable.  */
+       /* If the import destination is the current scope or one of its ancestors then
+          it is applicable.  */
+-      if (directive_match && !current->searched)
 +      directive_match = search_parents ?
 +                        strncmp (scope, current->import_dest,
 +                                 strlen(current->import_dest)) == 0 :
@@ -1781,11 +1873,82 @@ index 04b665b..21e013a 100644
 +          current->line_number < current_line &&
 +          !current->searched)
  	{
--	  sym = cp_lookup_symbol_namespace (current->import_src,
--					    name,
--					    linkage_name,
--					    block,
--					    domain);
+-	/* Mark this import as searched so that the recursive call does not
+-           search it again.  */
+-	current->searched = 1;
+-	searched_cleanup = make_cleanup (reset_directive_searched, current);
+-
+-	sym = cp_lookup_symbol_namespace (current->import_src,
+-	                                  name,
+-	                                  linkage_name,
+-	                                  block,
+-	                                  domain,
+-	                                  0);
+-
+-	current->searched = 0;
+-	discard_cleanups (searched_cleanup);
+-
+-	if (sym != NULL)
+-	  return sym;
+-	}
+-    }
+-
+-  return NULL;
+-}
+-
+- /* Searches for NAME in the current namespace, and by applying relevant import
+-    statements belonging to BLOCK and its parents. SCOPE is the namespace scope
+-    of the context in which the search is being evaluated.  */
+-
+-struct symbol*
+-cp_lookup_symbol_namespace (const char *scope,
+-                            const char *name,
+-                            const char *linkage_name,
+-                            const struct block *block,
+-                            const domain_enum domain,
+-                            const int search_parents)
+-{
+-  struct symbol *sym;
+-
+-  /* Search for name in namespaces imported to this and parent blocks.  */
+-  while (block != NULL)
+-    {
+-      sym = cp_lookup_symbol_imports (scope, name, linkage_name, block, domain,
+-                                      search_parents);
+-
+-      if (sym)
+-	return sym;
+-
+-      block = BLOCK_SUPERBLOCK (block);
+-    }
+-
+-  return NULL;
+-}
+-
+-/* Lookup NAME at namespace scope (or, in C terms, in static and
+-   global variables).  SCOPE is the namespace that the current
+-   function is defined within; only consider namespaces whose length
+-   is at least SCOPE_LEN.  Other arguments are as in
+-   cp_lookup_symbol_nonlocal.
+-
+-   For example, if we're within a function A::B::f and looking for a
+-   symbol x, this will get called with NAME = "x", SCOPE = "A::B", and
+-   SCOPE_LEN = 0.  It then calls itself with NAME and SCOPE the same,
+-   but with SCOPE_LEN = 1.  And then it calls itself with NAME and
+-   SCOPE the same, but with SCOPE_LEN = 4.  This third call looks for
+-   "A::B::x"; if it doesn't find it, then the second call looks for
+-   "A::x", and if that call fails, then the first call looks for
+-   "x".  */
+-
+-static struct symbol *
+-lookup_namespace_scope (const char *name,
+-			const char *linkage_name,
+-			const struct block *block,
+-			const domain_enum domain,
+-			const char *scope,
+-			int scope_len)
+-{
+-  char *namespace;
 +	  current->searched = 1;
 +	  searched_cleanup = make_cleanup (reset_directive_searched, current);
 +
@@ -1816,7 +1979,10 @@ index 04b665b..21e013a 100644
 +	    discard_cleanups (searched_cleanup);
 +	    continue;
 +	    }
-+
+ 
+-  if (scope[scope_len] != '\0')
+-    {
+-      /* Recursively search for names in child namespaces first.  */
 +	  if (strcmp (name, current->alias) == 0)
 +	    /* If the import is creating an alias and the alias matches the
 +	       sought name. Pass current->inner as the NAME to direct the
@@ -1836,41 +2002,40 @@ index 04b665b..21e013a 100644
 +	                                      0,
 +	                                      0);
 +	    }
-+
+ 
+-      struct symbol *sym;
+-      int new_scope_len = scope_len;
 +	  current->searched = 0;
 +	  discard_cleanups (searched_cleanup);
-+
- 	  if (sym != NULL)
- 	    return sym;
+ 
+-      /* If the current scope is followed by "::", skip past that.  */
+-      if (new_scope_len != 0)
+-	{
+-	  gdb_assert (scope[new_scope_len] == ':');
+-	  new_scope_len += 2;
++	  if (sym != NULL)
++	    return sym;
  	}
+-      new_scope_len += cp_find_first_component (scope + new_scope_len);
+-      sym = lookup_namespace_scope (name, linkage_name, block,
+-				    domain, scope, new_scope_len);
+-      if (sym != NULL)
+-	return sym;
      }
  
--  /* We didn't find anything by applying any of the using directives
--     that are still applicable; so let's see if we've got a match
--     using the current namespace.  */
--  
--  if (namespace[0] == '\0')
--    {
--      return lookup_symbol_file (name, linkage_name, block,
--				 domain, 0);
--    }
--  else
--    {
--      char *concatenated_name
--	= alloca (strlen (namespace) + 2 + strlen (name) + 1);
--      strcpy (concatenated_name, namespace);
--      strcat (concatenated_name, "::");
--      strcat (concatenated_name, name);
--      sym = lookup_symbol_file (concatenated_name, linkage_name,
--				block, domain, 
--				cp_is_anonymous (namespace));
--      return sym;
--    }
+-  /* Okay, we didn't find a match in our children, so look for the
+-     name in the current namespace.  */
+-
+-  namespace = alloca (scope_len + 1);
+-  strncpy (namespace, scope, scope_len);
+-  namespace[scope_len] = '\0';
+-  return cp_lookup_symbol_in_namespace (namespace, name, linkage_name,
+-                                        block, domain);
 +  return NULL;
  }
  
  /* Look up NAME in BLOCK's static block and in global blocks.  If
-@@ -356,17 +517,15 @@ cp_lookup_symbol_namespace (const char *namespace,
+@@ -453,17 +517,15 @@ lookup_namespace_scope (const char *name,
  
  static struct symbol *
  lookup_symbol_file (const char *name,
@@ -1889,7 +2054,7 @@ index 04b665b..21e013a 100644
    if (anonymous_namespace)
      {
        /* Symbols defined in anonymous namespaces have external linkage
-@@ -376,12 +535,11 @@ lookup_symbol_file (const char *name,
+@@ -473,12 +535,11 @@ lookup_symbol_file (const char *name,
        const struct block *global_block = block_global_block (block);
        
        if (global_block != NULL)
@@ -1904,7 +2069,7 @@ index 04b665b..21e013a 100644
      }
  
    if (sym != NULL)
-@@ -402,6 +560,7 @@ lookup_symbol_file (const char *name,
+@@ -499,6 +560,7 @@ lookup_symbol_file (const char *name,
        sym = lookup_possible_namespace_symbol (name);
        if (sym != NULL)
  	return sym;
@@ -1912,18 +2077,21 @@ index 04b665b..21e013a 100644
      }
  
    return NULL;
-@@ -429,9 +588,8 @@ cp_lookup_nested_type (struct type *parent_type,
- 	   lookup_symbol_namespace works when looking them up.  */
+@@ -527,10 +589,9 @@ cp_lookup_nested_type (struct type *parent_type,
  
  	const char *parent_name = TYPE_TAG_NAME (parent_type);
--	struct symbol *sym = cp_lookup_symbol_namespace (parent_name,
-+	struct symbol *sym = cp_lookup_symbol_in_namespace (parent_name,
- 							 nested_name,
--							 NULL,
- 							 block,
- 							 VAR_DOMAIN);
+ 	struct symbol *sym = cp_lookup_symbol_in_namespace (parent_name,
+-	                                                    nested_name,
+-	                                                    NULL,
+-	                                                    block,
+-	                                                    VAR_DOMAIN);
++							 nested_name,
++							 block,
++							 VAR_DOMAIN);
  	if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-@@ -677,7 +835,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
+ 	  return NULL;
+ 	else
+@@ -774,7 +835,7 @@ check_one_possible_namespace_symbol (const char *name, int len,
  
    memcpy (name_copy, name, len);
    name_copy[len] = '\0';
@@ -1932,7 +2100,7 @@ index 04b665b..21e013a 100644
  
    if (sym == NULL)
      {
-@@ -718,7 +876,7 @@ lookup_possible_namespace_symbol (const char *name)
+@@ -815,7 +876,7 @@ lookup_possible_namespace_symbol (const char *name)
        struct symbol *sym;
  
        sym = lookup_block_symbol (get_possible_namespace_block (objfile),
@@ -1968,10 +2136,10 @@ index c31fcff..fc294ae 100644
        psymtab_to_symtab (ps);
    }
 diff --git a/gdb/cp-support.h b/gdb/cp-support.h
-index a629955..2afdb48 100644
+index 33b1b44..50f8fe9 100644
 --- a/gdb/cp-support.h
 +++ b/gdb/cp-support.h
-@@ -38,15 +38,33 @@ struct demangle_component;
+@@ -38,14 +38,29 @@ struct demangle_component;
  
  /* This struct is designed to store data from using directives.  It
     says that names from namespace IMPORT_SRC should be visible within
@@ -2002,13 +2170,9 @@ index a629955..2afdb48 100644
 +  int line_number;
 +
    struct using_direct *next;
-+
-+  /* Used during import search to temporarly mark this node as searced.  */
-+  int searched;
- };
  
- 
-@@ -54,6 +72,7 @@ struct using_direct
+   /* Used during import search to temporarily mark this node as searched.  */
+@@ -57,6 +72,7 @@ struct using_direct
  
  extern char *cp_canonicalize_string (const char *string);
  
@@ -2016,7 +2180,7 @@ index a629955..2afdb48 100644
  extern char *cp_class_name_from_physname (const char *physname);
  
  extern char *method_name_from_physname (const char *physname);
-@@ -79,10 +98,16 @@ extern int cp_validate_operator (const char *input);
+@@ -82,10 +98,16 @@ extern int cp_validate_operator (const char *input);
  extern int cp_is_anonymous (const char *namespace);
  
  extern void cp_add_using_directive (const char *dest,
@@ -2034,7 +2198,7 @@ index a629955..2afdb48 100644
  					  struct using_direct *next);
  
  extern void cp_initialize_namespace (void);
-@@ -99,15 +124,20 @@ extern void cp_set_block_scope (const struct symbol *symbol,
+@@ -102,16 +124,20 @@ extern void cp_set_block_scope (const struct symbol *symbol,
  extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol);
  
  extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
@@ -2053,7 +2217,8 @@ index a629955..2afdb48 100644
 -						  const char *name,
 -						  const char *linkage_name,
 -						  const struct block *block,
--						  const domain_enum domain);
+-						  const domain_enum domain,
+-						  const int search_parents);
 +                                                  const char *name,
 +                                                  const struct block *block,
 +                                                  const domain_enum domain);
@@ -2073,10 +2238,10 @@ index 6ef6767..5f4825c 100644
    default_symfile_offsets, /* sym_offsets: parse user's offsets to
  			      internal form */
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index d716d0d..35dc185 100644
+index fc11609..2fbdb8c 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -1159,6 +1159,16 @@ for remote debugging.
+@@ -1157,6 +1157,16 @@ for remote debugging.
  Run using @var{device} for your program's standard input and output.
  @c FIXME: kingdon thinks there is more to -tty.  Investigate.
  
@@ -2093,7 +2258,7 @@ index d716d0d..35dc185 100644
  @c resolve the situation of these eventually
  @item -tui
  @cindex @code{--tui}
-@@ -19145,7 +19155,7 @@ command:
+@@ -19206,7 +19216,7 @@ using the @code{script-extension} setting.
  @table @code
  @kindex source
  @cindex execute commands from a file
@@ -2102,7 +2267,7 @@ index d716d0d..35dc185 100644
  Execute the command file @var{filename}.
  @end table
  
-@@ -19428,8 +19438,6 @@ containing @code{end}.  For example:
+@@ -19484,8 +19494,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -2111,7 +2276,7 @@ index d716d0d..35dc185 100644
  >print 23
  >end
  23
-@@ -19442,6 +19450,14 @@ in a Python script.  This can be controlled using @code{maint set
+@@ -19498,6 +19506,14 @@ in a Python script.  This can be controlled using @code{maint set
  python print-stack}: if @code{on}, the default, then Python stack
  printing is enabled; if @code{off}, then Python stack printing is
  disabled.
@@ -2125,8 +2290,8 @@ index d716d0d..35dc185 100644
 +auto-loading is disabled.
  @end table
  
- @node Python API
-@@ -19449,6 +19465,14 @@ disabled.
+ It is also possible to execute a Python script from the @value{GDBN}
+@@ -19519,6 +19535,14 @@ and thus is always available.
  @cindex python api
  @cindex programming in python
  
@@ -2141,7 +2306,7 @@ index d716d0d..35dc185 100644
  @cindex python stdout
  @cindex python pagination
  At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
-@@ -19461,13 +19485,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
+@@ -19531,13 +19555,17 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
  * Basic Python::                Basic Python Functions.
  * Exception Handling::
  * Auto-loading::                Automatically loading Python code.
@@ -2160,7 +2325,7 @@ index d716d0d..35dc185 100644
  * Frames In Python::            Acessing inferior stack frames from Python.
  * Lazy Strings In Python::      Python representation of lazy strings.
  @end menu
-@@ -19495,6 +19523,12 @@ command as having originated from the user invoking it interactively.
+@@ -19565,6 +19593,12 @@ command as having originated from the user invoking it interactively.
  It must be a boolean value.  If omitted, it defaults to @code{False}.
  @end defun
  
@@ -2173,7 +2338,7 @@ index d716d0d..35dc185 100644
  @findex gdb.parameter
  @defun parameter parameter
  Return the value of a @value{GDBN} parameter.  @var{parameter} is a
-@@ -19511,6 +19545,7 @@ a Python value of the appropriate type, and returned.
+@@ -19581,6 +19615,7 @@ a Python value of the appropriate type, and returned.
  @defun history number
  Return a value from @value{GDBN}'s value history (@pxref{Value
  History}).  @var{number} indicates which history element to return.
@@ -2181,7 +2346,7 @@ index d716d0d..35dc185 100644
  If @var{number} is negative, then @value{GDBN} will take its absolute value
  and count backward from the last element (i.e., the most recent element) to
  find the value to return.  If @var{number} is zero, then @value{GDBN} will
-@@ -19535,6 +19570,21 @@ compute values, for example, it is the only way to get the value of a
+@@ -19605,6 +19640,21 @@ compute values, for example, it is the only way to get the value of a
  convenience variable (@pxref{Convenience Vars}) as a @code{gdb.Value}.
  @end defun
  
@@ -2203,7 +2368,7 @@ index d716d0d..35dc185 100644
  @findex gdb.write
  @defun write string
  Print a string to @value{GDBN}'s paginated standard output stream.
-@@ -19549,6 +19599,11 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
+@@ -19619,6 +19669,11 @@ Flush @value{GDBN}'s paginated standard output stream.  Flushing
  function.
  @end defun
  
@@ -2215,7 +2380,7 @@ index d716d0d..35dc185 100644
  @node Exception Handling
  @subsubsection Exception Handling
  @cindex python exceptions
-@@ -19787,6 +19842,9 @@ module:
+@@ -19857,6 +19912,9 @@ module:
  This function looks up a type by name.  @var{name} is the name of the
  type to look up.  It must be a string.
  
@@ -2225,7 +2390,7 @@ index d716d0d..35dc185 100644
  Ordinarily, this function will return an instance of @code{gdb.Type}.
  If the named type cannot be found, it will throw an exception.
  @end defun
-@@ -19909,7 +19967,7 @@ If the type does not have a target, this method will throw an
+@@ -19979,7 +20037,7 @@ If the type does not have a target, this method will throw an
  exception.
  @end defmethod
  
@@ -2234,7 +2399,7 @@ index d716d0d..35dc185 100644
  If this @code{gdb.Type} is an instantiation of a template, this will
  return a new @code{gdb.Type} which represents the type of the
  @var{n}th template argument.
-@@ -19917,7 +19975,8 @@ return a new @code{gdb.Type} which represents the type of the
+@@ -19987,7 +20045,8 @@ return a new @code{gdb.Type} which represents the type of the
  If this @code{gdb.Type} is not a template type, this will throw an
  exception.  Ordinarily, only C@t{++} code will have template types.
  
@@ -2244,7 +2409,7 @@ index d716d0d..35dc185 100644
  @end defmethod
  @end table
  
-@@ -20271,6 +20330,121 @@ import gdb.libstdcxx.v6
+@@ -20341,6 +20400,121 @@ import gdb.libstdcxx.v6
  gdb.libstdcxx.v6.register_printers (gdb.current_objfile ())
  @end smallexample
  
@@ -2366,7 +2531,7 @@ index d716d0d..35dc185 100644
  @node Commands In Python
  @subsubsection Commands In Python
  
-@@ -20523,6 +20697,135 @@ registration of the command with @value{GDBN}.  Depending on how the
+@@ -20593,6 +20767,135 @@ registration of the command with @value{GDBN}.  Depending on how the
  Python code is read into @value{GDBN}, you may need to import the
  @code{gdb} module explicitly.
  
@@ -2502,7 +2667,7 @@ index d716d0d..35dc185 100644
  @node Functions In Python
  @subsubsection Writing new convenience functions
  
-@@ -20627,6 +20930,82 @@ which is used to format the value.  @xref{Pretty Printing}, for more
+@@ -20697,6 +21000,82 @@ which is used to format the value.  @xref{Pretty Printing}, for more
  information.
  @end defivar
  
@@ -2585,7 +2750,7 @@ index d716d0d..35dc185 100644
  @node Frames In Python
  @subsubsection Acessing inferior stack frames from Python.
  
-@@ -20691,6 +21070,14 @@ function to a string.
+@@ -20761,6 +21140,14 @@ function to a string.
  Returns the frame's resume address.
  @end defmethod
  
@@ -2600,7 +2765,7 @@ index d716d0d..35dc185 100644
  @defmethod Frame older
  Return the frame that called this frame.
  @end defmethod
-@@ -20699,10 +21086,18 @@ Return the frame that called this frame.
+@@ -20769,10 +21156,18 @@ Return the frame that called this frame.
  Return the frame called by this frame.
  @end defmethod
  
@@ -3145,7 +3310,7 @@ index fa0bd11..fdea2b4 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 15ef3e9..99f729b 100644
+index 2f671ca..bf52d4f 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -48,6 +48,11 @@
@@ -3763,7 +3928,7 @@ index 15ef3e9..99f729b 100644
      {
      case DW_TAG_namespace:
      case DW_TAG_typedef:
-@@ -2623,7 +2868,23 @@ pdi_needs_namespace (enum dwarf_tag tag)
+@@ -2623,7 +2868,30 @@ pdi_needs_namespace (enum dwarf_tag tag)
      case DW_TAG_union_type:
      case DW_TAG_enumeration_type:
      case DW_TAG_enumerator:
@@ -3780,6 +3945,13 @@ index 15ef3e9..99f729b 100644
 +	attr = dwarf2_attr (die, DW_AT_external, cu);
 +	if (attr == NULL && die->parent->tag != DW_TAG_namespace)
 +	  return 0;
++	/* A variable in a lexical block of some kind does not need a
++	   namespace, even though in C++ such variables may be
++	   external and have a mangled name.  */
++	if (die->parent->tag ==  DW_TAG_lexical_block
++	    || die->parent->tag ==  DW_TAG_try_block
++	    || die->parent->tag ==  DW_TAG_catch_block)
++	  return 0;
 +	return 1;
 +      }
 +      break;
@@ -3787,7 +3959,7 @@ index 15ef3e9..99f729b 100644
      default:
        return 0;
      }
-@@ -2656,12 +2917,12 @@ static void
+@@ -2656,12 +2924,12 @@ static void
  add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
  		    CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
  {
@@ -3804,7 +3976,7 @@ index 15ef3e9..99f729b 100644
  }
  
  /* Read a partial die corresponding to a subprogram and create a partial
-@@ -2752,27 +3013,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
+@@ -2752,27 +3020,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
  
        if (real_pdi->die_parent != NULL)
  	return;
@@ -3832,7 +4004,7 @@ index 15ef3e9..99f729b 100644
      }
  }
  
-@@ -3325,6 +3565,14 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3325,6 +3572,14 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
      case DW_TAG_imported_declaration:
      case DW_TAG_imported_module:
        processing_has_namespace_info = 1;
@@ -3847,7 +4019,7 @@ index 15ef3e9..99f729b 100644
        if (die->child != NULL && (die->tag == DW_TAG_imported_declaration
  				 || cu->language != language_fortran))
  	complaint (&symfile_complaints, _("Tag '%s' has unexpected children"),
-@@ -3340,41 +3588,71 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3340,41 +3595,71 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
  /* Return the fully qualified name of DIE, based on its DW_AT_name.
     If scope qualifiers are appropriate they will be added.  The result
     will be allocated on the objfile_obstack, or NULL if the DIE does
@@ -3940,7 +4112,7 @@ index 15ef3e9..99f729b 100644
  /* Read the import statement specified by the given die and record it.  */
  
  static void
-@@ -3385,9 +3663,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3385,9 +3670,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
    struct dwarf2_cu *imported_cu;
    const char *imported_name;
    const char *imported_name_prefix;
@@ -3958,7 +4130,7 @@ index 15ef3e9..99f729b 100644
    import_attr = dwarf2_attr (die, DW_AT_import, cu);
    if (import_attr == NULL)
      {
-@@ -3436,17 +3720,27 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3436,17 +3727,27 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
        return;
      }
  
@@ -3993,7 +4165,7 @@ index 15ef3e9..99f729b 100644
        canonical_name = alloca (strlen (imported_name_prefix) + 2 + strlen (imported_name) + 1);
        strcpy (canonical_name, imported_name_prefix);
        strcat (canonical_name, "::");
-@@ -3457,8 +3751,14 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3457,8 +3758,14 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
        canonical_name = alloca (strlen (imported_name) + 1);
        strcpy (canonical_name, imported_name);
      }
@@ -4010,7 +4182,7 @@ index 15ef3e9..99f729b 100644
  }
  
  static void
-@@ -3727,6 +4027,14 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3727,6 +4034,14 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
    struct attribute *attr;
  
    attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
@@ -4025,7 +4197,7 @@ index 15ef3e9..99f729b 100644
    if (!attr)
      return;
  
-@@ -3825,6 +4133,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3825,6 +4140,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
    char *name;
    CORE_ADDR baseaddr;
    struct block *block;
@@ -4033,7 +4205,7 @@ index 15ef3e9..99f729b 100644
    int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
  
    if (inlined_func)
-@@ -3843,13 +4152,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3843,13 +4159,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -4060,7 +4232,7 @@ index 15ef3e9..99f729b 100644
    lowpc += baseaddr;
    highpc += baseaddr;
  
-@@ -3876,14 +4195,19 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3876,14 +4202,19 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    cu->list_in_scope = &local_symbols;
  
@@ -4087,7 +4259,7 @@ index 15ef3e9..99f729b 100644
      }
  
    inherit_abstract_dies (die, cu);
-@@ -3899,6 +4223,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3899,6 +4230,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  			determine_prefix (die, cu),
  			processing_has_namespace_info);
  
@@ -4101,16 +4273,7 @@ index 15ef3e9..99f729b 100644
    /* If we have address ranges, record them.  */
    dwarf2_record_block_ranges (die, block, baseaddr, cu);
    
-@@ -3952,7 +4283,7 @@ read_lexical_block_scope (struct die_info *die, struct dwarf2_cu *cu)
-     }
-   new = pop_context ();
- 
--  if (local_symbols != NULL)
-+  if (local_symbols != NULL || using_directives != NULL)
-     {
-       struct block *block
-         = finish_block (0, &local_symbols, new->old_blocks, new->start_addr,
-@@ -4517,7 +4848,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
+@@ -4517,7 +4855,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
  	return;
  
        /* Get physical name.  */
@@ -4119,7 +4282,7 @@ index 15ef3e9..99f729b 100644
  
        /* The name is already allocated along with this objfile, so we don't
  	 need to duplicate it for the type.  */
-@@ -4679,7 +5010,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -4679,7 +5017,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
      return;
  
    /* Get the mangled name.  */
@@ -4128,7 +4291,7 @@ index 15ef3e9..99f729b 100644
  
    /* Look up member function name in fieldlist.  */
    for (i = 0; i < fip->nfnfields; i++)
-@@ -5010,14 +5341,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4986,14 +5324,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
        if (cu->language == language_cplus
  	  || cu->language == language_java)
  	{
@@ -4150,7 +4313,7 @@ index 15ef3e9..99f729b 100644
  	}
      }
  
-@@ -5258,51 +5593,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5236,51 +5578,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, type, cu);
  }
  
@@ -4202,7 +4365,7 @@ index 15ef3e9..99f729b 100644
  /* Given a pointer to a die which begins an enumeration, process all
     the dies that define the members of the enumeration, and create the
     symbol for the enumeration type.
-@@ -5380,6 +5670,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5358,6 +5655,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -4232,7 +4395,7 @@ index 15ef3e9..99f729b 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -5393,7 +5706,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5371,7 +5691,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -4241,7 +4404,7 @@ index 15ef3e9..99f729b 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -5440,16 +5753,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5418,16 +5738,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -4263,7 +4426,7 @@ index 15ef3e9..99f729b 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -5638,7 +5946,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5616,7 +5931,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
        if (is_anonymous)
  	{
  	  const char *previous_prefix = determine_prefix (die, cu);
@@ -4272,7 +4435,7 @@ index 15ef3e9..99f729b 100644
  	}
      }
  
-@@ -5654,20 +5962,155 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5632,20 +5947,155 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
      }
  }
  
@@ -4285,13 +4448,14 @@ index 15ef3e9..99f729b 100644
  {
 -  struct die_info *child_die = die->child;
 +  struct type *type;
-+
+ 
+-  /* FIXME: Support the separate Fortran module namespaces.  */
 +  type = read_module_type (die, cu);
 +
 +  if (type)
 +    new_symbol (die, type, cu);
 +}
-+
+ 
 +/* Read a Fortran module as type.
 +
 +   Modules present only as declarations - being used only for DW_AT_import of
@@ -4320,10 +4484,9 @@ index 15ef3e9..99f729b 100644
 +  type = init_type (TYPE_CODE_MODULE, 0, 0, module_name, objfile);
 +
 +  /* Create a context for reading the module variables.  */
- 
--  /* FIXME: Support the separate Fortran module namespaces.  */
++
 +  new = push_context (0, 0);
- 
++
 +  save_file_symbols = file_symbols;
 +  file_symbols = NULL;
 +  save_global_symbols = global_symbols;
@@ -4431,7 +4594,7 @@ index 15ef3e9..99f729b 100644
  }
  
  /* Return the name of the namespace represented by DIE.  Set
-@@ -5832,29 +6275,113 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5810,29 +6260,113 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -4559,7 +4722,7 @@ index 15ef3e9..99f729b 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -5954,7 +6481,6 @@ static struct type *
+@@ -5932,7 +6466,6 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -4567,7 +4730,7 @@ index 15ef3e9..99f729b 100644
    const char *name = NULL;
    struct type *this_type;
  
-@@ -6062,8 +6588,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6040,8 +6573,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -4577,7 +4740,7 @@ index 15ef3e9..99f729b 100644
    char *name;
    LONGEST negative_mask;
    
-@@ -6077,49 +6602,101 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6055,49 +6587,101 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -4682,8 +4845,7 @@ index 15ef3e9..99f729b 100644
 +      if (attr && attr_form_is_constant (attr))
 +	{
 +	  LONGEST high;
- 
--  range_type = create_range_type (NULL, base_type, low, high);
++
 +	  high = dwarf2_get_attr_constant_value (attr, 0);
 +	  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
 +	    high |= negative_mask;
@@ -4695,7 +4857,8 @@ index 15ef3e9..99f729b 100644
 +	  TYPE_HIGH_BOUND (range_type) = low - 1;
 +	}
 +    }
-+
+ 
+-  range_type = create_range_type (NULL, base_type, low, high);
 +  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
 +  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
 +  if (attr && attr_form_is_block (attr))
@@ -4715,7 +4878,7 @@ index 15ef3e9..99f729b 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -6578,6 +7155,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
+@@ -6556,6 +7140,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
  	  && abbrev->tag != DW_TAG_lexical_block
  	  && abbrev->tag != DW_TAG_variable
  	  && abbrev->tag != DW_TAG_namespace
@@ -4723,7 +4886,7 @@ index 15ef3e9..99f729b 100644
  	  && abbrev->tag != DW_TAG_member)
  	{
  	  /* Otherwise we skip to the next sibling, if any.  */
-@@ -6786,8 +7364,8 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6764,8 +7349,8 @@ read_partial_die (struct partial_die_info *part_die,
  	    }
  	  break;
  	case DW_AT_MIPS_linkage_name:
@@ -4734,7 +4897,7 @@ index 15ef3e9..99f729b 100644
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
  	  part_die->lowpc = DW_ADDR (&attr);
-@@ -6984,7 +7562,8 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6962,7 +7547,8 @@ fixup_partial_die (struct partial_die_info *part_die,
    /* If we found a reference attribute and the DIE has no name, try
       to find a name in the referred to DIE.  */
  
@@ -4744,7 +4907,7 @@ index 15ef3e9..99f729b 100644
      {
        struct partial_die_info *spec_die;
  
-@@ -8326,10 +8905,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -8304,10 +8890,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -4759,7 +4922,7 @@ index 15ef3e9..99f729b 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -8351,21 +8932,29 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8329,21 +8917,29 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -4796,12 +4959,14 @@ index 15ef3e9..99f729b 100644
  
        /* Default assumptions.
           Use the passed type or decode it from the die.  */
-@@ -8465,7 +9054,18 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8443,7 +9039,24 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	      var_decode_location (attr, sym, cu);
  	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
  	      if (attr2 && (DW_UNSND (attr2) != 0))
 -		add_symbol_to_list (sym, &global_symbols);
 +		{
++		  struct pending **list_to_add;
++
 +		  /* Workaround gfortran PR debug/40040 - it uses
 +		     DW_AT_location for variables in -fPIC libraries which may
 +		     get overriden by other libraries/executable and get
@@ -4811,21 +4976,16 @@ index 15ef3e9..99f729b 100644
 +		      && die->parent->tag == DW_TAG_module)
 +		    SYMBOL_CLASS (sym) = LOC_UNRESOLVED;
 +
-+		  add_symbol_to_list (sym, &global_symbols);
++		  /* A variable with DW_AT_external is never static, but it
++		     may be block-scoped.  */
++		  list_to_add = (cu->list_in_scope == &file_symbols
++				 ? &global_symbols : cu->list_in_scope);
++		  add_symbol_to_list (sym, list_to_add);
 +		}
  	      else
  		add_symbol_to_list (sym, cu->list_in_scope);
  	    }
-@@ -8602,7 +9202,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
- 	  add_symbol_to_list (sym, cu->list_in_scope);
- 	  break;
- 	case DW_TAG_enumerator:
--	  SYMBOL_LINKAGE_NAME (sym) = (char *) dwarf2_full_name (die, cu);
-+	  SYMBOL_LINKAGE_NAME (sym) = (char *) dwarf2_name (die, cu);
- 	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
- 	  if (attr)
- 	    {
-@@ -8626,6 +9226,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8604,6 +9217,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
  	  break;
@@ -4837,7 +4997,7 @@ index 15ef3e9..99f729b 100644
  	default:
  	  /* Not a tag we recognize.  Hopefully we aren't processing
  	     trash data, but since we must specifically ignore things
-@@ -8639,8 +9244,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8617,8 +9235,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
        /* For the benefit of old versions of GCC, check for anonymous
  	 namespaces based on the demangled name.  */
        if (!processing_has_namespace_info
@@ -4847,7 +5007,7 @@ index 15ef3e9..99f729b 100644
  	cp_scan_for_anonymous_namespaces (sym);
      }
    return (sym);
-@@ -8952,12 +9556,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8930,12 +9547,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
      case DW_TAG_namespace:
        this_type = read_namespace_type (die, cu);
        break;
@@ -4866,7 +5026,7 @@ index 15ef3e9..99f729b 100644
    return this_type;
  }
  
-@@ -9039,10 +9649,103 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -9017,10 +9640,103 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
  	     So it does not need a prefix.  */
  	  return "";
        default:
@@ -4971,7 +5131,7 @@ index 15ef3e9..99f729b 100644
  /* Return a newly-allocated string formed by concatenating PREFIX and
     SUFFIX with appropriate separator.  If PREFIX or SUFFIX is NULL or empty, then
     simply copy the SUFFIX or PREFIX, respectively.  If OBS is non-null,
-@@ -9092,17 +9795,111 @@ sibling_die (struct die_info *die)
+@@ -9070,17 +9786,111 @@ sibling_die (struct die_info *die)
    return die->sibling;
  }
  
@@ -4984,7 +5144,11 @@ index 15ef3e9..99f729b 100644
  {
    struct attribute *attr;
 +  char *name;
-+
+ 
+-  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+-  if (attr && DW_STRING (attr))
+-    return DW_STRING (attr);
+-  return dwarf2_name (die, cu);
 +  name = dwarf2_name (die, cu);
 +
 +  /* These are the only languages we know how to qualify names in.  */
@@ -5047,11 +5211,7 @@ index 15ef3e9..99f729b 100644
 +	    name = cname;
 +	}
 +    }
- 
--  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
--  if (attr && DW_STRING (attr))
--    return DW_STRING (attr);
--  return dwarf2_name (die, cu);
++
 +  return name;
 +}
 +
@@ -5089,7 +5249,7 @@ index 15ef3e9..99f729b 100644
  }
  
  /* Get name of a die, return NULL if not found.  */
-@@ -11450,6 +12247,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -11428,6 +12238,34 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -5124,7 +5284,7 @@ index 15ef3e9..99f729b 100644
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -11479,35 +12304,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+@@ -11457,35 +12295,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
        SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
        SYMBOL_LOCATION_BATON (sym) = baton;
      }
@@ -5175,7 +5335,7 @@ index 15ef3e9..99f729b 100644
      }
  }
  
-@@ -11795,6 +12610,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -11773,6 +12601,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -5207,7 +5367,7 @@ index 15ef3e9..99f729b 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -11803,6 +12643,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -11781,6 +12634,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -5216,7 +5376,7 @@ index 15ef3e9..99f729b 100644
    /* For Ada types, make sure that the gnat-specific data is always
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
-@@ -11958,23 +12800,13 @@ show_dwarf2_cmd (char *args, int from_tty)
+@@ -11936,23 +12791,13 @@ show_dwarf2_cmd (char *args, int from_tty)
    cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
  }
  
@@ -5244,7 +5404,7 @@ index 15ef3e9..99f729b 100644
  }
  
  /* munmap debug sections for OBJFILE, if necessary.  */
-@@ -11983,15 +12815,15 @@ static void
+@@ -11961,15 +12806,15 @@ static void
  dwarf2_per_objfile_free (struct objfile *objfile, void *d)
  {
    struct dwarf2_per_objfile *data = d;
@@ -5269,7 +5429,7 @@ index 15ef3e9..99f729b 100644
  }
  
  void _initialize_dwarf2_read (void);
-@@ -11999,6 +12831,7 @@ void _initialize_dwarf2_read (void);
+@@ -11977,6 +12822,7 @@ void _initialize_dwarf2_read (void);
  void
  _initialize_dwarf2_read (void)
  {
@@ -5278,10 +5438,32 @@ index 15ef3e9..99f729b 100644
      = register_objfile_data_with_cleanup (NULL, dwarf2_per_objfile_free);
  
 diff --git a/gdb/elfread.c b/gdb/elfread.c
-index 78e9163..4e208d1 100644
+index 78e9163..dc8a752 100644
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
-@@ -879,20 +879,13 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
+@@ -179,7 +179,8 @@ record_minimal_symbol (const char *name, int name_len, int copy_name,
+ {
+   struct gdbarch *gdbarch = get_objfile_arch (objfile);
+ 
+-  if (ms_type == mst_text || ms_type == mst_file_text)
++  if (ms_type == mst_text || ms_type == mst_file_text
++      || ms_type == mst_text_gnu_ifunc)
+     address = gdbarch_smash_text_address (gdbarch, address);
+ 
+   return prim_record_minimal_symbol_full (name, name_len, copy_name, address,
+@@ -388,7 +389,10 @@ elf_symtab_read (struct objfile *objfile, int type,
+ 	    {
+ 	      if (sym->flags & (BSF_GLOBAL | BSF_WEAK))
+ 		{
+-		  ms_type = mst_text;
++		  if (sym->flags & BSF_GNU_INDIRECT_FUNCTION)
++		    ms_type = mst_text_gnu_ifunc;
++		  else
++		    ms_type = mst_text;
+ 		}
+ 	      else if ((sym->name[0] == '.' && sym->name[1] == 'L')
+ 		       || ((sym->flags & BSF_LOCAL)
+@@ -879,20 +883,13 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
  				str_sect->filepos,
  				bfd_section_size (abfd, str_sect));
      }
@@ -5305,7 +5487,7 @@ index 78e9163..4e208d1 100644
      {
        char *debugfile;
  
-@@ -910,6 +903,20 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
+@@ -910,6 +907,20 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
      }
  }
  
@@ -5326,7 +5508,7 @@ index 78e9163..4e208d1 100644
  /* This cleans up the objfile's deprecated_sym_stab_info pointer, and
     the chain of stab_section_info's, that might be dangling from
     it.  */
-@@ -1052,6 +1059,7 @@ static struct sym_fns elf_sym_fns =
+@@ -1052,6 +1063,7 @@ static struct sym_fns elf_sym_fns =
    elf_new_init,			/* sym_new_init: init anything gbl to entire symtab */
    elf_symfile_init,		/* sym_init: read initial info, setup for sym_read() */
    elf_symfile_read,		/* sym_read: read a symbol file into symtab */
@@ -5335,7 +5517,7 @@ index 78e9163..4e208d1 100644
    default_symfile_offsets,	/* sym_offsets:  Translate ext. to int. relocation */
    elf_symfile_segments,		/* sym_segments: Get segment information from
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 27b7895..90c29a3 100644
+index a0556cf..abe6a06 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -43,6 +43,7 @@
@@ -6353,6 +6535,76 @@ index e117a8e..6bd3724 100644
      }
    else
      {
+diff --git a/gdb/frv-linux-tdep.c b/gdb/frv-linux-tdep.c
+index c051a4d..5b07063 100644
+--- a/gdb/frv-linux-tdep.c
++++ b/gdb/frv-linux-tdep.c
+@@ -32,6 +32,7 @@
+ #include "frame-unwind.h"
+ #include "regset.h"
+ #include "gdb_string.h"
++#include "linux-tdep.h"
+ 
+ /* Define the size (in bytes) of an FR-V instruction.  */
+ static const int frv_instr_size = 4;
+@@ -486,7 +487,21 @@ frv_linux_regset_from_core_section (struct gdbarch *gdbarch,
+   return NULL;
+ }
+ 
+-
++static CORE_ADDR
++frv_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++				      CORE_ADDR addr,
++				      struct target_ops *targ)
++{
++  CORE_ADDR pc = frv_convert_from_func_ptr_addr (gdbarch, addr, targ);
++  CORE_ADDR resolved;
++
++  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++  if (resolved != pc)
++    pc = frv_convert_from_func_ptr_addr (gdbarch, resolved, targ);
++
++  return pc;
++}
++
+ static void
+ frv_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+ {
+@@ -494,6 +509,10 @@ frv_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   frame_unwind_append_unwinder (gdbarch, &frv_linux_sigtramp_frame_unwind); 
+   set_gdbarch_regset_from_core_section (gdbarch,
+                                         frv_linux_regset_from_core_section);
++
++  if (frv_abi (gdbarch) == FRV_ABI_FDPIC)
++    set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  frv_linux_convert_from_func_ptr_addr);
+ }
+ 
+ static enum gdb_osabi
+diff --git a/gdb/frv-tdep.c b/gdb/frv-tdep.c
+index a38ec8e..b8856a9 100644
+--- a/gdb/frv-tdep.c
++++ b/gdb/frv-tdep.c
+@@ -1169,7 +1169,7 @@ find_func_descr (struct gdbarch *gdbarch, CORE_ADDR entry_point)
+   return descr;
+ }
+ 
+-static CORE_ADDR
++CORE_ADDR
+ frv_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
+                                 struct target_ops *targ)
+ {
+diff --git a/gdb/frv-tdep.h b/gdb/frv-tdep.h
+index 25cc9c4..95d5fe5 100644
+--- a/gdb/frv-tdep.h
++++ b/gdb/frv-tdep.h
+@@ -118,3 +118,6 @@ CORE_ADDR frv_fetch_objfile_link_map (struct objfile *objfile);
+ struct target_so_ops;
+ extern struct target_so_ops frv_so_ops;
+ 
++CORE_ADDR frv_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					  CORE_ADDR addr,
++					  struct target_ops *targ);
 diff --git a/gdb/gdbinit.in b/gdb/gdbinit.in
 index ffb7f53..a2e7e94 100644
 --- a/gdb/gdbinit.in
@@ -6399,7 +6651,7 @@ index cd24eaf..119af7d 100644
     once for each known thread.  */
  typedef int (*thread_callback_func) (struct thread_info *, void *);
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 117606a..536bee2 100644
+index 2ff8647..2bdaca8 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -39,6 +39,9 @@
@@ -6495,7 +6747,7 @@ index 117606a..536bee2 100644
        if (typeptr)
  	*typeptr = ntype;
      }
-@@ -726,6 +780,7 @@ create_range_type (struct type *result_type, struct type *index_type,
+@@ -723,6 +777,7 @@ create_range_type (struct type *result_type, struct type *index_type,
      TYPE_ZALLOC (result_type, sizeof (struct range_bounds));
    TYPE_LOW_BOUND (result_type) = low_bound;
    TYPE_HIGH_BOUND (result_type) = high_bound;
@@ -6503,7 +6755,7 @@ index 117606a..536bee2 100644
  
    if (low_bound >= 0)
      TYPE_UNSIGNED (result_type) = 1;
-@@ -825,26 +880,45 @@ create_array_type (struct type *result_type,
+@@ -822,26 +877,45 @@ create_array_type (struct type *result_type,
  
    TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
    TYPE_TARGET_TYPE (result_type) = element_type;
@@ -6562,7 +6814,7 @@ index 117606a..536bee2 100644
  
    return result_type;
  }
-@@ -1331,6 +1405,105 @@ stub_noname_complaint (void)
+@@ -1344,6 +1418,105 @@ stub_noname_complaint (void)
    complaint (&symfile_complaints, _("stub type has NULL name"));
  }
  
@@ -6668,7 +6920,7 @@ index 117606a..536bee2 100644
  /* Added by Bryan Boreham, Kewill, Sun Sep 17 18:07:17 1989.
  
     If this is a stubbed struct (i.e. declared as struct foo *), see if
-@@ -1462,51 +1635,36 @@ check_typedef (struct type *type)
+@@ -1475,51 +1648,36 @@ check_typedef (struct type *type)
          }
      }
  
@@ -6740,7 +6992,7 @@ index 117606a..536bee2 100644
  	  TYPE_TARGET_STUB (type) = 0;
  	}
        else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
-@@ -1514,9 +1672,12 @@ check_typedef (struct type *type)
+@@ -1527,9 +1685,12 @@ check_typedef (struct type *type)
  	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
  	  TYPE_TARGET_STUB (type) = 0;
  	}
@@ -6753,7 +7005,16 @@ index 117606a..536bee2 100644
    return type;
  }
  
-@@ -1809,6 +1970,7 @@ init_type (enum type_code code, int length, int flags,
+@@ -1798,6 +1959,8 @@ init_type (enum type_code code, int length, int flags,
+     TYPE_NOTTEXT (type) = 1;
+   if (flags & TYPE_FLAG_FIXED_INSTANCE)
+     TYPE_FIXED_INSTANCE (type) = 1;
++  if (flags & TYPE_FLAG_GNU_IFUNC)
++    TYPE_GNU_IFUNC (type) = 1;
+ 
+   if (name)
+     TYPE_NAME (type) = obsavestring (name, strlen (name),
+@@ -1822,6 +1985,7 @@ init_type (enum type_code code, int length, int flags,
          TYPE_SPECIFIC_FIELD (type) = TYPE_SPECIFIC_CALLING_CONVENTION;
          break;
      }
@@ -6761,7 +7022,7 @@ index 117606a..536bee2 100644
    return type;
  }
  
-@@ -2986,33 +3148,42 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
+@@ -2999,33 +3163,42 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
  }
  
  /* Allocate the hash table used by copy_type_recursive to walk
@@ -6819,7 +7080,7 @@ index 117606a..536bee2 100644
      return type;
  
    /* This type shouldn't be pointing to any types in other objfiles;
-@@ -3027,8 +3198,10 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3040,8 +3213,10 @@ copy_type_recursive (struct objfile *objfile,
    new_type = alloc_type_arch (get_type_arch (type));
  
    /* We must add the new type to the hash table immediately, in case
@@ -6832,7 +7093,7 @@ index 117606a..536bee2 100644
    stored->old = type;
    stored->new = new_type;
    *slot = stored;
-@@ -3039,6 +3212,19 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3052,6 +3227,19 @@ copy_type_recursive (struct objfile *objfile,
    TYPE_OBJFILE_OWNED (new_type) = 0;
    TYPE_OWNER (new_type).gdbarch = get_type_arch (type);
  
@@ -6852,7 +7113,7 @@ index 117606a..536bee2 100644
    if (TYPE_NAME (type))
      TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
    if (TYPE_TAG_NAME (type))
-@@ -3047,12 +3233,45 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3060,12 +3248,45 @@ copy_type_recursive (struct objfile *objfile,
    TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
    TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
  
@@ -6898,7 +7159,7 @@ index 117606a..536bee2 100644
        TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
        for (i = 0; i < nfields; i++)
  	{
-@@ -3061,8 +3280,8 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3074,8 +3295,8 @@ copy_type_recursive (struct objfile *objfile,
  	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
  	  if (TYPE_FIELD_TYPE (type, i))
  	    TYPE_FIELD_TYPE (new_type, i)
@@ -6909,7 +7170,7 @@ index 117606a..536bee2 100644
  	  if (TYPE_FIELD_NAME (type, i))
  	    TYPE_FIELD_NAME (new_type, i) = 
  	      xstrdup (TYPE_FIELD_NAME (type, i));
-@@ -3089,24 +3308,75 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3102,24 +3323,75 @@ copy_type_recursive (struct objfile *objfile,
  	}
      }
  
@@ -6991,7 +7252,7 @@ index 117606a..536bee2 100644
    /* Maybe copy the type_specific bits.
  
       NOTE drow/2005-12-09: We do not copy the C++-specific bits like
-@@ -3124,6 +3394,17 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3137,6 +3409,17 @@ copy_type_recursive (struct objfile *objfile,
    return new_type;
  }
  
@@ -7009,7 +7270,7 @@ index 117606a..536bee2 100644
  /* Make a copy of the given TYPE, except that the pointer & reference
     types are not preserved.
     
-@@ -3146,6 +3427,211 @@ copy_type (const struct type *type)
+@@ -3159,6 +3442,211 @@ copy_type (const struct type *type)
    return new_type;
  }
  
@@ -7221,7 +7482,28 @@ index 117606a..536bee2 100644
  
  /* Helper functions to initialize architecture-specific types.  */
  
-@@ -3636,6 +4122,11 @@ void
+@@ -3482,6 +3970,8 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
+     = lookup_pointer_type (builtin_type->builtin_void);
+   builtin_type->builtin_func_ptr
+     = lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
++  builtin_type->builtin_func_func
++    = lookup_function_type (builtin_type->builtin_func_ptr);
+ 
+   /* This type represents a GDB internal function.  */
+   builtin_type->internal_fn
+@@ -3595,6 +4085,11 @@ objfile_type (struct objfile *objfile)
+ 		 "<text variable, no debug info>", objfile);
+   TYPE_TARGET_TYPE (objfile_type->nodebug_text_symbol)
+     = objfile_type->builtin_int;
++  objfile_type->nodebug_text_gnu_ifunc_symbol
++    = init_type (TYPE_CODE_FUNC, 1, TYPE_FLAG_GNU_IFUNC,
++		 "<text gnu-ifunc variable, no debug info>", objfile);
++  TYPE_TARGET_TYPE (objfile_type->nodebug_text_gnu_ifunc_symbol)
++    = objfile_type->nodebug_text_symbol;
+   objfile_type->nodebug_data_symbol
+     = init_type (TYPE_CODE_INT,
+ 		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
+@@ -3649,6 +4144,11 @@ void
  _initialize_gdbtypes (void)
  {
    gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
@@ -7234,7 +7516,7 @@ index 117606a..536bee2 100644
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 380f72a..54c8739 100644
+index 72968a5..4df2a37 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -138,6 +138,8 @@ enum type_code
@@ -7246,7 +7528,15 @@ index 380f72a..54c8739 100644
      /* Internal function type.  */
      TYPE_CODE_INTERNAL_FUNCTION
    };
-@@ -214,6 +216,11 @@ enum type_instance_flag_value
+@@ -171,6 +173,7 @@ enum type_flag_value
+   TYPE_FLAG_FIXED_INSTANCE = (1 << 15),
+   TYPE_FLAG_STUB_SUPPORTED = (1 << 16),
+   TYPE_FLAG_NOTTEXT = (1 << 17),
++  TYPE_FLAG_GNU_IFUNC = (1 << 18),
+ 
+   /* Used for error-checking.  */
+   TYPE_FLAG_MIN = TYPE_FLAG_UNSIGNED
+@@ -214,6 +217,11 @@ enum type_instance_flag_value
  
  #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
  
@@ -7258,7 +7548,20 @@ index 380f72a..54c8739 100644
  /* Static type.  If this is set, the corresponding type had 
   * a static modifier.
   * Note: This may be unnecessary, since static data members
-@@ -279,6 +286,48 @@ enum type_instance_flag_value
+@@ -271,6 +279,12 @@ enum type_instance_flag_value
+ 
+ #define TYPE_NOTTEXT(t)		(TYPE_MAIN_TYPE (t)->flag_nottext)
+ 
++/* Currently used only for TYPE_CODE_FUNC where specifies the real function
++   address is returned by this function call.  TYPE_TARGET_TYPE determines the
++   final returned function type to be presented to user.  */
++
++#define TYPE_GNU_IFUNC(t)	(TYPE_MAIN_TYPE (t)->flag_gnu_ifunc)
++
+ /* Type owner.  If TYPE_OBJFILE_OWNED is true, the type is owned by
+    the objfile retrieved as TYPE_OBJFILE.  Otherweise, the type is
+    owned by an architecture; TYPE_OBJFILE is NULL in this case.  */
+@@ -279,6 +293,48 @@ enum type_instance_flag_value
  #define TYPE_OWNER(t) TYPE_MAIN_TYPE(t)->owner
  #define TYPE_OBJFILE(t) (TYPE_OBJFILE_OWNED(t)? TYPE_OWNER(t).objfile : NULL)
  
@@ -7307,7 +7610,7 @@ index 380f72a..54c8739 100644
  /* Constant type.  If this is set, the corresponding type has a
   * const modifier.
   */
-@@ -336,8 +385,7 @@ enum field_loc_kind
+@@ -336,8 +392,7 @@ enum field_loc_kind
    {
      FIELD_LOC_KIND_BITPOS,	/* bitpos */
      FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
@@ -7317,8 +7620,11 @@ index 380f72a..54c8739 100644
    };
  
  /* A discriminant to determine which field in the main_type.type_specific
-@@ -386,6 +434,13 @@ struct main_type
+@@ -384,8 +439,16 @@ struct main_type
+   unsigned int flag_vector : 1;
+   unsigned int flag_stub_supported : 1;
    unsigned int flag_nottext : 1;
++  unsigned int flag_gnu_ifunc : 1;
    unsigned int flag_fixed_instance : 1;
    unsigned int flag_objfile_owned : 1;
 +  unsigned int flag_discardable : 1;
@@ -7331,7 +7637,7 @@ index 380f72a..54c8739 100644
  
    /* A discriminant telling us which field of the type_specific union
       is being used for this type, if any.  */
-@@ -456,6 +511,20 @@ struct main_type
+@@ -456,6 +519,20 @@ struct main_type
  
    struct type *target_type;
  
@@ -7352,7 +7658,7 @@ index 380f72a..54c8739 100644
    /* For structure and union types, a description of each field.
       For set and pascal array types, there is one "field",
       whose type is the domain type of the set or array.
-@@ -492,12 +561,6 @@ struct main_type
+@@ -492,12 +569,6 @@ struct main_type
  
  	CORE_ADDR physaddr;
  	char *physname;
@@ -7365,7 +7671,7 @@ index 380f72a..54c8739 100644
        }
        loc;
  
-@@ -535,13 +598,22 @@ struct main_type
+@@ -535,13 +606,22 @@ struct main_type
  
      struct range_bounds
      {
@@ -7393,7 +7699,7 @@ index 380f72a..54c8739 100644
  
        /* Flags indicating whether the values of low and high are
           valid.  When true, the respective range value is
-@@ -593,6 +665,9 @@ struct main_type
+@@ -593,6 +673,9 @@ struct main_type
         supporting multiple ABIs.  Right now this is only fetched from
         the Dwarf-2 DW_AT_calling_convention attribute.  */
      unsigned calling_convention;
@@ -7403,7 +7709,7 @@ index 380f72a..54c8739 100644
    } type_specific;
  };
  
-@@ -839,13 +914,6 @@ struct cplus_struct_type
+@@ -839,13 +922,6 @@ struct cplus_struct_type
      int is_dynamic : 2;
    };
  
@@ -7417,7 +7723,7 @@ index 380f72a..54c8739 100644
  /* Struct used for ranking a function for overload resolution */
  struct badness_vector
    {
-@@ -900,9 +968,9 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -900,9 +976,9 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -7430,7 +7736,7 @@ index 380f72a..54c8739 100644
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
-@@ -911,15 +979,26 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -911,15 +987,26 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
  #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
@@ -7459,7 +7765,7 @@ index 380f72a..54c8739 100644
  
  /* Moto-specific stuff for FORTRAN arrays */
  
-@@ -928,11 +1007,23 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -928,11 +1015,23 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
     TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
  
@@ -7484,7 +7790,7 @@ index 380f72a..54c8739 100644
  
  /* C++ */
  
-@@ -961,6 +1052,7 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -961,6 +1060,7 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_GNAT_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.gnat_stuff
  #define TYPE_DESCRIPTIVE_TYPE(thistype) TYPE_GNAT_SPECIFIC(thistype)->descriptive_type
  #define TYPE_CALLING_CONVENTION(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.calling_convention
@@ -7492,7 +7798,7 @@ index 380f72a..54c8739 100644
  #define TYPE_BASECLASS(thistype,index) TYPE_FIELD_TYPE(thistype, index)
  #define TYPE_N_BASECLASSES(thistype) TYPE_CPLUS_SPECIFIC(thistype)->n_baseclasses
  #define TYPE_BASECLASS_NAME(thistype,index) TYPE_FIELD_NAME(thistype, index)
-@@ -979,7 +1071,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -979,7 +1079,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
  #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
  #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
@@ -7500,7 +7806,7 @@ index 380f72a..54c8739 100644
  #define SET_FIELD_BITPOS(thisfld, bitpos)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
     FIELD_BITPOS (thisfld) = (bitpos))
-@@ -989,9 +1080,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -989,9 +1088,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define SET_FIELD_PHYSADDR(thisfld, addr)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
     FIELD_STATIC_PHYSADDR (thisfld) = (addr))
@@ -7510,7 +7816,7 @@ index 380f72a..54c8739 100644
  #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
  #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
  
-@@ -1002,7 +1090,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -1002,7 +1098,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
@@ -7518,7 +7824,26 @@ index 380f72a..54c8739 100644
  #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
  #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
  #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
-@@ -1333,6 +1420,18 @@ extern struct type *create_array_type (struct type *, struct type *,
+@@ -1141,6 +1236,10 @@ struct builtin_type
+      (*) () can server as a generic function pointer.  */
+   struct type *builtin_func_ptr;
+ 
++  /* `function returning pointer to function (returning void)' type.
++     The final void return type is not significant for it.  */
++  struct type *builtin_func_func;
++
+ 
+   /* Special-purpose types.  */
+ 
+@@ -1181,6 +1280,7 @@ struct objfile_type
+ 
+   /* Types used for symbols with no debug information.  */
+   struct type *nodebug_text_symbol;
++  struct type *nodebug_text_gnu_ifunc_symbol;
+   struct type *nodebug_data_symbol;
+   struct type *nodebug_unknown_symbol;
+   struct type *nodebug_tls_symbol;
+@@ -1335,6 +1435,18 @@ extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  extern struct type *lookup_array_range_type (struct type *, int, int);
  
@@ -7537,7 +7862,7 @@ index 380f72a..54c8739 100644
  extern struct type *create_string_type (struct type *, struct type *,
  					struct type *);
  extern struct type *lookup_string_range_type (struct type *, int, int);
-@@ -1375,6 +1474,8 @@ extern int is_public_ancestor (struct type *, struct type *);
+@@ -1377,6 +1489,8 @@ extern int is_public_ancestor (struct type *, struct type *);
  
  extern int is_unique_ancestor (struct type *, struct value *);
  
@@ -7546,7 +7871,7 @@ index 380f72a..54c8739 100644
  /* Overload resolution */
  
  #define LENGTH_MATCH(bv) ((bv)->rank[0])
-@@ -1437,10 +1538,11 @@ extern void maintenance_print_type (char *, int);
+@@ -1439,10 +1553,11 @@ extern void maintenance_print_type (char *, int);
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -7611,6 +7936,78 @@ index 5321401..b1882a2 100644
  
    /* We didn't find it; print the raw data.  */
    if (vbit)
+diff --git a/gdb/hppa-linux-tdep.c b/gdb/hppa-linux-tdep.c
+index ebfc2f5..e40105b 100644
+--- a/gdb/hppa-linux-tdep.c
++++ b/gdb/hppa-linux-tdep.c
+@@ -32,6 +32,7 @@
+ #include "regset.h"
+ #include "regcache.h"
+ #include "hppa-tdep.h"
++#include "linux-tdep.h"
+ 
+ #include "elf/common.h"
+ 
+@@ -513,7 +514,21 @@ hppa_linux_regset_from_core_section (struct gdbarch *gdbarch,
+ 
+   return NULL;
+ }
+-
++
++static CORE_ADDR
++hppa32_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					 CORE_ADDR addr,
++					 struct target_ops *targ)
++{
++  CORE_ADDR pc = hppa32_convert_from_func_ptr_addr (gdbarch, addr, targ);
++  CORE_ADDR resolved;
++
++  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++  if (resolved != pc)
++    pc = hppa32_convert_from_func_ptr_addr (gdbarch, resolved, targ);
++
++  return pc;
++}
+ 
+ /* Forward declarations.  */
+ extern initialize_file_ftype _initialize_hppa_linux_tdep;
+@@ -555,6 +570,10 @@ hppa_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
++
++  if (tdep->bytes_per_address == 4)
++    set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++				       hppa32_linux_convert_from_func_ptr_addr);
+ }
+ 
+ void
+diff --git a/gdb/hppa-tdep.c b/gdb/hppa-tdep.c
+index a0665ef..347fbe4 100644
+--- a/gdb/hppa-tdep.c
++++ b/gdb/hppa-tdep.c
+@@ -1247,7 +1247,7 @@ hppa64_return_value (struct gdbarch *gdbarch, struct type *func_type,
+ }
+ 
+ 
+-static CORE_ADDR
++CORE_ADDR
+ hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
+ 				   struct target_ops *targ)
+ {
+diff --git a/gdb/hppa-tdep.h b/gdb/hppa-tdep.h
+index e2d8752..c626637 100644
+--- a/gdb/hppa-tdep.h
++++ b/gdb/hppa-tdep.h
+@@ -246,4 +246,8 @@ extern int hppa_in_solib_call_trampoline (struct gdbarch *gdbarch,
+ 					  CORE_ADDR pc, char *name);
+ extern CORE_ADDR hppa_skip_trampoline_code (struct frame_info *, CORE_ADDR pc);
+ 
++extern CORE_ADDR hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++						    CORE_ADDR addr,
++						    struct target_ops *targ);
++
+ #endif  /* hppa-tdep.h */
 diff --git a/gdb/i386-linux-nat.c b/gdb/i386-linux-nat.c
 index ff837f2..1710487 100644
 --- a/gdb/i386-linux-nat.c
@@ -7645,6 +8042,20 @@ index ff837f2..1710487 100644
    i386_set_debug_register_length (4);
  
    /* Override the default ptrace resume method.  */
+diff --git a/gdb/i386-linux-tdep.c b/gdb/i386-linux-tdep.c
+index 5acd229..aec1736 100644
+--- a/gdb/i386-linux-tdep.c
++++ b/gdb/i386-linux-tdep.c
+@@ -798,6 +798,9 @@ i386_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+                                   i386_linux_get_syscall_number);
+ 
+   set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/i386-nat.c b/gdb/i386-nat.c
 index fa0cce6..42dfd1c 100644
 --- a/gdb/i386-nat.c
@@ -7698,6 +8109,53 @@ index 7317e7d..ea914a5 100644
      int debug_register_length;
    };
  
+diff --git a/gdb/ia64-linux-tdep.c b/gdb/ia64-linux-tdep.c
+index b12f282..8ddb24a 100644
+--- a/gdb/ia64-linux-tdep.c
++++ b/gdb/ia64-linux-tdep.c
+@@ -26,6 +26,7 @@
+ #include "osabi.h"
+ #include "solib-svr4.h"
+ #include "symtab.h"
++#include "linux-tdep.h"
+ 
+ /* The sigtramp code is in a non-readable (executable-only) region
+    of memory called the ``gate page''.  The addresses in question
+@@ -139,6 +140,9 @@ ia64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+diff --git a/gdb/infcall.c b/gdb/infcall.c
+index e736faa..8ec026b 100644
+--- a/gdb/infcall.c
++++ b/gdb/infcall.c
+@@ -252,9 +252,17 @@ find_function_addr (struct value *function, struct type **retval_type)
+       if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
+ 	  || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
+ 	{
+-	  funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
+-							&current_target);
+-	  value_type = TYPE_TARGET_TYPE (ftype);
++	  CORE_ADDR funaddr2;
++
++	  funaddr2 = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
++							 &current_target);
++
++	  /* If TYPE_GNU_IFUNC is currently not resolvable keep its type.  */
++	  if (funaddr2 != funaddr || !TYPE_GNU_IFUNC (ftype))
++	    {
++	      funaddr = funaddr2;
++	      value_type = TYPE_TARGET_TYPE (ftype);
++	    }
+ 	}
+     }
+   else if (code == TYPE_CODE_INT)
 diff --git a/gdb/infcmd.c b/gdb/infcmd.c
 index f99a4ae..5599908 100644
 --- a/gdb/infcmd.c
@@ -8437,6 +8895,79 @@ index 7fc9584..b286dfd 100644
  
    t->to_can_async_p = linux_nat_can_async_p;
    t->to_is_async_p = linux_nat_is_async_p;
+diff --git a/gdb/linux-tdep.c b/gdb/linux-tdep.c
+index 07fd67c..02b2342 100644
+--- a/gdb/linux-tdep.c
++++ b/gdb/linux-tdep.c
+@@ -23,6 +23,8 @@
+ #include "auxv.h"
+ #include "target.h"
+ #include "elf/common.h"
++#include "value.h"
++#include "infcall.h"
+ 
+ /* This function is suitable for architectures that don't
+    extend/override the standard siginfo structure.  */
+@@ -152,3 +154,43 @@ linux_has_shared_address_space (void)
+ 
+   return target_is_uclinux;
+ }
++
++/* Call gnu-ifunc to resolve breakpoint at its returned function.  */
++
++CORE_ADDR
++linux_convert_from_func_and_ptr (struct gdbarch *gdbarch, CORE_ADDR func_ptr,
++                                 CORE_ADDR pc)
++{
++  struct type *func_func_type = builtin_type (gdbarch)->builtin_func_func;
++  struct minimal_symbol *msymbol;
++  struct value *function, *address;
++
++  if (!target_has_execution)
++    return pc;
++
++  msymbol = lookup_minimal_symbol_by_pc (func_ptr);
++  if (msymbol == NULL)
++    return pc;
++  if (MSYMBOL_TYPE (msymbol) != mst_text_gnu_ifunc)
++    return pc;
++
++  /* Not at the gnu-ifunc entry point?  */
++  if (SYMBOL_VALUE_ADDRESS (msymbol) != func_ptr)
++    return pc;
++
++  function = allocate_value (func_func_type);
++  set_value_address (function, pc);
++
++  /* gnu-ifuncs have no arguments.  FUNCTION is the code instruction address
++     while ADDRESS is a function descriptor.  */
++  address = call_function_by_hand (function, 0, NULL);
++
++  return value_as_address (address);
++}
++
++CORE_ADDR
++linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
++				  struct target_ops *targ)
++{
++  return linux_convert_from_func_and_ptr (gdbarch, addr, addr);
++}
+diff --git a/gdb/linux-tdep.h b/gdb/linux-tdep.h
+index a8b522b..282190e 100644
+--- a/gdb/linux-tdep.h
++++ b/gdb/linux-tdep.h
+@@ -22,4 +22,11 @@
+ 
+ struct type *linux_get_siginfo_type (struct gdbarch *);
+ 
++CORE_ADDR linux_convert_from_func_and_ptr (struct gdbarch *gdbarch,
++					   CORE_ADDR func_ptr, CORE_ADDR pc);
++
++CORE_ADDR linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
++					    CORE_ADDR addr,
++					    struct target_ops *targ);
++
+ #endif /* linux-tdep.h */
 diff --git a/gdb/m2-lang.c b/gdb/m2-lang.c
 index 80e9bf9..3057774 100644
 --- a/gdb/m2-lang.c
@@ -8449,6 +8980,28 @@ index 80e9bf9..3057774 100644
    op_name_standard,
    dump_subexp_body_standard,
    evaluate_subexp_modula2
+diff --git a/gdb/m32r-linux-tdep.c b/gdb/m32r-linux-tdep.c
+index 6804609..2cb1bf9 100644
+--- a/gdb/m32r-linux-tdep.c
++++ b/gdb/m32r-linux-tdep.c
+@@ -30,6 +30,7 @@
+ #include "gdb_string.h"
+ 
+ #include "glibc-tdep.h"
++#include "linux-tdep.h"
+ #include "solib-svr4.h"
+ #include "symtab.h"
+ 
+@@ -422,6 +423,9 @@ m32r_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   /* Enable TLS support.  */
+   set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                              svr4_fetch_objfile_link_map);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/machoread.c b/gdb/machoread.c
 index 02b61d3..13ab595 100644
 --- a/gdb/machoread.c
@@ -8641,6 +9194,101 @@ index b227411..3b932f0 100644
        struct varobj *var = varobj_get_handle (name);
  
        varobj_update_one (var, print_values, 1 /* explicit */);
+diff --git a/gdb/microblaze-linux-tdep.c b/gdb/microblaze-linux-tdep.c
+index a691b62..d679516 100644
+--- a/gdb/microblaze-linux-tdep.c
++++ b/gdb/microblaze-linux-tdep.c
+@@ -35,6 +35,7 @@
+ #include "trad-frame.h"
+ #include "frame-unwind.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ 
+ static int
+@@ -133,6 +134,9 @@ microblaze_linux_init_abi (struct gdbarch_info info,
+   /* Trampolines.  */
+   tramp_frame_prepend_unwinder (gdbarch,
+ 				&microblaze_linux_sighandler_tramp_frame);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ void
+diff --git a/gdb/minsyms.c b/gdb/minsyms.c
+index 287f9de..1fe0fbe 100644
+--- a/gdb/minsyms.c
++++ b/gdb/minsyms.c
+@@ -331,8 +331,9 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
+ 	       msymbol = msymbol->hash_next)
+ 	    {
+ 	      if (strcmp (SYMBOL_LINKAGE_NAME (msymbol), name) == 0 &&
+-		  (MSYMBOL_TYPE (msymbol) == mst_text ||
+-		   MSYMBOL_TYPE (msymbol) == mst_file_text))
++		  (MSYMBOL_TYPE (msymbol) == mst_text
++		   || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc
++		   || MSYMBOL_TYPE (msymbol) == mst_file_text))
+ 		{
+ 		  switch (MSYMBOL_TYPE (msymbol))
+ 		    {
+@@ -694,6 +695,16 @@ lookup_minimal_symbol_by_pc (CORE_ADDR pc)
+   return lookup_minimal_symbol_by_pc_section (pc, NULL);
+ }
+ 
++/* Return non-zero iff PC is in function implementing gnu-ifunc selection.  */
++
++int
++in_gnu_ifunc_stub (CORE_ADDR pc)
++{
++  struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
++
++  return msymbol && MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc;
++}
++
+ /* Find the minimal symbol named NAME, and return both the minsym
+    struct and its objfile.  This only checks the linkage name.  Sets
+    *OBJFILE_P and returns the minimal symbol, if it is found.  If it
+@@ -763,6 +774,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
+   switch (ms_type)
+     {
+     case mst_text:
++    case mst_text_gnu_ifunc:
+     case mst_file_text:
+     case mst_solib_trampoline:
+       section = SECT_OFF_TEXT (objfile);
+@@ -1228,7 +1240,8 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
+     {
+       ALL_MSYMBOLS (objfile, msymbol)
+       {
+-	if (MSYMBOL_TYPE (msymbol) == mst_text
++	if ((MSYMBOL_TYPE (msymbol) == mst_text
++	    || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc)
+ 	    && strcmp (SYMBOL_LINKAGE_NAME (msymbol),
+ 		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
+ 	  return SYMBOL_VALUE_ADDRESS (msymbol);
+diff --git a/gdb/mips-linux-tdep.c b/gdb/mips-linux-tdep.c
+index 6bb4eb6..2b07942 100644
+--- a/gdb/mips-linux-tdep.c
++++ b/gdb/mips-linux-tdep.c
+@@ -38,6 +38,7 @@
+ #include "target-descriptions.h"
+ #include "mips-linux-tdep.h"
+ #include "glibc-tdep.h"
++#include "linux-tdep.h"
+ 
+ static struct target_so_ops mips_svr4_so_ops;
+ 
+@@ -1225,6 +1226,9 @@ mips_linux_init_abi (struct gdbarch_info info,
+ 	tdesc_numbered_register (feature, tdesc_data, MIPS_RESTART_REGNUM,
+ 				 "restart");
+     }
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/mipsread.c b/gdb/mipsread.c
 index 4ef817e..1c53574 100644
 --- a/gdb/mipsread.c
@@ -8653,6 +9301,67 @@ index 4ef817e..1c53574 100644
    mipscoff_symfile_finish,	/* sym_finish: finished with file, cleanup */
    default_symfile_offsets,	/* sym_offsets: dummy FIXME til implem sym reloc */
    default_symfile_segments,	/* sym_segments: Get segment information from
+diff --git a/gdb/mn10300-linux-tdep.c b/gdb/mn10300-linux-tdep.c
+index d4602a4..7bba707 100644
+--- a/gdb/mn10300-linux-tdep.c
++++ b/gdb/mn10300-linux-tdep.c
+@@ -32,6 +32,7 @@
+ #include "frame.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include <stdlib.h>
+ 
+@@ -718,6 +719,9 @@ am33_linux_init_osabi (struct gdbarch_info gdbinfo, struct gdbarch *gdbarch)
+ 
+   tramp_frame_prepend_unwinder (gdbarch, &am33_linux_sigframe);
+   tramp_frame_prepend_unwinder (gdbarch, &am33_linux_rt_sigframe);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+diff --git a/gdb/objc-lang.c b/gdb/objc-lang.c
+index a050f15..04d1f1c 100644
+--- a/gdb/objc-lang.c
++++ b/gdb/objc-lang.c
+@@ -1178,16 +1178,6 @@ find_methods (struct symtab *symtab, char type,
+ 
+ 	  QUIT;
+ 
+-	  /* The minimal symbol might point to a function descriptor;
+-	     resolve it to the actual code address instead.  */
+-	  pc = gdbarch_convert_from_func_ptr_addr (gdbarch, pc,
+-						   &current_target);
+-
+-	  if (symtab)
+-	    if (pc < BLOCK_START (block) || pc >= BLOCK_END (block))
+-	      /* Not in the specified symtab.  */
+-	      continue;
+-
+ 	  symname = SYMBOL_NATURAL_NAME (msymbol);
+ 	  if (symname == NULL)
+ 	    continue;
+@@ -1223,6 +1213,17 @@ find_methods (struct symtab *symtab, char type,
+ 	      ((nselector == NULL) || (strcmp (selector, nselector) != 0)))
+ 	    continue;
+ 
++	  /* The minimal symbol might point to a function descriptor;
++	     resolve it to the actual code address instead.  Delay the call as
++	     its resolution may be expensive.  */
++	  pc = gdbarch_convert_from_func_ptr_addr (gdbarch, pc,
++						   &current_target);
++
++	  if (symtab)
++	    if (pc < BLOCK_START (block) || pc >= BLOCK_END (block))
++	      /* Not in the specified symtab.  */
++	      continue;
++
+ 	  sym = find_pc_function (pc);
+ 	  if (sym != NULL)
+ 	    {
 diff --git a/gdb/objfiles.c b/gdb/objfiles.c
 index 0b07e37..5de5300 100644
 --- a/gdb/objfiles.c
@@ -8745,7 +9454,7 @@ index c689622..eb3ae10 100644
    ALL_PSPACE_OBJFILES (ss, objfile)			\
      ALL_OBJFILE_PSYMTABS (objfile, p)
 diff --git a/gdb/parse.c b/gdb/parse.c
-index d5a199b..d2a04c3 100644
+index d5a199b..c3ef9e1 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
 @@ -62,6 +62,7 @@ const struct exp_descriptor exp_descriptor_standard =
@@ -8756,7 +9465,19 @@ index d5a199b..d2a04c3 100644
      op_name_standard,
      dump_subexp_body_standard,
      evaluate_subexp_standard
-@@ -841,6 +842,10 @@ operator_length_standard (struct expression *expr, int endpos,
+@@ -511,6 +512,11 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
+       write_exp_elt_type (objfile_type (objfile)->nodebug_text_symbol);
+       break;
+ 
++    case mst_text_gnu_ifunc:
++      write_exp_elt_type (objfile_type (objfile)
++					       ->nodebug_text_gnu_ifunc_symbol);
++      break;
++
+     case mst_data:
+     case mst_file_data:
+     case mst_bss:
+@@ -841,6 +847,10 @@ operator_length_standard (struct expression *expr, int endpos,
        args = 1;
        break;
  
@@ -8767,7 +9488,7 @@ index d5a199b..d2a04c3 100644
      case OP_OBJC_MSGCALL:	/* Objective C message (method) call */
        oplen = 4;
        args = 1 + longest_to_int (expr->elts[endpos - 2].longconst);
-@@ -1361,6 +1366,150 @@ parser_fprintf (FILE *x, const char *y, ...)
+@@ -1361,6 +1371,151 @@ parser_fprintf (FILE *x, const char *y, ...)
    va_end (args);
  }
  
@@ -8817,8 +9538,9 @@ index d5a199b..d2a04c3 100644
 +	const struct symbol *const symbol = elts[pos + 2].symbol;
 +	const struct obj_section *const section = SYMBOL_OBJ_SECTION (symbol);
 +
-+	/* Check objfile where the variable itself is placed.  */
-+	if (section && objfile_func && (*objfile_func) (section->objfile, data))
++	/* Check objfile where the variable itself is placed.
++	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
++	if (objfile_func && (*objfile_func) (SYMBOL_SYMTAB (symbol)->objfile, data))
 +	  return 1;
 +
 +	/* Check objfile where is placed the code touching the variable.  */
@@ -9003,8 +9725,42 @@ index 10ff73d..5b68f56 100644
    t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
    t->to_stopped_data_address = ppc_linux_stopped_data_address;
    t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
+diff --git a/gdb/ppc-linux-tdep.c b/gdb/ppc-linux-tdep.c
+index 36cedf1..2d736fe 100644
+--- a/gdb/ppc-linux-tdep.c
++++ b/gdb/ppc-linux-tdep.c
+@@ -48,6 +48,7 @@
+ #include "arch-utils.h"
+ #include "spu-tdep.h"
+ #include "xml-syscall.h"
++#include "linux-tdep.h"
+ 
+ #include "features/rs6000/powerpc-32l.c"
+ #include "features/rs6000/powerpc-altivec32l.c"
+@@ -672,8 +673,19 @@ ppc64_linux_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
+       res = bfd_get_section_contents (s->bfd, s->the_bfd_section,
+ 				      &buf, addr - s->addr, 8);
+       if (res != 0)
+-	return extract_unsigned_integer (buf, 8, byte_order)
+-		- bfd_section_vma (s->bfd, s->the_bfd_section) + s->addr;
++	{
++	  CORE_ADDR pc, resolved;
++	  
++	  pc = extract_unsigned_integer (buf, 8, byte_order)
++	       - bfd_section_vma (s->bfd, s->the_bfd_section) + s->addr;
++
++	  resolved = linux_convert_from_func_and_ptr (gdbarch, addr, pc);
++	  if (resolved != pc)
++	    pc = ppc64_linux_convert_from_func_ptr_addr (gdbarch, resolved,
++							 targ);
++
++	  return pc;
++	}
+    }
+ 
+   return addr;
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
-index 88db08b..18dae9e 100644
+index c8cb35c..18dae9e 100644
 --- a/gdb/printcmd.c
 +++ b/gdb/printcmd.c
 @@ -46,7 +46,6 @@
@@ -9050,7 +9806,7 @@ index 88db08b..18dae9e 100644
  
  
  /* Add an expression to the auto-display chain.
-@@ -1859,52 +1879,6 @@ disable_display_command (char *args, int from_tty)
+@@ -1859,51 +1879,6 @@ disable_display_command (char *args, int from_tty)
        }
  }
  
@@ -9083,15 +9839,14 @@ index 88db08b..18dae9e 100644
 -	{
 -	  const struct block *const block = elts[i + 1].block;
 -	  const struct symbol *const symbol = elts[i + 2].symbol;
--	  const struct obj_section *const section =
--	    SYMBOL_OBJ_SECTION (symbol);
 -
 -	  if (block != NULL
 -	      && solib_contains_address_p (solib,
 -					   block->startaddr))
 -	    return 1;
 -
--	  if (section && section->objfile == solib->objfile)
+-	  /* SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
+-	  if (SYMBOL_SYMTAB (symbol)->objfile == solib->objfile)
 -	    return 1;
 -	}
 -      endpos -= oplen;
@@ -9103,7 +9858,7 @@ index 88db08b..18dae9e 100644
  /* display_chain items point to blocks and expressions.  Some expressions in
     turn may point to symbols.
     Both symbols and blocks are obstack_alloc'd on objfile_stack, and are
-@@ -1916,18 +1890,20 @@ display_uses_solib_p (const struct display *d,
+@@ -1915,18 +1890,20 @@ display_uses_solib_p (const struct display *d,
  static void
  clear_dangling_display_expressions (struct so_list *solib)
  {
@@ -9134,7 +9889,7 @@ index 88db08b..18dae9e 100644
  }
  
  
-@@ -2812,4 +2788,6 @@ Show printing of source filename and line number with <symbol>."), NULL,
+@@ -2811,4 +2788,6 @@ Show printing of source filename and line number with <symbol>."), NULL,
  			   NULL,
  			   show_print_symbol_filename,
  			   &setprintlist, &showprintlist);
@@ -15252,6 +16007,28 @@ index 1e8d48e..95185d4 100644
  
        if ((gdb_output_sym == NULL) || (gdb_output_len_sym == NULL))
  	ret = -1;
+diff --git a/gdb/sh-linux-tdep.c b/gdb/sh-linux-tdep.c
+index da4137b..e3fcb1a 100644
+--- a/gdb/sh-linux-tdep.c
++++ b/gdb/sh-linux-tdep.c
+@@ -25,6 +25,7 @@
+ 
+ #include "glibc-tdep.h"
+ #include "sh-tdep.h"
++#include "linux-tdep.h"
+ 
+ #define REGSx16(base) \
+   {(base),      0}, \
+@@ -89,6 +90,9 @@ sh_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+       tdep->core_gregmap = (struct sh_corefile_regmap *)gregs_table;
+       tdep->core_fpregmap = (struct sh_corefile_regmap *)fpregs_table;
+     }
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/solib-darwin.c b/gdb/solib-darwin.c
 index 3c70089..0ee7d85 100644
 --- a/gdb/solib-darwin.c
@@ -15288,10 +16065,20 @@ index 94a77fb..7ea68d2 100644
  }
  
 diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
-index 826f8bf..4def88d 100644
+index e497364..feba23c 100644
 --- a/gdb/solib-svr4.c
 +++ b/gdb/solib-svr4.c
-@@ -1960,7 +1960,6 @@ struct target_so_ops svr4_so_ops;
+@@ -1208,7 +1208,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR pc)
+ 	   && pc < info->interp_text_sect_high)
+ 	  || (pc >= info->interp_plt_sect_low
+ 	      && pc < info->interp_plt_sect_high)
+-	  || in_plt_section (pc, NULL));
++	  || in_plt_section (pc, NULL)
++	  || in_gnu_ifunc_stub (pc));
+ }
+ 
+ /* Given an executable's ABFD and target, compute the entry-point
+@@ -1961,7 +1962,6 @@ struct target_so_ops svr4_so_ops;
  static struct symbol *
  elf_lookup_lib_symbol (const struct objfile *objfile,
  		       const char *name,
@@ -15299,7 +16086,7 @@ index 826f8bf..4def88d 100644
  		       const domain_enum domain)
  {
    bfd *abfd;
-@@ -1978,8 +1977,7 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
+@@ -1979,8 +1979,7 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
    if (abfd == NULL || scan_dyntag (DT_SYMBOLIC, abfd, NULL) != 1)
      return NULL;
  
@@ -15360,6 +16147,50 @@ index c7beaba..e31164c 100644
    som_symfile_finish,		/* sym_finish: finished with file, cleanup */
    som_symfile_offsets,		/* sym_offsets:  Translate ext. to int. relocation */
    default_symfile_segments,	/* sym_segments: Get segment information from
+diff --git a/gdb/sparc-linux-tdep.c b/gdb/sparc-linux-tdep.c
+index d65db6c..e91c0bf 100644
+--- a/gdb/sparc-linux-tdep.c
++++ b/gdb/sparc-linux-tdep.c
+@@ -32,6 +32,7 @@
+ #include "symtab.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include "sparc-tdep.h"
+ 
+@@ -279,6 +280,9 @@ sparc32_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   dwarf2_append_unwinders (gdbarch);
+ 
+   set_gdbarch_write_pc (gdbarch, sparc_linux_write_pc);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+diff --git a/gdb/sparc64-linux-tdep.c b/gdb/sparc64-linux-tdep.c
+index 8b7e908..4de6d9c 100644
+--- a/gdb/sparc64-linux-tdep.c
++++ b/gdb/sparc64-linux-tdep.c
+@@ -31,6 +31,7 @@
+ #include "symtab.h"
+ #include "trad-frame.h"
+ #include "tramp-frame.h"
++#include "linux-tdep.h"
+ 
+ #include "sparc64-tdep.h"
+ 
+@@ -244,6 +245,9 @@ sparc64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+   tdep->step_trap = sparc64_linux_step_trap;
+ 
+   set_gdbarch_write_pc (gdbarch, sparc64_linux_write_pc);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ 
 diff --git a/gdb/spu-tdep.c b/gdb/spu-tdep.c
 index c6db8dc..7359b50 100644
 --- a/gdb/spu-tdep.c
@@ -15506,10 +16337,20 @@ index efa069e..b520b93 100644
  extern void dwarf2_build_frame_info (struct objfile *);
  
 diff --git a/gdb/symmisc.c b/gdb/symmisc.c
-index 1f3eb9e..d096d5c 100644
+index 1f3eb9e..3ff239a 100644
 --- a/gdb/symmisc.c
 +++ b/gdb/symmisc.c
-@@ -1143,7 +1143,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
+@@ -294,6 +294,9 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
+ 	case mst_text:
+ 	  ms_type = 'T';
+ 	  break;
++	case mst_text_gnu_ifunc:
++	  ms_type = 'i';
++	  break;
+ 	case mst_solib_trampoline:
+ 	  ms_type = 'S';
+ 	  break;
+@@ -1143,7 +1146,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
      while (length--)
        {
  	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
@@ -15518,7 +16359,7 @@ index 1f3eb9e..d096d5c 100644
  	if (!sym)
  	  {
  	    printf_filtered ("Static symbol `");
-@@ -1160,7 +1160,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
+@@ -1160,7 +1163,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
      while (length--)
        {
  	sym = lookup_block_symbol (b, SYMBOL_LINKAGE_NAME (*psym),
@@ -15528,7 +16369,7 @@ index 1f3eb9e..d096d5c 100644
  	  {
  	    printf_filtered ("Global symbol `");
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index 426326d..20d90de 100644
+index af4e501..9537dae 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -42,6 +42,7 @@
@@ -15717,7 +16558,7 @@ index 426326d..20d90de 100644
  {
    struct symbol *sym;
    const struct language_defn *langdef;
-@@ -1354,55 +1381,19 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+@@ -1354,56 +1381,19 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
    /* Search specified block and its superiors.  Don't search
       STATIC_BLOCK or GLOBAL_BLOCK.  */
  
@@ -15735,13 +16576,14 @@ index 426326d..20d90de 100644
 -      && block != NULL)
 -    {
 -      struct symbol *sym = NULL;
+-      const struct block *function_block = block;
 -      /* 'this' is only defined in the function's block, so find the
 -	 enclosing function block.  */
--      for (; block && !BLOCK_FUNCTION (block);
--	   block = BLOCK_SUPERBLOCK (block));
+-      for (; function_block && !BLOCK_FUNCTION (function_block);
+-	   function_block = BLOCK_SUPERBLOCK (function_block));
 -
--      if (block && !dict_empty (BLOCK_DICT (block)))
--	sym = lookup_block_symbol (block, langdef->la_name_of_this,
+-      if (function_block && !dict_empty (BLOCK_DICT (function_block)))
+-	sym = lookup_block_symbol (function_block, langdef->la_name_of_this,
 -				   NULL, VAR_DOMAIN);
 -      if (sym)
 -	{
@@ -15780,7 +16622,7 @@ index 426326d..20d90de 100644
    if (sym != NULL)
      return sym;
  
-@@ -1412,11 +1403,11 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+@@ -1413,11 +1403,11 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
       desired name as a file-level static, then do psymtab-to-symtab
       conversion on the fly and return the found symbol. */
  
@@ -15794,7 +16636,7 @@ index 426326d..20d90de 100644
    if (sym != NULL)
      return sym;
  
-@@ -1427,30 +1418,81 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
+@@ -1428,30 +1418,81 @@ lookup_symbol_aux (const char *name, const char *linkage_name,
     Don't search STATIC_BLOCK or GLOBAL_BLOCK.  */
  
  static struct symbol *
@@ -15887,7 +16729,7 @@ index 426326d..20d90de 100644
  
    return NULL;
  }
-@@ -1484,13 +1526,12 @@ lookup_objfile_from_block (const struct block *block)
+@@ -1485,13 +1526,12 @@ lookup_objfile_from_block (const struct block *block)
     block_found appropriately.  */
  
  struct symbol *
@@ -15903,7 +16745,7 @@ index 426326d..20d90de 100644
    if (sym)
      {
        block_found = block;
-@@ -1506,7 +1547,6 @@ lookup_symbol_aux_block (const char *name, const char *linkage_name,
+@@ -1507,7 +1547,6 @@ lookup_symbol_aux_block (const char *name, const char *linkage_name,
  struct symbol *
  lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
  				   const char *name,
@@ -15911,7 +16753,7 @@ index 426326d..20d90de 100644
  				   const domain_enum domain)
  {
    const struct objfile *objfile;
-@@ -1525,7 +1565,7 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
+@@ -1526,7 +1565,7 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
          {
            bv = BLOCKVECTOR (s);
            block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -15920,7 +16762,7 @@ index 426326d..20d90de 100644
            if (sym)
              {
                block_found = block;
-@@ -1534,16 +1574,16 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
+@@ -1535,16 +1574,16 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
          }
  
        /* Now go through psymtabs.  */
@@ -15940,7 +16782,7 @@ index 426326d..20d90de 100644
                return fixup_symbol_section (sym, (struct objfile *)objfile);
              }
          }
-@@ -1558,8 +1598,7 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
+@@ -1559,8 +1598,7 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
     static symbols.  */
  
  static struct symbol *
@@ -15950,7 +16792,7 @@ index 426326d..20d90de 100644
  			   const domain_enum domain)
  {
    struct symbol *sym;
-@@ -1572,7 +1611,7 @@ lookup_symbol_aux_symtabs (int block_index,
+@@ -1573,7 +1611,7 @@ lookup_symbol_aux_symtabs (int block_index,
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, block_index);
@@ -15959,7 +16801,7 @@ index 426326d..20d90de 100644
      if (sym)
        {
  	block_found = block;
-@@ -1590,7 +1629,6 @@ lookup_symbol_aux_symtabs (int block_index,
+@@ -1591,7 +1629,6 @@ lookup_symbol_aux_symtabs (int block_index,
  
  static struct symbol *
  lookup_symbol_aux_psymtabs (int block_index, const char *name,
@@ -15967,7 +16809,7 @@ index 426326d..20d90de 100644
  			    const domain_enum domain)
  {
    struct symbol *sym;
-@@ -1601,16 +1639,15 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1602,16 +1639,15 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
    struct symtab *s;
    const int psymtab_index = (block_index == GLOBAL_BLOCK ? 1 : 0);
  
@@ -15987,7 +16829,7 @@ index 426326d..20d90de 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort try
-@@ -1627,7 +1664,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1628,7 +1664,7 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
  	    block = BLOCKVECTOR_BLOCK (bv,
  				       block_index == GLOBAL_BLOCK ?
  				       STATIC_BLOCK : GLOBAL_BLOCK);
@@ -15996,7 +16838,7 @@ index 426326d..20d90de 100644
  	    if (!sym)
  	      error (_("Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n%s may be an inlined function, or may be a template function\n(if a template, try specifying an instantiation: %s<type>)."),
  		     block_index == GLOBAL_BLOCK ? "global" : "static",
-@@ -1646,7 +1683,6 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
+@@ -1647,7 +1683,6 @@ lookup_symbol_aux_psymtabs (int block_index, const char *name,
  
  struct symbol *
  basic_lookup_symbol_nonlocal (const char *name,
@@ -16004,7 +16846,7 @@ index 426326d..20d90de 100644
  			      const struct block *block,
  			      const domain_enum domain)
  {
-@@ -1680,11 +1716,11 @@ basic_lookup_symbol_nonlocal (const char *name,
+@@ -1681,11 +1716,11 @@ basic_lookup_symbol_nonlocal (const char *name,
       than that one, so I don't think we should worry about that for
       now.  */
  
@@ -16018,7 +16860,7 @@ index 426326d..20d90de 100644
  }
  
  /* Lookup a symbol in the static block associated to BLOCK, if there
-@@ -1692,14 +1728,13 @@ basic_lookup_symbol_nonlocal (const char *name,
+@@ -1693,14 +1728,13 @@ basic_lookup_symbol_nonlocal (const char *name,
  
  struct symbol *
  lookup_symbol_static (const char *name,
@@ -16034,7 +16876,7 @@ index 426326d..20d90de 100644
    else
      return NULL;
  }
-@@ -1709,7 +1744,6 @@ lookup_symbol_static (const char *name,
+@@ -1710,7 +1744,6 @@ lookup_symbol_static (const char *name,
  
  struct symbol *
  lookup_symbol_global (const char *name,
@@ -16042,7 +16884,7 @@ index 426326d..20d90de 100644
  		      const struct block *block,
  		      const domain_enum domain)
  {
-@@ -1719,15 +1753,15 @@ lookup_symbol_global (const char *name,
+@@ -1720,15 +1753,15 @@ lookup_symbol_global (const char *name,
    /* Call library-specific lookup procedure.  */
    objfile = lookup_objfile_from_block (block);
    if (objfile != NULL)
@@ -16061,7 +16903,7 @@ index 426326d..20d90de 100644
  }
  
  int
-@@ -1751,14 +1785,11 @@ symbol_matches_domain (enum language symbol_language,
+@@ -1752,14 +1785,11 @@ symbol_matches_domain (enum language symbol_language,
  }
  
  /* Look, in partial_symtab PST, for symbol whose natural name is NAME.
@@ -16078,7 +16920,7 @@ index 426326d..20d90de 100644
  {
    struct partial_symbol *temp;
    struct partial_symbol **start, **psym;
-@@ -1810,9 +1841,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
+@@ -1811,9 +1841,7 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
  	internal_error (__FILE__, __LINE__, _("failed internal consistency check"));
  
        while (top <= real_top
@@ -16089,7 +16931,7 @@ index 426326d..20d90de 100644
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
  				     SYMBOL_DOMAIN (*top), domain))
-@@ -1829,15 +1858,9 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
+@@ -1830,15 +1858,9 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
        for (psym = start; psym < start + length; psym++)
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
@@ -16108,7 +16950,7 @@ index 426326d..20d90de 100644
  	}
      }
  
-@@ -1879,22 +1902,25 @@ basic_lookup_transparent_type (const char *name)
+@@ -1880,22 +1902,25 @@ basic_lookup_transparent_type (const char *name)
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -16139,7 +16981,7 @@ index 426326d..20d90de 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort
-@@ -1903,7 +1929,7 @@ basic_lookup_transparent_type (const char *name)
+@@ -1904,7 +1929,7 @@ basic_lookup_transparent_type (const char *name)
  	     * the psymtab gets it wrong in some cases.
  	     */
  	    block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -16148,7 +16990,7 @@ index 426326d..20d90de 100644
  	    if (!sym)
  	      error (_("Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
  %s may be an inlined function, or may be a template function\n\
-@@ -1927,21 +1953,26 @@ basic_lookup_transparent_type (const char *name)
+@@ -1928,21 +1953,26 @@ basic_lookup_transparent_type (const char *name)
    {
      bv = BLOCKVECTOR (s);
      block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -16179,7 +17021,7 @@ index 426326d..20d90de 100644
  	if (!sym)
  	  {
  	    /* This shouldn't be necessary, but as a last resort
-@@ -1950,7 +1981,7 @@ basic_lookup_transparent_type (const char *name)
+@@ -1951,7 +1981,7 @@ basic_lookup_transparent_type (const char *name)
  	     * the psymtab gets it wrong in some cases.
  	     */
  	    block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
@@ -16188,7 +17030,7 @@ index 426326d..20d90de 100644
  	    if (!sym)
  	      error (_("Internal: static symbol `%s' found in %s psymtab but not in symtab.\n\
  %s may be an inlined function, or may be a template function\n\
-@@ -1975,9 +2006,23 @@ find_main_psymtab (void)
+@@ -1976,9 +2006,23 @@ find_main_psymtab (void)
    struct partial_symtab *pst;
    struct objfile *objfile;
  
@@ -16214,7 +17056,7 @@ index 426326d..20d90de 100644
        {
  	return (pst);
        }
-@@ -1995,14 +2040,10 @@ find_main_psymtab (void)
+@@ -1996,14 +2040,10 @@ find_main_psymtab (void)
     search on the symbols.  Each symbol which is marked as being a ObjC/C++
     symbol (language_cplus or language_objc set) has both the encoded and
     non-encoded names tested for a match.
@@ -16229,7 +17071,7 @@ index 426326d..20d90de 100644
  		     const domain_enum domain)
  {
    struct dict_iterator iter;
-@@ -2015,9 +2056,7 @@ lookup_block_symbol (const struct block *block, const char *name,
+@@ -2016,9 +2056,7 @@ lookup_block_symbol (const struct block *block, const char *name,
  	   sym = dict_iter_name_next (name, &iter))
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
@@ -16240,7 +17082,7 @@ index 426326d..20d90de 100644
  	    return sym;
  	}
        return NULL;
-@@ -2037,9 +2076,7 @@ lookup_block_symbol (const struct block *block, const char *name,
+@@ -2038,9 +2076,7 @@ lookup_block_symbol (const struct block *block, const char *name,
  	   sym = dict_iter_name_next (name, &iter))
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
@@ -16251,7 +17093,16 @@ index 426326d..20d90de 100644
  	    {
  	      sym_found = sym;
  	      if (!SYMBOL_IS_ARGUMENT (sym))
-@@ -3261,7 +3298,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
+@@ -3201,7 +3237,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
+   {mst_file_data, mst_solib_trampoline, mst_abs, mst_unknown};
+   static enum minimal_symbol_type types4[]
+   =
+-  {mst_file_bss, mst_text, mst_abs, mst_unknown};
++  {mst_file_bss, mst_text_gnu_ifunc, mst_abs, mst_unknown};
+   enum minimal_symbol_type ourtype;
+   enum minimal_symbol_type ourtype2;
+   enum minimal_symbol_type ourtype3;
+@@ -3262,7 +3298,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
       matching the regexp.  That way we don't have to reproduce all of
       the machinery below. */
  
@@ -16261,10 +17112,19 @@ index 426326d..20d90de 100644
      struct partial_symbol **bound, **gbound, **sbound;
      int keep_going = 1;
 diff --git a/gdb/symtab.h b/gdb/symtab.h
-index 800ffd8..4253f9d 100644
+index 167dfe8..2f88e93 100644
 --- a/gdb/symtab.h
 +++ b/gdb/symtab.h
-@@ -396,7 +396,10 @@ typedef enum domain_enum_tag
+@@ -280,6 +280,8 @@ enum minimal_symbol_type
+ {
+   mst_unknown = 0,		/* Unknown type, the default */
+   mst_text,			/* Generally executable instructions */
++  mst_text_gnu_ifunc,		/* Executable code returning address
++				   of executable code */
+   mst_data,			/* Generally initialized data */
+   mst_bss,			/* Generally uninitialized data */
+   mst_abs,			/* Generally absolute (nonrelocatable) */
+@@ -396,7 +398,10 @@ typedef enum domain_enum_tag
    FUNCTIONS_DOMAIN,
  
    /* All defined types */
@@ -16276,7 +17136,7 @@ index 800ffd8..4253f9d 100644
  }
  domain_enum;
  
-@@ -993,7 +996,6 @@ extern struct symbol *lookup_symbol (const char *, const struct block *,
+@@ -994,7 +999,6 @@ extern struct symbol *lookup_symbol (const char *, const struct block *,
     that can't think of anything better to do.  */
  
  extern struct symbol *basic_lookup_symbol_nonlocal (const char *,
@@ -16284,7 +17144,7 @@ index 800ffd8..4253f9d 100644
  						    const struct block *,
  						    const domain_enum);
  
-@@ -1004,7 +1006,6 @@ extern struct symbol *basic_lookup_symbol_nonlocal (const char *,
+@@ -1005,7 +1009,6 @@ extern struct symbol *basic_lookup_symbol_nonlocal (const char *,
     is one; do nothing if BLOCK is NULL or a global block.  */
  
  extern struct symbol *lookup_symbol_static (const char *name,
@@ -16292,7 +17152,7 @@ index 800ffd8..4253f9d 100644
  					    const struct block *block,
  					    const domain_enum domain);
  
-@@ -1012,7 +1013,6 @@ extern struct symbol *lookup_symbol_static (const char *name,
+@@ -1013,7 +1016,6 @@ extern struct symbol *lookup_symbol_static (const char *name,
     necessary).  */
  
  extern struct symbol *lookup_symbol_global (const char *name,
@@ -16300,7 +17160,7 @@ index 800ffd8..4253f9d 100644
  					    const struct block *block,
  					    const domain_enum domain);
  
-@@ -1021,21 +1021,18 @@ extern struct symbol *lookup_symbol_global (const char *name,
+@@ -1022,21 +1024,18 @@ extern struct symbol *lookup_symbol_global (const char *name,
     will fix up the symbol if necessary.  */
  
  extern struct symbol *lookup_symbol_aux_block (const char *name,
@@ -16322,7 +17182,7 @@ index 800ffd8..4253f9d 100644
  					   const domain_enum);
  
  /* lookup a [struct, union, enum] by name, within a specified block */
-@@ -1065,6 +1062,8 @@ extern void clear_pc_function_cache (void);
+@@ -1066,6 +1065,8 @@ extern void clear_pc_function_cache (void);
  
  /* from symtab.c: */
  
@@ -16331,7 +17191,16 @@ index 800ffd8..4253f9d 100644
  /* lookup partial symbol table by filename */
  
  extern struct partial_symtab *lookup_partial_symtab (const char *);
-@@ -1367,7 +1366,6 @@ extern /*const */ char *main_name (void);
+@@ -1159,6 +1160,8 @@ extern struct minimal_symbol *lookup_minimal_symbol_by_pc_name
+ 
+ extern struct minimal_symbol *lookup_minimal_symbol_by_pc (CORE_ADDR);
+ 
++extern int in_gnu_ifunc_stub (CORE_ADDR pc);
++
+ extern struct minimal_symbol *
+     lookup_minimal_symbol_and_objfile (const char *,
+ 				       struct objfile **);
+@@ -1372,7 +1375,6 @@ extern /*const */ char *main_name (void);
  /* Check global symbols in objfile.  */
  struct symbol *lookup_global_symbol_from_objfile (const struct objfile *objfile,
  						  const char *name,
@@ -17647,6 +18516,229 @@ index 0ef6c4b..330ed87 100644
 +	unsupported "$test (no GCC)"
 +    }
 +}
+diff --git a/gdb/testsuite/gdb.base/gnu-ifunc-lib.c b/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
+new file mode 100644
+index 0000000..204ce99
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
+@@ -0,0 +1,54 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <assert.h>
++
++typedef int (*final_t) (int arg);
++
++static int
++init_stub (int arg)
++{
++  return 0;
++}
++
++static int
++final (int arg)
++{
++  return arg + 1;
++}
++
++static volatile int gnu_ifunc_initialized;
++
++void
++gnu_ifunc_pre (void)
++{
++  assert (!gnu_ifunc_initialized);
++
++  gnu_ifunc_initialized = 1;
++}
++
++final_t gnu_ifuncX (void) asm ("gnu_ifunc");
++asm (".type gnu_ifunc, @gnu_indirect_function");
++
++final_t
++gnu_ifuncX (void)
++{
++  if (!gnu_ifunc_initialized)
++    return init_stub;
++  else
++    return final;
++}
+diff --git a/gdb/testsuite/gdb.base/gnu-ifunc.c b/gdb/testsuite/gdb.base/gnu-ifunc.c
+new file mode 100644
+index 0000000..e4a823d
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/gnu-ifunc.c
+@@ -0,0 +1,36 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <assert.h>
++
++extern int gnu_ifunc (int arg);
++extern void gnu_ifunc_pre (void);
++
++int
++main (void)
++{
++  int i;
++
++  gnu_ifunc_pre ();
++  
++  i = gnu_ifunc (1);	/* break-at-call */
++  assert (i == 2);
++
++  gnu_ifunc (2);	/* break-at-nextcall */
++
++  return 0;	/* break-at-exit */
++}
+diff --git a/gdb/testsuite/gdb.base/gnu-ifunc.exp b/gdb/testsuite/gdb.base/gnu-ifunc.exp
+new file mode 100644
+index 0000000..4b3ac41
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/gnu-ifunc.exp
+@@ -0,0 +1,115 @@
++# Copyright (C) 2009 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if {[skip_shlib_tests]} {
++    return 0
++}
++
++set testfile "gnu-ifunc"
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${testfile}
++
++set libfile "${testfile}-lib"
++set libsrc ${libfile}.c
++set lib_so ${objdir}/${subdir}/${libfile}.so
++
++set lib_nodebug_so_base ${libfile}-nodebug.so
++set lib_nodebug_so ${objdir}/${subdir}/${lib_nodebug_so_base}
++
++# {debug} provides DWARF symbol gnu_ifuncX confusing the ELF symbol
++# gnu_ifunc during address->symbol resolution for printing the symbol.
++# Still we need it here for "step"ping into the function.
++set lib_opts [list debug]
++set lib_nodebug_opts [list]
++set exec_opts [list debug shlib=$lib_so]
++
++if [get_compiler_info ${binfile}] {
++    return -1
++}
++
++if { [gdb_compile_shlib ${srcdir}/${subdir}/$libsrc $lib_so $lib_opts] != ""
++     || [gdb_compile ${srcdir}/${subdir}/$srcfile $binfile executable $exec_opts] != ""} {
++    untested "Could not compile either $libsrc or $srcfile."
++    return -1
++}
++
++# Start with a fresh gdb.
++
++clean_restart $testfile
++gdb_load_shlibs ${lib_so}
++
++if ![runto_main] then {
++    fail "Can't run to main"
++    return 1;
++}
++
++# The "if" condition is artifical to test regression of a format patch.
++gdb_breakpoint "[gdb_get_line_number "break-at-nextcall"] if i && gnu_ifunc (i) != 42"
++
++gdb_breakpoint [gdb_get_line_number "break-at-call"]
++gdb_continue_to_breakpoint "break-at-call" ".*break-at-call.*"
++
++# Test GDB will automatically indirect the call.
++
++gdb_test "p gnu_ifunc (3)" " = 4"
++
++# Test GDB will skip the gnu_ifunc resolver on first call.
++
++gdb_test "step" "\r\nfinal .*"
++
++# Test GDB will not break before the final chosen implementation.
++
++# Also test a format patch regression:
++# Continuing.
++# Error in testing breakpoint condition:
++# Attempt to take address of value not located in memory.
++# 
++# Breakpoint 2, main () at ./gdb.base/gnu-ifunc.c:33
++
++gdb_test "continue" "Continuing.\r\n\r\nBreakpoint .* (at|in) .*break-at-nextcall.*" \
++	 "continue to break-at-nextcall"
++
++gdb_breakpoint "gnu_ifunc"
++
++gdb_continue_to_breakpoint "nextcall gnu_ifunc"
++
++gdb_test "frame" "#0 +(0x\[0-9a-f\]+ in +)?final \\(.*" "nextcall gnu_ifunc skipped"
++
++
++# Compare the two different addresses:
++
++gdb_test "p gnu_ifunc" " = {<text variable, no debug info>} 0x\[0-9a-f\]+ <final>" "p gnu_ifunc executing"
++gdb_test "info sym gnu_ifunc" "final in section .*" "info sym gnu_ifunc executing"
++
++set test "info addr gnu_ifunc"
++gdb_test_multiple $test $test {
++    -re "Symbol \"gnu_ifunc\" is at (0x\[0-9a-f\]+) in .*$gdb_prompt $" {
++	pass $test
++    }
++}
++gdb_test "info sym $expect_out(1,string)" "gnu_ifunc in section .*" "info sym <gnu_ifunc-address>"
++
++# <*gnu_ifunc> would be an incorrect resolution from DW_AT_MIPS_linkage_name.
++# We do not use {debug} build option for this purpose.
++
++if { [gdb_compile_shlib ${srcdir}/${subdir}/$libsrc $lib_nodebug_so $lib_nodebug_opts] != ""} {
++    untested "Could not compile either $libsrc."
++    return -1
++}
++
++clean_restart $lib_nodebug_so_base
++
++gdb_test "p gnu_ifunc" " = {<text gnu-ifunc variable, no debug info>} 0x\[0-9a-f\]+ <gnu_ifunc>" "p gnu_ifunc not executing without debug"
++gdb_test "info sym gnu_ifunc" "gnu_ifunc in section .*" "info sym gnu_ifunc not executing without debug"
 diff --git a/gdb/testsuite/gdb.base/internal-var-field-address.c b/gdb/testsuite/gdb.base/internal-var-field-address.c
 new file mode 100644
 index 0000000..eeb7b85
@@ -18342,6 +19434,48 @@ index 454c6f4..8f88ad7 100644
  gdb_test_multiple "print add<int>(2,2)" "print add<int>(2,2)" {
      -re "\\$\[0-9\]+ = 4\r\n$gdb_prompt $" {
  	pass "print add<int>(2,2)"
+diff --git a/gdb/testsuite/gdb.cp/exception.exp b/gdb/testsuite/gdb.cp/exception.exp
+index 47890f1..03c8847 100644
+--- a/gdb/testsuite/gdb.cp/exception.exp
++++ b/gdb/testsuite/gdb.cp/exception.exp
+@@ -146,7 +146,9 @@ gdb_test_multiple "continue" $name {
+ 
+ set name "backtrace after first throw"
+ gdb_test_multiple "backtrace" $name {
+-    -re ".*#\[0-9\]+${ws}($hex in |)__cxa_throw.*#\[0-9\]+${ws}$hex in foo \\(i=20\\) at .*${srcfile}:\[0-9\]+\r\n#\[0-9\]+${ws}$hex in main \\(.*\\) at .*${srcfile}:\[0-9\]+\r\n$gdb_prompt $" {
++    -re ".*#\[0-9\]+.*\[\[:<:\]\]__cxa_throw\[\[:>:\]\].*#\[0-9\]+${ws}$hex in foo \\(i=20\\) at .*${srcfile}:\[0-9\]+\r\n#\[0-9\]+${ws}$hex in main \\(.*\\) at .*${srcfile}:\[0-9\]+\r\n$gdb_prompt $" {
++	# Either __cxxabiv1::__cxa_throw or __cxa_throw can be printed
++	# depending on debug info presence.
+ 	pass $name
+     }
+ }
+@@ -168,7 +170,7 @@ gdb_test_multiple "continue" $name {
+ 
+ set name "backtrace after first catch"
+ gdb_test_multiple "backtrace" $name {
+-    -re ".*#\[0-9\]+${ws}($hex in |)__cxa_begin_catch.*#\[0-9\]+${ws}$hex in main \\(.*\\) at .*$srcfile:\[0-9\]+\r\n$gdb_prompt $" {
++    -re ".*#\[0-9\]+.*\[\[:<:\]\]__cxa_begin_catch\[\[:>:\]\].*#\[0-9\]+${ws}$hex in main \\(.*\\) at .*$srcfile:\[0-9\]+\r\n$gdb_prompt $" {
+ 	pass $name
+     }
+ }
+@@ -190,7 +192,7 @@ gdb_test_multiple "continue" $name {
+ 
+ set name "backtrace after second throw"
+ gdb_test_multiple "backtrace" $name {
+-    -re ".*#\[0-9\]+${ws}($hex in |)__cxa_throw.*#\[0-9\]+${ws}$hex in foo \\(i=20\\) at .*${srcfile}:\[0-9\]+\r\n#\[0-9\]+${ws}$hex in main \\(.*\\) at .*${srcfile}:\[0-9\]+\r\n$gdb_prompt $" {
++    -re ".*#\[0-9\]+.*\[\[:<:\]\]__cxa_throw\[\[:>:\]\].*#\[0-9\]+${ws}$hex in foo \\(i=20\\) at .*${srcfile}:\[0-9\]+\r\n#\[0-9\]+${ws}$hex in main \\(.*\\) at .*${srcfile}:\[0-9\]+\r\n$gdb_prompt $" {
+ 	pass $name
+     }
+ }
+@@ -212,7 +214,7 @@ gdb_test_multiple "continue" $name {
+ 
+ set name "backtrace after second catch"
+ gdb_test_multiple "backtrace" $name {
+-    -re ".*#\[0-9\]+${ws}($hex in |)__cxa_begin_catch.*#\[0-9\]+${ws}$hex in main \\(.*\\) at .*$srcfile:\[0-9\]+\r\n$gdb_prompt $" {
++    -re ".*#\[0-9\]+.*\[\[:<:\]\]__cxa_begin_catch\[\[:>:\]\].*#\[0-9\]+${ws}$hex in main \\(.*\\) at .*$srcfile:\[0-9\]+\r\n$gdb_prompt $" {
+ 	pass $name
+     }
+ }
 diff --git a/gdb/testsuite/gdb.cp/expand-sals.exp b/gdb/testsuite/gdb.cp/expand-sals.exp
 index 25ec4a9..e4fd59b 100644
 --- a/gdb/testsuite/gdb.cp/expand-sals.exp
@@ -18732,6 +19866,48 @@ index 0000000..ee9aeff
 +gdb_test "advance $line" \
 +  ".*catch (...).*" \
 +  "advance-over-throw"
+diff --git a/gdb/testsuite/gdb.cp/m-static.cc b/gdb/testsuite/gdb.cp/m-static.cc
+index 2a0b61c..7f997ef 100644
+--- a/gdb/testsuite/gdb.cp/m-static.cc
++++ b/gdb/testsuite/gdb.cp/m-static.cc
+@@ -15,6 +15,12 @@ protected:
+ 
+ public:
+   gnu_obj_1(antiquities a, long l) {}
++
++  long method ()
++  {
++    static bool svar = true;
++    return key2;
++  }
+ };
+ 
+ const bool gnu_obj_1::test;
+@@ -70,5 +76,8 @@ int main()
+ 
+   test4.dummy = test4.elsewhere;
+   test4.dummy = 0;
+-  return test4.dummy;	// breakpoint: constructs-done
++
++  test1.method (); // breakpoint: constructs-done
++
++  return test4.dummy;
+ }
+diff --git a/gdb/testsuite/gdb.cp/m-static.exp b/gdb/testsuite/gdb.cp/m-static.exp
+index f207462..7b4e0ca 100644
+--- a/gdb/testsuite/gdb.cp/m-static.exp
++++ b/gdb/testsuite/gdb.cp/m-static.exp
+@@ -132,5 +132,10 @@ gdb_test "print test4.nowhere" "field nowhere is nonexistent or has been optimis
+ # that GDB's current behavior in such situations is either consistent
+ # across platforms or optimal, so I'm not including one now.
+ 
++# Step into test1.method and examine the method-scoped static.
++# This is a regression test for PR 9708.
++gdb_test "step" "gnu_obj_1::method.*"
++gdb_test "print svar" " = true"
++
+ gdb_exit
+ return 0
 diff --git a/gdb/testsuite/gdb.cp/member-ptr.cc b/gdb/testsuite/gdb.cp/member-ptr.cc
 index ffffb4c..b406a59 100644
 --- a/gdb/testsuite/gdb.cp/member-ptr.cc
@@ -19581,18 +20757,70 @@ index 0000000..1806523
 +# Test that the search can fail efficiently 
 +
 +gdb_test "print y" "No symbol \"y\" in current context."
-diff --git a/gdb/testsuite/gdb.cp/namespace-using.cc b/gdb/testsuite/gdb.cp/namespace-using.cc
-index 4786fd5..8ff5622 100644
---- a/gdb/testsuite/gdb.cp/namespace-using.cc
-+++ b/gdb/testsuite/gdb.cp/namespace-using.cc
-@@ -1,26 +1,129 @@
+diff --git a/gdb/testsuite/gdb.cp/namespace.exp b/gdb/testsuite/gdb.cp/namespace.exp
+index 4362fd8..f7cfd57 100644
+--- a/gdb/testsuite/gdb.cp/namespace.exp
++++ b/gdb/testsuite/gdb.cp/namespace.exp
+@@ -24,6 +24,7 @@
+ # for namespaces.
+ # Note: As of 2000-06-03, they passed under g++ - djb
+ 
++load_lib "cp-support.exp"
+ 
+ if $tracelevel then {
+         strace $tracelevel
+@@ -241,11 +242,16 @@ gdb_test "ptype E" "type = namespace C::D::E"
+ gdb_test "ptype CClass" "type = (class C::CClass \{\r\n  public:|struct C::CClass \{)\r\n    int x;\r\n\}"
+ gdb_test "ptype CClass::NestedClass" "type = (class C::CClass::NestedClass \{\r\n  public:|struct C::CClass::NestedClass \{)\r\n    int y;\r\n\}"
+ gdb_test "ptype NestedClass" "No symbol \"NestedClass\" in current context."
+-setup_kfail "gdb/1448" "*-*-*"
+-gdb_test "ptype ::C::CClass" "type = class C::CClass \{\r\n  public:\r\n    int x;\r\n\}"
+-setup_kfail "gdb/1448" "*-*-*"
+-gdb_test "ptype ::C::CClass::NestedClass" "type = class C::CClass::NestedClass \{\r\n  public:\r\n    int y;\r\n\}"
+-setup_kfail "gdb/1448" "*-*-*"
++cp_test_ptype_class \
++	"ptype ::C::CClass" "" "class" "C::CClass" \
++	{
++	    { field public "int x;" }
++	}
++cp_test_ptype_class \
++	"ptype ::C::CClass::NestedClass" "" "class" "C::CClass::NestedClass" \
++	{
++	    { field public "int y;" }
++	}
+ gdb_test "ptype ::C::NestedClass" "No symbol \"NestedClass\" in namespace \"C\"."
+ gdb_test "ptype C::CClass" "No symbol \"CClass\" in namespace \"C::C\"."
+ gdb_test "ptype C::CClass::NestedClass" "No type \"CClass\" within class or namespace \"C::C\"."
+@@ -255,8 +261,11 @@ gdb_test "ptype C::NestedClass" "No symbol \"NestedClass\" in namespace \"C::C\"
+ 
+ gdb_test "print cOtherFile" "\\$\[0-9\].* = 316"
+ gdb_test "ptype OtherFileClass" "type = (class C::OtherFileClass \{\r\n  public:|struct C::OtherFileClass \{)\r\n    int z;\r\n\}"
+-setup_kfail "gdb/1448" "*-*-*"
+-gdb_test "ptype ::C::OtherFileClass" "type = class C::OtherFileClass \{\r\n  public:\r\n    int z;\r\n\}"
++cp_test_ptype_class \
++	"ptype ::C::OtherFileClass" "" "class" "C::OtherFileClass" \
++	{
++	    { field public "int z;" }
++	}
+ gdb_test "ptype C::OtherFileClass" "No symbol \"OtherFileClass\" in namespace \"C::C\"."
+ 
+ # Some anonymous namespace tests.
+diff --git a/gdb/testsuite/gdb.cp/nsusing.cc b/gdb/testsuite/gdb.cp/nsusing.cc
+index b1f0ce4..0bf2df5 100644
+--- a/gdb/testsuite/gdb.cp/nsusing.cc
++++ b/gdb/testsuite/gdb.cp/nsusing.cc
+@@ -1,34 +1,81 @@
+-namespace O
 +namespace M
-+{
+ {
+-  int ox = 4;
 +  int x = 911;
-+}
-+
+ }
+ 
+-namespace PQ
 +namespace N
-+{
+ {
+-  int marker6 ()
 +  int x = 912;
 +}
 +
@@ -19613,14 +20841,17 @@ index 4786fd5..8ff5622 100644
 +{
 +  int
 +  marker9 ()
-+  {
+   {
+-    return 0;
 +    //x;
 +    return marker10 ();
-+  }
-+}
-+
+   }
+ }
+ 
+-namespace P
 +namespace L
-+{
+ {
+-  using namespace O;
 +  using namespace J;
 +  int
 +  marker8 ()
@@ -19628,16 +20859,21 @@ index 4786fd5..8ff5622 100644
 +    jx;
 +    return K::marker9 ();
 +  }
-+}
-+
+ }
+ 
+-//--------------
+-namespace C
 +namespace G
-+{
+ {
+-  int cc = 3;
 +  namespace H
 +  {
 +    int ghx = 6;
 +  }
-+}
-+
+ }
+ 
+-using namespace C;
+-int marker5 ()
 +namespace I
 +{  
 +  int
@@ -19650,13 +20886,15 @@ index 4786fd5..8ff5622 100644
 +}
 +
 +namespace E
-+{
+ {
+-  cc;
+-  return PQ::marker6 ();
 +  namespace F
 +  {
 +    int efx = 5;
 +  }
-+}
-+
+ }
+ 
 +using namespace E::F;
 +int
 +marker6 ()
@@ -19664,16 +20902,16 @@ index 4786fd5..8ff5622 100644
 +  efx;
 +  return I::marker7 ();
 +}
-+
+ 
  namespace A
  {
-   int _a = 1;
+@@ -36,23 +83,47 @@ namespace A
    int x = 2;
  }
  
 -int marker4(){
 -	using A::x;
--	return 0;
+-	return marker5 ();
 +namespace C
 +{
 +  int cc = 3;
@@ -19690,17 +20928,17 @@ index 4786fd5..8ff5622 100644
 +{
 +  cc;
 +  return marker6 ();
-+}
-+
+ }
+ 
+-int marker3(){
+-	return marker4();
 +int
 +marker4 ()
 +{
 +  using D::dx;
 +  return marker5 ();
- }
- 
--int marker3(){
--	return marker4();
++}
++
 +int
 +marker3 ()
 +{
@@ -19723,7 +20961,7 @@ index 4786fd5..8ff5622 100644
  {
    int total = 0;
    {
-@@ -29,17 +132,18 @@ int marker1()
+@@ -61,17 +132,18 @@ int marker1()
        using namespace A;
        int c = 2;
        {
@@ -19734,7 +20972,7 @@ index 4786fd5..8ff5622 100644
        }
      }
    }
-   return total;
+   return marker2() + total;
  }
  
 -int main()
@@ -19746,23 +20984,20 @@ index 4786fd5..8ff5622 100644
 -  return marker1();
 +  return marker1 ();
  }
-diff --git a/gdb/testsuite/gdb.cp/namespace-using.exp b/gdb/testsuite/gdb.cp/namespace-using.exp
-index 319552b..0673088 100644
---- a/gdb/testsuite/gdb.cp/namespace-using.exp
-+++ b/gdb/testsuite/gdb.cp/namespace-using.exp
-@@ -28,6 +28,11 @@ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {deb
-     return -1
+diff --git a/gdb/testsuite/gdb.cp/nsusing.exp b/gdb/testsuite/gdb.cp/nsusing.exp
+index ef0237d..46a4a07 100644
+--- a/gdb/testsuite/gdb.cp/nsusing.exp
++++ b/gdb/testsuite/gdb.cp/nsusing.exp
+@@ -29,7 +29,7 @@ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {deb
  }
  
-+if [get_compiler_info ${binfile}] {
+ if [get_compiler_info ${binfile}] {
+-    return -1
 +    return -1;
-+}
-+
-+
- # Get things started.
+ }
  
- gdb_exit
-@@ -46,42 +51,155 @@ if ![runto_main] then {
+ 
+@@ -51,32 +51,87 @@ if ![runto_main] then {
  
  gdb_test "print _a" "= 1"
  
@@ -19852,15 +21087,9 @@ index 319552b..0673088 100644
 +    perror "couldn't run to breakpoint marker3"
 +}
  
--gdb_test "print _a" "No symbol \"_a\" in current context." "Print a without import"
-+# gcc-4-3 puts import statements for aliases in
-+# the global scope instead of the corresponding
-+# function scope. These wrong import statements throw
-+# this test off. This is fixed in gcc-4-4.
-+if [test_compiler_info gcc-4-3-*] then { setup_xfail *-*-* }
-+
-+gdb_test "print _a" "No symbol \"_a\" in current context." "Print _a without import"
- 
+ # gcc-4-3 puts import statements for aliases in
+ # the global scope instead of the corresponding
+@@ -89,32 +144,62 @@ gdb_test "print _a" "No symbol \"_a\" in current context." "Print _a without imp
  ############################################
  # Test printing of individually imported elements
  
@@ -19872,26 +21101,34 @@ index 319552b..0673088 100644
  
 -gdb_test "print x" "= 2"
 +gdb_test "print dx" "= 4"
-+
-+############################################
+ 
+ ############################################
+-# test printing of namespace imported into
+-# file scope.
 +# Test printing of namespace aliases
-+
-+if ![runto marker5] then {
-+    perror "couldn't run to marker5"
-+    continue
-+}
-+
+ 
+ if ![runto marker5] then {
+     perror "couldn't run to marker5"
+     continue
+ }
+ 
+-gdb_test "print cc" "= 3"
 +gdb_test "print efx" "= 5"
-+
-+############################################
+ 
+ ############################################
+-# test printing of namespace imported into
+-# file scope.
 +# Test printing of variables imported from
 +# nested namespaces
-+
+ 
+-if ![runto PQ::marker6] then {
+-    perror "couldn't run to PQ::marker6"
 +if ![runto I::marker7] then {
 +    perror "couldn't run to breakpoint I::marker7"
-+    continue
-+}
-+
+     continue
+ }
+ 
+-gdb_test "print ox" "No symbol \"ox\" in current context."
 +gdb_test "print ghx" "= 6"
 +
 +############################################
@@ -19925,54 +21162,6 @@ index 319552b..0673088 100644
 +# Assert that M::x is printed and not N::x
 +gdb_test "print x" "= 911" "print x (from M::x)"
 +
-diff --git a/gdb/testsuite/gdb.cp/namespace.exp b/gdb/testsuite/gdb.cp/namespace.exp
-index 4362fd8..f7cfd57 100644
---- a/gdb/testsuite/gdb.cp/namespace.exp
-+++ b/gdb/testsuite/gdb.cp/namespace.exp
-@@ -24,6 +24,7 @@
- # for namespaces.
- # Note: As of 2000-06-03, they passed under g++ - djb
- 
-+load_lib "cp-support.exp"
- 
- if $tracelevel then {
-         strace $tracelevel
-@@ -241,11 +242,16 @@ gdb_test "ptype E" "type = namespace C::D::E"
- gdb_test "ptype CClass" "type = (class C::CClass \{\r\n  public:|struct C::CClass \{)\r\n    int x;\r\n\}"
- gdb_test "ptype CClass::NestedClass" "type = (class C::CClass::NestedClass \{\r\n  public:|struct C::CClass::NestedClass \{)\r\n    int y;\r\n\}"
- gdb_test "ptype NestedClass" "No symbol \"NestedClass\" in current context."
--setup_kfail "gdb/1448" "*-*-*"
--gdb_test "ptype ::C::CClass" "type = class C::CClass \{\r\n  public:\r\n    int x;\r\n\}"
--setup_kfail "gdb/1448" "*-*-*"
--gdb_test "ptype ::C::CClass::NestedClass" "type = class C::CClass::NestedClass \{\r\n  public:\r\n    int y;\r\n\}"
--setup_kfail "gdb/1448" "*-*-*"
-+cp_test_ptype_class \
-+	"ptype ::C::CClass" "" "class" "C::CClass" \
-+	{
-+	    { field public "int x;" }
-+	}
-+cp_test_ptype_class \
-+	"ptype ::C::CClass::NestedClass" "" "class" "C::CClass::NestedClass" \
-+	{
-+	    { field public "int y;" }
-+	}
- gdb_test "ptype ::C::NestedClass" "No symbol \"NestedClass\" in namespace \"C\"."
- gdb_test "ptype C::CClass" "No symbol \"CClass\" in namespace \"C::C\"."
- gdb_test "ptype C::CClass::NestedClass" "No type \"CClass\" within class or namespace \"C::C\"."
-@@ -255,8 +261,11 @@ gdb_test "ptype C::NestedClass" "No symbol \"NestedClass\" in namespace \"C::C\"
- 
- gdb_test "print cOtherFile" "\\$\[0-9\].* = 316"
- gdb_test "ptype OtherFileClass" "type = (class C::OtherFileClass \{\r\n  public:|struct C::OtherFileClass \{)\r\n    int z;\r\n\}"
--setup_kfail "gdb/1448" "*-*-*"
--gdb_test "ptype ::C::OtherFileClass" "type = class C::OtherFileClass \{\r\n  public:\r\n    int z;\r\n\}"
-+cp_test_ptype_class \
-+	"ptype ::C::OtherFileClass" "" "class" "C::OtherFileClass" \
-+	{
-+	    { field public "int z;" }
-+	}
- gdb_test "ptype C::OtherFileClass" "No symbol \"OtherFileClass\" in namespace \"C::C\"."
- 
- # Some anonymous namespace tests.
 diff --git a/gdb/testsuite/gdb.cp/overload.exp b/gdb/testsuite/gdb.cp/overload.exp
 index 1bfa0f3..9fd31a8 100644
 --- a/gdb/testsuite/gdb.cp/overload.exp
@@ -21400,6 +22589,16 @@ index 0000000..4e92e75
 +
 +gdb_exit
 +return 0
+diff --git a/gdb/testsuite/gdb.cp/shadow.exp b/gdb/testsuite/gdb.cp/shadow.exp
+index 1e5e80b..40c35a4 100644
+--- a/gdb/testsuite/gdb.cp/shadow.exp
++++ b/gdb/testsuite/gdb.cp/shadow.exp
+@@ -85,5 +85,4 @@ gdb_test "print x" "= 55" "Print local x not namespace x"
+ gdb_breakpoint [gdb_get_line_number "marker5"]
+ gdb_continue_to_breakpoint "marker5"
+ 
+-setup_kfail "gdb/7936" "*-*-*"
+ gdb_test "print x" "= 11" "Print imported namespace x"
 diff --git a/gdb/testsuite/gdb.cp/shadowing.cc b/gdb/testsuite/gdb.cp/shadowing.cc
 new file mode 100644
 index 0000000..6d9c2f1
@@ -21551,6 +22750,56 @@ index 0000000..6922eed
 +if [test_compiler_info gcc-4-3-*] then { setup_xfail *-*-* }
 +
 +gdb_test "print x" "= 11" "Print imported namespace x"
+diff --git a/gdb/testsuite/gdb.cp/userdef.cc b/gdb/testsuite/gdb.cp/userdef.cc
+index 338c58a..56a735f 100644
+--- a/gdb/testsuite/gdb.cp/userdef.cc
++++ b/gdb/testsuite/gdb.cp/userdef.cc
+@@ -311,6 +311,11 @@ public:
+   int z;
+ };
+ 
++bool operator== (const Member &m1, const Member &m2)
++{
++  return m1.z == m2.z;
++}
++
+ class Container
+ {
+ public:
+@@ -330,8 +335,12 @@ int main (void)
+  A1 two(4,5);
+  A1 three(0,0);
+  Container c;
++ Member mem1, mem2;
+  int val;
+  
++ mem1.z = 5;
++ mem2.z = 7;
++
+  marker1(); // marker1-returns-here
+  cout << one; // marker1-returns-here
+  cout << two;
+diff --git a/gdb/testsuite/gdb.cp/userdef.exp b/gdb/testsuite/gdb.cp/userdef.exp
+index bd54c78..27ec80b 100644
+--- a/gdb/testsuite/gdb.cp/userdef.exp
++++ b/gdb/testsuite/gdb.cp/userdef.exp
+@@ -113,6 +113,7 @@ gdb_test "print one > two" "\\\$\[0-9\]* = 0\[\r\n\]"
+ gdb_test "print one >= two" "\\\$\[0-9\]* = 0\[\r\n\]"
+ 
+ gdb_test "print one == two" "\\\$\[0-9\]* = 0\[\r\n\]"
++gdb_test "print one.operator== (two)" "\\\$\[0-9\]* = 0\[\r\n\]"
+ 
+ gdb_test "print one != two" "\\\$\[0-9\]* = 1\[\r\n\]"
+ 
+@@ -155,5 +156,8 @@ gdb_test "print *c" "\\\$\[0-9\]* = \\(Member &\\) @$hex: {z = .*}"
+ gdb_test "print &*c" "\\\$\[0-9\]* = \\(Member \\*\\) $hex"
+ gdb_test "ptype &*c" "type = struct Member {\[\r\n \]+int z;\[\r\n\]+} &\\*"
+ 
++gdb_test "print operator== (mem1, mem2)" " = false"
++gdb_test "print operator== (mem1, mem1)" " = true"
++
+ gdb_exit
+ return 0
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-aranges.S b/gdb/testsuite/gdb.dwarf2/dw2-aranges.S
 new file mode 100644
 index 0000000..d5b9ca5
@@ -24760,7 +26009,7 @@ index ed76b09..8bf3634 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index ca34083..c23fd68 100644
+index 2cdbcbe..6b82476 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -38,6 +38,7 @@
@@ -24985,15 +26234,19 @@ index ca34083..c23fd68 100644
        if (func_name == NULL)
          {
  	  *symp = fsym;
-@@ -3096,7 +3201,7 @@ value_maybe_namespace_elt (const struct type *curtype,
+@@ -3096,9 +3201,9 @@ value_maybe_namespace_elt (const struct type *curtype,
    struct symbol *sym;
    struct value *result;
  
 -  sym = cp_lookup_symbol_namespace (namespace_name, name, NULL,
+-				    get_selected_block (0), 
+-				    VAR_DOMAIN, 1);
 +  sym = cp_lookup_symbol_namespace(namespace_name, name,
- 				    get_selected_block (0), 
- 				    VAR_DOMAIN);
++                                   get_selected_block (0), 
++                                   VAR_DOMAIN);
  
+   if (sym == NULL)
+     return NULL;
 @@ -3240,7 +3345,7 @@ value_of_local (const char *name, int complain)
  
    /* Calling lookup_block_symbol is necessary to get the LOC_REGISTER
@@ -25359,3 +26612,25 @@ index 25cc2d9..6784654 100644
    xcoff_symfile_finish,		/* sym_finish: finished with file, cleanup */
    xcoff_symfile_offsets,	/* sym_offsets: xlate offsets ext->int form */
    default_symfile_segments,	/* sym_segments: Get segment information from
+diff --git a/gdb/xtensa-linux-tdep.c b/gdb/xtensa-linux-tdep.c
+index 667d9b3..0d86219 100644
+--- a/gdb/xtensa-linux-tdep.c
++++ b/gdb/xtensa-linux-tdep.c
+@@ -22,6 +22,7 @@
+ 
+ #include "solib-svr4.h"
+ #include "symtab.h"
++#include "linux-tdep.h"
+ 
+ /* OS specific initialization of gdbarch.  */
+ 
+@@ -30,6 +31,9 @@ xtensa_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
+ {
+   set_solib_svr4_fetch_link_map_offsets
+     (gdbarch, svr4_ilp32_fetch_link_map_offsets);
++
++  set_gdbarch_convert_from_func_ptr_addr (gdbarch,
++					  linux_convert_from_func_ptr_addr);
+ }
+ 
+ /* Provide a prototype to silence -Wmissing-prototypes.  */

@@ -58,8 +58,10 @@ Http://sourceware.org/ml/gdb-patches/2010-01/msg00517.html
 	* exec.c (exec_file_attach): Print a more useful error message if the
 	user did "gdb core".
 
---- a/gdb/exceptions.h
-+++ b/gdb/exceptions.h
+Index: gdb-7.0.50.20100128/gdb/exceptions.h
+===================================================================
+--- gdb-7.0.50.20100128.orig/gdb/exceptions.h	2010-01-18 07:25:22.000000000 +0100
++++ gdb-7.0.50.20100128/gdb/exceptions.h	2010-01-28 22:49:00.000000000 +0100
 @@ -78,6 +78,9 @@ enum errors {
    /* Feature is not supported in this copy of GDB.  */
    UNSUPPORTED_ERROR,
@@ -70,39 +72,41 @@ Http://sourceware.org/ml/gdb-patches/2010-01/msg00517.html
    /* Add more errors here.  */
    NR_ERRORS
  };
---- a/gdb/exec.c
-+++ b/gdb/exec.c
+Index: gdb-7.0.50.20100128/gdb/exec.c
+===================================================================
+--- gdb-7.0.50.20100128.orig/gdb/exec.c	2010-01-28 22:48:59.000000000 +0100
++++ gdb-7.0.50.20100128/gdb/exec.c	2010-01-28 22:58:45.000000000 +0100
 @@ -34,6 +34,7 @@
- #include "arch-utils.h"
  #include "gdbthread.h"
  #include "progspace.h"
+ #include "solib.h"
 +#include "exceptions.h"
  
  #include <fcntl.h>
  #include "readline/readline.h"
-@@ -253,6 +254,19 @@ exec_file_attach (char *filename, int from_tty)
-       scratch_pathname = xstrdup (scratch_pathname);
-       cleanups = make_cleanup (xfree, scratch_pathname);
- 
-+      /* If the user accidentally did "gdb core", print a useful
-+	 error message.  */
-+      if (bfd_check_format (exec_bfd, bfd_core))
-+       {
-+	 /* Make sure to close exec_bfd, or else "run" might try to use
-+	    it.  */
-+	 exec_close ();
-+	 throw_error (IS_CORE_ERROR,
-+		      _("\"%s\" is a core file.\n"
-+			"Please specify an executable to debug."),
-+		      scratch_pathname);
-+       }
-+
-       if (!bfd_check_format (exec_bfd, bfd_object))
- 	{
+@@ -258,6 +259,17 @@ exec_file_attach (char *filename, int fr
  	  /* Make sure to close exec_bfd, or else "run" might try to use
---- a/gdb/main.c
-+++ b/gdb/main.c
-@@ -240,6 +240,36 @@ captured_command_loop (void *data)
+ 	     it.  */
+ 	  exec_close ();
++
++	  /* If the user accidentally did "gdb core", print a useful
++	     error message.  Check it only after bfd_object has been checked as
++	     a valid executable may get recognized for example also as
++	     "trad-core".  */
++	  if (bfd_check_format (exec_bfd, bfd_core))
++	    throw_error (IS_CORE_ERROR,
++			 _("\"%s\" is a core file.\n"
++			   "Please specify an executable to debug."),
++			 scratch_pathname);
++
+ 	  error (_("\"%s\": not in executable format: %s"),
+ 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+ 	}
+Index: gdb-7.0.50.20100128/gdb/main.c
+===================================================================
+--- gdb-7.0.50.20100128.orig/gdb/main.c	2010-01-28 22:48:59.000000000 +0100
++++ gdb-7.0.50.20100128/gdb/main.c	2010-01-28 22:49:00.000000000 +0100
+@@ -241,6 +241,36 @@ captured_command_loop (void *data)
    return 1;
  }
  
@@ -139,7 +143,7 @@ Http://sourceware.org/ml/gdb-patches/2010-01/msg00517.html
  static int
  captured_main (void *data)
  {
-@@ -668,6 +698,8 @@ extern int gdbtk_test (char *);
+@@ -703,6 +733,8 @@ extern int gdbtk_test (char *);
  	{
  	  symarg = argv[optind];
  	  execarg = argv[optind];
@@ -148,7 +152,7 @@ Http://sourceware.org/ml/gdb-patches/2010-01/msg00517.html
  	  optind++;
  	}
  
-@@ -800,10 +831,25 @@ Excess command line arguments ignored. (%s%s)\n"),
+@@ -835,10 +867,25 @@ Excess command line arguments ignored. (
        && symarg != NULL
        && strcmp (execarg, symarg) == 0)
      {
