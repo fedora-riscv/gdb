@@ -36,7 +36,7 @@ Version: 7.0.50.20100128
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{dist}
+Release: 11%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -427,8 +427,8 @@ Patch408: gdb-ppc-power7-test.patch
 # Revert: Add -Wunused-function to compile flags.
 Patch412: gdb-unused-revert.patch
 
-# It may crash here but it is not understood why.
-Patch414: gdb-archer-pie-assert-temp-workaround.patch
+# Fix failed gdb_assert due to the PIE patchset (BZ 559414).
+Patch414: gdb-bz559414-pie-assert-fix.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -682,13 +682,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch415 -p1
 %patch393 -p1
 %patch335 -p1
-# Patch414: gdb-archer-pie-assert-temp-workaround.patch
-# It may crash here but it is not understood why.
 # Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 # Currently disabled for RHEL as it is a new experimental feature not present
 # in FSF GDB and possibly affecting new user scripts.
 %if 0%{!?rhel:1}
-%patch414 -p1 -R
 %patch415 -p1 -R
 %endif
 %if 0%{!?el5:1}
@@ -1013,6 +1010,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-11.fc13
+- Fix failed gdb_assert due to the PIE patchset (BZ 559414).
+
 * Thu Jan 28 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-10.fc13
 - Upgrade to the FSF GDB snapshot: 7.0.50.20100128
 - archer-jankratochvil-fedora13 commit: 39c5a8b75fad3acd7204903db5dee025055a4594

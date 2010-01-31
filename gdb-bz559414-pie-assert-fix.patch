@@ -1,0 +1,172 @@
+http://sourceware.org/ml/gdb-patches/2010-01/msg00661.html
+Subject: [patch] Fix failed gdb_assert due to the PIE patchset
+
+Hi,
+
+the PIE patchset brought in an occasionally failing gdb_assert (according to
+Fedora ABRT bugreports).
+solib-svr4.c:600: internal-error: scan_dyntag: Assertion `target_section < current_target_sections->sections_end' failed.
+
+Now I understand it as generally current_target_sections are about target-side
+data while symbols are the GDB side and there is only loose relation of those.
+
+ABFD can be from multiple places acting for multiple purposes as parsed by
+elf_lookup_lib_symbol:
+
+exec_bfd:
+	It cannot be from exec_one - this BFD has no associated objfile to
+	pass to symfile_objfile.  OK.
+symfile_objfile:
+	It gets translated by elf_lookup_lib_symbol into exec_bfd which
+	represents the target data.  OK.
+so_list's objfile's separate_debug_objfile file:
+	gdb_assert-forbidden as input to elf_lookup_lib_symbol.  OK.
+so_list's objfile's main file:
+	update_solib_list must have called add_target_sections.  OK.
+objfile's separate_debug_objfile file:
+	gdb_assert-forbidden as input to elf_lookup_lib_symbol.  OK.
+objfile's main file (if it has no associated so_list):
+	Such ABFD from add_symbol_file_command has no add_target_sections
+	called.  Still it can have current context BLOCK which crashes
+	scan_dyntag.  BUG.
+
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
+
+The patch mostly reverts the PIE part there.
+
+OK to check in?
+
+
+Sorry,
+Jan
+
+
+gdb/
+2010-01-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* solib-svr4.c (scan_dyntag): New variable dyn_addr.  Replace gdb_assert
+	by a conditional setting DYN_ADDR.  Use DYN_ADDR.
+	* config/djgpp/fnchange.lst: Add translations for
+	symbol-without-target_section.exp and symbol-without-target_section.c.
+
+gdb/testsuite/
+2010-01-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/symbol-without-target_section.exp,
+	gdb.base/symbol-without-target_section.c: New.
+
+--- a/gdb/config/djgpp/fnchange.lst
++++ b/gdb/config/djgpp/fnchange.lst
+@@ -394,6 +394,8 @@
+ @V@/gdb/testsuite/gdb.base/solib-symbol-main.c @V@/gdb/testsuite/gdb.base/so-symmain.c
+ @V@/gdb/testsuite/gdb.base/solib-overlap-lib.c @V@/gdb/testsuite/gdb.base/so-ovrlib.c
+ @V@/gdb/testsuite/gdb.base/solib-overlap-main.c @V@/gdb/testsuite/gdb.base/so-ovrmain.c
++@V@/gdb/testsuite/gdb.base/gdb.base/symbol-without-target_section.exp @V@/gdb/testsuite/gdb.base/symnosec.exp
++@V@/gdb/testsuite/gdb.base/gdb.base/symbol-without-target_section.c @V@/gdb/testsuite/gdb.base/symnosec.c
+ @V@/gdb/testsuite/gdb.base/type-opaque-lib.c @V@/gdb/testsuite/gdb.base/ty-opqlib.c
+ @V@/gdb/testsuite/gdb.base/type-opaque-main.c @V@/gdb/testsuite/gdb.base/ty-opqmain.c
+ @V@/gdb/testsuite/gdb.base/watchpoint-hw.c @V@/gdb/testsuite/gdb.base/wp-hw.c
+--- a/gdb/solib-svr4.c
++++ b/gdb/solib-svr4.c
+@@ -570,7 +570,7 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
+ {
+   int arch_size, step, sect_size;
+   long dyn_tag;
+-  CORE_ADDR dyn_ptr;
++  CORE_ADDR dyn_ptr, dyn_addr;
+   gdb_byte *bufend, *bufstart, *buf;
+   Elf32_External_Dyn *x_dynp_32;
+   Elf64_External_Dyn *x_dynp_64;
+@@ -597,7 +597,17 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
+        target_section++)
+     if (sect == target_section->the_bfd_section)
+       break;
+-  gdb_assert (target_section < current_target_sections->sections_end);
++  if (target_section < current_target_sections->sections_end)
++    dyn_addr = target_section->addr;
++  else
++    {
++      /* ABFD may come from OBJFILE acting only as a symbol file without being
++	 loaded into the target (see add_symbol_file_command).  This case is
++	 such fallback to the file VMA address without the possibility of
++	 having the section relocated to its actual in-memory address.  */
++
++      dyn_addr = bfd_section_vma (abfd, sect);
++    }
+ 
+   /* Read in .dynamic from the BFD.  We will get the actual value
+      from memory later.  */
+@@ -639,7 +649,7 @@ scan_dyntag (int dyntag, bfd *abfd, CORE_ADDR *ptr)
+ 	     CORE_ADDR ptr_addr;
+ 
+ 	     ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+-	     ptr_addr = target_section->addr + (buf - bufstart) + arch_size / 8;
++	     ptr_addr = dyn_addr + (buf - bufstart) + arch_size / 8;
+ 	     if (target_read_memory (ptr_addr, ptr_buf, arch_size / 8) == 0)
+ 	       dyn_ptr = extract_typed_address (ptr_buf, ptr_type);
+ 	     *ptr = dyn_ptr;
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/symbol-without-target_section.c
+@@ -0,0 +1,18 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int symbol_without_target_section;
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/symbol-without-target_section.exp
+@@ -0,0 +1,39 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Exploit formerly failed assertion in scan_dyntag when it got called for
++# objfile having ".dynamic" section but without having data loaded in target.
++# Such file is ${binmainfile} through add-symbol-file here.  Set context first
++# by "list main" to have some local BLOCK set in lookup_symbol_global.
++
++set testfile symbol-without-target_section
++set srclibfile ${testfile}.c
++set binlibfile ${testfile}.x
++set srcmainfile start.c
++set binmainfile ${testfile}
++if { [gdb_compile "${srcdir}/${subdir}/${srclibfile}" \
++		  "${objdir}/${subdir}/${binlibfile}" object {debug}] != "" } {
++    untested ${testfile}.exp
++    return -1
++}
++if {[build_executable ${testfile}.exp ${binmainfile} ${srcmainfile} {debug}] == -1} {
++    return -1
++}
++clean_restart ${binlibfile}
++
++gdb_test "add-symbol-file ${objdir}/${subdir}/${binmainfile} 0" "" "add-symbol-file" \
++	 "add symbol table from file \".*\" at.*\\(y or n\\) " "y"
++gdb_test "list main"
++gdb_test "print symbol_without_target_section"
+
