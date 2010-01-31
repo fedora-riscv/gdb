@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?_with_upstream:.upstream}%{dist}
+Release: 30%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -444,6 +444,9 @@ Patch401: gdb-stabs-read_args.patch
 # Fix crash while executing python code.
 Patch402: gdb-python-cplus-crash.patch
 
+# Fix failed gdb_assert due to the PIE patchset (BZ 559414).
+Patch414: gdb-bz559414-pie-assert-fix.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -686,13 +689,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch390 -p1
 %patch391 -p1
 %patch392 -p1
-# Always verify its applicability.
-%patch393 -p1
-%patch335 -p1
-%if 0%{!?el5:1}
-%patch393 -p1 -R
-%patch335 -p1 -R
-%endif
 %patch394 -p1
 %patch395 -p1
 %patch396 -p1
@@ -702,6 +698,14 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch400 -p1
 %patch401 -p1
 %patch402 -p1
+%patch414 -p1
+# Always verify their applicability.
+%patch393 -p1
+%patch335 -p1
+%if 0%{!?el5:1}
+%patch393 -p1 -R
+%patch335 -p1 -R
+%endif
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1020,6 +1024,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-30.fc12
+- Fix failed gdb_assert due to the PIE patchset (BZ 559414).
+
 * Fri Jan 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-29.fc12
 - Disable break-by-name on inlined functions due to a regression on parameters
   of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
