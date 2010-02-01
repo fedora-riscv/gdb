@@ -36,7 +36,7 @@ Version: 7.0.50.20100128
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{dist}
+Release: 12%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -45,7 +45,6 @@ Group: Development/Debuggers
 Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
-ExcludeArch: ia64
 
 # For our convenience
 %define gdb_src gdb-%{version}
@@ -1010,6 +1009,10 @@ fi
 %endif
 
 %changelog
+* Mon Feb  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-12.fc13
+- archer-jankratochvil-fedora13 commit: 5a573e8b26a2f0a6947d4c0249e43e5456610860
+- Remove ExcludeArch on ia64 as it is now fixed up.
+
 * Sun Jan 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-11.fc13
 - Fix failed gdb_assert due to the PIE patchset (BZ 559414).
 
