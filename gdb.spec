@@ -36,7 +36,7 @@ Version: 7.0.50.20100203
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{dist}
+Release: 14%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1005,6 +1005,9 @@ fi
 %endif
 
 %changelog
+* Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-14.fc13
+- Rediff gdb-6.8-bz254229-gcore-prpsinfo.patch for older patch(1) compatibility.
+
 * Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-13.fc13
 - archer-jankratochvil-fedora13 commit: 59c35a31f0981a0f0b884b32c91ae6325b2126cd
 - Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291;
