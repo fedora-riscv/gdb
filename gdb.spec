@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?_with_upstream:.upstream}%{dist}
+Release: 31%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -447,6 +447,9 @@ Patch402: gdb-python-cplus-crash.patch
 # Fix failed gdb_assert due to the PIE patchset (BZ 559414).
 Patch414: gdb-bz559414-pie-assert-fix.patch
 
+# Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
+Patch416: gdb-bz559291-fortran-module-toplevel.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -699,6 +702,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch401 -p1
 %patch402 -p1
 %patch414 -p1
+%patch416 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1024,6 +1028,9 @@ fi
 %endif
 
 %changelog
+* Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-31.fc12
+- Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
+
 * Sun Jan 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-30.fc12
 - Fix failed gdb_assert due to the PIE patchset (BZ 559414).
 

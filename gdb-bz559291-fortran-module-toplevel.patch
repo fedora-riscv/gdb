@@ -1,0 +1,108 @@
+http://sourceware.org/ml/archer/2010-q1/msg00047.html
+Subject: [fortran-module] [commit] Fix a regression on setting breakpoint at
+
+[ Backport for F-12.  ]
+
+f5c7672a52316155bc3367cbc2f0e7db22523634
+
+https://bugzilla.redhat.com/show_bug.cgi?id=559291
+
+gdb/
+2010-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    David Moore  <david.moore@intel.com>
+	* f-lang.c (f_lookup_symbol_nonlocal): Always fallback on
+	basic_lookup_symbol_nonlocal.
+
+gdb/testsuite/
+2010-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	* gdb.fortran/module.exp (show language, setting breakpoint at module):
+	New.
+	* gdb.fortran/module.f90: New statement program module.
+
+--- ./gdb/f-lang.c	2010-02-03 01:50:07.000000000 +0100
++++ ./gdb/f-lang.c	2010-02-03 01:49:06.000000000 +0100
+@@ -308,33 +308,33 @@ f_lookup_symbol_nonlocal (const char *na
+ 			  const struct block *block,
+ 			  const domain_enum domain)
+ {
+-  struct fortran_using *use;
+-
+-  if (!block)
+-    return NULL;
+-
+-  for (use = BLOCK_FORTRAN_USE (block); use; use = use->next)
++  if (block)
+     {
+-      struct symbol *sym;
+-      struct type *type;
+-      struct symbol *retval;
+-
+-      sym = lookup_symbol_global (use->module_name, block, MODULE_DOMAIN);
+-
+-      /* Module name lookup should not fail with correct debug info.  */
+-      if (sym == NULL)
+-	continue;
+-
+-      type = SYMBOL_TYPE (sym);
+-      gdb_assert (TYPE_CODE (type) == TYPE_CODE_MODULE);
+-      gdb_assert (TYPE_MODULE_BLOCK (type) != NULL);
+-
+-      retval = lookup_block_symbol (TYPE_MODULE_BLOCK (type), name, domain);
+-      if (retval)
+-	return retval;
++      struct fortran_using *use;
++
++      for (use = BLOCK_FORTRAN_USE (block); use; use = use->next)
++	{
++	  struct symbol *sym;
++	  struct type *type;
++	  struct symbol *retval;
++
++	  sym = lookup_symbol_global (use->module_name, block, MODULE_DOMAIN);
++
++	  /* Module name lookup should not fail with correct debug info.  */
++	  if (sym == NULL)
++	    continue;
++
++	  type = SYMBOL_TYPE (sym);
++	  gdb_assert (TYPE_CODE (type) == TYPE_CODE_MODULE);
++	  gdb_assert (TYPE_MODULE_BLOCK (type) != NULL);
++
++	  retval = lookup_block_symbol (TYPE_MODULE_BLOCK (type), name, domain);
++	  if (retval)
++	    return retval;
++	}
+     }
+ 
+-  return NULL;
++  return basic_lookup_symbol_nonlocal (name, block, domain);
+ }
+ 
+ /* This is declared in c-lang.h but it is silly to import that file for what
+--- ./gdb/testsuite/gdb.fortran/module.exp	2010-02-03 01:50:13.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/module.exp	2010-02-03 01:47:42.000000000 +0100
+@@ -43,3 +43,13 @@ gdb_test "print var_b" " = 11"
+ gdb_test "print var_c" "No symbol \"var_c\" in current context\\."
+ gdb_test "print var_d" " = 12"
+ gdb_test "print var_i" " = 14" "print var_i value 14"
++
++# Breakpoint would work in language "c".
++gdb_test "show language" {The current source language is "(auto; currently )?fortran".}
++
++# gcc-4.4.2: The main program is always MAIN__ in .symtab so "runto" above
++# works.  But DWARF DW_TAG_subprogram contains the name specified by
++# the "program" Fortran statement.
++if [gdb_breakpoint "module"] {
++    pass "setting breakpoint at module"
++}
+--- ./gdb/testsuite/gdb.fortran/module.f90	2010-02-03 01:50:07.000000000 +0100
++++ ./gdb/testsuite/gdb.fortran/module.f90	2010-02-03 01:47:42.000000000 +0100
+@@ -37,6 +37,8 @@ end module modmany
+         var_i = var_i                         ! i-is-2
+         end
+ 
++        program module
++
+         use modmany, only: var_b, var_d => var_c, var_i
+ 
+         call sub1
