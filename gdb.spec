@@ -32,11 +32,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.50.20100128
+Version: 7.0.50.20100203
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{dist}
+Release: 13%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -426,9 +426,6 @@ Patch408: gdb-ppc-power7-test.patch
 # Revert: Add -Wunused-function to compile flags.
 Patch412: gdb-unused-revert.patch
 
-# Fix failed gdb_assert due to the PIE patchset (BZ 559414).
-Patch414: gdb-bz559414-pie-assert-fix.patch
-
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -677,7 +674,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch407 -p1
 %patch408 -p1
 %patch412 -p1
-%patch414 -p1
 %patch415 -p1
 %patch393 -p1
 %patch335 -p1
@@ -1009,6 +1005,11 @@ fi
 %endif
 
 %changelog
+* Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-13.fc13
+- archer-jankratochvil-fedora13 commit: 59c35a31f0981a0f0b884b32c91ae6325b2126cd
+- Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291;
+  David Moore, Intel).
+
 * Mon Feb  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100128-12.fc13
 - archer-jankratochvil-fedora13 commit: 5a573e8b26a2f0a6947d4c0249e43e5456610860
 - Remove ExcludeArch on ia64 as it is now fixed up.
