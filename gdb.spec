@@ -13,7 +13,7 @@ Version: 6.8.50.20090302
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?_with_upstream:.upstream}%{?dist}
+Release: 40%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -400,6 +400,9 @@ Patch379: gdb-bz508406-vla-type-objfile.patch
 # Fix crash on some catch commands (BZ 533525).
 Patch386: gdb-bz533525-catch-crash.patch
 
+# Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
+Patch416: gdb-bz559291-fortran-module-toplevel.patch
+
 BuildRequires: ncurses-devel texinfo gettext flex bison expat-devel
 Requires: readline
 BuildRequires: readline-devel
@@ -603,6 +606,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch377 -p1
 %patch379 -p1
 %patch386 -p1
+%patch416 -p1
 %patch124 -p1
 
 find -name "*.orig" | xargs rm -f
@@ -883,6 +887,9 @@ fi
 %endif
 
 %changelog
+* Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-40
+- Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
+
 * Tue Nov 10 2009 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.8.50.20090302-39
 - Fix crash on some catch commands (BZ 533525).
 
