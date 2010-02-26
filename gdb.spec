@@ -36,7 +36,7 @@ Version: 7.0.50.20100203
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{dist}
+Release: 16%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -374,6 +374,7 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
 # The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
 Patch349: gdb-archer.patch
+Patch420: gdb-archer-ada.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
@@ -428,6 +429,9 @@ Patch412: gdb-unused-revert.patch
 
 # Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 Patch417: gdb-bz541866-rwatch-before-run.patch
+
+# Remove false gdb_assert on $sp underflow.
+Patch422: gdb-infcall-sp-underflow.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -565,6 +569,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 #patch232 -p1
 %patch349 -p1
+%patch420 -p1
 %patch124 -p1
 %patch1 -p1
 %patch3 -p1
@@ -678,6 +683,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch408 -p1
 %patch412 -p1
 %patch417 -p1
+%patch422 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1010,6 +1016,11 @@ fi
 %endif
 
 %changelog
+* Fri Feb 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-16.fc13
+- Fix ia64 part of the bt-clone-stop.exp fix.
+- Fix gdb.ada/* regressions (Keith Seitz).
+- Remove false gdb_assert on $sp underflow.
+
 * Mon Feb  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-15.fc13
 - Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 
