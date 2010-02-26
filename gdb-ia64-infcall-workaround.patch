@@ -1,0 +1,117 @@
+There was a regression by:
+
+Re: [rfc, v3] Fix frame_id_inner comparison false positives
+http://sourceware.org/ml/gdb-patches/2008-08/msg00578.html
+http://sourceware.org/ml/gdb-cvs/2008-08/msg00182.html
+916dde5d38b45a659514e47942ece70aec04cd78
+
+the part:
+	* stack.c (return_command): Directly pop the selected frame.
+
+Reproducible on:
+hp-diablo-01.rhts.eng.bos.redhat.com
+RHEL5.5-Server-20100216.nightly
+kernel-2.6.18-187.el5.ia64
+
+Not reproducible on:
+hp-bl860c-03.rhts.eng.bos.redhat.com
+RHEL-4.8
+kernel-2.6.9-89.EL.ia64
+
+To make ia64-tdep.c compilable +/- this stack.c check-in one must apply:
+
+Re: [RFC] Remove addr, endaddr, offset from obj_section
+http://sourceware.org/ml/gdb-patches/2008-09/msg00011.html
+http://sourceware.org/ml/gdb-cvs/2008-09/msg00009.html
+99072369ec3c8f94c9a596e5ce30bf1f1c4bf20e
+
+It is reproducible by:
+	gdb.base/call-signal-resume.exp
+although one must first remove the gdb_assert by:
+	gdb-infcall-sp-underflow.patch
+
+Reproducer:
+	set confirm no
+	set breakpoint pending on
+	set height 0
+	set width 0
+	# testcase from: gdb-6.8-37.el5.src
+	file gdb.base/call-signals
+	break stop_one
+	run
+	call gen_signal ()
+	bt
+	frame 3
+	return
+	p/x $sp
+	break stop_two
+	info break
+	p/x $pc
+	p/x $sp
+	bt
+	set debug infrun 1
+	delete 1
+	continue
+	bt
+	p/x $pc
+	echo Bug is reproduced if sp is now 0:\n
+	p/x $sp
+	kill
+	quit
+
+
+--- ./gdb/frame.c	2010-02-23 21:35:35.000000000 +0100
++++ ./gdb/frame.c	2010-02-23 21:46:34.000000000 +0100
+@@ -517,7 +517,7 @@ frame_id_eq (struct frame_id l, struct f
+    a stack overflow strategy that cause the handler to be run on a
+    different stack.  */
+ 
+-static int
++int
+ frame_id_inner (struct gdbarch *gdbarch, struct frame_id l, struct frame_id r)
+ {
+   int inner;
+--- ./gdb/frame.h	2009-09-13 18:28:28.000000000 +0200
++++ ./gdb/frame.h	2010-02-23 21:46:10.000000000 +0100
+@@ -708,4 +708,7 @@ extern struct frame_info *create_new_fra
+ extern int frame_unwinder_is (struct frame_info *fi,
+ 			      const struct frame_unwind *unwinder);
+ 
++extern int frame_id_inner (struct gdbarch *gdbarch, struct frame_id l,
++			   struct frame_id r);
++
+ #endif /* !defined (FRAME_H)  */
+--- ./gdb/stack.c	2010-02-23 21:35:34.000000000 +0100
++++ ./gdb/stack.c	2010-02-23 21:44:39.000000000 +0100
+@@ -1967,8 +1967,29 @@ If you continue, the return value that y
+ 	error (_("Not confirmed"));
+     }
+ 
+-  /* Discard the selected frame and all frames inner-to it.  */
+-  frame_pop (get_selected_frame (NULL));
++  /* NOTE: cagney/2003-01-18: Is this silly?  Rather than pop each
++     frame in turn, should this code just go straight to the relevant
++     frame and pop that?  */
++
++  /* First discard all frames inner-to the selected frame (making the
++     selected frame current).  */
++  {
++    struct frame_id selected_id = get_frame_id (get_selected_frame (NULL));
++    while (!frame_id_eq (selected_id, get_frame_id (get_current_frame ())))
++      {
++	struct frame_info *frame = get_current_frame ();
++	if (frame_id_inner (get_frame_arch (frame), selected_id,
++			    get_frame_id (frame)))
++	  /* Caught in the safety net, oops!  We've gone way past the
++             selected frame.  */
++	  error (_("Problem while popping stack frames (corrupt stack?)"));
++	frame_pop (get_current_frame ());
++      }
++  }
++
++  /* Second discard the selected frame (which is now also the current
++     frame).  */
++  frame_pop (get_current_frame ());
+ 
+   /* Store RETURN_VALUE in the just-returned register set.  */
+   if (return_value != NULL)

@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?_with_upstream:.upstream}%{dist}
+Release: 32%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -349,6 +349,7 @@ Patch326: gdb-6.8-tui-singlebinary.patch
 # Support transparent debugging of inlined functions for an optimized code.
 # Disable break-by-name on inlined functions due to a regression on parameters
 # of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
+# Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
 Patch350: gdb-6.8-inlining-addon.patch
 Patch328: gdb-6.8-inlining-by-name.patch
 
@@ -375,6 +376,8 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
 # The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
 Patch349: gdb-archer.patch
+Patch418: gdb-archer-excessive-files.patch
+Patch420: gdb-archer-ada.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
@@ -449,6 +452,21 @@ Patch414: gdb-bz559414-pie-assert-fix.patch
 
 # Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
 Patch416: gdb-bz559291-fortran-module-toplevel.patch
+
+# Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
+Patch417: gdb-bz541866-rwatch-before-run.patch
+
+# testsuite: Fix long timeout on arches with failing gdb.base/interrupt.exp.
+Patch419: gdb-test-interrupt.exp-timeout.patch
+
+# Fix crash on stale addrinfo->sectindex (more sensitive due to the PIE patch).
+Patch421: gdb-stale-sectindex.patch
+
+# Remove false gdb_assert on $sp underflow.
+Patch422: gdb-infcall-sp-underflow.patch
+
+# Workaround ia64 inferior calls clearing SP.
+Patch423: gdb-ia64-infcall-workaround.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -581,6 +599,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %patch232 -p1
 %patch349 -p1
+%patch418 -p1
+%patch420 -p1
 %patch383 -p1
 %patch384 -p1
 %patch385 -p1
@@ -672,7 +692,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch322 -p1
 %patch324 -p1
 %patch326 -p1
-%patch350 -p1
+###patch350 -p1
 ###patch328 -p1
 %patch329 -p1
 %patch330 -p1
@@ -703,6 +723,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch402 -p1
 %patch414 -p1
 %patch416 -p1
+%patch417 -p1
+%patch419 -p1
+%patch421 -p1
+%patch422 -p1
+%patch423 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1028,6 +1053,16 @@ fi
 %endif
 
 %changelog
+* Fri Feb 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-32.fc12
+- Fix gdb.ada/* regressions (Keith Seitz).
+- Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
+- Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
+- Fix crash on stale addrinfo->sectindex (more sensitive due to the PIE patch).
+- Remove false gdb_assert on $sp underflow.
+- Workaround ia64 inferior calls clearing SP.
+- testsuite: Fix long timeout on arches with failing gdb.base/interrupt.exp.
+- Fix ia64 part of the bt-clone-stop.exp fix.
+
 * Wed Feb  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-31.fc12
 - Fortran: Fix regression on setting breakpoint at toplevel symbols (BZ 559291).
 
