@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?_with_upstream:.upstream}%{dist}
+Release: 33%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -468,6 +468,12 @@ Patch422: gdb-infcall-sp-underflow.patch
 # Workaround ia64 inferior calls clearing SP.
 Patch423: gdb-ia64-infcall-workaround.patch
 
+# [delayed-symfile] Backport fix of reread_symbols (Tom Tromey, BZ 562517).
+Patch424: gdb-bz562517-archer-reread-quick_addrmap.patch
+
+# Fix false warning: section .gnu.liblist not found in ...
+Patch425: gdb-false-warning-gnu.liblist.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -728,6 +734,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch421 -p1
 %patch422 -p1
 %patch423 -p1
+%patch424 -p1
+%patch425 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1053,6 +1061,10 @@ fi
 %endif
 
 %changelog
+* Sun Feb 28 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-33.fc12
+- [delayed-symfile] Backport fix of reread_symbols (Tom Tromey, BZ 562517).
+- Fix false warning: section .gnu.liblist not found in ...
+
 * Fri Feb 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-32.fc12
 - Fix gdb.ada/* regressions (Keith Seitz).
 - Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
