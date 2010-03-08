@@ -36,7 +36,7 @@ Version: 7.0.90.20100306
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?_with_upstream:.upstream}%{dist}
+Release: 20%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -345,13 +345,6 @@ Patch324: gdb-6.8-glibc-headers-compat.patch
 # Create a single binary `gdb' autodetecting --tui by its argv[0].
 Patch326: gdb-6.8-tui-singlebinary.patch
 
-# Support transparent debugging of inlined functions for an optimized code.
-# Disable break-by-name on inlined functions due to a regression on parameters
-# of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
-# Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
-Patch350: gdb-6.8-inlining-addon.patch
-Patch328: gdb-6.8-inlining-by-name.patch
-
 # Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
 Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
 
@@ -544,7 +537,8 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
-This package provides a program that allows you to run GDB on a different machine than the one which is running the program being debugged.
+This package provides a program that allows you to run GDB on a different
+machine than the one which is running the program being debugged.
 %endif # 0%{!?el5:1}
 
 %prep
@@ -657,8 +651,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch322 -p1
 %patch324 -p1
 %patch326 -p1
-###patch350 -p1
-###patch328 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
@@ -1017,6 +1009,9 @@ fi
 %endif
 
 %changelog
+* Mon Mar  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-20.fc13
+- Remove unapplied: gdb-6.8-inlining-addon.patch gdb-6.8-inlining-by-name.patch
+
 * Mon Mar  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-19.fc13
 - Include also %%doc COPYING3 (review by Petr Machata).
 - Remove URL for Source (review by Matej Cepl).
