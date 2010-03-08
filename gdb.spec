@@ -36,13 +36,14 @@ Version: 7.0.90.20100306
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{dist}
+Release: 19%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
+# Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
+Source: gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -984,7 +985,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%doc COPYING COPYING.LIB README NEWS
+%doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gcore
 %{_bindir}/gdb
 %{_bindir}/gdbtui
@@ -1016,6 +1017,10 @@ fi
 %endif
 
 %changelog
+* Mon Mar  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-19.fc13
+- Include also %%doc COPYING3 (review by Petr Machata).
+- Remove URL for Source (review by Matej Cepl).
+
 * Sun Mar  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-18.fc13
 - archer-jankratochvil-fedora13 commit: 59c35a31f0981a0f0b884b32c91ae6325b2126cd
 
