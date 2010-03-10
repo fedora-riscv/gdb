@@ -36,9 +36,9 @@ Version: 7.0.90.20100306
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?_with_upstream:.upstream}%{dist}
+Release: 22%{?_with_upstream:.upstream}%{dist}
 
-License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
+License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
@@ -1009,6 +1009,9 @@ fi
 %endif
 
 %changelog
+* Wed Mar 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-22.fc13
+- Another License update.
+
 * Wed Mar 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-21.fc13
 - Update License for all the licenses contained in .src.rpm.
 
