@@ -32,11 +32,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.90.20100306
+Version: 7.0.90.20100312
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{dist}
+Release: 23%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -427,6 +427,9 @@ Patch422: gdb-infcall-sp-underflow.patch
 # Fix false warning: section .gnu.liblist not found in ...
 Patch425: gdb-false-warning-gnu.liblist.patch
 
+# Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+Patch429: gdb-bz562975-std-terminate-double-free.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -677,6 +680,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch417 -p1
 %patch422 -p1
 %patch425 -p1
+%patch429 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1009,6 +1013,10 @@ fi
 %endif
 
 %changelog
+* Fri Mar 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100312-23.fc13
+- Update to new FSF GDB snapshot.
+- Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+
 * Wed Mar 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-22.fc13
 - Another License update.
 
