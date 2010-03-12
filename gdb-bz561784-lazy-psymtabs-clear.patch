@@ -1,0 +1,73 @@
+commit 770630ed9a3f11e8ec2d03557bf9852a1bbc507d
+Author: Tom Tromey <tromey@redhat.com>
+Date:   Fri Feb 26 16:47:37 2010 -0700
+
+    Fix https://bugzilla.redhat.com/show_bug.cgi?id=561784
+    
+    The bug is that psymtabs_addrmap can be left in an inconsistent
+    state when lazily reading psymtabs.  This doesn't occur with
+    a non-lazy read because in that case the objfile is destroyed
+    on error.
+    
+    This fix works by clearing out the psymtabs for an objfile
+    if reading fails.
+
+diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
+index 18300c5..0c13fc7 100644
+--- a/gdb/dwarf2read.c
++++ b/gdb/dwarf2read.c
+@@ -2267,6 +2267,29 @@ build_type_psymtabs (struct objfile *objfile)
+ 			  process_type_comp_unit, objfile);
+ }
+ 
++/* A cleanup function that clears an objfile's psymtabs.  There are
++   two cases to consider.  If we are reading symbols directly, then on
++   a failure the objfile will be destroyed.  In this case, clearing
++   the psymtabs is fine -- a little wasted time, but nothing serious.
++   If we are reading symbols lazily, then it is too late to destroy
++   the objfile.  Instead we just make it look like the objfile has no
++   psymtabs.  */
++
++static void
++do_clear_psymtabs (void *arg)
++{
++  struct objfile *objfile = arg;
++
++  objfile->psymtabs_addrmap = NULL;
++  objfile->psymtabs = NULL;
++  bcache_xfree (objfile->psymbol_cache);
++  objfile->psymbol_cache = bcache_xmalloc ();
++  xfree (objfile->global_psymbols.list);
++  memset (&objfile->global_psymbols, 0, sizeof (objfile->global_psymbols));
++  xfree (objfile->static_psymbols.list);
++  memset (&objfile->static_psymbols, 0, sizeof (objfile->static_psymbols));
++}
++
+ /* Build the partial symbol table by doing a quick pass through the
+    .debug_info and .debug_abbrev sections.  */
+ 
+@@ -2277,7 +2300,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+      mmap()  on architectures that support it. (FIXME) */
+   bfd *abfd = objfile->obfd;
+   gdb_byte *info_ptr;
+-  struct cleanup *back_to;
++  struct cleanup *back_to, *clear_psymtabs;
+ 
+   info_ptr = dwarf2_per_objfile->info.buffer;
+ 
+@@ -2291,6 +2314,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+ 
+   objfile->psymtabs_addrmap =
+     addrmap_create_mutable (&objfile->objfile_obstack);
++  clear_psymtabs = make_cleanup (do_clear_psymtabs, objfile);
+ 
+   /* Since the objects we're extracting from .debug_info vary in
+      length, only the individual functions to extract them (like
+@@ -2320,6 +2344,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+ 					    dwarf2_per_objfile->info.size);
+     }
+ 
++  discard_cleanups (clear_psymtabs);
+   objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
+ 						    &objfile->objfile_obstack);
+ 

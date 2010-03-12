@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{dist}
+Release: 34%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -474,6 +474,18 @@ Patch424: gdb-bz562517-archer-reread-quick_addrmap.patch
 # Fix false warning: section .gnu.liblist not found in ...
 Patch425: gdb-false-warning-gnu.liblist.patch
 
+# Fix parsing of gcc -feliminate-dwarf2-dups binaries (Tom Tromey, BZ 552619).
+Patch426: gdb-bz552619-dwarf3-offset-size.patch 
+
+# Fix crash on pretty printed object by MI (Tom Tromey, BZ 560034).
+Patch427: gdb-bz560034-mi-prettyprint-crash.patch
+
+# [delayed-symfile] Fix crash on failed reading psymtab (Tom Tromey, BZ 561784).
+Patch428: gdb-bz561784-lazy-psymtabs-clear.patch
+
+# Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+Patch429: gdb-bz562975-std-terminate-double-free.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -736,6 +748,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch423 -p1
 %patch424 -p1
 %patch425 -p1
+%patch426 -p1
+%patch427 -p1
+%patch428 -p1
+%patch429 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1061,6 +1077,12 @@ fi
 %endif
 
 %changelog
+* Fri Mar 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-34.fc12
+- Fix parsing of gcc -feliminate-dwarf2-dups binaries (Tom Tromey, BZ 552619).
+- Fix crash on pretty printed object by MI (Tom Tromey, BZ 560034).
+- [delayed-symfile] Fix crash on failed reading psymtab (Tom Tromey, BZ 561784).
+- Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+
 * Sun Feb 28 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-33.fc12
 - [delayed-symfile] Backport fix of reread_symbols (Tom Tromey, BZ 562517).
 - Fix false warning: section .gnu.liblist not found in ...
