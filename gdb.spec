@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?_with_upstream:.upstream}%{dist}
+Release: 35%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -224,8 +224,7 @@ Patch213: gdb-6.5-readline-long-line-crash-test.patch
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 
-# Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
-Patch215: gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch
+# Test sideeffects of skipping ppc .so libs trampolines (BZ 218379).
 Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
@@ -667,7 +666,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch211 -p1
 %patch213 -p1
 %patch214 -p1
-%patch215 -p1
 %patch216 -p1
 %patch217 -p1
 %patch225 -p1
@@ -1077,6 +1075,10 @@ fi
 %endif
 
 %changelog
+* Mon Mar 15 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-35.fc12
+- Drop gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch having false symbols
+  resolving (related to BZ 573277).
+
 * Fri Mar 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-34.fc12
 - Fix parsing of gcc -feliminate-dwarf2-dups binaries (Tom Tromey, BZ 552619).
 - Fix crash on pretty printed object by MI (Tom Tromey, BZ 560034).
