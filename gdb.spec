@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?_with_upstream:.upstream}%{dist}
+Release: 35%{?_with_upstream:.upstream}%{dist}.1
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -400,8 +400,12 @@ Patch383: gdb-bz528668-symfile-sepcrc.patch
 Patch384: gdb-bz528668-symfile-cleanup.patch
 Patch385: gdb-bz528668-symfile-multi.patch
 
+# sparc glibc does not support ifunc patches have been sent upstream adding
+# they are not in any fedora sparc build
+%ifnarch %{sparc}
 # Support GNU IFUNCs - indirect functions (BZ 539590).
 Patch387: gdb-bz539590-gnu-ifunc.patch
+%endif
 
 # Fix bp conditionals [bp_location-accel] regression (BZ 538626).
 Patch388: gdb-bz538626-bp_location-accel-bp-cond.patch
@@ -723,7 +727,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch376 -p1
 %patch381 -p1
 %patch382 -p1
+%ifnarch %{sparc}
 %patch387 -p1
+%endif
 %patch389 -p1
 %patch390 -p1
 %patch391 -p1
@@ -1075,6 +1081,10 @@ fi
 %endif
 
 %changelog
+* Fri Mar 26 2010 Dennis Gilmore <dennis@ausil.us> - 7.0.1-35.1
+- dont apply gdb-bz539590-gnu-ifunc.patch on sparc
+- we dont yet have the support in glibc
+
 * Mon Mar 15 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-35.fc12
 - Drop gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch having false symbols
   resolving (related to BZ 573277).
