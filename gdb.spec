@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?_with_upstream:.upstream}%{dist}.1
+Release: 36%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -489,6 +489,9 @@ Patch428: gdb-bz561784-lazy-psymtabs-clear.patch
 # Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
 Patch429: gdb-bz562975-std-terminate-double-free.patch
 
+# Fix incorrect relocation of sections with duplicate name (BZ 575737).
+Patch431: gdb-bz575737-pie-duplicate-section-name.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -756,6 +759,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch427 -p1
 %patch428 -p1
 %patch429 -p1
+%patch431 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1081,6 +1085,9 @@ fi
 %endif
 
 %changelog
+* Fri Mar 26 2010 Dennis Gilmore <dennis@ausil.us> - 7.0.1-36.fc12
+- Fix incorrect relocation of sections with duplicate name (BZ 575737).
+
 * Fri Mar 26 2010 Dennis Gilmore <dennis@ausil.us> - 7.0.1-35.1
 - dont apply gdb-bz539590-gnu-ifunc.patch on sparc
 - we dont yet have the support in glibc

@@ -1,0 +1,191 @@
+http://sourceware.org/ml/gdb-patches/2010-03/msg00799.html
+Subject: [patch] Fix separate-debug with non-unique section names (PR 11409)
+
+A different version was checked-in but they are interchangeable:
+	http://sourceware.org/ml/gdb-patches/2010-03/msg00799.html
+	http://sourceware.org/ml/gdb-cvs/2010-03/msg00241.html
+
+Hi,
+
+gdb-7.1 is now broken for example for debugging /usr/bin/emacs due to:
+http://sourceware.org/bugzilla/show_bug.cgi?id=11409
+  [22] .data   PROGBITS 00000000007fe8a0 1fe8a0 215068 00  WA  0   0 32
+  [23] .data   PROGBITS 0000000000a13920 413920 68c6e0 00  WA  0   0 32
+
+It is in fact a regression against gdb-7.0 by me due to:
+
+commit 71d0069a9f238a11f7f455bf6ad2adfc25683521
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Tue Jan 5 15:51:01 2010 +0000
+
+gdb/
+        * symfile.c (syms_from_objfile): Remove the !MAINLINE conditional.
+
+as while the code was broken even before the broken relocation was not applied
+to mainline binary (before PIE+OSX patches went in).
+
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
+
+OK to check-in also for gdb-7.1 (7.1.1)?
+
+
+Thanks,
+Jan
+
+
+gdb/
+2010-03-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symfile.c (addr_info_make_relative): Move sect declaration to the
+	outer block.  Initialize it to NULL.  Prefer SECT->next more than
+	bfd_get_section_by_name.
+
+gdb/testsuite/
+2010-03-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/dup-sect.exp, gdb.base/dup-sect.S: New.
+
+--- a/gdb/symfile.c
++++ b/gdb/symfile.c
+@@ -529,6 +529,7 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
+   asection *lower_sect;
+   CORE_ADDR lower_offset;
+   int i;
++  asection *sect;
+ 
+   /* Find lowest loadable section to be used as starting point for
+      continguous sections. FIXME!! won't work without call to find
+@@ -553,11 +554,23 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
+      (the loadable section directly below it in memory).
+      this_offset = lower_offset = lower_addr - lower_orig_addr */
+ 
++  sect = NULL;
+   for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
+     {
+       const char *sect_name = addrs->other[i].name;
+-      asection *sect = bfd_get_section_by_name (abfd, sect_name);
+ 
++      /* Prefer the next section of that we have found last.  The separate
++	 debug info files have either the same section layout or just a few
++	 sections are missing there.  On the other hand the section name is not
++	 unique and we could find an inappropraite section by its name.  */
++
++      if (sect)
++	sect = sect->next;
++      if (sect && strcmp (sect_name, bfd_get_section_name (abfd, sect)) != 0)
++	sect = NULL;
++
++      if (sect == NULL)
++	sect = bfd_get_section_by_name (abfd, sect_name);
+       if (sect)
+ 	{
+ 	  /* This is the index used by BFD. */
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/dup-sect.S
+@@ -0,0 +1,22 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++	.section	sect1, "a"
++var1:	.byte	1
++
++	.section	sect2, "a"
++var2:	.byte	2
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/dup-sect.exp
+@@ -0,0 +1,79 @@
++# This testcase is part of GDB, the GNU debugger.
++
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test inappropriate offseting of multiple sections with the same name.
++# When kept in object file (before final executable link) it still works.
++# When separate debug info file is not used it still works.
++# When the ELF symbol table is kept in the main binary it still works.
++# Used .S file as in .c file we would need __attriute__((section)) which is
++# a GCC extension.
++
++# This test can only be run on targets which support ELF and use gas.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0
++}
++
++set testfile dup-sect
++set srcfile ${testfile}.S
++set srcmainfile start.c
++set executable ${testfile}
++set binfile ${objdir}/${subdir}/${executable}
++
++if {[build_executable ${testfile}.exp $executable [list ${srcfile} ${srcmainfile}] {}] == -1} {
++    return -1
++}
++
++set test "rename section"
++set objcopy_program [transform objcopy]
++set result [catch "exec $objcopy_program --rename-section sect2=sect1 $binfile" output]
++verbose "result is $result"
++verbose "output is $output"
++if {$result != 0} {
++    fail $test
++    return
++}
++pass $test
++
++set test "split"
++if {[gdb_gnu_strip_debug $binfile] != 0} {
++    fail $test
++} else {
++    pass $test
++}
++
++# gdb_gnu_strip_debug uses only --strip-debug and keeps the ELF symbol table
++# in $binfile.
++set test "strip"
++set strip_program [transform strip]
++set result [catch "exec $strip_program $binfile" output]
++verbose "result is $result"
++verbose "output is $output"
++if {$result != 0} {
++    fail $test
++    return
++}
++pass $test
++
++clean_restart $executable
++
++gdb_test "p/d *(const char *) &var1" " = 1" "var1 after strip"
++gdb_test "p/d *(const char *) &var2" " = 2" "var2 after strip"
+
