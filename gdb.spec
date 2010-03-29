@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{dist}
+Release: 3%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -441,6 +441,9 @@ Patch434: gdb-pie-1of6-reprelinked-bin.patch
 Patch435: gdb-pie-2of6-reprelinked-ld.patch
 Patch436: gdb-pie-3of6-relocate-once.patch
 
+# [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
+Patch437: gdb-using-directive-leak.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -695,6 +698,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch434 -p1
 %patch435 -p1
 %patch436 -p1
+%patch437 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1027,6 +1031,9 @@ fi
 %endif
 
 %changelog
+* Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-3.fc13
+- [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
+
 * Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-2.fc13
 - Drop obsoleted `gdb-archer-pie-0315-breakpoint_address_match.patch'.
 - Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
