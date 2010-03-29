@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{dist}
+Release: 2%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -119,7 +119,6 @@ Patch118: gdb-6.3-gstack-20050411.patch
 
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
-Patch124: gdb-archer-pie-0315-breakpoint_address_match.patch
 Patch389: gdb-archer-pie-addons.patch
 Patch394: gdb-archer-pie-addons-keep-disabled.patch
 
@@ -429,6 +428,19 @@ Patch429: gdb-bz562975-std-terminate-double-free.patch
 # PIE: Fix back re-reun.
 Patch430: gdb-pie-rerun.patch
 
+# Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
+Patch432: gdb-solib-memory-error-nonfatal.patch
+
+# testsuite: Fix unstable results of gdb.base/prelink.exp.
+Patch433: gdb-6.7-testsuite-stable-results-prelink.patch 
+
+# [patch 1/6] PIE: Attach binary even after re-prelinked underneath
+# [patch 2/6] PIE: Attach binary even after ld.so re-prelinked underneath
+# [patch 3/6] PIE: Fix occasional error attaching i686 binary
+Patch434: gdb-pie-1of6-reprelinked-bin.patch
+Patch435: gdb-pie-2of6-reprelinked-ld.patch
+Patch436: gdb-pie-3of6-relocate-once.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -567,7 +579,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch232 -p1
 %patch349 -p1
 %patch420 -p1
-%patch124 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -679,6 +690,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch422 -p1
 %patch429 -p1
 %patch430 -p1
+%patch432 -p1
+%patch433 -p1
+%patch434 -p1
+%patch435 -p1
+%patch436 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1011,6 +1027,14 @@ fi
 %endif
 
 %changelog
+* Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-2.fc13
+- Drop obsoleted `gdb-archer-pie-0315-breakpoint_address_match.patch'.
+- Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
+  - PIE: Attach binary even after re-prelinked underneath.
+  - PIE: Attach binary even after ld.so re-prelinked underneath.
+  - PIE: Fix occasional error attaching i686 binary (BZ 576742).
+- testsuite: Fix unstable results of gdb.base/prelink.exp.
+
 * Thu Mar 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-1.fc13
 - Update to new FSF GDB release.
 
