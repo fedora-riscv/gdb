@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{dist}
+Release: 4%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -378,9 +378,6 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 Patch382: gdb-core-open-vdso-warning.patch
 
-# Fix callback-mode readline-6.0 regression for CTRL-C.
-Patch390: gdb-readline-6.0-signal.patch
-
 # Fix syscall restarts for amd64->i386 biarch.
 Patch391: gdb-x86_64-i386-syscall-restart.patch
 
@@ -676,7 +673,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch381 -p1
 %patch382 -p1
-%patch390 -p1
 %patch391 -p1
 %patch392 -p1
 %patch397 -p1
@@ -1031,6 +1027,10 @@ fi
 %endif
 
 %changelog
+* Wed Mar 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-4.fc13
+- Remove gdb-readline-6.0-signal.patch with a bug causing crash while no longer
+  required with F-13 readline-6.1 (BZ 575516)
+
 * Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-3.fc13
 - [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
 
