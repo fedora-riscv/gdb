@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?_with_upstream:.upstream}%{dist}
+Release: 37%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1085,7 +1085,10 @@ fi
 %endif
 
 %changelog
-* Fri Mar 26 2010 Dennis Gilmore <dennis@ausil.us> - 7.0.1-36.fc12
+* Wed Mar 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-37.fc12
+- Fix crash due to gdb-readline-6.0-signal.patch (BZ 575516)
+
+* Fri Mar 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-36.fc12
 - Fix incorrect relocation of sections with duplicate name (BZ 575737).
 
 * Fri Mar 26 2010 Dennis Gilmore <dennis@ausil.us> - 7.0.1-35.1
