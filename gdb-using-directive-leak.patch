@@ -1,0 +1,209 @@
+FSF GDB variant is at:
+http://sourceware.org/ml/gdb-patches/2010-03/msg00789.html
+
+commit 56b45f494f647360f9d6ff84f12f59c08cbe05af
+Author: Sami Wagiaalla <swagiaal@redhat.com>
+Date:   Mon Mar 29 16:08:58 2010 -0400
+
+    Fix using_directive memory leak.
+
+Index: gdb-7.0.1/gdb/buildsym.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/buildsym.c	2009-07-02 19:21:05.000000000 +0200
++++ gdb-7.0.1/gdb/buildsym.c	2010-04-02 23:41:10.000000000 +0200
+@@ -387,6 +387,7 @@ finish_block (struct symbol *symbol, str
+     }
+ 
+   block_set_using (block, using_directives, &objfile->objfile_obstack);
++  using_directives = NULL;
+ 
+   record_pending_block (objfile, block, opblock);
+ 
+Index: gdb-7.0.1/gdb/cp-namespace.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/cp-namespace.c	2010-04-02 23:40:44.000000000 +0200
++++ gdb-7.0.1/gdb/cp-namespace.c	2010-04-02 23:45:37.000000000 +0200
+@@ -122,7 +122,8 @@ cp_scan_for_anonymous_namespaces (const 
+ 		 anonymous namespace.  So add symbols in it to the
+ 		 namespace given by the previous component if there is
+ 		 one, or to the global namespace if there isn't.  */
+-	      cp_add_using_directive (dest, src, "", "", 0);
++	      cp_add_using_directive (dest, src, "", "", 0,
++	                              &SYMBOL_SYMTAB (symbol)->objfile->objfile_obstack);
+ 	    }
+ 	  /* The "+ 2" is for the "::".  */
+ 	  previous_component = next_component + 2;
+@@ -134,11 +135,17 @@ cp_scan_for_anonymous_namespaces (const 
+ }
+ 
+ /* Add a using directive to using_list. If the using directive in question
+-   has already been added, don't add it twice.  */
++   has already been added, don't add it twice.
++   Create a new struct using_direct which imports the namespace SRC into the
++   scope DEST.  ALIAS is the name of the imported namespace in the current
++   scope.  If ALIAS is NULL then the namespace is known by its original name.
++   The arguments are copied into newly allocated memory so they can be
++   temporaries.  */
+ 
+ void
+ cp_add_using_directive (const char *dest, const char *src, const char* alias,
+-			const char *declaration, const int line_number)
++			const char *declaration, const int line_number,
++			struct obstack *obstack)
+ {
+   struct using_direct *current;
+   struct using_direct *new;
+@@ -148,12 +155,26 @@ cp_add_using_directive (const char *dest
+   for (current = using_directives; current != NULL; current = current->next)
+     {
+       if (strcmp (current->import_src, src) == 0
+-          && strcmp (current->import_dest, dest) == 0)
++	  && strcmp (current->import_dest, dest) == 0
++	  && ((alias == NULL && current->alias == NULL)
++	      || (alias != NULL && current->alias != NULL
++		  && strcmp (alias, current->alias) == 0)))
+ 	return;
+     }
+ 
+-  using_directives = cp_add_using (dest, src, alias, declaration,
+-				   line_number, using_directives);
++  new = OBSTACK_ZALLOC (obstack, struct using_direct);
++
++  new->import_src = obsavestring (src, strlen (src), obstack);
++  new->import_dest = obsavestring (dest, strlen (dest), obstack);
++
++  if (alias != NULL)
++    new->alias = obsavestring (alias, strlen (alias), obstack);
++
++  new->declaration = obsavestring (declaration, strlen (declaration), obstack);
++  new->line_number = line_number;
++
++  new->next = using_directives;
++  using_directives = new;
+ 
+ }
+ 
+@@ -205,37 +226,6 @@ cp_is_anonymous (const char *namespace)
+ 	  != NULL);
+ }
+ 
+-/* Create a new struct using direct which imports the namespace SRC
+-   into the scope DEST.  ALIAS is the name of the imported namespace
+-   in the current scope.  If ALIAS is an empty string  then the
+-   namespace is known by its original name.
+-
+-   Set its next member in the linked list to NEXT; allocate all memory
+-   using xmalloc.  It copies the strings, so NAME can be a temporary
+-   string.  */
+-
+-struct using_direct *
+-cp_add_using (const char *dest,
+-              const char *src,
+-              const char *alias,
+-              const char *declaration,
+-              const int line_number,
+-	      struct using_direct *next)
+-{
+-  struct using_direct *retval;
+-
+-  retval = xmalloc (sizeof (struct using_direct));
+-  retval->import_src = savestring (src, strlen (src));
+-  retval->import_dest = savestring (dest, strlen (dest));
+-  retval->alias = savestring (alias, strlen (alias));
+-  retval->declaration = savestring (declaration, strlen (declaration));
+-  retval->line_number = line_number;
+-  retval->next = next;
+-  retval->searched = 0;
+-
+-  return retval;
+-}
+-
+ /* Make a copy of the using directives in the list pointed to by
+    USING, using OBSTACK to allocate memory.  Free all memory pointed
+    to by USING via xfree.  */
+Index: gdb-7.0.1/gdb/cp-support.h
+===================================================================
+--- gdb-7.0.1.orig/gdb/cp-support.h	2010-04-02 23:40:44.000000000 +0200
++++ gdb-7.0.1/gdb/cp-support.h	2010-04-02 23:41:10.000000000 +0200
+@@ -101,14 +101,8 @@ extern void cp_add_using_directive (cons
+                                     const char *src,
+                                     const char *alias,
+                                     const char *declaration,
+-                                    const int line_number);
+-
+-extern struct using_direct *cp_add_using (const char *dest,
+-                                          const char *src,
+-                                          const char *alias,
+-                                          const char *declaration,
+-                                          const int line_number,
+-					  struct using_direct *next);
++                                    const int line_number,
++                                    struct obstack *obstack);
+ 
+ extern void cp_initialize_namespace (void);
+ 
+Index: gdb-7.0.1/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.0.1.orig/gdb/dwarf2read.c	2010-04-02 23:41:04.000000000 +0200
++++ gdb-7.0.1/gdb/dwarf2read.c	2010-04-02 23:42:37.000000000 +0200
+@@ -3793,12 +3793,12 @@ read_import_statement (struct die_info *
+     }
+   }
+   
+-  using_directives = cp_add_using (import_prefix,
+-                                   canonical_name,
+-                                   import_alias,
+-                                   imported_declaration,
+-                                   line_number,
+-                                   using_directives);
++  cp_add_using_directive (import_prefix,
++                          canonical_name,
++                          import_alias,
++                          imported_declaration,
++                          line_number,
++                          &cu->objfile->objfile_obstack);
+ }
+ 
+ static void
+@@ -5972,7 +5972,12 @@ read_namespace (struct die_info *die, st
+       if (is_anonymous)
+ 	{
+ 	  const char *previous_prefix = determine_prefix (die, cu);
+-	  cp_add_using_directive (previous_prefix, TYPE_NAME (type), "", "", dwarf2_read_decl_line(die, cu));
++	  cp_add_using_directive (previous_prefix,
++	                          TYPE_NAME (type),
++	                          "",
++	                          "",
++	                          dwarf2_read_decl_line(die, cu),
++	                          &objfile->objfile_obstack);
+ 	}
+     }
+ 
+Index: gdb-7.0.1/gdb/testsuite/gdb.cp/gdb2384-base.cc
+===================================================================
+--- gdb-7.0.1.orig/gdb/testsuite/gdb.cp/gdb2384-base.cc	2009-01-03 06:58:04.000000000 +0100
++++ gdb-7.0.1/gdb/testsuite/gdb.cp/gdb2384-base.cc	2010-04-02 23:41:10.000000000 +0200
+@@ -23,6 +23,8 @@ base::base (int _x)
+ {
+ }
+ 
++using namespace B;
++
+ int
+ base::meth ()
+ {
+Index: gdb-7.0.1/gdb/testsuite/gdb.cp/gdb2384-base.h
+===================================================================
+--- gdb-7.0.1.orig/gdb/testsuite/gdb.cp/gdb2384-base.h	2009-01-03 06:58:04.000000000 +0100
++++ gdb-7.0.1/gdb/testsuite/gdb.cp/gdb2384-base.h	2010-04-02 23:41:10.000000000 +0200
+@@ -16,6 +16,10 @@
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    */
+ 
++namespace B{
++  int x;
++}
++
+ class base
+ {
+  public:

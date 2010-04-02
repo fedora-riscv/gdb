@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?_with_upstream:.upstream}%{dist}
+Release: 38%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -492,6 +492,9 @@ Patch429: gdb-bz562975-std-terminate-double-free.patch
 # Fix incorrect relocation of sections with duplicate name (BZ 575737).
 Patch431: gdb-bz575737-pie-duplicate-section-name.patch
 
+# [expr-cumulative] Fix using-directive memory leak (Sami Wagiaalla, BZ 578351).
+Patch437: gdb-using-directive-leak.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -760,6 +763,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch428 -p1
 %patch429 -p1
 %patch431 -p1
+%patch437 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1085,6 +1089,9 @@ fi
 %endif
 
 %changelog
+* Fri Apr  2 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-38.fc12
+- [expr-cumulative] Fix using-directive memory leak (Sami Wagiaalla, BZ 578351).
+
 * Wed Mar 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-37.fc12
 - Fix crash due to gdb-readline-6.0-signal.patch (BZ 575516)
 
