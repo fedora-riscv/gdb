@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{dist}
+Release: 7%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -455,6 +455,7 @@ Patch445: gdb-bz578250-avx-07of10.patch
 Patch446: gdb-bz578250-avx-08of10.patch
 Patch447: gdb-bz578250-avx-09of10.patch
 Patch448: gdb-bz578250-avx-10of10.patch
+Patch449: gdb-bz578250-avx-10of10-ppc.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -721,6 +722,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch446 -p1
 %patch447 -p1
 %patch448 -p1
+%patch449 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1053,6 +1055,9 @@ fi
 %endif
 
 %changelog
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-7.fc13
+- Fix ppc build of the AVX registers support (for BZ 578250).
+
 * Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-6.fc13
 - Support AVX registers (BZ 578250).
 
