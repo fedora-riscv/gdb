@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{dist}
+Release: 5%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -441,6 +441,9 @@ Patch436: gdb-pie-3of6-relocate-once.patch
 # [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
 Patch437: gdb-using-directive-leak.patch
 
+# Fix dangling displays in separate debuginfo (BZ 574483).
+Patch438: gdb-bz574483-display-sepdebug.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -695,6 +698,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch435 -p1
 %patch436 -p1
 %patch437 -p1
+%patch438 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1027,6 +1031,9 @@ fi
 %endif
 
 %changelog
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-5.fc13
+- Fix dangling displays in separate debuginfo (BZ 574483).
+
 * Wed Mar 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-4.fc13
 - Remove gdb-readline-6.0-signal.patch with a bug causing crash while no longer
   required with F-13 readline-6.1 (BZ 575516)
