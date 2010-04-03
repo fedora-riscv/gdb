@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{dist}
+Release: 6%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -444,6 +444,18 @@ Patch437: gdb-using-directive-leak.patch
 # Fix dangling displays in separate debuginfo (BZ 574483).
 Patch438: gdb-bz574483-display-sepdebug.patch
 
+# Support AVX registers (BZ 578250).
+Patch439: gdb-bz578250-avx-01of10.patch
+Patch440: gdb-bz578250-avx-02of10.patch
+Patch441: gdb-bz578250-avx-03of10.patch
+Patch442: gdb-bz578250-avx-04of10.patch
+Patch443: gdb-bz578250-avx-05of10.patch
+Patch444: gdb-bz578250-avx-06of10.patch
+Patch445: gdb-bz578250-avx-07of10.patch
+Patch446: gdb-bz578250-avx-08of10.patch
+Patch447: gdb-bz578250-avx-09of10.patch
+Patch448: gdb-bz578250-avx-10of10.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -699,6 +711,16 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch436 -p1
 %patch437 -p1
 %patch438 -p1
+%patch439 -p1
+%patch440 -p1
+%patch441 -p1
+%patch442 -p1
+%patch443 -p1
+%patch444 -p1
+%patch445 -p1
+%patch446 -p1
+%patch447 -p1
+%patch448 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1031,6 +1053,9 @@ fi
 %endif
 
 %changelog
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-6.fc13
+- Support AVX registers (BZ 578250).
+
 * Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-5.fc13
 - Fix dangling displays in separate debuginfo (BZ 574483).
 
