@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?_with_upstream:.upstream}%{dist}
+Release: 40%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -81,7 +81,7 @@ Source2: gdb-orphanripper.c
 Source3: gdb-gstack.man
 
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%define libstdcxxpython libstdc++-v3-python-r151798
+%define libstdcxxpython libstdc++-v3-python-r155978
 Source4: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
@@ -385,9 +385,6 @@ Patch360: gdb-6.8-bz457187-largefile-test.patch
 
 # Fix compatibility of --with-system-readline and readline-6.0+.
 Patch375: gdb-readline-6.0.patch
-
-# Fix python pretty printers lookup on x86_64.
-Patch376: libstdc++-v3-python-common-prefix.patch
 
 # New test for step-resume breakpoint placed in multiple threads at once.
 Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
@@ -733,7 +730,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch352 -p1
 %patch360 -p1
 %patch375 -p1
-%patch376 -p1
 %patch381 -p1
 %patch382 -p1
 %ifnarch %{sparc}
@@ -1093,6 +1089,9 @@ fi
 %endif
 
 %changelog
+* Sun Apr  4 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-40.fc12
+- Upgrade libstdc++ Python pretty printers to r155978 (Phil Muldoon, BZ 561541).
+
 * Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-39.fc12
 - Fix dangling displays in separate debuginfo (BZ 574483).
 
