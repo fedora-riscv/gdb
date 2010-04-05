@@ -702,3 +702,102 @@ gdb/testsuite/
 +gdb_test "p/d *(const char *) &var1" " = 1" "var1 after strip"
 +gdb_test "p/d *(const char *) &var2" " = 2" "var2 after strip"
 
+
+
+[patch] Fix breakpoint at *_start
+http://sourceware.org/ml/gdb-patches/2010-04/msg00059.html
+http://sourceware.org/ml/gdb-cvs/2010-04/msg00029.html
+
+### src/gdb/ChangeLog	2010/04/04 13:54:42	1.11568
+### src/gdb/ChangeLog	2010/04/04 22:12:04	1.11569
+## -1,5 +1,10 @@
+ 2010-04-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
++	* infcmd.c (run_command_1): Call proceed with regcache_read_pc address.
++	* config/djgpp/fnchange.lst: Add translation for break-entry.exp.
++
++2010-04-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
+ 	* breakpoint.c (bpstat_find_step_resume_breakpoint): Remove.
+ 	* breakpoint.h (bpstat_find_step_resume_breakpoint): Remove.
+ 
+--- src/gdb/infcmd.c	2010/03/25 20:48:53	1.263
++++ src/gdb/infcmd.c	2010/04/04 22:12:04	1.264
+@@ -580,8 +580,9 @@
+      has done its thing; now we are setting up the running program.  */
+   post_create_inferior (&current_target, 0);
+ 
+-  /* Start the target running.  */
+-  proceed ((CORE_ADDR) -1, TARGET_SIGNAL_0, 0);
++  /* Start the target running.  Do not use -1 continuation as it would skip
++     breakpoint right at the entry point.  */
++  proceed (regcache_read_pc (get_current_regcache ()), TARGET_SIGNAL_0, 0);
+ 
+   /* Since there was no error, there's no need to finish the thread
+      states here.  */
+--- src/gdb/config/djgpp/fnchange.lst	2010/02/01 19:27:55	1.108
++++ src/gdb/config/djgpp/fnchange.lst	2010/04/04 22:12:07	1.109
+@@ -371,6 +371,7 @@
+ @V@/gdb/testsuite/gdb.arch/powerpc-prologue.exp @V@/gdb/testsuite/gdb.arch/ppc-prologue.exp
+ @V@/gdb/testsuite/gdb.base/bitfields2.c @V@/gdb/testsuite/gdb.base/bitfiel2.c
+ @V@/gdb/testsuite/gdb.base/bitfields2.exp @V@/gdb/testsuite/gdb.base/bitfiel2.exp
++@V@/gdb/testsuite/gdb.base/break-entry.exp @V@/gdb/testsuite/gdb.base/brkentry.exp
+ @V@/gdb/testsuite/gdb.base/coremaker2.c @V@/gdb/testsuite/gdb.base/core2maker.c
+ @V@/gdb/testsuite/gdb.base/hashline1.exp @V@/gdb/testsuite/gdb.base/hash1line.exp
+ @V@/gdb/testsuite/gdb.base/hashline2.exp @V@/gdb/testsuite/gdb.base/hash2line.exp
+### src/gdb/testsuite/ChangeLog	2010/04/02 05:13:07	1.2218
+### src/gdb/testsuite/ChangeLog	2010/04/04 22:12:09	1.2219
+## -1,3 +1,7 @@
++2010-04-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* gdb.base/break-entry.exp: New.
++
+ 2010-04-02  Hui Zhu  <teawater@gmail.com>
+             Michael Snyder <msnyder@vmware.com>
+ 
+--- src/gdb/testsuite/gdb.base/break-entry.exp
++++ src/gdb/testsuite/gdb.base/break-entry.exp	2010-04-05 20:17:39.234684000 +0000
+@@ -0,0 +1,43 @@
++# Copyright (C) 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test inferior can stop at its very first instruction, usually "_start".
++# Dynamic executables have first instruction in ld.so.
++
++set testfile break-entry
++if { [prepare_for_testing ${testfile}.exp ${testfile} start.c {additional_flags=-static}] } {
++    return -1
++}
++
++set test "info files"
++set entry ""
++gdb_test_multiple $test $test {
++    -re "\r\n\[\t \]*Entry point:\[\t \]*(0x\[0-9a-f\]+)\r\n.*$gdb_prompt $" {
++	set entry $expect_out(1,string)
++	pass $test
++    }
++}
++if {$entry == ""} {
++    untested ${testfile}.exp
++    return
++}
++
++if ![runto "*$entry"] {
++    return
++}
++gdb_test {p/x $pc} " = $entry"
++
++gdb_breakpoint "main"
++gdb_continue_to_breakpoint "main" "main.*"

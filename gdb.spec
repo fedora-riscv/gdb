@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{dist}
+Release: 8%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1055,6 +1055,9 @@ fi
 %endif
 
 %changelog
+* Mon Apr  5 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-8.fc13
+- Fix breakpoint at *_start (BZ 162775, bugreport by John Reiser).
+
 * Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-7.fc13
 - Fix ppc build of the AVX registers support (for BZ 578250).
 
