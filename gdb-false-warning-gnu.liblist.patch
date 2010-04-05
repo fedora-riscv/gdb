@@ -1,88 +1,20 @@
-http://sourceware.org/ml/gdb-patches/2010-02/msg00713.html
-Subject: Re: [patch] Fix false warning: section .gnu.liblist not found in ...  [rediffed]
+http://sourceware.org/ml/gdb-cvs/2010-03/msg00066.html
+16558457783d71e2856ff2b9ceaa83199d2d9811
 
-Hi,
-
-only a technical rediff.
-
-------------------------------------------------------------------------------
-
-On Sat, 13 Feb 2010 23:49:29 +0100, Jan Kratochvil wrote:
-Hi,
-
-post-7.0 GDB started to print many false warnings on prelink-ed system:
-
-$ ./gdb -nx -ex r echo
-...
-Reading symbols from /bin/echo...Reading symbols from /usr/lib/debug/bin/echo.debug...
-warning: section .gnu.liblist not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.conflict not found in /usr/lib/debug/bin/echo.debug
-done.
-done.
-Starting program: /bin/echo
-warning: section .gnu.liblist not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.conflict not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.liblist not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.conflict not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.liblist not found in /usr/lib/debug/bin/echo.debug
-warning: section .gnu.conflict not found in /usr/lib/debug/bin/echo.debug
-
-These sections are from prelink and they are not present in the *.debug files.
-
-It is formally a regression by:
-
-commit 3bfec189bb0fa1a2a44f1645dd68a9572e7a841c
-
-2010-01-07  Tristan Gingold  <gingold@adacore.com>
-
-	* symfile.c (build_section_addr_info_from_objfile): New function.
-	(symbol_file_add_separate): Don't use offsets from objfile but
-	built an addr info.
-
-
-But I think would be unavoidable even for the unification of PIC+PIE handling.
-
-Found no usable section flag differences for .gnu.liblist vs. for example
-.text so used just the section name for the exception.
-
-.gnu.liblist/.gnu.conflict related dumps:
-
-executable:
-Section Headers:
-  [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
-  [ 6] .gnu.liblist      GNU_LIBLIST     00000000004006b8 0006b8 000028 14   A 28   0  4
-  [ 7] .gnu.conflict     RELA            00000000004006e0 0006e0 0001c8 18   A  5   0  8
-Program Headers:
-  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
-  LOAD           0x000000 0x0000000000400000 0x0000000000400000 0x005254 0x005254 R E 0x200000
-Dynamic section at offset 0x52c8 contains 24 entries:
-  Tag        Type                         Name/Value
- 0x000000006ffffef9 (GNU_LIBLIST)        0x4006b8
- 0x000000006ffffdf7 (GNU_LIBLISTSZ)      40 (bytes)
- 0x000000006ffffef8 (GNU_CONFLICT)       0x4006e0
- 0x000000006ffffdf6 (GNU_CONFLICTSZ)     456 (bytes)
-
-library:
-Section Headers:
-  [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
-  [74] .gnu.liblist      GNU_LIBLIST     0000000000000000 249940 000014 14     75   0  4
-
-
-No regressions on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
-
-
-Thanks,
-Jan
-
-
-2010-03-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	* symfile.c (addr_info_make_relative): New variable sect_name, use it.
-	Do not warn on ".gnu.liblist" and ".gnu.conflict".
-
---- a/gdb/symfile.c
-+++ b/gdb/symfile.c
-@@ -597,7 +597,8 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
+### src/gdb/ChangeLog	2010/03/08 07:45:49	1.11442
+### src/gdb/ChangeLog	2010/03/08 08:32:49	1.11443
+## -1,3 +1,8 @@
++2010-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* symfile.c (addr_info_make_relative): New variable sect_name, use it.
++	Do not warn on ".gnu.liblist" and ".gnu.conflict".
++
+ 2010-03-08  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	Memory error when reading wrong core file.
+--- src/gdb/symfile.c	2010/03/05 19:32:44	1.275
++++ src/gdb/symfile.c	2010/03/08 08:32:49	1.276
+@@ -592,7 +592,8 @@
  
    for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
      {
@@ -92,16 +24,22 @@ Jan
  
        if (sect)
  	{
-@@ -614,8 +615,16 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
+@@ -609,8 +610,22 @@
  	}
        else
  	{
 -	  warning (_("section %s not found in %s"), addrs->other[i].name,
 -		   bfd_get_filename (abfd));
-+	  /* These two sections are intentionally loaded into memory from
-+	     the DYNAMIC segment and so they have both SEC_ALLOC and SEC_LOAD
-+	     set in the main executable (not in the library files).  They
-+	     are not present in the separate debug info file, though.  */
++	  /* This section does not exist in ABFD, which is normally
++	     unexpected and we want to issue a warning.
++
++	     However, the ELF prelinker does create a couple of sections
++	     (".gnu.liblist" and ".gnu.conflict") which are marked in the main
++	     executable as loadable (they are loaded in memory from the
++	     DYNAMIC segment) and yet are not present in separate debug info
++	     files.  This is fine, and should not cause a warning.  Shared
++	     libraries contain just the section ".gnu.liblist" but it is not
++	     marked as loadable there.  */
 +
 +	  if (!(strcmp (sect_name, ".gnu.liblist") == 0
 +		|| strcmp (sect_name, ".gnu.conflict") == 0))
@@ -112,3 +50,50 @@ Jan
  
  	  /* SECTINDEX is invalid if ADDR is zero.  */
 
+
+
+http://sourceware.org/ml/gdb-cvs/2010-03/msg00138.html
+http://sourceware.org/ml/gdb-patches/2010-03/msg00535.html
+cc3e71651e2fd0168a2d3dd4efc2d3e15fd508dd
+
+### src/gdb/ChangeLog	2010/03/15 03:48:46	1.11479
+### src/gdb/ChangeLog	2010/03/15 09:31:30	1.11480
+## -1,3 +1,8 @@
++2010-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* symfile.c (addr_info_make_relative): Ignore also missing ".dynbss"
++	and ".sdynbss".  Update the comment.
++
+ 2010-03-15  Jie Zhang  <jie@codesourcery.com>
+ 
+ 	* MAINTAINERS: Update my email address.
+--- src/gdb/symfile.c	2010/03/10 18:20:07	1.277
++++ src/gdb/symfile.c	2010/03/15 09:31:34	1.278
+@@ -576,16 +576,19 @@
+ 	  /* This section does not exist in ABFD, which is normally
+ 	     unexpected and we want to issue a warning.
+ 
+-	     However, the ELF prelinker does create a couple of sections
+-	     (".gnu.liblist" and ".gnu.conflict") which are marked in the main
+-	     executable as loadable (they are loaded in memory from the
+-	     DYNAMIC segment) and yet are not present in separate debug info
+-	     files.  This is fine, and should not cause a warning.  Shared
+-	     libraries contain just the section ".gnu.liblist" but it is not
+-	     marked as loadable there.  */
++	     However, the ELF prelinker does create a few sections which are
++	     marked in the main executable as loadable (they are loaded in
++	     memory from the DYNAMIC segment) and yet are not present in
++	     separate debug info files.  This is fine, and should not cause
++	     a warning.  Shared libraries contain just the section
++	     ".gnu.liblist" but it is not marked as loadable there.  There is
++	     no other way to identify them than by their name as the sections
++	     created by prelink have no special flags.  */
+ 
+ 	  if (!(strcmp (sect_name, ".gnu.liblist") == 0
+-		|| strcmp (sect_name, ".gnu.conflict") == 0))
++		|| strcmp (sect_name, ".gnu.conflict") == 0
++		|| strcmp (sect_name, ".dynbss") == 0
++		|| strcmp (sect_name, ".sdynbss") == 0))
+ 	    warning (_("section %s not found in %s"), sect_name,
+ 		     bfd_get_filename (abfd));
+ 

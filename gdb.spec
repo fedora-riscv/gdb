@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?_with_upstream:.upstream}%{dist}
+Release: 41%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1089,6 +1089,9 @@ fi
 %endif
 
 %changelog
+* Mon Apr  5 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-41.fc12
+- Fix also false warning: section .dynbss not found in ...
+
 * Sun Apr  4 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-40.fc12
 - Upgrade libstdc++ Python pretty printers to r155978 (Phil Muldoon, BZ 561541).
 
