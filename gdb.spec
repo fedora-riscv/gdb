@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{dist}
+Release: 9%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -182,10 +182,6 @@ Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
-
-# Hard-code executable names in gstack, such that it can run with a
-# corrupted or missing PATH.
-Patch177: gdb-6.3-gstack-without-path-20060414.patch
 
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
@@ -625,7 +621,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch169 -p1
 %patch170 -p1
 %patch176 -p1
-%patch177 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -1055,6 +1050,11 @@ fi
 %endif
 
 %changelog
+* Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-9.fc13
+- Fix gstack to print even the frame #0.  New gdb.base/gstack.exp.  (BZ 579793)
+- Merge gdb-6.3-gstack-without-path-20060414.p* into gdb-6.3-gstack-20050411.p*,
+  no real code change.
+
 * Mon Apr  5 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-8.fc13
 - Fix breakpoint at *_start (BZ 162775, bugreport by John Reiser).
 
