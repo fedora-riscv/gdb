@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?_with_upstream:.upstream}%{dist}
+Release: 43%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1084,6 +1084,9 @@ fi
 %endif
 
 %changelog
+* Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-43.fc12
+- Fix gstack to print even the frame #0.  New gdb.base/gstack.exp.  (BZ 579793)
+
 * Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-42.fc12
 - Merge gdb-6.3-gstack-without-path-20060414.p* into gdb-6.3-gstack-20050411.p*,
   no real code change.
