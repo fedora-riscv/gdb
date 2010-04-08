@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{dist}
+Release: 10%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -483,7 +483,7 @@ BuildRequires: libstdc++%{?_isa}
 %define bits_other %{?_isa}
 %if 0%{!?el5:1}
 %ifarch s390x
-%define bits_other (%{__isa_name}-31)
+%define bits_other (%{__isa_name}-32)
 %else #!s390x
 %ifarch ppc
 %define bits_other (%{__isa_name}-64)
@@ -1050,6 +1050,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-10.fc13
+- Fix s390 --with testsuite Buildrequiers to be (s390-32) (BZ 580347, Cai Qian).
+
 * Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-9.fc13
 - Fix gstack to print even the frame #0.  New gdb.base/gstack.exp.  (BZ 579793)
 - Merge gdb-6.3-gstack-without-path-20060414.p* into gdb-6.3-gstack-20050411.p*,
