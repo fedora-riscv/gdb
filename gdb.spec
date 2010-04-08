@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{dist}
+Release: 11%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1050,6 +1050,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-11.fc13
+- testsuite: Fix gdb.base/gstack.exp also for ppc64 inferiors (for BZ 579793).
+
 * Thu Apr  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-10.fc13
 - Fix s390 --with testsuite Buildrequiers to be (s390-32) (BZ 580347, Cai Qian).
 
