@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 43%{?_with_upstream:.upstream}%{dist}
+Release: 44%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -491,6 +491,9 @@ Patch437: gdb-using-directive-leak.patch
 # Fix dangling displays in separate debuginfo (BZ 574483).
 Patch438: gdb-bz574483-display-sepdebug.patch
 
+# Fix pretty printers regression in 7.0.1-40.fc12 (Phil Muldoon, BZ 582052).
+Patch450: gdb-bz582052-libstdc++-compat.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -759,6 +762,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch431 -p1
 %patch437 -p1
 %patch438 -p1
+%patch450 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1084,6 +1088,9 @@ fi
 %endif
 
 %changelog
+* Wed Apr 14 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-44.fc12
+- Fix pretty printers regression in 7.0.1-40.fc12 (Phil Muldoon, BZ 582052).
+
 * Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-43.fc12
 - Fix gstack to print even the frame #0.  New gdb.base/gstack.exp.  (BZ 579793)
 
