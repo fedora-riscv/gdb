@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit cb854301ce799ed6c96a80a03d829f3d186e4811
+commit 39998c496988faaa1509cc6ab76b5c4777659bf4
 
 branch `archer' - the merge of branches:
 archer-tromey-delayed-symfile2
@@ -1275,7 +1275,7 @@ index d620881..34cb34a 100644
    dump_subexp_body_standard,
    evaluate_subexp_c
 diff --git a/gdb/c-typeprint.c b/gdb/c-typeprint.c
-index ed98381..a405826 100644
+index ed98381..3061ab7 100644
 --- a/gdb/c-typeprint.c
 +++ b/gdb/c-typeprint.c
 @@ -32,6 +32,7 @@
@@ -1358,12 +1358,13 @@ index ed98381..a405826 100644
        printed_any = 1;
      }
  
-@@ -558,7 +584,12 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
+@@ -558,7 +584,13 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
  	fprintf_filtered (stream, ")");
  
        fprintf_filtered (stream, "[");
 -      if (TYPE_LENGTH (TYPE_TARGET_TYPE (type)) > 0
-+      if (TYPE_ARRAY_UPPER_BOUND_IS_DWARF_BLOCK (type))
++      if (TYPE_RANGE_DATA (TYPE_INDEX_TYPE (type))->high.kind
++	  != RANGE_BOUND_KIND_CONSTANT)
 +	{
 +	  /* No _() - printed sources should not be locale dependent.  */
 +	  fprintf_filtered (stream, "variable");
@@ -1372,7 +1373,7 @@ index ed98381..a405826 100644
  	&& !TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
  	fprintf_filtered (stream, "%d",
  			  (TYPE_LENGTH (type)
-@@ -591,7 +622,7 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
+@@ -591,7 +623,7 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
        if (passed_a_ptr)
  	fprintf_filtered (stream, ")");
        if (!demangled_args)
@@ -3284,10 +3285,23 @@ index 437ca39..f7fce92 100644
    /* The current depth of dwarf expression recursion, via DW_OP_call*,
       DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index 1c4d057..ac67f22 100644
+index 1c4d057..20dcacd 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
-@@ -121,6 +121,9 @@ struct dwarf_expr_baton
+@@ -46,6 +46,12 @@ static void
+ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
+ 			 gdb_byte **start, size_t *length);
+ 
++static struct value *dwarf2_evaluate_loc_desc (struct type *type,
++					       struct frame_info *frame,
++					       gdb_byte *data,
++					       unsigned short size,
++					     struct dwarf2_per_cu_data *per_cu);
++
+ /* A helper function for dealing with location lists.  Given a
+    symbol baton (BATON) and a pc value (PC), find the appropriate
+    location expression, set *LOCEXPR_LENGTH, and return a pointer
+@@ -121,6 +127,9 @@ struct dwarf_expr_baton
  {
    struct frame_info *frame;
    struct objfile *objfile;
@@ -3297,7 +3311,7 @@ index 1c4d057..ac67f22 100644
  };
  
  /* Helper functions for dwarf2_evaluate_loc_desc.  */
-@@ -189,22 +192,33 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
+@@ -189,22 +198,33 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
        symbaton = SYMBOL_LOCATION_BATON (framefunc);
        *start = find_location_expression (symbaton, length, pc);
      }
@@ -3340,7 +3354,7 @@ index 1c4d057..ac67f22 100644
  }
  
  /* Helper function for dwarf2_evaluate_loc_desc.  Computes the CFA for
-@@ -227,6 +241,129 @@ dwarf_expr_tls_address (void *baton, CORE_ADDR offset)
+@@ -227,6 +247,155 @@ dwarf_expr_tls_address (void *baton, CORE_ADDR offset)
    return target_translate_tls_address (debaton->objfile, offset);
  }
  
@@ -3467,10 +3481,42 @@ index 1c4d057..ac67f22 100644
 +  return retval;
 +}
 +
++/* Evaluate DWARF location list at DLLBATON expecting it produces exactly one
++   CORE_ADDR result stored to *ADDRP on the DWARF stack stack.  If the result
++   could not be found return zero and keep *ADDRP unchanged.  */
++
++int
++dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
++			  struct type *type, CORE_ADDR *addrp)
++{
++  struct frame_info *frame = get_selected_frame (NULL);
++  gdb_byte *data;
++  size_t size;
++  struct value *val;
++
++  data = find_location_expression (dllbaton, &size,
++				   get_frame_address_in_block (frame));
++  if (data == NULL)
++    return 0;
++
++  val = dwarf2_evaluate_loc_desc (type, frame, data, size, dllbaton->per_cu);
++  if (value_optimized_out (val))
++    return 0;
++
++  *addrp = value_as_address (val);
++  return 1;
++}
++
  struct piece_closure
  {
    /* The number of pieces used to describe this variable.  */
-@@ -406,9 +543,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+@@ -401,48 +570,31 @@ static struct lval_funcs pieced_value_funcs = {
+    SIZE, to find the current location of variable VAR in the context
+    of FRAME.  */
+ static struct value *
+-dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
++dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
+ 			  gdb_byte *data, unsigned short size,
  			  struct dwarf2_per_cu_data *per_cu)
  {
    struct value *retval;
@@ -3481,7 +3527,10 @@ index 1c4d057..ac67f22 100644
  
    if (size == 0)
      {
-@@ -418,22 +554,8 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+-      retval = allocate_value (SYMBOL_TYPE (var));
++      retval = allocate_value (type);
+       VALUE_LVAL (retval) = not_lval;
+       set_value_optimized_out (retval, 1);
        return retval;
      }
  
@@ -3505,19 +3554,88 @@ index 1c4d057..ac67f22 100644
    if (ctx->num_pieces > 0)
      {
        struct piece_closure *c;
-@@ -463,6 +585,11 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+       struct frame_id frame_id = get_frame_id (frame);
+ 
+       c = allocate_piece_closure (ctx->num_pieces, ctx->pieces, ctx->gdbarch);
+-      retval = allocate_computed_value (SYMBOL_TYPE (var),
+-					&pieced_value_funcs,
+-					c);
++      retval = allocate_computed_value (type, &pieced_value_funcs, c);
+       VALUE_FRAME_ID (retval) = frame_id;
+     }
+   else
+@@ -454,7 +606,7 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+ 	    struct gdbarch *arch = get_frame_arch (frame);
+ 	    CORE_ADDR dwarf_regnum = dwarf_expr_fetch (ctx, 0);
+ 	    int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, dwarf_regnum);
+-	    retval = value_from_register (SYMBOL_TYPE (var), gdb_regnum, frame);
++	    retval = value_from_register (type, gdb_regnum, frame);
+ 	  }
+ 	  break;
+ 
+@@ -463,7 +615,12 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
  	    CORE_ADDR address = dwarf_expr_fetch (ctx, 0);
  	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
  
+-	    retval = allocate_value (SYMBOL_TYPE (var));
 +	    /* object_address_set called here is required in ALLOCATE_VALUE's
 +	       CHECK_TYPEDEF for the object's possible
 +	       DW_OP_push_object_address.  */
 +	    object_address_set (address);
 +
- 	    retval = allocate_value (SYMBOL_TYPE (var));
++	    retval = allocate_value (type);
  	    VALUE_LVAL (retval) = lval_memory;
  	    set_value_lazy (retval, 1);
-@@ -868,7 +995,7 @@ static int
+ 	    if (in_stack_memory)
+@@ -478,10 +635,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+ 	    bfd_byte *contents;
+ 	    size_t n = ctx->addr_size;
+ 
+-	    retval = allocate_value (SYMBOL_TYPE (var));
++	    retval = allocate_value (type);
+ 	    contents = value_contents_raw (retval);
+-	    if (n > TYPE_LENGTH (SYMBOL_TYPE (var)))
+-	      n = TYPE_LENGTH (SYMBOL_TYPE (var));
++	    if (n > TYPE_LENGTH (type))
++	      n = TYPE_LENGTH (type);
+ 	    store_unsigned_integer (contents, n,
+ 				    gdbarch_byte_order (ctx->gdbarch),
+ 				    value);
+@@ -493,10 +650,10 @@ dwarf2_evaluate_loc_desc (struct symbol *var, struct frame_info *frame,
+ 	    bfd_byte *contents;
+ 	    size_t n = ctx->len;
+ 
+-	    retval = allocate_value (SYMBOL_TYPE (var));
++	    retval = allocate_value (type);
+ 	    contents = value_contents_raw (retval);
+-	    if (n > TYPE_LENGTH (SYMBOL_TYPE (var)))
+-	      n = TYPE_LENGTH (SYMBOL_TYPE (var));
++	    if (n > TYPE_LENGTH (type))
++	      n = TYPE_LENGTH (type);
+ 	    memcpy (contents, ctx->data, n);
+ 	  }
+ 	  break;
+@@ -720,8 +877,8 @@ locexpr_read_variable (struct symbol *symbol, struct frame_info *frame)
+ {
+   struct dwarf2_locexpr_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
+   struct value *val;
+-  val = dwarf2_evaluate_loc_desc (symbol, frame, dlbaton->data, dlbaton->size,
+-				  dlbaton->per_cu);
++  val = dwarf2_evaluate_loc_desc (SYMBOL_TYPE (symbol), frame, dlbaton->data,
++				  dlbaton->size, dlbaton->per_cu);
+ 
+   return val;
+ }
+@@ -844,7 +1001,7 @@ loclist_read_variable (struct symbol *symbol, struct frame_info *frame)
+       set_value_optimized_out (val, 1);
+     }
+   else
+-    val = dwarf2_evaluate_loc_desc (symbol, frame, data, size,
++    val = dwarf2_evaluate_loc_desc (SYMBOL_TYPE (symbol), frame, data, size,
+ 				    dlbaton->per_cu);
+ 
+   return val;
+@@ -868,7 +1025,7 @@ static int
  loclist_describe_location (struct symbol *symbol, struct ui_file *stream)
  {
    /* FIXME: Could print the entire list of locations.  */
@@ -3526,7 +3644,7 @@ index 1c4d057..ac67f22 100644
    return 1;
  }
  
-@@ -884,16 +1011,56 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+@@ -884,16 +1041,56 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
  
    data = find_location_expression (dlbaton, &size, ax->scope);
    if (data == NULL)
@@ -3587,10 +3705,10 @@ index 1c4d057..ac67f22 100644
 +  missing_tracepoint_var_ref
 +};
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index fa0bd11..fdea2b4 100644
+index fa0bd11..3535c1f 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
-@@ -72,5 +72,11 @@ struct dwarf2_loclist_baton
+@@ -72,5 +72,14 @@ struct dwarf2_loclist_baton
  
  extern const struct symbol_computed_ops dwarf2_locexpr_funcs;
  extern const struct symbol_computed_ops dwarf2_loclist_funcs;
@@ -3600,10 +3718,13 @@ index fa0bd11..fdea2b4 100644
 +
 +extern CORE_ADDR dwarf_locexpr_baton_eval
 +  (struct dwarf2_locexpr_baton *dlbaton);
++
++extern int dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
++				     struct type *type, CORE_ADDR *addrp);
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index a05c946..285c58e 100644
+index a05c946..9452844 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -48,6 +48,10 @@
@@ -3728,7 +3849,17 @@ index a05c946..285c58e 100644
  
  static char *dwarf2_canonicalize_name (char *, struct dwarf2_cu *,
  				       struct obstack *);
-@@ -1144,6 +1177,9 @@ static void age_cached_comp_units (void);
+@@ -1114,6 +1147,9 @@ static int attr_form_is_section_offset (struct attribute *);
+ 
+ static int attr_form_is_constant (struct attribute *);
+ 
++static struct dwarf2_loclist_baton *dwarf2_attr_to_loclist_baton
++  (struct attribute *attr, struct dwarf2_cu *cu);
++
+ static void dwarf2_symbol_mark_computed (struct attribute *attr,
+ 					 struct symbol *sym,
+ 					 struct dwarf2_cu *cu);
+@@ -1144,6 +1180,9 @@ static void age_cached_comp_units (void);
  
  static void free_one_cached_comp_unit (void *);
  
@@ -3738,7 +3869,7 @@ index a05c946..285c58e 100644
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1163,22 +1199,31 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
+@@ -1163,22 +1202,31 @@ static void dwarf2_clear_marks (struct dwarf2_per_cu_data *);
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -3779,7 +3910,7 @@ index a05c946..285c58e 100644
  }
  
  /* When loading sections, we can either look for ".<name>", or for
-@@ -1271,10 +1316,13 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
+@@ -1271,10 +1319,13 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *ignore_ptr)
  }
  
  /* Decompress a section that was compressed using zlib.  Store the
@@ -3795,7 +3926,7 @@ index a05c946..285c58e 100644
                           gdb_byte **outbuf, bfd_size_type *outsize)
  {
    bfd *abfd = objfile->obfd;
-@@ -1291,6 +1339,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -1291,6 +1342,7 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
    z_stream strm;
    int rc;
    int header_size = 12;
@@ -3803,7 +3934,7 @@ index a05c946..285c58e 100644
  
    if (bfd_seek (abfd, sectp->filepos, SEEK_SET) != 0
        || bfd_bread (compressed_buffer, compressed_size, abfd) != compressed_size)
-@@ -1320,8 +1369,13 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -1320,8 +1372,13 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
    strm.avail_in = compressed_size - header_size;
    strm.next_in = (Bytef*) compressed_buffer + header_size;
    strm.avail_out = uncompressed_size;
@@ -3819,7 +3950,7 @@ index a05c946..285c58e 100644
    rc = inflateInit (&strm);
    while (strm.avail_in > 0)
      {
-@@ -1342,26 +1396,176 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
+@@ -1342,26 +1399,176 @@ zlib_decompress_section (struct objfile *objfile, asection *sectp,
      error (_("Dwarf Error: concluding DWARF uncompression in '%s': %d"),
             bfd_get_filename (abfd), rc);
  
@@ -4001,7 +4132,7 @@ index a05c946..285c58e 100644
  
    if (info->asection == NULL || info->size == 0)
      return;
-@@ -1374,7 +1578,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1374,7 +1581,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
        /* Upon decompression, update the buffer and its size.  */
        if (strncmp (header, "ZLIB", sizeof (header)) == 0)
          {
@@ -4010,7 +4141,7 @@ index a05c946..285c58e 100644
  				   &info->size);
            return;
          }
-@@ -1397,7 +1601,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1397,7 +1604,7 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
  
        if (retbuf != MAP_FAILED)
  	{
@@ -4019,7 +4150,7 @@ index a05c946..285c58e 100644
  	  info->buffer = retbuf + (sectp->filepos & (pagesize - 1)) ;
  	  return;
  	}
-@@ -1405,8 +1609,15 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1405,8 +1612,15 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
  #endif
  
    /* If we get here, we are a normal, not-compressed section.  */
@@ -4037,7 +4168,7 @@ index a05c946..285c58e 100644
  
    /* When debugging .o files, we may need to apply relocations; see
       http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
-@@ -1415,6 +1626,8 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1415,6 +1629,8 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
    retbuf = symfile_relocate_debug_section (objfile, sectp, buf);
    if (retbuf != NULL)
      {
@@ -4046,7 +4177,7 @@ index a05c946..285c58e 100644
        info->buffer = retbuf;
        return;
      }
-@@ -1423,6 +1636,19 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1423,6 +1639,19 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
        || bfd_bread (buf, info->size, abfd) != info->size)
      error (_("Dwarf Error: Can't read DWARF data from '%s'"),
  	   bfd_get_filename (abfd));
@@ -4066,7 +4197,7 @@ index a05c946..285c58e 100644
  }
  
  /* Fill in SECTP, BUFP and SIZEP with section info, given OBJFILE and
-@@ -2070,6 +2296,29 @@ build_type_psymtabs (struct objfile *objfile)
+@@ -2070,6 +2299,29 @@ build_type_psymtabs (struct objfile *objfile)
  			  process_type_comp_unit, objfile);
  }
  
@@ -4096,7 +4227,7 @@ index a05c946..285c58e 100644
  /* Build the partial symbol table by doing a quick pass through the
     .debug_info and .debug_abbrev sections.  */
  
-@@ -2080,7 +2329,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+@@ -2080,7 +2332,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
       mmap()  on architectures that support it. (FIXME) */
    bfd *abfd = objfile->obfd;
    gdb_byte *info_ptr;
@@ -4105,7 +4236,7 @@ index a05c946..285c58e 100644
  
    info_ptr = dwarf2_per_objfile->info.buffer;
  
-@@ -2094,6 +2343,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+@@ -2094,6 +2346,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
  
    objfile->psymtabs_addrmap =
      addrmap_create_mutable (&objfile->objfile_obstack);
@@ -4113,7 +4244,7 @@ index a05c946..285c58e 100644
  
    /* Since the objects we're extracting from .debug_info vary in
       length, only the individual functions to extract them (like
-@@ -2123,6 +2373,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
+@@ -2123,6 +2376,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
  					    dwarf2_per_objfile->info.size);
      }
  
@@ -4121,7 +4252,7 @@ index a05c946..285c58e 100644
    objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
  						    &objfile->objfile_obstack);
  
-@@ -2389,11 +2640,18 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+@@ -2389,11 +2643,18 @@ partial_die_parent_scope (struct partial_die_info *pdi,
        || parent->tag == DW_TAG_union_type
        || parent->tag == DW_TAG_enumeration_type)
      {
@@ -4142,7 +4273,7 @@ index a05c946..285c58e 100644
      }
    else if (parent->tag == DW_TAG_enumerator)
      /* Enumerators should not get the name of the enumeration as a prefix.  */
-@@ -2405,7 +2663,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+@@ -2405,7 +2666,7 @@ partial_die_parent_scope (struct partial_die_info *pdi,
  	 ignoring them.  */
        complaint (&symfile_complaints,
  		 _("unhandled containing DIE tag %d for DIE at %d"),
@@ -4151,7 +4282,7 @@ index a05c946..285c58e 100644
        parent->scope = grandparent_scope;
      }
  
-@@ -2420,12 +2678,22 @@ partial_die_full_name (struct partial_die_info *pdi,
+@@ -2420,12 +2681,22 @@ partial_die_full_name (struct partial_die_info *pdi,
  		       struct dwarf2_cu *cu)
  {
    char *parent_scope;
@@ -4178,7 +4309,7 @@ index a05c946..285c58e 100644
  }
  
  static void
-@@ -2441,12 +2709,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2441,12 +2712,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -4194,7 +4325,7 @@ index a05c946..285c58e 100644
  
    if (actual_name == NULL)
      actual_name = pdi->name;
-@@ -2543,6 +2808,13 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2543,6 +2811,13 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
  			   &objfile->global_psymbols,
  			   0, (CORE_ADDR) 0, cu->language, objfile);
        break;
@@ -4208,7 +4339,7 @@ index a05c946..285c58e 100644
      case DW_TAG_class_type:
      case DW_TAG_interface_type:
      case DW_TAG_structure_type:
-@@ -2586,49 +2858,10 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+@@ -2586,49 +2861,10 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
        break;
      }
  
@@ -4258,7 +4389,7 @@ index a05c946..285c58e 100644
  /* Read a partial die corresponding to a namespace; also, add a symbol
     corresponding to that namespace to the symbol table.  NAMESPACE is
     the name of the enclosing namespace.  */
-@@ -2656,12 +2889,12 @@ static void
+@@ -2656,12 +2892,12 @@ static void
  add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
  		    CORE_ADDR *highpc, int need_pc, struct dwarf2_cu *cu)
  {
@@ -4275,7 +4406,7 @@ index a05c946..285c58e 100644
  }
  
  /* Read a partial die corresponding to a subprogram and create a partial
-@@ -2739,7 +2972,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
+@@ -2739,7 +2975,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
  	 could fix this by only using the demangled name to get the
  	 prefix (but see comment in read_structure_type).  */
  
@@ -4283,7 +4414,7 @@ index a05c946..285c58e 100644
        struct partial_die_info *real_pdi;
  
        /* If this DIE (this DIE's specification, if any) has a parent, then
-@@ -2752,27 +2984,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
+@@ -2752,27 +2987,6 @@ guess_structure_name (struct partial_die_info *struct_pdi,
  
        if (real_pdi->die_parent != NULL)
  	return;
@@ -4311,7 +4442,7 @@ index a05c946..285c58e 100644
      }
  }
  
-@@ -3325,6 +3536,14 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3325,6 +3539,14 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
      case DW_TAG_imported_declaration:
      case DW_TAG_imported_module:
        processing_has_namespace_info = 1;
@@ -4326,7 +4457,7 @@ index a05c946..285c58e 100644
        if (die->child != NULL && (die->tag == DW_TAG_imported_declaration
  				 || cu->language != language_fortran))
  	complaint (&symfile_complaints, _("Tag '%s' has unexpected children"),
-@@ -3337,42 +3556,183 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3337,42 +3559,183 @@ process_die (struct die_info *die, struct dwarf2_cu *cu)
      }
  }
  
@@ -4537,7 +4668,7 @@ index a05c946..285c58e 100644
  }
  
  /* Read the import statement specified by the given die and record it.  */
-@@ -3385,11 +3745,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3385,11 +3748,15 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
    struct dwarf2_cu *imported_cu;
    const char *imported_name;
    const char *imported_name_prefix;
@@ -4557,7 +4688,7 @@ index a05c946..285c58e 100644
    import_attr = dwarf2_attr (die, DW_AT_import, cu);
    if (import_attr == NULL)
      {
-@@ -3439,19 +3803,25 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3439,19 +3806,25 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
      }
  
    /* Figure out the local name after import.  */
@@ -4590,7 +4721,7 @@ index a05c946..285c58e 100644
        strcpy (canonical_name, imported_name_prefix);
        strcat (canonical_name, "::");
        strcat (canonical_name, imported_name);
-@@ -3461,10 +3831,13 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3461,10 +3834,13 @@ read_import_statement (struct die_info *die, struct dwarf2_cu *cu)
        canonical_name = alloca (strlen (imported_name) + 1);
        strcpy (canonical_name, imported_name);
      }
@@ -4605,7 +4736,7 @@ index a05c946..285c58e 100644
                                     using_directives);
  }
  
-@@ -3734,6 +4107,14 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3734,6 +4110,14 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
    struct attribute *attr;
  
    attr = dwarf2_attr (die, DW_AT_abstract_origin, cu);
@@ -4620,7 +4751,7 @@ index a05c946..285c58e 100644
    if (!attr)
      return;
  
-@@ -3832,6 +4213,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3832,6 +4216,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
    char *name;
    CORE_ADDR baseaddr;
    struct block *block;
@@ -4628,7 +4759,7 @@ index a05c946..285c58e 100644
    int inlined_func = (die->tag == DW_TAG_inlined_subroutine);
  
    if (inlined_func)
-@@ -3850,13 +4232,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3850,13 +4235,23 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -4655,7 +4786,7 @@ index a05c946..285c58e 100644
    lowpc += baseaddr;
    highpc += baseaddr;
  
-@@ -3883,14 +4275,19 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3883,14 +4278,19 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  
    cu->list_in_scope = &local_symbols;
  
@@ -4682,7 +4813,7 @@ index a05c946..285c58e 100644
      }
  
    inherit_abstract_dies (die, cu);
-@@ -3906,6 +4303,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -3906,6 +4306,13 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
  			determine_prefix (die, cu),
  			processing_has_namespace_info);
  
@@ -4696,7 +4827,7 @@ index a05c946..285c58e 100644
    /* If we have address ranges, record them.  */
    dwarf2_record_block_ranges (die, block, baseaddr, cu);
    
-@@ -4524,7 +4928,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
+@@ -4524,7 +4931,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
  	return;
  
        /* Get physical name.  */
@@ -4705,7 +4836,7 @@ index a05c946..285c58e 100644
  
        /* The name is already allocated along with this objfile, so we don't
  	 need to duplicate it for the type.  */
-@@ -4686,7 +5090,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
+@@ -4686,7 +5093,7 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
      return;
  
    /* Get the mangled name.  */
@@ -4714,7 +4845,7 @@ index a05c946..285c58e 100644
  
    /* Look up member function name in fieldlist.  */
    for (i = 0; i < fip->nfnfields; i++)
-@@ -4993,14 +5397,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -4993,14 +5400,18 @@ read_structure_type (struct die_info *die, struct dwarf2_cu *cu)
        if (cu->language == language_cplus
  	  || cu->language == language_java)
  	{
@@ -4736,7 +4867,7 @@ index a05c946..285c58e 100644
  	}
      }
  
-@@ -5219,7 +5627,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5219,7 +5630,7 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
    type = alloc_type (objfile);
  
    TYPE_CODE (type) = TYPE_CODE_ENUM;
@@ -4745,7 +4876,7 @@ index a05c946..285c58e 100644
    if (name != NULL)
      TYPE_TAG_NAME (type) = (char *) name;
  
-@@ -5244,51 +5652,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5244,51 +5655,6 @@ read_enumeration_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, type, cu);
  }
  
@@ -4797,7 +4928,7 @@ index a05c946..285c58e 100644
  /* Given a pointer to a die which begins an enumeration, process all
     the dies that define the members of the enumeration, and create the
     symbol for the enumeration type.
-@@ -5366,6 +5729,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5366,6 +5732,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -4827,7 +4958,7 @@ index a05c946..285c58e 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -5379,7 +5765,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5379,7 +5768,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -4836,7 +4967,7 @@ index a05c946..285c58e 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -5426,16 +5812,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5426,16 +5815,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -4858,7 +4989,7 @@ index a05c946..285c58e 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -5624,7 +6005,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5624,7 +6008,7 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
        if (is_anonymous)
  	{
  	  const char *previous_prefix = determine_prefix (die, cu);
@@ -4867,7 +4998,7 @@ index a05c946..285c58e 100644
  	}
      }
  
-@@ -5640,20 +6021,155 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5640,20 +6024,155 @@ read_namespace (struct die_info *die, struct dwarf2_cu *cu)
      }
  }
  
@@ -4888,12 +5019,11 @@ index a05c946..285c58e 100644
 +}
 +
 +/* Read a Fortran module as type.
- 
--  /* FIXME: Support the separate Fortran module namespaces.  */
++
 +   Modules present only as declarations - being used only for DW_AT_import of
 +   DW_TAG_imported_module - are ignored here.  They are read in only in form of
 +   the module name by read_fortran_imported_module.  */
- 
++
 +static struct type *
 +read_module_type (struct die_info *die, struct dwarf2_cu *cu)
 +{
@@ -4924,9 +5054,10 @@ index a05c946..285c58e 100644
 +  save_global_symbols = global_symbols;
 +  global_symbols = NULL;
 +  save_list_in_scope = cu->list_in_scope;
-+
+ 
+-  /* FIXME: Support the separate Fortran module namespaces.  */
 +  /* Process the child DIEs.  */
-+
+ 
 +  child_die = die->child;
    while (child_die && child_die->tag)
      {
@@ -5026,7 +5157,7 @@ index a05c946..285c58e 100644
  }
  
  /* Return the name of the namespace represented by DIE.  Set
-@@ -5818,29 +6334,113 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -5818,29 +6337,115 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -5111,7 +5242,8 @@ index a05c946..285c58e 100644
 +		}
 +	    }
 +
-+	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
++	  TYPE_RANGE_DATA (range_type)->high.kind
++	    = RANGE_BOUND_KIND_DWARF_BLOCK;
 +	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block = length_baton;
 +	  TYPE_DYNAMIC (range_type) = 1;
 +	}
@@ -5135,7 +5267,8 @@ index a05c946..285c58e 100644
 -        }
 +      if (attr && attr_form_is_block (attr))
 +	{
-+	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
++	  TYPE_RANGE_DATA (range_type)->high.kind
++	    = RANGE_BOUND_KIND_DWARF_BLOCK;
 +	  TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
 +					dwarf2_attr_to_locexpr_baton (attr, cu);
 +	  TYPE_DYNAMIC (range_type) = 1;
@@ -5154,7 +5287,7 @@ index a05c946..285c58e 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -5940,11 +6540,10 @@ static struct type *
+@@ -5940,11 +6545,10 @@ static struct type *
  read_typedef (struct die_info *die, struct dwarf2_cu *cu)
  {
    struct objfile *objfile = cu->objfile;
@@ -5167,7 +5300,7 @@ index a05c946..285c58e 100644
    this_type = init_type (TYPE_CODE_TYPEDEF, 0,
  			 TYPE_FLAG_TARGET_STUB, NULL, objfile);
    TYPE_NAME (this_type) = (char *) name;
-@@ -6048,8 +6647,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6048,8 +6652,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -5177,7 +5310,7 @@ index a05c946..285c58e 100644
    char *name;
    LONGEST negative_mask;
    
-@@ -6063,49 +6661,101 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6063,49 +6666,157 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  		     0, NULL, cu->objfile);
      }
  
@@ -5200,9 +5333,28 @@ index a05c946..285c58e 100644
 -    low = dwarf2_get_attr_constant_value (attr, 0);
 +  if (attr && attr_form_is_block (attr))
 +    {
-+      TYPE_LOW_BOUND_IS_DWARF_BLOCK (range_type) = 1;
++      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
 +      TYPE_RANGE_DATA (range_type)->low.u.dwarf_block =
 +					dwarf2_attr_to_locexpr_baton (attr, cu);
++      TYPE_DYNAMIC (range_type) = 1;
++      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
++      low = 0;
++    }
++  else if (attr && is_ref_attr (attr))
++    {
++      struct die_info *target_die;
++      struct dwarf2_cu *target_cu = cu;
++      struct attribute *target_loc_attr;
++
++      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
++      gdb_assert (target_cu->objfile == cu->objfile);
++      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
++
++      TYPE_RANGE_DATA (range_type)->low.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
++      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.loclist
++        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
++      TYPE_RANGE_DATA (range_type)->low.u.dwarf_loclist.type
++        = die_type (target_die, target_cu);
 +      TYPE_DYNAMIC (range_type) = 1;
 +      /* For setting a default if DW_AT_UPPER_BOUND would be missing.  */
 +      low = 0;
@@ -5250,9 +5402,8 @@ index a05c946..285c58e 100644
 -             the lower bound we've computed above.  */
 -          high = low - 1;
 -        }
--      else
--        high = dwarf2_get_attr_constant_value (attr, 1);
-+  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)))
++  if (!attr || (!attr_form_is_block (attr) && !attr_form_is_constant (attr)
++		&& !is_ref_attr (attr)))
 +    {
 +      attr = dwarf2_attr (die, DW_AT_count, cu);
 +      /* It does not hurt but it is needlessly ineffective in check_typedef.  */
@@ -5262,6 +5413,49 @@ index a05c946..285c58e 100644
 +	  TYPE_DYNAMIC (range_type) = 1;
 +	}
 +      /* Pass it now as the regular DW_AT_upper_bound.  */
++    }
++
++  if (attr && attr_form_is_block (attr))
++    {
++      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_BLOCK;
++      TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
++					dwarf2_attr_to_locexpr_baton (attr, cu);
++      TYPE_DYNAMIC (range_type) = 1;
++    }
++  else if (attr && is_ref_attr (attr))
++    {
++      struct die_info *target_die;
++      struct dwarf2_cu *target_cu = cu;
++      struct attribute *target_loc_attr;
++
++      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
++      gdb_assert (target_cu->objfile == cu->objfile);
++      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
++
++      TYPE_RANGE_DATA (range_type)->high.kind = RANGE_BOUND_KIND_DWARF_LOCLIST;
++      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.loclist
++        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
++      TYPE_RANGE_DATA (range_type)->high.u.dwarf_loclist.type
++        = die_type (target_die, target_cu);
++      TYPE_DYNAMIC (range_type) = 1;
++    }
++  else
++    {
++      if (attr && attr_form_is_constant (attr))
++	{
++	  LONGEST high;
++
++	  high = dwarf2_get_attr_constant_value (attr, 0);
++	  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
++	    high |= negative_mask;
++	  TYPE_HIGH_BOUND (range_type) = high;
++	}
+       else
+-        high = dwarf2_get_attr_constant_value (attr, 1);
++	{
++	  TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
++	  TYPE_HIGH_BOUND (range_type) = low - 1;
++	}
      }
  
 -  negative_mask = 
@@ -5270,39 +5464,33 @@ index a05c946..285c58e 100644
 -    low |= negative_mask;
 -  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
 -    high |= negative_mask;
-+  if (attr && attr_form_is_block (attr))
-+    {
-+      TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type) = 1;
-+      TYPE_RANGE_DATA (range_type)->high.u.dwarf_block =
-+					dwarf2_attr_to_locexpr_baton (attr, cu);
-+      TYPE_DYNAMIC (range_type) = 1;
-+    }
-+  else
-+    {
-+      if (attr && attr_form_is_constant (attr))
-+	{
-+	  LONGEST high;
- 
--  range_type = create_range_type (NULL, base_type, low, high);
-+	  high = dwarf2_get_attr_constant_value (attr, 0);
-+	  if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
-+	    high |= negative_mask;
-+	  TYPE_HIGH_BOUND (range_type) = high;
-+	}
-+      else
-+	{
-+	  TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
-+	  TYPE_HIGH_BOUND (range_type) = low - 1;
-+	}
-+    }
-+
 +  /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
 +  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
 +  if (attr && attr_form_is_block (attr))
 +    {
-+      TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (range_type) = 1;
++      TYPE_RANGE_DATA (range_type)->byte_stride.kind
++        = RANGE_BOUND_KIND_DWARF_BLOCK;
 +      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_block =
 +					dwarf2_attr_to_locexpr_baton (attr, cu);
++      TYPE_DYNAMIC (range_type) = 1;
++    }
++  else if (attr && is_ref_attr (attr))
++    {
++      struct die_info *target_die;
++      struct dwarf2_cu *target_cu = cu;
++      struct attribute *target_loc_attr;
+ 
+-  range_type = create_range_type (NULL, base_type, low, high);
++      target_die = follow_die_ref_or_sig (die, attr, &target_cu);
++      gdb_assert (target_cu->objfile == cu->objfile);
++      target_loc_attr = dwarf2_attr (target_die, DW_AT_location, target_cu);
++
++      TYPE_RANGE_DATA (range_type)->byte_stride.kind
++        = RANGE_BOUND_KIND_DWARF_LOCLIST;
++      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.loclist
++        = dwarf2_attr_to_loclist_baton (target_loc_attr, target_cu);
++      TYPE_RANGE_DATA (range_type)->byte_stride.u.dwarf_loclist.type
++        = die_type (target_die, target_cu);
 +      TYPE_DYNAMIC (range_type) = 1;
 +    }
 +  else if (attr && attr_form_is_constant (attr))
@@ -5315,7 +5503,7 @@ index a05c946..285c58e 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -6564,6 +7214,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
+@@ -6564,6 +7275,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
  	  && abbrev->tag != DW_TAG_lexical_block
  	  && abbrev->tag != DW_TAG_variable
  	  && abbrev->tag != DW_TAG_namespace
@@ -5323,7 +5511,7 @@ index a05c946..285c58e 100644
  	  && abbrev->tag != DW_TAG_member)
  	{
  	  /* Otherwise we skip to the next sibling, if any.  */
-@@ -6772,7 +7423,8 @@ read_partial_die (struct partial_die_info *part_die,
+@@ -6772,7 +7484,8 @@ read_partial_die (struct partial_die_info *part_die,
  	    }
  	  break;
  	case DW_AT_MIPS_linkage_name:
@@ -5333,7 +5521,7 @@ index a05c946..285c58e 100644
  	  break;
  	case DW_AT_low_pc:
  	  has_low_pc_attr = 1;
-@@ -6970,7 +7622,8 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -6970,7 +7683,8 @@ fixup_partial_die (struct partial_die_info *part_die,
    /* If we found a reference attribute and the DIE has no name, try
       to find a name in the referred to DIE.  */
  
@@ -5343,7 +5531,7 @@ index a05c946..285c58e 100644
      {
        struct partial_die_info *spec_die;
  
-@@ -8312,10 +8965,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -8312,10 +9026,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -5358,7 +5546,7 @@ index a05c946..285c58e 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -8337,21 +8992,27 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8337,21 +9053,27 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
  
@@ -5392,7 +5580,7 @@ index a05c946..285c58e 100644
  
        /* Default assumptions.
           Use the passed type or decode it from the die.  */
-@@ -8451,7 +9112,24 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8451,7 +9173,24 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	      var_decode_location (attr, sym, cu);
  	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
  	      if (attr2 && (DW_UNSND (attr2) != 0))
@@ -5418,7 +5606,7 @@ index a05c946..285c58e 100644
  	      else
  		add_symbol_to_list (sym, cu->list_in_scope);
  	    }
-@@ -8576,7 +9254,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8576,7 +9315,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  }
  	  break;
  	case DW_TAG_typedef:
@@ -5428,7 +5616,7 @@ index a05c946..285c58e 100644
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  SYMBOL_DOMAIN (sym) = VAR_DOMAIN;
  	  add_symbol_to_list (sym, cu->list_in_scope);
-@@ -8588,7 +9267,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8588,7 +9328,8 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  add_symbol_to_list (sym, cu->list_in_scope);
  	  break;
  	case DW_TAG_enumerator:
@@ -5438,7 +5626,7 @@ index a05c946..285c58e 100644
  	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
  	  if (attr)
  	    {
-@@ -8612,6 +9292,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8612,6 +9353,11 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  	  SYMBOL_CLASS (sym) = LOC_TYPEDEF;
  	  add_symbol_to_list (sym, &global_symbols);
  	  break;
@@ -5450,7 +5638,7 @@ index a05c946..285c58e 100644
  	default:
  	  /* Not a tag we recognize.  Hopefully we aren't processing
  	     trash data, but since we must specifically ignore things
-@@ -8625,8 +9310,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -8625,8 +9371,7 @@ new_symbol (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
        /* For the benefit of old versions of GCC, check for anonymous
  	 namespaces based on the demangled name.  */
        if (!processing_has_namespace_info
@@ -5460,7 +5648,7 @@ index a05c946..285c58e 100644
  	cp_scan_for_anonymous_namespaces (sym);
      }
    return (sym);
-@@ -8938,12 +9622,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8938,12 +9683,18 @@ read_type_die (struct die_info *die, struct dwarf2_cu *cu)
      case DW_TAG_namespace:
        this_type = read_namespace_type (die, cu);
        break;
@@ -5479,7 +5667,7 @@ index a05c946..285c58e 100644
    return this_type;
  }
  
-@@ -9011,6 +9701,10 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -9011,6 +9762,10 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
        case DW_TAG_namespace:
  	parent_type = read_type_die (parent, cu);
  	/* We give a name to even anonymous namespaces.  */
@@ -5490,7 +5678,7 @@ index a05c946..285c58e 100644
  	return TYPE_TAG_NAME (parent_type);
        case DW_TAG_class_type:
        case DW_TAG_interface_type:
-@@ -9025,7 +9719,7 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
+@@ -9025,7 +9780,7 @@ determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
  	     So it does not need a prefix.  */
  	  return "";
        default:
@@ -5499,7 +5687,7 @@ index a05c946..285c58e 100644
        }
  }
  
-@@ -9078,17 +9772,37 @@ sibling_die (struct die_info *die)
+@@ -9078,17 +9833,37 @@ sibling_die (struct die_info *die)
    return die->sibling;
  }
  
@@ -5525,7 +5713,11 @@ index a05c946..285c58e 100644
 +      if (module_name)
 +	{
 +	  char *retval;
-+
+ 
+-  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+-  if (attr && DW_STRING (attr))
+-    return DW_STRING (attr);
+-  return dwarf2_name (die, cu);
 +	  /* `__modulename_MOD_variablename0'.  */
 +	  retval = obstack_alloc (&cu->objfile->objfile_obstack,
 +				  2 + strlen (module_name) + 5 + strlen (name)
@@ -5535,16 +5727,12 @@ index a05c946..285c58e 100644
 +	  return retval;
 +	}
 +    }
- 
--  attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
--  if (attr && DW_STRING (attr))
--    return DW_STRING (attr);
--  return dwarf2_name (die, cu);
++
 +  return name;
  }
  
  /* Get name of a die, return NULL if not found.  */
-@@ -11436,6 +12150,34 @@ attr_form_is_constant (struct attribute *attr)
+@@ -11436,64 +12211,94 @@ attr_form_is_constant (struct attribute *attr)
      }
  }
  
@@ -5574,20 +5762,76 @@ index a05c946..285c58e 100644
 +  return baton;
 +}
 +
++static struct dwarf2_loclist_baton *
++dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
++{
++  struct dwarf2_loclist_baton *baton;
++
++  if (!(attr_form_is_section_offset (attr)
++	/* ".debug_loc" may not exist at all, or the offset may be outside
++	   the section.  If so, fall through to the complaint in the
++	   other branch.  */
++	&& DW_UNSND (attr) < dwarf2_per_objfile->loc.size))
++    return NULL;
++
++  baton = obstack_alloc (&cu->objfile->objfile_obstack,
++			 sizeof (struct dwarf2_loclist_baton));
++  baton->per_cu = cu->per_cu;
++  gdb_assert (baton->per_cu);
++
++  /* We don't know how long the location list is, but make sure we
++     don't run off the edge of the section.  */
++  baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
++  baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
++  baton->base_address = cu->base_address;
++  if (cu->base_known == 0)
++    complaint (&symfile_complaints,
++	       _("Location list used without specifying the CU base address."));
++
++  return baton;
++}
++
 +/* SYM may get its SYMBOL_CLASS overriden on invalid ATTR content.  */
 +
  static void
  dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
  			     struct dwarf2_cu *cu)
-@@ -11465,35 +12207,25 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+ {
+-  if (attr_form_is_section_offset (attr)
+-      /* ".debug_loc" may not exist at all, or the offset may be outside
+-	 the section.  If so, fall through to the complaint in the
+-	 other branch.  */
+-      && DW_UNSND (attr) < dwarf2_per_objfile->loc.size)
+-    {
+-      struct dwarf2_loclist_baton *baton;
+-
+-      baton = obstack_alloc (&cu->objfile->objfile_obstack,
+-			     sizeof (struct dwarf2_loclist_baton));
+-      baton->per_cu = cu->per_cu;
+-      gdb_assert (baton->per_cu);
+-
+-      /* We don't know how long the location list is, but make sure we
+-	 don't run off the edge of the section.  */
+-      baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
+-      baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
+-      baton->base_address = cu->base_address;
+-      if (cu->base_known == 0)
+-	complaint (&symfile_complaints,
+-		   _("Location list used without specifying the CU base address."));
++  struct dwarf2_loclist_baton *loclist_baton;
+ 
++  loclist_baton = dwarf2_attr_to_loclist_baton (attr, cu);
++  if (loclist_baton)
++    {
        SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
-       SYMBOL_LOCATION_BATON (sym) = baton;
-     }
+-      SYMBOL_LOCATION_BATON (sym) = baton;
++      SYMBOL_LOCATION_BATON (sym) = loclist_baton;
++    }
 +  else if (attr_form_is_block (attr))
 +    {
 +      SYMBOL_COMPUTED_OPS (sym) = &dwarf2_locexpr_funcs;
 +      SYMBOL_LOCATION_BATON (sym) = dwarf2_attr_to_locexpr_baton (attr, cu);
-+    }
+     }
    else
      {
 -      struct dwarf2_locexpr_baton *baton;
@@ -5630,7 +5874,7 @@ index a05c946..285c58e 100644
      }
  }
  
-@@ -11781,6 +12513,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -11781,6 +12586,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -5662,7 +5906,7 @@ index a05c946..285c58e 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.  */
  
-@@ -11789,6 +12546,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -11789,6 +12619,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_offset_and_type **slot, ofs;
  
@@ -5671,7 +5915,7 @@ index a05c946..285c58e 100644
    /* For Ada types, make sure that the gnat-specific data is always
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
-@@ -11944,23 +12703,13 @@ show_dwarf2_cmd (char *args, int from_tty)
+@@ -11944,23 +12776,13 @@ show_dwarf2_cmd (char *args, int from_tty)
    cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
  }
  
@@ -5699,7 +5943,7 @@ index a05c946..285c58e 100644
  }
  
  /* munmap debug sections for OBJFILE, if necessary.  */
-@@ -11969,15 +12718,15 @@ static void
+@@ -11969,15 +12791,15 @@ static void
  dwarf2_per_objfile_free (struct objfile *objfile, void *d)
  {
    struct dwarf2_per_objfile *data = d;
@@ -7033,7 +7277,7 @@ index cd24eaf..119af7d 100644
     once for each known thread.  */
  typedef int (*thread_callback_func) (struct thread_info *, void *);
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 46846c4..bf6e891 100644
+index 46846c4..95bcca4 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -39,6 +39,9 @@
@@ -7162,8 +7406,8 @@ index 46846c4..bf6e891 100644
 +  /* DWARF blocks may depend on runtime information like
 +     DW_OP_PUSH_OBJECT_ADDRESS not being available during the
 +     CREATE_ARRAY_TYPE time.  */
-+  if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (range_type)
-+      || TYPE_HIGH_BOUND_IS_DWARF_BLOCK (range_type)
++  if (TYPE_RANGE_DATA (range_type)->low.kind != RANGE_BOUND_KIND_CONSTANT
++      || TYPE_RANGE_DATA (range_type)->high.kind != RANGE_BOUND_KIND_CONSTANT
 +      || TYPE_LOW_BOUND_UNDEFINED (range_type) 
 +      || TYPE_HIGH_BOUND_UNDEFINED (range_type) 
 +      || get_discrete_bounds (range_type, &low_bound, &high_bound) < 0)
@@ -7495,7 +7739,7 @@ index 46846c4..bf6e891 100644
    if (TYPE_NAME (type))
      TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
    if (TYPE_TAG_NAME (type))
-@@ -3053,12 +3241,45 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3053,12 +3241,48 @@ copy_type_recursive (struct objfile *objfile,
    TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
    TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
  
@@ -7536,12 +7780,15 @@ index 46846c4..bf6e891 100644
      {
        int i, nfields;
  
++      /* TYPE_CODE_RANGE uses TYPE_RANGE_DATA of the union with TYPE_FIELDS.  */
++      gdb_assert (TYPE_CODE (type) != TYPE_CODE_RANGE);
++
        nfields = TYPE_NFIELDS (type);
 +      TYPE_NFIELDS (new_type) = nfields;
        TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
        for (i = 0; i < nfields; i++)
  	{
-@@ -3067,8 +3288,8 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3067,8 +3291,8 @@ copy_type_recursive (struct objfile *objfile,
  	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
  	  if (TYPE_FIELD_TYPE (type, i))
  	    TYPE_FIELD_TYPE (new_type, i)
@@ -7552,7 +7799,7 @@ index 46846c4..bf6e891 100644
  	  if (TYPE_FIELD_NAME (type, i))
  	    TYPE_FIELD_NAME (new_type, i) = 
  	      xstrdup (TYPE_FIELD_NAME (type, i));
-@@ -3095,24 +3316,75 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3095,24 +3319,166 @@ copy_type_recursive (struct objfile *objfile,
  	}
      }
  
@@ -7561,55 +7808,147 @@ index 46846c4..bf6e891 100644
 +  TYPE_DYNAMIC (new_type) = 0;
 +
    /* For range types, copy the bounds information. */
-   if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+-  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
++  if (TYPE_CODE (new_type) == TYPE_CODE_RANGE)
      {
        TYPE_RANGE_DATA (new_type) = xmalloc (sizeof (struct range_bounds));
        *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
 +
-+      if (TYPE_LOW_BOUND_IS_DWARF_BLOCK (type))
++      switch (TYPE_RANGE_DATA (new_type)->low.kind)
 +	{
++	case RANGE_BOUND_KIND_CONSTANT:
++	  break;
++	case RANGE_BOUND_KIND_DWARF_BLOCK:
 +	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-+	     it is expected to be made constant by CHECK_TYPEDEF.  */
-+	  if (TYPE_NOT_ALLOCATED (type)
-+	      || TYPE_NOT_ASSOCIATED (type))
-+	    TYPE_RANGE_DATA (new_type)->low.u.dwarf_block = NULL;
++	     it is expected to be made constant by CHECK_TYPEDEF.
++	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	     */
++	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
++	      || ! has_stack_frames ())
++	    {
++	      /* We should set 1 for Fortran but how to find the language?  */
++	      TYPE_LOW_BOUND (new_type) = 0;
++	      TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
++	    }
 +	  else
 +	    TYPE_LOW_BOUND (new_type) = dwarf_locexpr_baton_eval
 +				(TYPE_RANGE_DATA (new_type)->low.u.dwarf_block);
-+	  TYPE_LOW_BOUND_IS_DWARF_BLOCK (new_type) = 0;
++	  TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
++	  break;
++	case RANGE_BOUND_KIND_DWARF_LOCLIST:
++	  {
++	    CORE_ADDR addr;
++
++	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
++	       it is expected to be made constant by CHECK_TYPEDEF.
++	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	       */
++	    if (! TYPE_NOT_ALLOCATED (new_type)
++	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
++	        && dwarf_loclist_baton_eval
++		  (TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.loclist,
++		   TYPE_RANGE_DATA (new_type)->low.u.dwarf_loclist.type, &addr))
++	      TYPE_LOW_BOUND (new_type) = addr;
++	    else
++	      {
++		/* We should set 1 for Fortran but how to find the language?  */
++		TYPE_LOW_BOUND (new_type) = 0;
++		TYPE_LOW_BOUND_UNDEFINED (new_type) = 1;
++	      }
++	    TYPE_RANGE_DATA (new_type)->low.kind = RANGE_BOUND_KIND_CONSTANT;
++	  }
++	  break;
 +	}
 +
-+      if (TYPE_HIGH_BOUND_IS_DWARF_BLOCK (type))
++      switch (TYPE_RANGE_DATA (new_type)->high.kind)
 +	{
++	case RANGE_BOUND_KIND_CONSTANT:
++	  break;
++	case RANGE_BOUND_KIND_DWARF_BLOCK:
 +	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-+	     it is expected to be made constant by CHECK_TYPEDEF.  */
-+	  if (TYPE_NOT_ALLOCATED (type)
-+	      || TYPE_NOT_ASSOCIATED (type))
-+	    TYPE_RANGE_DATA (new_type)->high.u.dwarf_block = NULL;
++	     it is expected to be made constant by CHECK_TYPEDEF.
++	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	     */
++	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
++	      || ! has_stack_frames ())
++	    {
++	      TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
++	      TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
++	    }
 +	  else
 +	    TYPE_HIGH_BOUND (new_type) = dwarf_locexpr_baton_eval
 +			       (TYPE_RANGE_DATA (new_type)->high.u.dwarf_block);
-+	  TYPE_HIGH_BOUND_IS_DWARF_BLOCK (new_type) = 0;
++	  TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
++	  break;
++	case RANGE_BOUND_KIND_DWARF_LOCLIST:
++	  {
++	    CORE_ADDR addr;
++
++	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
++	       it is expected to be made constant by CHECK_TYPEDEF.
++	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	       */
++	    if (! TYPE_NOT_ALLOCATED (new_type)
++	        && ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ()
++	        && dwarf_loclist_baton_eval
++		      (TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.loclist,
++		       TYPE_RANGE_DATA (new_type)->high.u.dwarf_loclist.type,
++		       &addr))
++	      TYPE_HIGH_BOUND (new_type) = addr;
++	    else
++	      {
++		TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type) - 1;
++		TYPE_HIGH_BOUND_UNDEFINED (new_type) = 1;
++	      }
++	    TYPE_RANGE_DATA (new_type)->high.kind = RANGE_BOUND_KIND_CONSTANT;
++	  }
++	  break;
 +	}
 +
-+      if (TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (type))
++      switch (TYPE_RANGE_DATA (new_type)->byte_stride.kind)
 +	{
++	case RANGE_BOUND_KIND_CONSTANT:
++	  break;
++	case RANGE_BOUND_KIND_DWARF_BLOCK:
 +	  /* `struct dwarf2_locexpr_baton' is too bound to its objfile so
-+	     it is expected to be made constant by CHECK_TYPEDEF.  */
-+	  if (TYPE_NOT_ALLOCATED (type)
-+	      || TYPE_NOT_ASSOCIATED (type))
-+	    TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block = NULL;
++	     it is expected to be made constant by CHECK_TYPEDEF.
++	     TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	     */
++	  if (TYPE_NOT_ALLOCATED (new_type) || TYPE_NOT_ASSOCIATED (new_type)
++	      || ! has_stack_frames ())
++	    TYPE_BYTE_STRIDE (new_type) = 0;
 +	  else
 +	    TYPE_BYTE_STRIDE (new_type) = dwarf_locexpr_baton_eval
 +			(TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_block);
-+	  TYPE_BYTE_STRIDE_IS_DWARF_BLOCK (new_type) = 0;
++	  TYPE_RANGE_DATA (new_type)->byte_stride.kind
++	    = RANGE_BOUND_KIND_CONSTANT;
++	  break;
++	case RANGE_BOUND_KIND_DWARF_LOCLIST:
++	  {
++	    CORE_ADDR addr = 0;
++
++	    /* `struct dwarf2_loclist_baton' is too bound to its objfile so
++	       it is expected to be made constant by CHECK_TYPEDEF.
++	       TYPE_NOT_ALLOCATED and TYPE_NOT_ASSOCIATED are not valid for TYPE.
++	       */
++	    if (! TYPE_NOT_ALLOCATED (new_type)
++		&& ! TYPE_NOT_ASSOCIATED (new_type) && has_stack_frames ())
++	      dwarf_loclist_baton_eval
++	       (TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.loclist,
++		TYPE_RANGE_DATA (new_type)->byte_stride.u.dwarf_loclist.type,
++		&addr);
++	    TYPE_BYTE_STRIDE (new_type) = addr;
++	    TYPE_RANGE_DATA (new_type)->byte_stride.kind
++	      = RANGE_BOUND_KIND_CONSTANT;
++	  }
++	  break;
 +	}
 +
 +      /* Convert TYPE_RANGE_HIGH_BOUND_IS_COUNT into a regular bound.  */
-+      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (type))
++      if (TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type))
 +	{
-+	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (type)
-+				       + TYPE_HIGH_BOUND (type) - 1;
++	  TYPE_HIGH_BOUND (new_type) = TYPE_LOW_BOUND (new_type)
++				       + TYPE_HIGH_BOUND (new_type) - 1;
 +	  TYPE_RANGE_HIGH_BOUND_IS_COUNT (new_type) = 0;
 +	}
      }
@@ -7634,7 +7973,7 @@ index 46846c4..bf6e891 100644
    /* Maybe copy the type_specific bits.
  
       NOTE drow/2005-12-09: We do not copy the C++-specific bits like
-@@ -3130,6 +3402,17 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3130,6 +3496,17 @@ copy_type_recursive (struct objfile *objfile,
    return new_type;
  }
  
@@ -7652,7 +7991,7 @@ index 46846c4..bf6e891 100644
  /* Make a copy of the given TYPE, except that the pointer & reference
     types are not preserved.
     
-@@ -3152,6 +3435,211 @@ copy_type (const struct type *type)
+@@ -3152,6 +3529,211 @@ copy_type (const struct type *type)
    return new_type;
  }
  
@@ -7864,7 +8203,7 @@ index 46846c4..bf6e891 100644
  
  /* Helper functions to initialize architecture-specific types.  */
  
-@@ -3475,6 +3963,8 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
+@@ -3475,6 +4057,8 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
      = lookup_pointer_type (builtin_type->builtin_void);
    builtin_type->builtin_func_ptr
      = lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
@@ -7873,7 +8212,7 @@ index 46846c4..bf6e891 100644
  
    /* This type represents a GDB internal function.  */
    builtin_type->internal_fn
-@@ -3588,6 +4078,11 @@ objfile_type (struct objfile *objfile)
+@@ -3588,6 +4172,11 @@ objfile_type (struct objfile *objfile)
  		 "<text variable, no debug info>", objfile);
    TYPE_TARGET_TYPE (objfile_type->nodebug_text_symbol)
      = objfile_type->builtin_int;
@@ -7885,7 +8224,7 @@ index 46846c4..bf6e891 100644
    objfile_type->nodebug_data_symbol
      = init_type (TYPE_CODE_INT,
  		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-@@ -3642,6 +4137,11 @@ void
+@@ -3642,6 +4231,11 @@ void
  _initialize_gdbtypes (void)
  {
    gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
@@ -7898,7 +8237,7 @@ index 46846c4..bf6e891 100644
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 643fa03..6381dcf 100644
+index 643fa03..efe5512 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -138,6 +138,8 @@ enum type_code
@@ -8056,7 +8395,7 @@ index 643fa03..6381dcf 100644
        }
        loc;
  
-@@ -544,13 +615,22 @@ struct main_type
+@@ -544,13 +615,34 @@ struct main_type
  
      struct range_bounds
      {
@@ -8064,11 +8403,23 @@ index 643fa03..6381dcf 100644
 +	{
 +	  union
 +	    {
-+	      struct dwarf2_locexpr_baton *dwarf_block;
 +	      LONGEST constant;
++	      struct dwarf2_locexpr_baton *dwarf_block;
++	      struct
++		{
++		  struct dwarf2_loclist_baton *loclist;
++		  struct type *type;
++		}
++	      dwarf_loclist;
 +	    }
 +	  u;
-+	  unsigned is_dwarf_block : 1;
++	  enum range_bound_kind
++	    {
++	      RANGE_BOUND_KIND_CONSTANT,
++	      RANGE_BOUND_KIND_DWARF_BLOCK,
++	      RANGE_BOUND_KIND_DWARF_LOCLIST
++	    }
++	  kind;
 +	}
        /* Low bound of range. */
 -
@@ -8084,7 +8435,7 @@ index 643fa03..6381dcf 100644
  
        /* Flags indicating whether the values of low and high are
           valid.  When true, the respective range value is
-@@ -602,6 +682,9 @@ struct main_type
+@@ -602,6 +694,9 @@ struct main_type
         supporting multiple ABIs.  Right now this is only fetched from
         the Dwarf-2 DW_AT_calling_convention attribute.  */
      unsigned calling_convention;
@@ -8094,7 +8445,7 @@ index 643fa03..6381dcf 100644
    } type_specific;
  };
  
-@@ -838,13 +921,6 @@ struct cplus_struct_type
+@@ -838,13 +933,6 @@ struct cplus_struct_type
      int is_dynamic : 2;
    };
  
@@ -8108,7 +8459,7 @@ index 643fa03..6381dcf 100644
  /* Struct used for ranking a function for overload resolution */
  struct badness_vector
    {
-@@ -899,9 +975,9 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -899,9 +987,9 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -8121,7 +8472,7 @@ index 643fa03..6381dcf 100644
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
-@@ -910,15 +986,26 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -910,11 +998,16 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
  #define TYPE_TEMPLATE_ARGS(thistype) TYPE_CPLUS_SPECIFIC(thistype)->template_args
@@ -8140,26 +8491,7 @@ index 643fa03..6381dcf 100644
  #define TYPE_LOW_BOUND_UNDEFINED(range_type) \
     TYPE_RANGE_DATA(range_type)->low_undefined
  #define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
-    TYPE_RANGE_DATA(range_type)->high_undefined
-+#define TYPE_LOW_BOUND_IS_DWARF_BLOCK(range_type) \
-+   TYPE_RANGE_DATA(range_type)->low.is_dwarf_block
-+#define TYPE_HIGH_BOUND_IS_DWARF_BLOCK(range_type) \
-+   TYPE_RANGE_DATA(range_type)->high.is_dwarf_block
-+#define TYPE_BYTE_STRIDE_IS_DWARF_BLOCK(range_type) \
-+   TYPE_RANGE_DATA(range_type)->byte_stride.is_dwarf_block
- 
- /* Moto-specific stuff for FORTRAN arrays */
- 
-@@ -927,11 +1014,23 @@ extern void allocate_gnat_aux_type (struct type *);
- #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
-    TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
- 
-+#define TYPE_ARRAY_UPPER_BOUND_IS_DWARF_BLOCK(arraytype) \
-+   TYPE_HIGH_BOUND_IS_DWARF_BLOCK(TYPE_INDEX_TYPE(arraytype))
-+#define TYPE_ARRAY_LOWER_BOUND_IS_DWARF_BLOCK(arraytype) \
-+   TYPE_LOW_BOUND_IS_DWARF_BLOCK(TYPE_INDEX_TYPE(arraytype))
-+
- #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
+@@ -931,7 +1024,14 @@ extern void allocate_gnat_aux_type (struct type *);
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
  
  #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
@@ -8175,7 +8507,7 @@ index 643fa03..6381dcf 100644
  
  /* C++ */
  
-@@ -959,6 +1058,7 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -959,6 +1059,7 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_GNAT_SPECIFIC(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.gnat_stuff
  #define TYPE_DESCRIPTIVE_TYPE(thistype) TYPE_GNAT_SPECIFIC(thistype)->descriptive_type
  #define TYPE_CALLING_CONVENTION(thistype) TYPE_MAIN_TYPE(thistype)->type_specific.calling_convention
@@ -8183,7 +8515,7 @@ index 643fa03..6381dcf 100644
  #define TYPE_BASECLASS(thistype,index) TYPE_FIELD_TYPE(thistype, index)
  #define TYPE_N_BASECLASSES(thistype) TYPE_CPLUS_SPECIFIC(thistype)->n_baseclasses
  #define TYPE_BASECLASS_NAME(thistype,index) TYPE_FIELD_NAME(thistype, index)
-@@ -977,7 +1077,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -977,7 +1078,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
  #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
  #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
@@ -8191,7 +8523,7 @@ index 643fa03..6381dcf 100644
  #define SET_FIELD_BITPOS(thisfld, bitpos)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
     FIELD_BITPOS (thisfld) = (bitpos))
-@@ -987,9 +1086,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -987,9 +1087,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define SET_FIELD_PHYSADDR(thisfld, addr)			\
    (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSADDR,		\
     FIELD_STATIC_PHYSADDR (thisfld) = (addr))
@@ -8201,7 +8533,7 @@ index 643fa03..6381dcf 100644
  #define FIELD_ARTIFICIAL(thisfld) ((thisfld).artificial)
  #define FIELD_BITSIZE(thisfld) ((thisfld).bitsize)
  
-@@ -1000,7 +1096,6 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -1000,7 +1097,6 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
  #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
@@ -8209,7 +8541,7 @@ index 643fa03..6381dcf 100644
  #define TYPE_FIELD_ARTIFICIAL(thistype, n) FIELD_ARTIFICIAL(TYPE_FIELD(thistype,n))
  #define TYPE_FIELD_BITSIZE(thistype, n) FIELD_BITSIZE(TYPE_FIELD(thistype,n))
  #define TYPE_FIELD_PACKED(thistype, n) (FIELD_BITSIZE(TYPE_FIELD(thistype,n))!=0)
-@@ -1139,6 +1234,10 @@ struct builtin_type
+@@ -1139,6 +1235,10 @@ struct builtin_type
       (*) () can server as a generic function pointer.  */
    struct type *builtin_func_ptr;
  
@@ -8220,7 +8552,7 @@ index 643fa03..6381dcf 100644
  
    /* Special-purpose types.  */
  
-@@ -1179,6 +1278,7 @@ struct objfile_type
+@@ -1179,6 +1279,7 @@ struct objfile_type
  
    /* Types used for symbols with no debug information.  */
    struct type *nodebug_text_symbol;
@@ -8228,7 +8560,7 @@ index 643fa03..6381dcf 100644
    struct type *nodebug_data_symbol;
    struct type *nodebug_unknown_symbol;
    struct type *nodebug_tls_symbol;
-@@ -1333,6 +1433,18 @@ extern struct type *create_array_type (struct type *, struct type *,
+@@ -1333,6 +1434,18 @@ extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  extern struct type *lookup_array_range_type (struct type *, int, int);
  
@@ -8247,7 +8579,7 @@ index 643fa03..6381dcf 100644
  extern struct type *create_string_type (struct type *, struct type *,
  					struct type *);
  extern struct type *lookup_string_range_type (struct type *, int, int);
-@@ -1375,6 +1487,8 @@ extern int is_public_ancestor (struct type *, struct type *);
+@@ -1375,6 +1488,8 @@ extern int is_public_ancestor (struct type *, struct type *);
  
  extern int is_unique_ancestor (struct type *, struct value *);
  
@@ -8256,7 +8588,7 @@ index 643fa03..6381dcf 100644
  /* Overload resolution */
  
  #define LENGTH_MATCH(bv) ((bv)->rank[0])
-@@ -1437,10 +1551,11 @@ extern void maintenance_print_type (char *, int);
+@@ -1437,10 +1552,11 @@ extern void maintenance_print_type (char *, int);
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -24773,6 +25105,242 @@ index 0000000..39632d5
 +
 +# Failed gdb_load would abort the testcase execution earlier.
 +pass "file loaded"
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
+new file mode 100644
+index 0000000..9353698
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
+@@ -0,0 +1,176 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* Debug information */
++
++/* We will `break *main' at the very first instruction.  */
++#define main_length 1
++
++	.section	.data
++vardata:
++	/* See DW_OP_lit3 + 1 (0-based).  */
++	.string		"seennotseen"
++
++	.section	.debug_info
++.Lcu1_begin:
++	.4byte		.Lcu1_end - .Lcu1_start	/* Length of Compilation Unit */
++.Lcu1_start:
++	.2byte		2			/* DWARF version number */
++	.4byte		.Ldebug_abbrev0		/* Offset Into Abbrev. Section */
++	.byte		4			/* Pointer Size (in bytes) */
++
++	/* CU die */
++	.uleb128	1			/* Abbrev: DW_TAG_compile_unit */
++	.4byte		.Lproducer		/* DW_AT_producer */
++	/* Use C++ to exploit a bug in parsing DW_AT_name "".  */
++	.byte		4			/* DW_AT_language (C++) -  */
++	.4byte		main			/* DW_AT_low_pc */
++	.byte		main_length		/* DW_AT_high_pc */
++
++.Larray_type:
++	.uleb128	2			/* Abbrev: DW_TAG_array_type */
++	.4byte		.Lchar_type-.Lcu1_begin	/* DW_AT_type */
++
++	.uleb128	3			/* Abbrev: DW_TAG_subrange_type */
++	.4byte		.Luint_type-.Lcu1_begin	/* DW_AT_type */
++	.byte		0			/* DW_AT_lower_bound */
++	.4byte		.Llen_var-.Lcu1_begin	/* DW_AT_upper_bound */
++	.byte		0			/* End of children of die */
++
++.Luint_type:
++	.uleb128	4			/* Abbrev: DW_TAG_base_type */
++	.4byte		.Luint_str		/* DW_AT_name */
++	.byte		4			/* DW_AT_byte_size */
++	.byte		7			/* DW_AT_encoding */
++
++.Lchar_type:
++	.uleb128	4			/* Abbrev: DW_TAG_base_type */
++	.4byte		.Lchar_str		/* DW_AT_name */
++	.byte		1			/* DW_AT_byte_size */
++	.byte		6			/* DW_AT_encoding */
++
++.Llen_var:
++	.uleb128	5			/* Abbrev: DW_TAG_variable artificial */
++	.byte		1			/* DW_AT_artificial */
++	.4byte		.Luint_type-.Lcu1_begin	/* DW_AT_type */
++	.4byte		.Llen_loclist-.Lloclist	/* DW_AT_location */
++
++	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
++	.string		"a_string"		/* DW_AT_name */
++	.4byte		.Larray_type-.Lcu1_begin/* DW_AT_type */
++	.byte		2f - 1f			/* DW_AT_location */
++1:	.byte		3			/*   DW_OP_addr */
++	.4byte		vardata			/*   <addr> */
++2:
++
++	.byte		0			/* End of children of CU */
++.Lcu1_end:
++
++	.section	.debug_loc
++.Lloclist:
++.Llen_loclist:
++	.4byte	0			# Location list begin address
++	.4byte	main_length		# Location list end address
++	.value	2f-1f	# Location expression size
++1:	.byte	0x33	# DW_OP_lit3
++	.byte	0x9f	# DW_OP_stack_value
++2:
++	.quad	0x0	# Location list terminator begin (*.LLST2)
++	.quad	0x0	# Location list terminator end (*.LLST2)
++
++	.section .debug_abbrev
++.Ldebug_abbrev0:
++	.uleb128	1			/* Abbrev code */
++	.uleb128	0x11			/* DW_TAG_compile_unit */
++	.byte		0x1			/* has_children */
++	.uleb128	0x25			/* DW_AT_producer */
++	.uleb128	0xe			/* DW_FORM_strp */
++	.uleb128	0x13			/* DW_AT_language */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	2			/* Abbrev code */
++	.uleb128	0x1			/* TAG: DW_TAG_array_type */
++	.byte		0x1			/* DW_children_yes */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	3			/* Abbrev code */
++	.uleb128	0x21			/* DW_TAG_subrange_type */
++	.byte		0x0			/* no children */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x22			/* DW_AT_lower_bound */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x2f			/* DW_AT_upper_bound */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	4			/* Abbrev code */
++	.uleb128	0x24			/* DW_TAG_base_type */
++	.byte		0x0			/* no_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0xe			/* DW_FORM_strp */
++	.uleb128	0xb			/* DW_AT_byte_size */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x3e			/* DW_AT_encoding */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	5			/* Abbrev code */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0x0			/* no_children */
++	.uleb128	0x34			/* DW_AT_artificial */
++	.uleb128	0x0c			/* DW_FORM_flag */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x02			/* DW_AT_location */
++	.uleb128	0x06			/* DW_FORM_data4 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	6			/* Abbrev code */
++	.uleb128	0x34			/* DW_TAG_variable */
++	.byte		0x0			/* no_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x2			/* DW_AT_location */
++	.uleb128	0xa			/* DW_FORM_block1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.byte		0x0			/* Terminator */
++
++/* String table */
++	.section .debug_str
++.Lproducer:
++	.string		"GNU C 3.3.3"
++.Lchar_str:
++	.string		"char"
++.Luint_str:
++	.string		"unsigned int"
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
+new file mode 100644
+index 0000000..28db005
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
+@@ -0,0 +1,48 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test printing variable with dynamic bounds which reference a different
++# (artificial in the GCC case) variable containing loclist as its location.
++# This testcase uses value (not address) of the referenced variable:
++# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=43762
++
++# This test can only be run on targets which support DWARF-2 and use gas.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0
++}
++
++set testfile dw2-bound-loclist
++if { [prepare_for_testing ${testfile}.exp ${testfile} [list ${testfile}.S main.c] {}] } {
++    return -1
++}
++
++# Verify it behaves at least as an unbound array without inferior.
++
++gdb_test "p a_string" { = 0x[0-9a-f]+ "seennotseen"}
++gdb_test "ptype a_string" {type = char \[\]}
++
++# Not runto_main as dw2-bound-loclist.S handles only the first byte of main.
++if ![runto "*main"] {
++    return -1
++}
++
++gdb_test "p a_string" { = "seen"}
++gdb_test "ptype a_string" {type = char \[4\]}
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-empty-namespace.S b/gdb/testsuite/gdb.dwarf2/dw2-empty-namespace.S
 new file mode 100644
 index 0000000..7b03ff1
