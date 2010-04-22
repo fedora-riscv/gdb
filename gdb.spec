@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{dist}
+Release: 14%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -453,6 +453,13 @@ Patch447: gdb-bz578250-avx-09of10.patch
 Patch448: gdb-bz578250-avx-10of10.patch
 Patch449: gdb-bz578250-avx-10of10-ppc.patch
 
+# Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
+Patch451: gdb-bz575292-delayed-physname.patch
+
+# Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
+Patch452: gdb-bz570635-prettyprint-doc1.patch
+Patch453: gdb-bz570635-prettyprint-doc2.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -718,6 +725,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch447 -p1
 %patch448 -p1
 %patch449 -p1
+%patch451 -p1
+%patch452 -p1
+%patch453 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1050,6 +1060,10 @@ fi
 %endif
 
 %changelog
+* Thu Apr 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-14.fc13
+- Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
+- Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
+
 * Fri Apr 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-13.fc13
 - archer-jankratochvil-fedora13 commit: 39998c496988faaa1509cc6ab76b5c4777659bf4
 - [vla] Fix boundaries for arrays on -O2 -g (support bound-ref->var->loclist).
