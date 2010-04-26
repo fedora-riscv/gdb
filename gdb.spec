@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?_with_upstream:.upstream}%{dist}
+Release: 15%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -460,6 +460,9 @@ Patch451: gdb-bz575292-delayed-physname.patch
 Patch452: gdb-bz570635-prettyprint-doc1.patch
 Patch453: gdb-bz570635-prettyprint-doc2.patch
 
+# Fix crash when using GNU IFUNC call from breakpoint condition.
+Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -725,9 +728,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch447 -p1
 %patch448 -p1
 %patch449 -p1
-%patch451 -p1
+# Avoid internal error by disabling the previous BZ 575292 fix (BZ 585445).
+#patch451 -p1
 %patch452 -p1
 %patch453 -p1
+%patch454 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1060,6 +1065,10 @@ fi
 %endif
 
 %changelog
+* Mon Apr 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-15.fc13
+- Fix crash when using GNU IFUNC call from breakpoint condition.
+- Avoid internal error by disabling the previous BZ 575292 fix (BZ 585445).
+
 * Thu Apr 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-14.fc13
 - Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
 - Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
