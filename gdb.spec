@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?_with_upstream:.upstream}%{dist}
+Release: 45%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -494,6 +494,9 @@ Patch438: gdb-bz574483-display-sepdebug.patch
 # Fix pretty printers regression in 7.0.1-40.fc12 (Phil Muldoon, BZ 582052).
 Patch450: gdb-bz582052-libstdc++-compat.patch
 
+# Fix crash when using GNU IFUNC call from breakpoint condition.
+Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -763,6 +766,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch437 -p1
 %patch438 -p1
 %patch450 -p1
+%patch454 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1088,6 +1092,9 @@ fi
 %endif
 
 %changelog
+* Mon Apr 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-45.fc12
+- Fix crash when using GNU IFUNC call from breakpoint condition.
+
 * Wed Apr 14 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-44.fc12
 - Fix pretty printers regression in 7.0.1-40.fc12 (Phil Muldoon, BZ 582052).
 
