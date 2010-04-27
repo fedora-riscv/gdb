@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?_with_upstream:.upstream}%{dist}
+Release: 17%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -465,6 +465,9 @@ Patch453: gdb-bz570635-prettyprint-doc2.patch
 # Fix crash when using GNU IFUNC call from breakpoint condition.
 Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
 
+# Fail gracefully if the _Unwind_DebugHook arg. is optimized out (Tom Tromey).
+Patch456: gdb-unwind-debughook-safe-fail.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -736,6 +739,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch453 -p1
 %patch454 -p1
 %patch455 -p1
+%patch456 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1068,6 +1072,9 @@ fi
 %endif
 
 %changelog
+* Tue Apr 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-17.fc13
+- Fail gracefully if the _Unwind_DebugHook arg. is optimized out (Tom Tromey).
+
 * Tue Apr 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-16.fc13
 - Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
 
