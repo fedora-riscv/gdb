@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{dist}
+Release: 16%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -454,7 +454,9 @@ Patch448: gdb-bz578250-avx-10of10.patch
 Patch449: gdb-bz578250-avx-10of10-ppc.patch
 
 # Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
+# Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
 Patch451: gdb-bz575292-delayed-physname.patch
+Patch455: gdb-bz575292-void-workaround.patch
 
 # Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
 Patch452: gdb-bz570635-prettyprint-doc1.patch
@@ -733,6 +735,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch452 -p1
 %patch453 -p1
 %patch454 -p1
+%patch455 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1065,6 +1068,9 @@ fi
 %endif
 
 %changelog
+* Tue Apr 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-16.fc13
+- Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
+
 * Mon Apr 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-15.fc13
 - Fix crash when using GNU IFUNC call from breakpoint condition.
 - Avoid internal error by disabling the previous BZ 575292 fix (BZ 585445).
