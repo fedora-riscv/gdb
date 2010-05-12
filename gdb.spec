@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{dist}
+Release: 19%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -470,6 +470,12 @@ Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
 Patch456: gdb-unwind-debughook-safe-fail.patch
 Patch457: gdb-unwind-debughook-step-independent.patch
 
+# testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
+Patch458: gdb-archer-vla-test-oom.patch
+
+# Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
+Patch459: gdb-moribund-utrace-workaround.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -743,6 +749,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch455 -p1
 %patch456 -p1
 %patch457 -p1
+%patch458 -p1
+%patch459 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1075,6 +1083,11 @@ fi
 %endif
 
 %changelog
+* Wed May 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-19.fc13
+- Backport <tab>-completion bug on anonymous structure fields (BZ 590648).
+- testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
+- Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
+
 * Thu Apr 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-18.fc13
 - Make _Unwind_DebugHook independent from step-resume breakpoint (Tom Tromey).
 
