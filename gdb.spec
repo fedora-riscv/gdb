@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?_with_upstream:.upstream}%{dist}
+Release: 20%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -455,6 +455,7 @@ Patch449: gdb-bz578250-avx-10of10-ppc.patch
 
 # Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
 # Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
+# Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
 Patch451: gdb-bz575292-delayed-physname.patch
 Patch455: gdb-bz575292-void-workaround.patch
 
@@ -475,6 +476,9 @@ Patch458: gdb-archer-vla-test-oom.patch
 
 # Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
 Patch459: gdb-moribund-utrace-workaround.patch
+
+# Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
+Patch460: gdb-archer-vla-ref-optimizedout.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -741,8 +745,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch447 -p1
 %patch448 -p1
 %patch449 -p1
-# Avoid internal error by disabling the previous BZ 575292 fix (BZ 585445).
-#patch451 -p1
+%patch451 -p1
 %patch452 -p1
 %patch453 -p1
 %patch454 -p1
@@ -751,6 +754,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch457 -p1
 %patch458 -p1
 %patch459 -p1
+%patch460 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1083,6 +1087,10 @@ fi
 %endif
 
 %changelog
+* Thu May 13 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-20.fc13
+- Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
+- Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
+
 * Wed May 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-19.fc13
 - Backport <tab>-completion bug on anonymous structure fields (BZ 590648).
 - testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
