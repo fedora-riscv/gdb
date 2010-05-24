@@ -227,3 +227,204 @@ http://sourceware.org/ml/gdb-cvs/2009-11/msg00034.html
  	{
  	  language_info (1);	/* Print what changed.  */
  	}
+
+
+
+https://bugzilla.redhat.com/show_bug.cgi?id=578136
+https://bugzilla.redhat.com/show_bug.cgi?id=593926
+http://sourceware.org/ml/gdb-patches/2010-04/msg00820.html
+http://sourceware.org/ml/gdb-cvs/2010-04/msg00240.html
+
+### src/gdb/ChangeLog	2010/04/23 18:09:16	1.11678
+### src/gdb/ChangeLog	2010/04/23 21:44:19	1.11679
+## -1,3 +1,14 @@
++2010-04-23  Daniel Jacobowitz  <dan@codesourcery.com>
++	    Paul Pluzhnikov  <ppluzhnikov@google.com>
++	    Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix deadlock on looped list of loaded shared objects.
++	* solib-svr4.c (LM_PREV): New function.
++	(IGNORE_FIRST_LINK_MAP_ENTRY): Use it.
++	(svr4_current_sos): Check for correct l_prev.  New variables prev_lm
++	and next_lm.  Clear prev_lm for solib_svr4_r_ldsomap.
++	* config/djgpp/fnchange.lst: Add translation for solib-corrupted.exp.
++
+ 2010-04-23  Doug Evans  <dje@google.com>
+ 
+ 	* configure.ac (CONFIG_SRCS): Add py-auto-load.o even if not using
+--- src/gdb/solib-svr4.c	2010/03/11 22:07:02	1.130
++++ src/gdb/solib-svr4.c	2010/04/23 21:44:19	1.131
+@@ -272,6 +272,16 @@
+ }
+ 
+ static CORE_ADDR
++LM_PREV (struct so_list *so)
++{
++  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
++  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
++
++  return extract_typed_address (so->lm_info->lm + lmo->l_prev_offset,
++				ptr_type);
++}
++
++static CORE_ADDR
+ LM_NAME (struct so_list *so)
+ {
+   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+@@ -284,16 +294,12 @@
+ static int
+ IGNORE_FIRST_LINK_MAP_ENTRY (struct so_list *so)
+ {
+-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+-  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+-
+   /* Assume that everything is a library if the dynamic loader was loaded
+      late by a static executable.  */
+   if (exec_bfd && bfd_get_section_by_name (exec_bfd, ".dynamic") == NULL)
+     return 0;
+ 
+-  return extract_typed_address (so->lm_info->lm + lmo->l_prev_offset,
+-				ptr_type) == 0;
++  return LM_PREV (so) == 0;
+ }
+ 
+ /* Per-inferior SVR4 specific data.  */
+@@ -1101,7 +1107,7 @@
+ static struct so_list *
+ svr4_current_sos (void)
+ {
+-  CORE_ADDR lm;
++  CORE_ADDR lm, prev_lm;
+   struct so_list *head = 0;
+   struct so_list **link_ptr = &head;
+   CORE_ADDR ldsomap = 0;
+@@ -1120,6 +1126,7 @@
+ 
+   /* Walk the inferior's link map list, and build our list of
+      `struct so_list' nodes.  */
++  prev_lm = 0;
+   lm = solib_svr4_r_map (info);
+ 
+   while (lm)
+@@ -1127,6 +1134,7 @@
+       struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+       struct so_list *new = XZALLOC (struct so_list);
+       struct cleanup *old_chain = make_cleanup (xfree, new);
++      CORE_ADDR next_lm;
+ 
+       new->lm_info = xmalloc (sizeof (struct lm_info));
+       make_cleanup (xfree, new->lm_info);
+@@ -1138,14 +1146,21 @@
+ 
+       read_memory (lm, new->lm_info->lm, lmo->link_map_size);
+ 
+-      lm = LM_NEXT (new);
++      next_lm = LM_NEXT (new);
++
++      if (LM_PREV (new) != prev_lm)
++	{
++	  warning (_("Corrupted shared library list"));
++	  free_so (new);
++	  next_lm = 0;
++	}
+ 
+       /* For SVR4 versions, the first entry in the link map is for the
+          inferior executable, so we must ignore it.  For some versions of
+          SVR4, it has no name.  For others (Solaris 2.3 for example), it
+          does have a name, so we can no longer use a missing name to
+          decide when to ignore it. */
+-      if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
++      else if (IGNORE_FIRST_LINK_MAP_ENTRY (new) && ldsomap == 0)
+ 	{
+ 	  info->main_lm_addr = new->lm_info->lm_addr;
+ 	  free_so (new);
+@@ -1182,12 +1197,18 @@
+ 	    }
+ 	}
+ 
++      prev_lm = lm;
++      lm = next_lm;
++
+       /* On Solaris, the dynamic linker is not in the normal list of
+ 	 shared objects, so make sure we pick it up too.  Having
+ 	 symbol information for the dynamic linker is quite crucial
+ 	 for skipping dynamic linker resolver code.  */
+       if (lm == 0 && ldsomap == 0)
+-	lm = ldsomap = solib_svr4_r_ldsomap (info);
++	{
++	  lm = ldsomap = solib_svr4_r_ldsomap (info);
++	  prev_lm = 0;
++	}
+ 
+       discard_cleanups (old_chain);
+     }
+--- src/gdb/config/djgpp/fnchange.lst	2010/04/09 15:15:05	1.112
++++ src/gdb/config/djgpp/fnchange.lst	2010/04/23 21:44:19	1.113
+@@ -397,6 +397,7 @@
+ @V@/gdb/testsuite/gdb.base/siginfo-obj.c @V@/gdb/testsuite/gdb.base/si-obj.c
+ @V@/gdb/testsuite/gdb.base/siginfo-addr.exp @V@/gdb/testsuite/gdb.base/si-addr.exp
+ @V@/gdb/testsuite/gdb.base/siginfo-obj.exp @V@/gdb/testsuite/gdb.base/si-obj.exp
++@V@/gdb/testsuite/gdb.base/solib-corrupted.exp @V@/gdb/testsuite/gdb.base/so-crptd.exp
+ @V@/gdb/testsuite/gdb.base/solib-disc.c @V@/gdb/testsuite/gdb.base/so-disc.c
+ @V@/gdb/testsuite/gdb.base/solib-display-lib.c @V@/gdb/testsuite/gdb.base/so-displib.c
+ @V@/gdb/testsuite/gdb.base/solib-display-main.c @V@/gdb/testsuite/gdb.base/so-dispmain.c
+### src/gdb/testsuite/ChangeLog	2010/04/23 18:03:31	1.2252
+### src/gdb/testsuite/ChangeLog	2010/04/23 21:44:20	1.2253
+## -1,3 +1,8 @@
++2010-04-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix deadlock on looped list of loaded shared objects.
++	* gdb.base/solib-corrupted.exp: New.
++
+ 2010-04-23  Doug Evans  <dje@google.com>
+ 
+ 	* gdb.python/py-section-script.c: New file.
+--- src/gdb/testsuite/gdb.base/solib-corrupted.exp
++++ src/gdb/testsuite/gdb.base/solib-corrupted.exp	2010-05-24 18:00:52.057995000 +0000
+@@ -0,0 +1,46 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++set testfile "solib-corrupted"
++set srcfile start.c
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
++    untested ${testfile}.exp
++    return -1
++}
++
++if ![runto_main] {
++    fail "Can't run to main"
++    return
++}
++
++gdb_test "info sharedlibrary" "" "normal list"
++
++# GDB checks there for matching L_PREV.
++set test "make solibs looping"
++gdb_test_multiple "p/x _r_debug->r_map->l_next = _r_debug->r_map" $test {
++    -re "(No symbol \"_r_debug\" in current context\\.|Attempt to extract a component of a value that is not a structure pointer\\.)\r\n$gdb_prompt $" {
++	# glibc debug info is not available and it is too difficult to find and
++	# parse it from this testcase without the gdb supporting functions.
++	verbose -log "no _r_debug symbol has been found"
++	xfail $test
++	untested ${testfile}.exp
++	return
++    }
++    -re " = 0x\[0-9a-f\]+\r\n$gdb_prompt $" {
++	pass $test
++    }
++}
++gdb_test "info sharedlibrary" "warning: Corrupted shared library list\r\n.*" "corrupted list"
