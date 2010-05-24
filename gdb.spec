@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?_with_upstream:.upstream}%{dist}
+Release: 22%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -480,6 +480,12 @@ Patch459: gdb-moribund-utrace-workaround.patch
 # Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
 Patch460: gdb-archer-vla-ref-optimizedout.patch
 
+# Remove core file when starting a process (BZ 594560).
+Patch461: gdb-bz594560-core-vs-process.patch
+
+# Import fix of TUI layout internal error (BZ 595475).
+Patch462: gdb-bz595475-tui-layout.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -755,6 +761,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch458 -p1
 %patch459 -p1
 %patch460 -p1
+%patch461 -p1
+%patch462 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1087,6 +1095,11 @@ fi
 %endif
 
 %changelog
+* Mon May 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-22.fc13
+- Remove core file when starting a process (BZ 594560).
+- Fix lock up on loops in the solib chain (BZ 593926).
+- Import fix of TUI layout internal error (BZ 595475).
+
 * Sun May 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-21.fc13
 - Make gdb-6.8-bz254229-gcore-prpsinfo.patch RHEL-5 /usr/bin/patch compatible
   (bugreported by Jonas Maebe).
