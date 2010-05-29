@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?_with_upstream:.upstream}%{dist}
+Release: 47%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -500,6 +500,9 @@ Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
 # Import fix of TUI layout internal error (BZ 595475).
 Patch462: gdb-bz595475-tui-layout.patch
 
+# Fix follow-exec for C++ programs (bugreported by Martin Stransky).
+Patch470: gdb-archer-next-over-throw-cxx-exec.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -771,6 +774,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch450 -p1
 %patch454 -p1
 %patch462 -p1
+%patch470 -p1
 # Always verify their applicability.
 %patch393 -p1
 %patch335 -p1
@@ -1096,6 +1100,9 @@ fi
 %endif
 
 %changelog
+* Sat May 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-47.fc12
+- Fix follow-exec for C++ programs (bugreported by Martin Stransky).
+
 * Mon May 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-46.fc12
 - Fix lock up on loops in the solib chain (BZ 593926).
 - Import fix of TUI layout internal error (BZ 595475).
