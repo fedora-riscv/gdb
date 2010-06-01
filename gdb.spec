@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?_with_upstream:.upstream}%{dist}
+Release: 24%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1117,6 +1117,10 @@ fi
 %endif
 
 %changelog
+* Tue Jun  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-24.fc13
+- Fix crash on /proc/PID/stat race during inferior exit (BZ 596751).
+- testsuite: gdb.threads/watchthreads-reorder.exp kernel-2.6.33 compat. fix.
+
 * Sun May 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-23.fc13
 - Fix and support DW_OP_*piece (Tom Tromey, BZ 589467).
 - Fix follow-exec for C++ programs (bugreported by Martin Stransky).
