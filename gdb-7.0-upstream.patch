@@ -428,3 +428,87 @@ http://sourceware.org/ml/gdb-cvs/2010-04/msg00240.html
 +    }
 +}
 +gdb_test "info sharedlibrary" "warning: Corrupted shared library list\r\n.*" "corrupted list"
+
+
+
+FYI: fix java-related crash
+http://sourceware.org/ml/gdb-patches/2010-02/msg00445.html
+http://sourceware.org/ml/gdb-cvs/2010-02/msg00142.html
+
+[ Backported. ]
+
+### src/gdb/ChangeLog	2010/02/17 20:54:52	1.11374
+### src/gdb/ChangeLog	2010/02/17 22:25:04	1.11375
+## -1,3 +1,7 @@
++2010-02-17  Tom Tromey  <tromey@redhat.com>
++
++	* objfiles.c (gdb_bfd_ref): Handle abfd==NULL.
++
+ 2010-02-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* symfile.c (build_section_addr_info_from_objfile): Include sections
+--- src/gdb/objfiles.c	2010/02/09 10:59:50	1.110
++++ src/gdb/objfiles.c	2010/02/17 22:25:05	1.111
+@@ -1504,7 +1504,12 @@
+ struct bfd *
+ gdb_bfd_ref (struct bfd *abfd)
+ {
+-  int *p_refcount = bfd_usrdata (abfd);
++  int *p_refcount;
++
++  if (abfd == NULL)
++    return NULL;
++
++  p_refcount = bfd_usrdata (abfd);
+ 
+   if (p_refcount != NULL)
+     {
+### src/gdb/testsuite/ChangeLog	2010/02/17 22:09:05	1.2143
+### src/gdb/testsuite/ChangeLog	2010/02/17 22:25:05	1.2144
+## -1,3 +1,8 @@
++2010-02-17  Tom Tromey  <tromey@redhat.com>
++
++	* gdb.java/jprint.java (jprint.props): New field.
++	* gdb.java/jprint.exp (set_lang_java): Add regression test.
++
+ 2010-02-17  Pedro Alves  <pedro@codesourcery.com>
+ 
+ 	* gdb.base/charset.exp: Don't assume new `regsub' syntax
+--- src/gdb/testsuite/gdb.java/jprint.exp	2010/01/01 07:32:03	1.10
++++ src/gdb/testsuite/gdb.java/jprint.exp	2010/02/17 22:25:05	1.11
+@@ -84,4 +84,7 @@
+     gdb_test "call x.dothat(55)" "new value is 58\r\n.*= 62.*" "virtual fn call"
+     gdb_test "p x.addprint(1,2,3)" "sum is 6\r\n.*" "inherited static call"
+     gdb_test "call x.addk(44)" "adding k gives 121\r\n.*= 121.*" "inherited virtual fn call"
++
++    # Regression test for a crasher.
++    gdb_test "print *jprint.props" " = .*" "print a java.util.Properties"
+ }
+--- gdb-7.0.1/gdb/testsuite/gdb.java/jprint.java.orig	2007-05-14 18:44:27.000000000 +0200
++++ gdb-7.0.1/gdb/testsuite/gdb.java/jprint.java	2010-06-02 12:41:07.000000000 +0200
+@@ -1,6 +1,6 @@
+ // jprint.java test program.
+ //
+-// Copyright 2004
++// Copyright 2004, 2010
+ // Free Software Foundation, Inc.
+ //
+ // Written by Jeff Johnston <jjohnstn@redhat.com> 
+@@ -23,6 +23,8 @@
+ // Foundation, Inc., 59 Temple Place - Suite 330,
+ // Boston, MA 02111-1307, USA.
+ 
++import java.util.Properties;
++
+ class jvclass {
+   public static int k;
+   static {
+@@ -41,6 +43,8 @@ class jvclass {
+ }
+     
+ public class jprint extends jvclass {
++  public static Properties props = new Properties ();
++
+   public int dothat (int x) {
+     int y = x + 3;
+     System.out.println ("new value is " + y);

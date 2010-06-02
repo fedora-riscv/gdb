@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 47%{?_with_upstream:.upstream}%{dist}
+Release: 48%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1100,6 +1100,9 @@ fi
 %endif
 
 %changelog
+* Wed Jun  2 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-48.fc12
+- Fix Java-related crash (BZ 566145, Tom Tromey).
+
 * Sat May 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-47.fc12
 - Fix follow-exec for C++ programs (bugreported by Martin Stransky).
 
