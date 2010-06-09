@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{dist}
+Release: 26%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -502,6 +502,11 @@ Patch470: gdb-archer-next-over-throw-cxx-exec.patch
 # Fix ADL anonymous type crash (BZ 600746, Sami Wagiaalla).
 Patch472: gdb-bz600746-koenig-crash.patch
 
+# Backport DWARF-4 support (BZ 601887, Tom Tromey).
+Patch473: gdb-bz601887-dwarf4-1of2.patch
+Patch474: gdb-bz601887-dwarf4-2of2.patch
+Patch475: gdb-bz601887-dwarf4-rh-test.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -789,6 +794,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch471 -p1
 %patch470 -p1
 %patch472 -p1
+%patch473 -p1
+%patch474 -p1
+%patch475 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1121,6 +1129,9 @@ fi
 %endif
 
 %changelog
+* Wed Jun  9 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-26.fc13
+- Backport DWARF-4 support (BZ 601887, Tom Tromey).
+
 * Wed Jun  9 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-25.fc13
 - Fix ADL anonymous type crash (BZ 600746, Sami Wagiaalla).
 
