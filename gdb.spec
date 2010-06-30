@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?_with_upstream:.upstream}%{dist}
+Release: 28%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -522,6 +522,11 @@ Patch483: gdb-bz602314-ptype-class-typedef-3of3.patch
 # Fix `set print object on' for some non-dynamic classes (BZ 606660).
 Patch484: gdb-bz606660-print-object-nonvirtual.patch
 
+# Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
+Patch485: gdb-bz562763-pretty-print-2d-vectors-prereq.patch
+Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
+Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -821,6 +826,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch482 -p1
 %patch483 -p1
 %patch484 -p1
+%patch485 -p1
+%patch486 -p1
+%patch487 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1153,6 +1161,9 @@ fi
 %endif
 
 %changelog
+* Wed Jun 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-28.fc13
+- Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
+
 * Wed Jun 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-27.fc13
 - Fix obstack corruptions on C++ (BZ 606185, Chris Moller, Jan Kratochvil).
 - Improve support for typedefs in classes (BZ 602314).
