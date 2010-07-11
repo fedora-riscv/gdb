@@ -58,10 +58,8 @@ Http://sourceware.org/ml/gdb-patches/2010-01/msg00517.html
 	* exec.c (exec_file_attach): Print a more useful error message if the
 	user did "gdb core".
 
-Index: gdb-7.0.50.20100128/gdb/exceptions.h
-===================================================================
---- gdb-7.0.50.20100128.orig/gdb/exceptions.h	2010-01-18 07:25:22.000000000 +0100
-+++ gdb-7.0.50.20100128/gdb/exceptions.h	2010-01-28 22:49:00.000000000 +0100
+--- ./gdb/exceptions.h	2010-04-11 22:31:30.000000000 +0200
++++ ./gdb/exceptions.h	2010-04-11 22:31:47.000000000 +0200
 @@ -78,6 +78,9 @@ enum errors {
    /* Feature is not supported in this copy of GDB.  */
    UNSUPPORTED_ERROR,
@@ -72,40 +70,49 @@ Index: gdb-7.0.50.20100128/gdb/exceptions.h
    /* Add more errors here.  */
    NR_ERRORS
  };
-Index: gdb-7.0.50.20100128/gdb/exec.c
-===================================================================
---- gdb-7.0.50.20100128.orig/gdb/exec.c	2010-01-28 22:48:59.000000000 +0100
-+++ gdb-7.0.50.20100128/gdb/exec.c	2010-01-28 22:58:45.000000000 +0100
+--- ./gdb/exec.c	2010-04-11 22:31:30.000000000 +0200
++++ ./gdb/exec.c	2010-04-11 22:41:26.000000000 +0200
 @@ -34,6 +34,7 @@
+ #include "arch-utils.h"
  #include "gdbthread.h"
  #include "progspace.h"
- #include "solib.h"
 +#include "exceptions.h"
  
  #include <fcntl.h>
  #include "readline/readline.h"
-@@ -258,6 +259,17 @@ exec_file_attach (char *filename, int fr
- 	  /* Make sure to close exec_bfd, or else "run" might try to use
- 	     it.  */
- 	  exec_close ();
+@@ -256,12 +257,27 @@ exec_file_attach (char *filename, int fr
+ 
+       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
+ 	{
++	  int is_core;
 +
 +	  /* If the user accidentally did "gdb core", print a useful
 +	     error message.  Check it only after bfd_object has been checked as
 +	     a valid executable may get recognized for example also as
 +	     "trad-core".  */
-+	  if (bfd_check_format (exec_bfd, bfd_core))
-+	    throw_error (IS_CORE_ERROR,
-+			 _("\"%s\" is a core file.\n"
-+			   "Please specify an executable to debug."),
-+			 scratch_pathname);
++	  is_core = bfd_check_format (exec_bfd, bfd_core);
 +
- 	  error (_("\"%s\": not in executable format: %s"),
- 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+ 	  /* Make sure to close exec_bfd, or else "run" might try to use
+ 	     it.  */
+ 	  exec_close ();
+-	  error (_("\"%s\": not in executable format: %s"),
+-		 scratch_pathname,
+-		 gdb_bfd_errmsg (bfd_get_error (), matching));
++
++	  if (is_core != 0)
++	    throw_error (IS_CORE_ERROR,
++		   _("\"%s\" is a core file.\n"
++		     "Please specify an executable to debug."),
++		   scratch_pathname);
++	  else
++	    error (_("\"%s\": not in executable format: %s"),
++		   scratch_pathname,
++		   gdb_bfd_errmsg (bfd_get_error (), matching));
  	}
-Index: gdb-7.0.50.20100128/gdb/main.c
-===================================================================
---- gdb-7.0.50.20100128.orig/gdb/main.c	2010-01-28 22:48:59.000000000 +0100
-+++ gdb-7.0.50.20100128/gdb/main.c	2010-01-28 22:49:00.000000000 +0100
+ 
+       /* FIXME - This should only be run for RS6000, but the ifdef is a poor
+--- ./gdb/main.c	2010-04-11 22:31:30.000000000 +0200
++++ ./gdb/main.c	2010-04-11 22:31:47.000000000 +0200
 @@ -241,6 +241,36 @@ captured_command_loop (void *data)
    return 1;
  }

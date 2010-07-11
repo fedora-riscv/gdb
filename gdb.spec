@@ -32,17 +32,18 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.0.50.20100203
+Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{dist}
+Release: 28%{?_with_upstream:.upstream}%{dist}
 
-License: GPLv3+
+License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
+# Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -118,7 +119,6 @@ Patch118: gdb-6.3-gstack-20050411.patch
 
 # VSYSCALL and PIE
 Patch122: gdb-6.3-test-pie-20050107.patch
-Patch124: gdb-archer-pie-0315-breakpoint_address_match.patch
 Patch389: gdb-archer-pie-addons.patch
 Patch394: gdb-archer-pie-addons-keep-disabled.patch
 
@@ -183,10 +183,6 @@ Patch170: gdb-6.3-bt-past-zero-20051201.patch
 # Use bigger numbers than int.
 Patch176: gdb-6.3-large-core-20051206.patch
 
-# Hard-code executable names in gstack, such that it can run with a
-# corrupted or missing PATH.
-Patch177: gdb-6.3-gstack-without-path-20060414.patch
-
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
@@ -224,8 +220,7 @@ Patch213: gdb-6.5-readline-long-line-crash-test.patch
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 
-# Try to reduce sideeffects of skipping ppc .so libs trampolines (BZ 218379).
-Patch215: gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch
+# Test sideeffects of skipping ppc .so libs trampolines (BZ 218379).
 Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
@@ -241,7 +236,7 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
@@ -344,13 +339,6 @@ Patch324: gdb-6.8-glibc-headers-compat.patch
 # Create a single binary `gdb' autodetecting --tui by its argv[0].
 Patch326: gdb-6.8-tui-singlebinary.patch
 
-# Support transparent debugging of inlined functions for an optimized code.
-# Disable break-by-name on inlined functions due to a regression on parameters
-# of inlined functions falsely <optimized out> (BZ 556975 Comment 8).
-# Disable addon (finish) due to inline-cmds.exp: up from outer_inline2 assert.
-Patch350: gdb-6.8-inlining-addon.patch
-Patch328: gdb-6.8-inlining-by-name.patch
-
 # Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
 Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
 
@@ -374,6 +362,7 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
 # The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
 Patch349: gdb-archer.patch
+Patch420: gdb-archer-ada.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
@@ -384,9 +373,6 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 Patch382: gdb-core-open-vdso-warning.patch
-
-# Fix callback-mode readline-6.0 regression for CTRL-C.
-Patch390: gdb-readline-6.0-signal.patch
 
 # Fix syscall restarts for amd64->i386 biarch.
 Patch391: gdb-x86_64-i386-syscall-restart.patch
@@ -403,9 +389,6 @@ Patch335: gdb-rhel5-compat.patch
 
 # Fix regression by python on ia64 due to stale current frame.
 Patch397: gdb-follow-child-stale-parent.patch
-
-# Fix related_breakpoint stale ref crash.
-Patch400: gdb-stale-related_breakpoint.patch
 
 # Workaround ccache making lineno non-zero for command-line definitions.
 Patch403: gdb-ccache-workaround.patch
@@ -428,6 +411,121 @@ Patch412: gdb-unused-revert.patch
 
 # Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 Patch417: gdb-bz541866-rwatch-before-run.patch
+
+# Remove false gdb_assert on $sp underflow.
+Patch422: gdb-infcall-sp-underflow.patch
+
+# Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+Patch429: gdb-bz562975-std-terminate-double-free.patch
+
+# PIE: Fix back re-reun.
+Patch430: gdb-pie-rerun.patch
+
+# Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
+Patch432: gdb-solib-memory-error-nonfatal.patch
+
+# testsuite: Fix unstable results of gdb.base/prelink.exp.
+Patch433: gdb-6.7-testsuite-stable-results-prelink.patch 
+
+# [patch 1/6] PIE: Attach binary even after re-prelinked underneath
+# [patch 2/6] PIE: Attach binary even after ld.so re-prelinked underneath
+# [patch 3/6] PIE: Fix occasional error attaching i686 binary
+Patch434: gdb-pie-1of6-reprelinked-bin.patch
+Patch435: gdb-pie-2of6-reprelinked-ld.patch
+Patch436: gdb-pie-3of6-relocate-once.patch
+
+# [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
+Patch437: gdb-using-directive-leak.patch
+
+# Fix dangling displays in separate debuginfo (BZ 574483).
+Patch438: gdb-bz574483-display-sepdebug.patch
+
+# Support AVX registers (BZ 578250).
+Patch439: gdb-bz578250-avx-01of10.patch
+Patch440: gdb-bz578250-avx-02of10.patch
+Patch441: gdb-bz578250-avx-03of10.patch
+Patch442: gdb-bz578250-avx-04of10.patch
+Patch443: gdb-bz578250-avx-05of10.patch
+Patch444: gdb-bz578250-avx-06of10.patch
+Patch445: gdb-bz578250-avx-07of10.patch
+Patch446: gdb-bz578250-avx-08of10.patch
+Patch447: gdb-bz578250-avx-09of10.patch
+Patch448: gdb-bz578250-avx-10of10.patch
+Patch449: gdb-bz578250-avx-10of10-ppc.patch
+
+# Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
+# Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
+# Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
+Patch451: gdb-bz575292-delayed-physname.patch
+Patch455: gdb-bz575292-void-workaround.patch
+
+# Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
+Patch452: gdb-bz570635-prettyprint-doc1.patch
+Patch453: gdb-bz570635-prettyprint-doc2.patch
+
+# Fix crash when using GNU IFUNC call from breakpoint condition.
+Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
+
+# Fail gracefully if the _Unwind_DebugHook arg. is optimized out (Tom Tromey).
+# Make _Unwind_DebugHook independent from step-resume breakpoint (Tom Tromey).
+Patch456: gdb-unwind-debughook-safe-fail.patch
+Patch457: gdb-unwind-debughook-step-independent.patch
+
+# testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
+Patch458: gdb-archer-vla-test-oom.patch
+
+# Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
+Patch459: gdb-moribund-utrace-workaround.patch
+
+# Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
+Patch460: gdb-archer-vla-ref-optimizedout.patch
+
+# Remove core file when starting a process (BZ 594560).
+Patch461: gdb-bz594560-core-vs-process.patch
+
+# Import fix of TUI layout internal error (BZ 595475).
+Patch462: gdb-bz595475-tui-layout.patch
+
+# Fix and support DW_OP_*piece (Tom Tromey, BZ 589467).
+Patch463: gdb-bz589467-pieces01of4.patch
+Patch464: gdb-bz589467-pieces02of4.patch
+Patch465: gdb-bz589467-pieces03of4.patch
+Patch466: gdb-bz589467-pieces1of4.patch
+Patch467: gdb-bz589467-pieces2of4.patch
+Patch468: gdb-bz589467-pieces3of4.patch
+Patch469: gdb-bz589467-pieces4of4.patch
+Patch471: gdb-bz589467-pieces-vla-compat.patch
+
+# Fix follow-exec for C++ programs (bugreported by Martin Stransky).
+Patch470: gdb-archer-next-over-throw-cxx-exec.patch
+
+# Fix ADL anonymous type crash (BZ 600746, Sami Wagiaalla).
+Patch472: gdb-bz600746-koenig-crash.patch
+
+# Backport DWARF-4 support (BZ 601887, Tom Tromey).
+Patch473: gdb-bz601887-dwarf4-1of2.patch
+Patch474: gdb-bz601887-dwarf4-2of2.patch
+Patch475: gdb-bz601887-dwarf4-rh-test.patch
+
+# Fix obstack corruptions on C++ (BZ 606185, Chris Moller, Jan Kratochvil).
+Patch476: gdb-bz606185-obstack-1of5.patch
+Patch477: gdb-bz606185-obstack-2of5.patch
+Patch478: gdb-bz606185-obstack-3of5.patch
+Patch479: gdb-bz606185-obstack-4of5.patch
+Patch480: gdb-bz606185-obstack-5of5.patch
+
+# Improve support for typedefs in classes (BZ 602314).
+Patch481: gdb-bz602314-ptype-class-typedef-1of3.patch
+Patch482: gdb-bz602314-ptype-class-typedef-2of3.patch
+Patch483: gdb-bz602314-ptype-class-typedef-3of3.patch
+
+# Fix `set print object on' for some non-dynamic classes (BZ 606660).
+Patch484: gdb-bz606660-print-object-nonvirtual.patch
+
+# Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
+Patch485: gdb-bz562763-pretty-print-2d-vectors-prereq.patch
+Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
+Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -459,7 +557,7 @@ BuildRequires: libstdc++%{?_isa}
 %define bits_other %{?_isa}
 %if 0%{!?el5:1}
 %ifarch s390x
-%define bits_other (%{__isa_name}-31)
+%define bits_other (%{__isa_name}-32)
 %else #!s390x
 %ifarch ppc
 %define bits_other (%{__isa_name}-64)
@@ -539,7 +637,8 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
-This package provides a program that allows you to run GDB on a different machine than the one which is running the program being debugged.
+This package provides a program that allows you to run GDB on a different
+machine than the one which is running the program being debugged.
 %endif # 0%{!?el5:1}
 
 %prep
@@ -563,9 +662,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
-%patch124 -p1
+%patch420 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -596,7 +695,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch169 -p1
 %patch170 -p1
 %patch176 -p1
-%patch177 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -609,7 +707,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch211 -p1
 %patch213 -p1
 %patch214 -p1
-%patch215 -p1
 %patch216 -p1
 %patch217 -p1
 %patch225 -p1
@@ -651,8 +748,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch322 -p1
 %patch324 -p1
 %patch326 -p1
-###patch350 -p1
-###patch328 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
@@ -663,11 +758,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch360 -p1
 %patch381 -p1
 %patch382 -p1
-%patch390 -p1
 %patch391 -p1
 %patch392 -p1
 %patch397 -p1
-%patch400 -p1
 %patch403 -p1
 %patch404 -p1
 %patch405 -p1
@@ -678,6 +771,64 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch408 -p1
 %patch412 -p1
 %patch417 -p1
+%patch422 -p1
+%patch429 -p1
+%patch430 -p1
+%patch432 -p1
+%patch433 -p1
+%patch434 -p1
+%patch435 -p1
+%patch436 -p1
+%patch437 -p1
+%patch438 -p1
+%patch439 -p1
+%patch440 -p1
+%patch441 -p1
+%patch442 -p1
+%patch443 -p1
+%patch444 -p1
+%patch445 -p1
+%patch446 -p1
+%patch447 -p1
+%patch448 -p1
+%patch449 -p1
+%patch451 -p1
+%patch452 -p1
+%patch453 -p1
+%patch454 -p1
+%patch455 -p1
+%patch456 -p1
+%patch457 -p1
+%patch458 -p1
+%patch459 -p1
+%patch460 -p1
+%patch461 -p1
+%patch462 -p1
+%patch463 -p1
+%patch464 -p1
+%patch465 -p1
+%patch466 -p1
+%patch467 -p1
+%patch468 -p1
+%patch469 -p1
+%patch471 -p1
+%patch470 -p1
+%patch472 -p1
+%patch473 -p1
+%patch474 -p1
+%patch475 -p1
+%patch476 -p1
+%patch477 -p1
+%patch478 -p1
+%patch479 -p1
+%patch480 -p1
+%patch481 -p1
+%patch482 -p1
+%patch483 -p1
+%patch484 -p1
+%patch485 -p1
+%patch486 -p1
+%patch487 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -685,7 +836,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 # Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 # Currently disabled for RHEL as it is a new experimental feature not present
 # in FSF GDB and possibly affecting new user scripts.
-%if 0%{!?rhel:1}
+%if 0%{?rhel:1}
 %patch415 -p1 -R
 %endif
 %if 0%{!?el5:1}
@@ -978,7 +1129,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%doc COPYING COPYING.LIB README NEWS
+%doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gcore
 %{_bindir}/gdb
 %{_bindir}/gdbtui
@@ -1010,6 +1161,148 @@ fi
 %endif
 
 %changelog
+* Sun Jul 11 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-28.fc14
+- Rebuild for Fedora 14.
+
+* Wed Jun 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-28.fc13
+- Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
+
+* Wed Jun 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-27.fc13
+- Fix obstack corruptions on C++ (BZ 606185, Chris Moller, Jan Kratochvil).
+- Improve support for typedefs in classes (BZ 602314).
+- Fix `set print object on' for some non-dynamic classes (BZ 606660).
+
+* Wed Jun  9 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-26.fc13
+- Backport DWARF-4 support (BZ 601887, Tom Tromey).
+
+* Wed Jun  9 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-25.fc13
+- Fix ADL anonymous type crash (BZ 600746, Sami Wagiaalla).
+
+* Tue Jun  1 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-24.fc13
+- Fix crash on /proc/PID/stat race during inferior exit (BZ 596751).
+- testsuite: gdb.threads/watchthreads-reorder.exp kernel-2.6.33 compat. fix.
+
+* Sun May 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-23.fc13
+- Fix and support DW_OP_*piece (Tom Tromey, BZ 589467).
+- Fix follow-exec for C++ programs (bugreported by Martin Stransky).
+
+* Mon May 24 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-22.fc13
+- Remove core file when starting a process (BZ 594560).
+- Fix lock up on loops in the solib chain (BZ 593926).
+- Import fix of TUI layout internal error (BZ 595475).
+
+* Sun May 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-21.fc13
+- Make gdb-6.8-bz254229-gcore-prpsinfo.patch RHEL-5 /usr/bin/patch compatible
+  (bugreported by Jonas Maebe).
+
+* Thu May 13 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-20.fc13
+- Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
+- Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
+
+* Wed May 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-19.fc13
+- Backport <tab>-completion bug on anonymous structure fields (BZ 590648).
+- testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
+- Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
+
+* Thu Apr 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-18.fc13
+- Make _Unwind_DebugHook independent from step-resume breakpoint (Tom Tromey).
+
+* Tue Apr 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-17.fc13
+- Fail gracefully if the _Unwind_DebugHook arg. is optimized out (Tom Tromey).
+
+* Tue Apr 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-16.fc13
+- Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
+
+* Mon Apr 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-15.fc13
+- Fix crash when using GNU IFUNC call from breakpoint condition.
+- Avoid internal error by disabling the previous BZ 575292 fix (BZ 585445).
+
+* Thu Apr 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-14.fc13
+- Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
+- Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
+
+* Fri Apr 16 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-13.fc13
+- archer-jankratochvil-fedora13 commit: 39998c496988faaa1509cc6ab76b5c4777659bf4
+- [vla] Fix boundaries for arrays on -O2 -g (support bound-ref->var->loclist).
+- [vla] Fix copy_type_recursive for unavailable variables (Joost van der Sluis).
+
+* Sun Apr 11 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-12.fc13
+- Fix crash on trying to load invalid executable (BZ 581215).
+
+* Thu Apr  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-11.fc13
+- testsuite: Fix gdb.base/gstack.exp also for ppc64 inferiors (for BZ 579793).
+
+* Thu Apr  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-10.fc13
+- Fix s390 --with testsuite Buildrequiers to be (s390-32) (BZ 580347, Cai Qian).
+
+* Wed Apr  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-9.fc13
+- Fix gstack to print even the frame #0.  New gdb.base/gstack.exp.  (BZ 579793)
+- Merge gdb-6.3-gstack-without-path-20060414.p* into gdb-6.3-gstack-20050411.p*,
+  no real code change.
+
+* Mon Apr  5 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-8.fc13
+- Fix breakpoint at *_start (BZ 162775, bugreport by John Reiser).
+
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-7.fc13
+- Fix ppc build of the AVX registers support (for BZ 578250).
+
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-6.fc13
+- Support AVX registers (BZ 578250).
+
+* Sat Apr  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-5.fc13
+- Fix dangling displays in separate debuginfo (BZ 574483).
+
+* Wed Mar 31 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-4.fc13
+- Remove gdb-readline-6.0-signal.patch with a bug causing crash while no longer
+  required with F-13 readline-6.1 (BZ 575516)
+
+* Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-3.fc13
+- [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
+
+* Mon Mar 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-2.fc13
+- Drop obsoleted `gdb-archer-pie-0315-breakpoint_address_match.patch'.
+- Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
+  - PIE: Attach binary even after re-prelinked underneath.
+  - PIE: Attach binary even after ld.so re-prelinked underneath.
+  - PIE: Fix occasional error attaching i686 binary (BZ 576742).
+- testsuite: Fix unstable results of gdb.base/prelink.exp.
+
+* Thu Mar 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-1.fc13
+- Update to new FSF GDB release.
+
+* Mon Mar 15 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100312-24.fc13
+- Drop gdb-6.5-bz218379-ppc-solib-trampoline-fix.patch having false symbols
+  resolving (related to BZ 573277).
+
+* Fri Mar 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100312-23.fc13
+- Update to new FSF GDB snapshot.
+- Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
+
+* Wed Mar 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-22.fc13
+- Another License update.
+
+* Wed Mar 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-21.fc13
+- Update License for all the licenses contained in .src.rpm.
+
+* Mon Mar  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-20.fc13
+- Remove unapplied: gdb-6.8-inlining-addon.patch gdb-6.8-inlining-by-name.patch
+
+* Mon Mar  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-19.fc13
+- Include also %%doc COPYING3 (review by Petr Machata).
+- Remove URL for Source (review by Matej Cepl).
+
+* Sun Mar  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.90.20100306-18.fc13
+- archer-jankratochvil-fedora13 commit: 59c35a31f0981a0f0b884b32c91ae6325b2126cd
+
+* Sun Feb 28 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-17.fc13
+- Fix false warning: section .gnu.liblist not found in ...
+- Fix crash on stale addrinfo->sectindex (more sensitive due to the PIE patch).
+
+* Fri Feb 26 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-16.fc13
+- Fix ia64 part of the bt-clone-stop.exp fix.
+- Fix gdb.ada/* regressions (Keith Seitz).
+- Remove false gdb_assert on $sp underflow.
+
 * Mon Feb  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.50.20100203-15.fc13
 - Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 
