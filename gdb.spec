@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{dist}
+Release: 29%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -649,7 +649,8 @@ machine than the one which is running the program being debugged.
 %setup -q -n %{gdb_src}
 
 # libstdc++ pretty printers.
-tar xjf %{SOURCE4}
+# Disabled now for F-14 before rebase.
+#tar xjf %{SOURCE4}
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
@@ -828,7 +829,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch484 -p1
 %patch485 -p1
 %patch486 -p1
-%patch487 -p1
+# Disabled now for F-14 before rebase.
+#patch487 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1055,21 +1057,22 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
-%if 0%{!?_without_python:1}
-# Temporarily now:
-for LIB in lib lib64;do
-  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
-  mkdir -p $LIBPATH
-  # basename is being run only for the native (non-biarch) file.
-  sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
-      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
-      < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
-      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
-done
-test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
-      $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-%endif # 0%{!?_without_python:1}
+# Disabled now for F-14 before rebase.
+#%if 0%{!?_without_python:1}
+## Temporarily now:
+#for LIB in lib lib64;do
+#  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
+#  mkdir -p $LIBPATH
+#  # basename is being run only for the native (non-biarch) file.
+#  sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
+#      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
+#      < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
+#      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+#done
+#test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
+#cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
+#      $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
+#%endif # 0%{!?_without_python:1}
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -1161,6 +1164,9 @@ fi
 %endif
 
 %changelog
+* Tue Jul 13 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-29.fc14
+- Disable temporarily Python files before the new rebase is done (BZ 613710).
+
 * Sun Jul 11 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-28.fc14
 - Rebuild for Fedora 14.
 
