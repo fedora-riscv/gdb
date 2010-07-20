@@ -36,7 +36,7 @@ Version: 7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{dist}
+Release: 29%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -527,6 +527,12 @@ Patch485: gdb-bz562763-pretty-print-2d-vectors-prereq.patch
 Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
 Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 
+# Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
+Patch489: gdb-bz614659-prelink-dynbss.patch
+
+# [delayed-symfile] Fix a backtrace regression on CFIs without DIE (BZ 614604).
+Patch490: gdb-bz614604-bt-cfi-without-die.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -829,6 +835,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch485 -p1
 %patch486 -p1
 %patch487 -p1
+%patch489 -p1
+%patch490 -p1
 
 %patch415 -p1
 %patch393 -p1
@@ -1161,6 +1169,10 @@ fi
 %endif
 
 %changelog
+* Tue Jul 20 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-29.fc13
+- Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
+- [delayed-symfile] Fix a backtrace regression on CFIs without DIE (BZ 614604).
+
 * Wed Jun 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-28.fc13
 - Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
 
