@@ -32,18 +32,18 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.1
+Version: 7.1.90.20100721
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?_with_upstream:.upstream}%{dist}
+Release: 1%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -80,10 +80,6 @@ Source2: gdb-orphanripper.c
 
 # Man page for gstack(1).
 Source3: gdb-gstack.man
-
-# libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%define libstdcxxpython libstdc++-v3-python-r155978
-Source4: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
 Patch1: gdb-6.3-rh-dummykfail-20041202.patch
@@ -193,9 +189,6 @@ Patch190: gdb-6.5-dwarf-stack-overflow.patch
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 
-# Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
-Patch195: gdb-6.5-tls-of-separate-debuginfo.patch
-
 # Fix TLS symbols resolving for shared libraries with a relative pathname.
 # The testsuite needs `gdb-6.5-tls-of-separate-debuginfo.patch'.
 Patch196: gdb-6.5-sharedlibrary-path.patch
@@ -203,9 +196,6 @@ Patch196: gdb-6.5-sharedlibrary-path.patch
 # Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
 # FIXME: It could be autodetected.
 Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch
-
-# Fix `gcore' command for 32bit inferiors on 64bit hosts.
-Patch201: gdb-6.5-gcore-i386-on-amd64.patch
 
 # Testcase for deadlocking on last address space byte; for corrupted backtraces.
 Patch211: gdb-6.5-last-address-space-byte-test.patch
@@ -236,16 +226,13 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
 
 # Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
 Patch235: gdb-6.3-bz231832-obstack-2gb.patch
-
-# Fix prelink(8) testcase for non-root $PATH missing `/usr/sbin' (BZ 225783).
-Patch240: gdb-6.6-bz225783-prelink-path.patch
 
 # Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
 Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
@@ -255,9 +242,6 @@ Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 
 # Notify user of a child forked process being detached (BZ 235197).
 Patch247: gdb-6.6-bz235197-fork-detach-info.patch
-
-# New testcase for gcore of 32bit inferiors on 64bit hosts.
-Patch249: gdb-6.6-gcore32-test.patch
 
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
 Patch254: gdb-6.6-testsuite-timeouts.patch
@@ -330,9 +314,6 @@ Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 # Test a crash on libraries missing the .text section.
 Patch320: gdb-6.5-section-num-fixup-test.patch
 
-# Refuse creating watchpoints of an address value, suggested by Martin Stransky.
-Patch322: gdb-6.8-constant-watchpoints.patch
-
 # Fix compatibility with recent glibc headers.
 Patch324: gdb-6.8-glibc-headers-compat.patch
 
@@ -397,9 +378,6 @@ Patch403: gdb-ccache-workaround.patch
 Patch404: gdb-fortran-common-reduce.patch
 Patch405: gdb-fortran-common.patch
 
-# Fix Fortran logical-kind=8 (BZ 465310).
-Patch406: gdb-fortran-logical8.patch
-
 # Testcase for "Do not make up line information" fix by Daniel Jacobowitz.
 Patch407: gdb-lineno-makeup-test.patch
 
@@ -412,118 +390,27 @@ Patch412: gdb-unused-revert.patch
 # Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 Patch417: gdb-bz541866-rwatch-before-run.patch
 
-# Remove false gdb_assert on $sp underflow.
-Patch422: gdb-infcall-sp-underflow.patch
-
-# Fix double-free on std::terminate handler (Tom Tromey, BZ 562975).
-Patch429: gdb-bz562975-std-terminate-double-free.patch
-
-# PIE: Fix back re-reun.
-Patch430: gdb-pie-rerun.patch
-
-# Do not consider memory error on reading _r_debug->r_map as fatal (BZ 576742).
-Patch432: gdb-solib-memory-error-nonfatal.patch
-
-# testsuite: Fix unstable results of gdb.base/prelink.exp.
-Patch433: gdb-6.7-testsuite-stable-results-prelink.patch 
-
-# [patch 1/6] PIE: Attach binary even after re-prelinked underneath
-# [patch 2/6] PIE: Attach binary even after ld.so re-prelinked underneath
-# [patch 3/6] PIE: Fix occasional error attaching i686 binary
-Patch434: gdb-pie-1of6-reprelinked-bin.patch
-Patch435: gdb-pie-2of6-reprelinked-ld.patch
-Patch436: gdb-pie-3of6-relocate-once.patch
-
-# [expr-cumulative] using-directive: Fix memory leak (Sami Wagiaalla).
-Patch437: gdb-using-directive-leak.patch
-
-# Fix dangling displays in separate debuginfo (BZ 574483).
-Patch438: gdb-bz574483-display-sepdebug.patch
-
-# Support AVX registers (BZ 578250).
-Patch439: gdb-bz578250-avx-01of10.patch
-Patch440: gdb-bz578250-avx-02of10.patch
-Patch441: gdb-bz578250-avx-03of10.patch
-Patch442: gdb-bz578250-avx-04of10.patch
-Patch443: gdb-bz578250-avx-05of10.patch
-Patch444: gdb-bz578250-avx-06of10.patch
-Patch445: gdb-bz578250-avx-07of10.patch
-Patch446: gdb-bz578250-avx-08of10.patch
-Patch447: gdb-bz578250-avx-09of10.patch
-Patch448: gdb-bz578250-avx-10of10.patch
-Patch449: gdb-bz578250-avx-10of10-ppc.patch
-
 # Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
 # Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
 # Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
 Patch451: gdb-bz575292-delayed-physname.patch
-Patch455: gdb-bz575292-void-workaround.patch
-
-# Pretty printers not well documented (BZ 570635, Tom Tromey, Jan Kratochvil).
-Patch452: gdb-bz570635-prettyprint-doc1.patch
-Patch453: gdb-bz570635-prettyprint-doc2.patch
 
 # Fix crash when using GNU IFUNC call from breakpoint condition.
 Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
 
-# Fail gracefully if the _Unwind_DebugHook arg. is optimized out (Tom Tromey).
-# Make _Unwind_DebugHook independent from step-resume breakpoint (Tom Tromey).
-Patch456: gdb-unwind-debughook-safe-fail.patch
-Patch457: gdb-unwind-debughook-step-independent.patch
-
-# testsuite: Fix gdb.base/vla-overflow.exp FAILing on s390x (BZ 590635).
-Patch458: gdb-archer-vla-test-oom.patch
-
 # Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
 Patch459: gdb-moribund-utrace-workaround.patch
-
-# Fix crash on VLA bound referencing an optimized-out variable (BZ 591879).
-Patch460: gdb-archer-vla-ref-optimizedout.patch
 
 # Remove core file when starting a process (BZ 594560).
 Patch461: gdb-bz594560-core-vs-process.patch
 
-# Import fix of TUI layout internal error (BZ 595475).
-Patch462: gdb-bz595475-tui-layout.patch
-
-# Fix and support DW_OP_*piece (Tom Tromey, BZ 589467).
-Patch463: gdb-bz589467-pieces01of4.patch
-Patch464: gdb-bz589467-pieces02of4.patch
-Patch465: gdb-bz589467-pieces03of4.patch
-Patch466: gdb-bz589467-pieces1of4.patch
-Patch467: gdb-bz589467-pieces2of4.patch
-Patch468: gdb-bz589467-pieces3of4.patch
-Patch469: gdb-bz589467-pieces4of4.patch
-Patch471: gdb-bz589467-pieces-vla-compat.patch
-
 # Fix follow-exec for C++ programs (bugreported by Martin Stransky).
 Patch470: gdb-archer-next-over-throw-cxx-exec.patch
 
-# Fix ADL anonymous type crash (BZ 600746, Sami Wagiaalla).
-Patch472: gdb-bz600746-koenig-crash.patch
-
 # Backport DWARF-4 support (BZ 601887, Tom Tromey).
-Patch473: gdb-bz601887-dwarf4-1of2.patch
-Patch474: gdb-bz601887-dwarf4-2of2.patch
 Patch475: gdb-bz601887-dwarf4-rh-test.patch
 
-# Fix obstack corruptions on C++ (BZ 606185, Chris Moller, Jan Kratochvil).
-Patch476: gdb-bz606185-obstack-1of5.patch
-Patch477: gdb-bz606185-obstack-2of5.patch
-Patch478: gdb-bz606185-obstack-3of5.patch
-Patch479: gdb-bz606185-obstack-4of5.patch
-Patch480: gdb-bz606185-obstack-5of5.patch
-
-# Improve support for typedefs in classes (BZ 602314).
-Patch481: gdb-bz602314-ptype-class-typedef-1of3.patch
-Patch482: gdb-bz602314-ptype-class-typedef-2of3.patch
-Patch483: gdb-bz602314-ptype-class-typedef-3of3.patch
-
-# Fix `set print object on' for some non-dynamic classes (BZ 606660).
-Patch484: gdb-bz606660-print-object-nonvirtual.patch
-
 # Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
-Patch485: gdb-bz562763-pretty-print-2d-vectors-prereq.patch
 Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
 Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 
@@ -663,7 +550,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch420 -p1
 %patch1 -p1
@@ -699,10 +586,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
-%patch195 -p1
 %patch196 -p1
 %patch199 -p1
-%patch201 -p1
 %patch208 -p1
 %patch209 -p1
 %patch211 -p1
@@ -715,11 +600,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch231 -p1
 %patch234 -p1
 %patch235 -p1
-%patch240 -p1
 %patch241 -p1
 %patch245 -p1
 %patch247 -p1
-%patch249 -p1
 %patch254 -p1
 %patch258 -p1
 %patch260 -p1
@@ -746,7 +629,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch317 -p1
 %patch318 -p1
 %patch320 -p1
-%patch322 -p1
 %patch324 -p1
 %patch326 -p1
 %patch329 -p1
@@ -767,80 +649,23 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch405 -p1
 %patch389 -p1
 %patch394 -p1
-%patch406 -p1
 %patch407 -p1
 %patch408 -p1
 %patch412 -p1
 %patch417 -p1
-%patch422 -p1
-%patch429 -p1
-%patch430 -p1
-%patch432 -p1
-%patch433 -p1
-%patch434 -p1
-%patch435 -p1
-%patch436 -p1
-%patch437 -p1
-%patch438 -p1
-%patch439 -p1
-%patch440 -p1
-%patch441 -p1
-%patch442 -p1
-%patch443 -p1
-%patch444 -p1
-%patch445 -p1
-%patch446 -p1
-%patch447 -p1
-%patch448 -p1
-%patch449 -p1
 %patch451 -p1
-%patch452 -p1
-%patch453 -p1
 %patch454 -p1
-%patch455 -p1
-%patch456 -p1
-%patch457 -p1
-%patch458 -p1
 %patch459 -p1
-%patch460 -p1
 %patch461 -p1
-%patch462 -p1
-%patch463 -p1
-%patch464 -p1
-%patch465 -p1
-%patch466 -p1
-%patch467 -p1
-%patch468 -p1
-%patch469 -p1
-%patch471 -p1
 %patch470 -p1
-%patch472 -p1
-%patch473 -p1
-%patch474 -p1
 %patch475 -p1
-%patch476 -p1
-%patch477 -p1
-%patch478 -p1
-%patch479 -p1
-%patch480 -p1
-%patch481 -p1
-%patch482 -p1
-%patch483 -p1
-%patch484 -p1
-%patch485 -p1
 %patch486 -p1
-# Disabled now for F-14 before rebase.
+# This patch should be applied to gcc-4.5+.src.rpm:
 #patch487 -p1
-
 %patch415 -p1
+
 %patch393 -p1
 %patch335 -p1
-# Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
-# Currently disabled for RHEL as it is a new experimental feature not present
-# in FSF GDB and possibly affecting new user scripts.
-%if 0%{?rhel:1}
-%patch415 -p1 -R
-%endif
 %if 0%{!?el5:1}
 %patch393 -p1 -R
 %patch335 -p1 -R
@@ -1161,9 +986,13 @@ fi
 %endif
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
+%{_libdir}/libinproctrace.so
 %endif
 
 %changelog
+* Wed Jul 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100721-1.fc14
+- Rebase to FSF GDB 7.1.90.20100721 (which is 7.2 pre-release).
+
 * Tue Jul 13 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1-29.fc14
 - Disable temporarily Python files before the new rebase is done (BZ 613710).
 
