@@ -9,11 +9,11 @@ Neither its obstack-leak.patch nor
 	http://sourceware.org/ml/gdb-patches/2010-05/msg00271.html
 is needed as the linked list is used instead.
 
-Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
+Index: gdb-7.1.90.20100721/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.1.90.20100711.orig/gdb/dwarf2read.c	2010-07-13 00:34:00.000000000 +0200
-+++ gdb-7.1.90.20100711/gdb/dwarf2read.c	2010-07-13 22:25:18.000000000 +0200
-@@ -216,6 +216,28 @@ struct comp_unit_head
+--- gdb-7.1.90.20100721.orig/gdb/dwarf2read.c	2010-07-22 11:59:19.000000000 +0200
++++ gdb-7.1.90.20100721/gdb/dwarf2read.c	2010-07-22 12:00:08.000000000 +0200
+@@ -253,6 +253,28 @@ struct comp_unit_head
    unsigned int first_die_offset;
  };
  
@@ -42,7 +42,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
  /* Internal state when decoding a particular compilation unit.  */
  struct dwarf2_cu
  {
-@@ -294,6 +316,10 @@ struct dwarf2_cu
+@@ -331,6 +353,10 @@ struct dwarf2_cu
    /* Header data from the line table, during full symbol processing.  */
    struct line_header *line_header;
  
@@ -53,17 +53,17 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    /* Mark used when releasing cached dies.  */
    unsigned int mark : 1;
  
-@@ -1142,6 +1168,9 @@ static struct type *get_die_type (struct
- static struct dwarf2_locexpr_baton *dwarf2_attr_to_locexpr_baton
-   (struct attribute *attr, struct dwarf2_cu *cu);
+@@ -1239,6 +1265,9 @@ static gdb_byte *partial_read_comp_unit_
+ static void init_cu_die_reader (struct die_reader_specs *reader,
+ 				struct dwarf2_cu *cu);
  
 +static const char *dwarf2_physname (char *name, struct die_info *die,
 +				    struct dwarf2_cu *cu);
 +
- /* Try to locate the sections we need for DWARF 2 debugging
-    information and return true if we have enough to do something.  */
+ #if WORDS_BIGENDIAN
  
-@@ -3137,6 +3166,58 @@ load_full_comp_unit (struct dwarf2_per_c
+ /* Convert VALUE between big- and little-endian.  */
+@@ -4103,6 +4132,58 @@ load_full_comp_unit (struct dwarf2_per_c
    discard_cleanups (free_cu_cleanup);
  }
  
@@ -122,8 +122,8 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
  /* Generate full symbol information for PST and CU, whose DIEs have
     already been loaded into memory.  */
  
-@@ -3148,7 +3229,7 @@ process_full_comp_unit (struct dwarf2_pe
-   struct objfile *objfile = pst->objfile;
+@@ -4113,7 +4194,7 @@ process_full_comp_unit (struct dwarf2_pe
+   struct objfile *objfile = per_cu->objfile;
    CORE_ADDR lowpc, highpc;
    struct symtab *symtab;
 -  struct cleanup *back_to;
@@ -131,7 +131,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    CORE_ADDR baseaddr;
  
    baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
-@@ -3158,11 +3239,22 @@ process_full_comp_unit (struct dwarf2_pe
+@@ -4123,11 +4204,22 @@ process_full_comp_unit (struct dwarf2_pe
  
    cu->list_in_scope = &file_symbols;
  
@@ -154,7 +154,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    /* Some compilers don't define a DW_AT_high_pc attribute for the
       compilation unit.  If the DW_AT_high_pc is missing, synthesize
       it, by scanning the DIE's below the compilation unit.  */
-@@ -4854,7 +4946,6 @@ dwarf2_add_member_fn (struct field_info 
+@@ -5838,7 +5930,6 @@ dwarf2_add_member_fn (struct field_info 
    int i;
    struct fn_field *fnp;
    char *fieldname;
@@ -162,7 +162,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    struct nextfnfield *new_fnfield;
    struct type *this_type;
  
-@@ -4866,9 +4957,6 @@ dwarf2_add_member_fn (struct field_info 
+@@ -5850,9 +5941,6 @@ dwarf2_add_member_fn (struct field_info 
    if (fieldname == NULL)
      return;
  
@@ -172,7 +172,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    /* Look up member function name in fieldlist.  */
    for (i = 0; i < fip->nfnfields; i++)
      {
-@@ -4894,7 +4982,7 @@ dwarf2_add_member_fn (struct field_info 
+@@ -5878,7 +5966,7 @@ dwarf2_add_member_fn (struct field_info 
        flp->name = fieldname;
        flp->length = 0;
        flp->head = NULL;
@@ -181,7 +181,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
      }
  
    /* Create a new member function field and chain it to the field list
-@@ -4908,9 +4996,19 @@ dwarf2_add_member_fn (struct field_info 
+@@ -5892,9 +5980,19 @@ dwarf2_add_member_fn (struct field_info 
  
    /* Fill in the member function field info.  */
    fnp = &new_fnfield->fnfield;
@@ -204,7 +204,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
    fnp->type = alloc_type (objfile);
    this_type = read_type_die (die, cu);
    if (this_type && TYPE_CODE (this_type) == TYPE_CODE_FUNC)
-@@ -4936,7 +5034,7 @@ dwarf2_add_member_fn (struct field_info 
+@@ -5920,7 +6018,7 @@ dwarf2_add_member_fn (struct field_info 
      }
    else
      complaint (&symfile_complaints, _("member function type missing for '%s'"),
@@ -213,7 +213,7 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
  
    /* Get fcontext from DW_AT_containing_type if present.  */
    if (dwarf2_attr (die, DW_AT_containing_type, cu) != NULL)
-@@ -7315,7 +7413,9 @@ load_partial_dies (bfd *abfd, gdb_byte *
+@@ -8299,7 +8397,9 @@ load_partial_dies (bfd *abfd, gdb_byte *
  		      || last_die->tag == DW_TAG_interface_type
  		      || last_die->tag == DW_TAG_structure_type
  		      || last_die->tag == DW_TAG_union_type))
@@ -224,10 +224,10 @@ Index: gdb-7.1.90.20100711/gdb/dwarf2read.c
  		  && (last_die->tag == DW_TAG_subprogram
  		      || last_die->tag == DW_TAG_lexical_block))))
  	{
-Index: gdb-7.1.90.20100711/gdb/testsuite/gdb.dwarf2/pr11465.S
+Index: gdb-7.1.90.20100721/gdb/testsuite/gdb.dwarf2/pr11465.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.1.90.20100711/gdb/testsuite/gdb.dwarf2/pr11465.S	2010-07-13 22:24:48.000000000 +0200
++++ gdb-7.1.90.20100721/gdb/testsuite/gdb.dwarf2/pr11465.S	2010-07-22 11:59:29.000000000 +0200
 @@ -0,0 +1,355 @@
 +/* Copyright 2010 Free Software Foundation, Inc.
 +
@@ -584,10 +584,10 @@ Index: gdb-7.1.90.20100711/gdb/testsuite/gdb.dwarf2/pr11465.S
 +.LASF4:
 +	.string	"GNU C++ 4.4.2"
 +	.ident	"GCC: (GNU) 4.4.2"
-Index: gdb-7.1.90.20100711/gdb/testsuite/gdb.dwarf2/pr11465.exp
+Index: gdb-7.1.90.20100721/gdb/testsuite/gdb.dwarf2/pr11465.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.1.90.20100711/gdb/testsuite/gdb.dwarf2/pr11465.exp	2010-07-13 22:24:48.000000000 +0200
++++ gdb-7.1.90.20100721/gdb/testsuite/gdb.dwarf2/pr11465.exp	2010-07-22 11:59:29.000000000 +0200
 @@ -0,0 +1,39 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +

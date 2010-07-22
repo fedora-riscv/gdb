@@ -36,7 +36,7 @@ Version: 7.1.90.20100721
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{dist}
+Release: 4%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -417,6 +417,9 @@ Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 # Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
 Patch489: gdb-bz614659-prelink-dynbss.patch
 
+# Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
+Patch491: gdb-gdb-add-index-script.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -667,6 +670,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 #patch487 -p1
 %patch415 -p1
 %patch489 -p1
+%patch491 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -972,6 +976,7 @@ fi
 %{_mandir}/*/gstack.1*
 %if 0%{!?el5:1}
 %{_bindir}/pstack
+%{_bindir}/gdb-add-index
 %{_mandir}/*/pstack.1*
 %endif # 0%{!?el5:1}
 %endif # 0%{!?_with_upstream:1}
@@ -994,7 +999,12 @@ fi
 %endif
 
 %changelog
-* Thu Jul 22 2010 David Malcolm <dmalcolm@redhat.com> - 7.1.90.20100721-3
+* Thu Jul 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100721-4.fc14
+- Import archer-tromey-python.
+- Import archer-tromey-optional-psymtab (as present in FSF GDB post-7.2).
+  - Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
+
+* Thu Jul 22 2010 David Malcolm <dmalcolm@redhat.com> - 7.1.90.20100721-3.fc14
 - Rebuilt for https://fedoraproject.org/wiki/Features/Python_2.7/MassRebuild
 
 * Wed Jul 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100721-2.fc14
