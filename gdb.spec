@@ -36,7 +36,7 @@ Version: 7.1.90.20100721
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{dist}
+Release: 3%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -994,6 +994,9 @@ fi
 %endif
 
 %changelog
+* Thu Jul 22 2010 David Malcolm <dmalcolm@redhat.com> - 7.1.90.20100721-3
+- Rebuilt for https://fedoraproject.org/wiki/Features/Python_2.7/MassRebuild
+
 * Wed Jul 21 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100721-2.fc14
 - Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
 
