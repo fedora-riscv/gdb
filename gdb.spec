@@ -32,11 +32,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.1.90.20100721
+Version: 7.1.90.20100806
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{dist}
+Release: 7%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -420,6 +420,9 @@ Patch489: gdb-bz614659-prelink-dynbss.patch
 # Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
 Patch491: gdb-gdb-add-index-script.patch
 
+# Fix gcore from very small terminal windows (BZ 555076).
+Patch493: gdb-bz555076-gcore-small-height.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -671,6 +674,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch415 -p1
 %patch489 -p1
 %patch491 -p1
+%patch493 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -999,6 +1003,10 @@ fi
 %endif
 
 %changelog
+* Fri Aug  6 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100806-7.fc14
+- Fix gcore from very small terminal windows (BZ 555076).
+- Fix false `filesystem' debuginfo rpm request (BZ 599598).
+
 * Wed Jul 28 2010 Mamoru Tasaka <mtasaka@ioa.s.u-tokyo.ac.jp> - 7.1.90.20100721-6.fc14
 - Rebuild against python 2.7
 
