@@ -3,6 +3,8 @@
 # --with debug: Build without optimizations and without splitting the debuginfo.
 # --with upstream: No Fedora specific patches get applied.
 # --without python: No python support.
+# --with profile: gcc -fprofile-generate / -fprofile-use: Before better
+#                 workload gets run it decreases the general performance now.
 
 # RHEL-5 was the last not providing `/etc/rpm/macros.dist'.
 %if 0%{!?dist:1}
@@ -36,7 +38,7 @@ Version: 7.1.90.20100806
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{dist}
+Release: 10%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -426,6 +428,9 @@ Patch493: gdb-bz555076-gcore-small-height.patch
 # Out of memory is just an error, not fatal (uninitialized VLS vars, BZ 568248).
 Patch496: gdb-bz568248-oom-is-error.patch
 
+# Workaround false GCC warning(s).
+Patch497: gdb-false-gcc-warning.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -679,6 +684,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch491 -p1
 %patch493 -p1
 %patch496 -p1
+%patch497 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -715,9 +721,11 @@ rm -f gdb/doc/*.info-*
 # built.
 # Initially we're in the %{gdb_src} directory.
 
-rm -fr %{gdb_build}
-mkdir %{gdb_build}
-cd %{gdb_build}
+for fprofile in %{?_with_profile:-fprofile} ""
+do
+
+mkdir %{gdb_build}$fprofile
+cd %{gdb_build}$fprofile
 
 # g77 executable is no longer present in Fedora gcc-4.x+.
 g77="`which gfortran 2>/dev/null || true`"
@@ -784,7 +792,56 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	%{_target_platform}
 %endif
 
-make %{?_smp_mflags}
+if [ -z "%{!?_with_profile:no}" ]
+then
+  # Run all the configure tests being incompatible with $FPROFILE_CFLAGS.
+  make %{?_smp_mflags} configure-host configure-target
+  make %{?_smp_mflags} clean
+
+  # Workaround -fprofile-use:
+  # linux-x86-low.c:2225: Error: symbol `start_i386_goto' is already defined
+  make %{?_smp_mflags} -C gdb/gdbserver linux-x86-low.o
+fi
+
+# Global CFLAGS would fail on:
+# conftest.c:1:1: error: coverage mismatch for function 'main' while reading counter 'arcs'
+if [ "$fprofile" = "-fprofile" ]
+then
+  FPROFILE_CFLAGS='-fprofile-generate'
+elif [ -z "%{!?_with_profile:no}" ]
+then
+  FPROFILE_CFLAGS='-fprofile-use'
+  # We cannot use -fprofile-dir as the bare filenames clash.
+  (cd ../%{gdb_build}-fprofile;
+   # It was 333 on x86_64.
+   test $(find -name "*.gcda"|wc -l) -gt 300
+   find -name "*.gcda" | while read -r i
+   do
+     ln $i ../%{gdb_build}/$i
+   done
+  )
+else
+  FPROFILE_CFLAGS=""
+fi
+
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS"
+
+if [ "$fprofile" = "-fprofile" ]
+then
+  cd gdb
+  cp -p gdb gdb-withindex
+  PATH="$PWD:$PATH" sh ../../gdb/gdb-add-index $PWD/gdb-withindex
+  ./gdb -nx -ex q ./gdb-withindex
+  ./gdb -nx -readnow -ex q ./gdb-withindex
+  cd ..
+fi
+
+cd ..
+
+done	# fprofile
+
+cd %{gdb_build}
+
 make %{?_smp_mflags} info
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
@@ -1007,6 +1064,10 @@ fi
 %endif
 
 %changelog
+* Tue Aug 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100806-10.fc14
+- Fix /usr/bin/gdb-add-index missing -nx for gdb.
+- New option --with profile (disabled by default - missing workload, BZ 615603).
+
 * Sat Aug  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100806-9.fc14
 - Fix python gdb.execute to_string pagination (BZ 620930).
 
