@@ -38,7 +38,7 @@ Version: 7.1.90.20100806
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{dist}
+Release: 11%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1064,6 +1064,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug 19 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100806-11.fc14
+- Fix crash on MI variable calling inferior function (BZ 610986).
+
 * Tue Aug 10 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.1.90.20100806-10.fc14
 - Fix /usr/bin/gdb-add-index missing -nx for gdb.
 - New option --with profile (disabled by default - missing workload, BZ 615603).
