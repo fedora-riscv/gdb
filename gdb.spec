@@ -36,7 +36,7 @@ Version: 7.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 49%{?_with_upstream:.upstream}%{dist}
+Release: 50%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+
 Group: Development/Debuggers
@@ -1108,6 +1108,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug 19 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-50.fc12
+- Fix crash on MI variable calling inferior function (BZ 610986).
+
 * Tue Jul 20 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.0.1-49.fc12
 - Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
 - [delayed-symfile] Fix a backtrace regression on CFIs without DIE (BZ 614604).
