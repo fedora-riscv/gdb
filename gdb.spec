@@ -34,11 +34,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.1.90.20100806
+Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{dist}
+Release: 1%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1066,6 +1066,9 @@ fi
 %endif
 
 %changelog
+* Fri Sep  3 2010 Dan Horák <dan[at]danny.cz> - 7.2-1.fc14
+- Formal update to the final FSF GDB release.
+
 * Tue Aug 24 2010 Dan Horák <dan[at]danny.cz> - 7.1.90.20100806-12.fc14
 - libinproctrace doesn't exist on s390(x)
 
