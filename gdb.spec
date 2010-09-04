@@ -38,7 +38,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{dist}
+Release: 2%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1060,12 +1060,15 @@ fi
 %endif
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
-%ifnarch s390 s390x
+%ifnarch s390 s390x %{sparc}
 %{_libdir}/libinproctrace.so
 %endif
 %endif
 
 %changelog
+* Sat Sep 04 2010 Dennis Gilmore <dennis@ausil.us> - 7.2-2
+- libinproctrace doesnt exist on sparc arches
+
 * Fri Sep  3 2010 Dan Horák <dan[at]danny.cz> - 7.2-1.fc14
 - Formal update to the final FSF GDB release.
 
