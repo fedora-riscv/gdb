@@ -1069,7 +1069,7 @@ fi
 * Sat Sep 04 2010 Dennis Gilmore <dennis@ausil.us> - 7.2-2
 - libinproctrace doesnt exist on sparc arches
 
-* Fri Sep  3 2010 Dan Horák <dan[at]danny.cz> - 7.2-1.fc14
+* Fri Sep  3 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-1.fc14
 - Formal update to the final FSF GDB release.
 
 * Tue Aug 24 2010 Dan Horák <dan[at]danny.cz> - 7.1.90.20100806-12.fc14
