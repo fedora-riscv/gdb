@@ -38,7 +38,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{dist}
+Release: 4%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -434,6 +434,9 @@ Patch497: gdb-false-gcc-warning.patch
 # Do not crash on broken separate debuginfo due to old elfutils (BZ 631575).
 Patch499: gdb-bz631575-gdb-index-nobits.patch
 
+# Fix symbol lookup misses methods of current class (BZ 631158, Sami Wagiaalla).
+Patch500: gdb-bz631158-cxx-this-lookup.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -689,6 +692,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch496 -p1
 %patch497 -p1
 %patch499 -p1
+%patch500 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1070,6 +1074,10 @@ fi
 %endif
 
 %changelog
+* Sat Sep 11 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-4.fc14
+- Fix symbol lookup misses methods of current class (BZ 631158, Sami Wagiaalla).
+- Fix python gdb.execute-to_string redirection (BZ 627506, with Paul Bolle).
+
 * Wed Sep  8 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-3.fc14
 - Do not crash on broken separate debuginfo due to old elfutils (BZ 631575).
 
