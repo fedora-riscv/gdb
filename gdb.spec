@@ -38,7 +38,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{dist}
+Release: 6%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -751,6 +751,9 @@ export CFLAGS="$RPM_OPT_FLAGS"
 CFLAGS="$CFLAGS -O0 -ggdb2"
 %endif
 
+# Temporarily build with -O0 to workaround GCC BZ 634757 (cmove bug).
+CFLAGS="$CFLAGS -O0"
+
 ../configure							\
 	--prefix=%{_prefix}					\
 	--libdir=%{_libdir}					\
@@ -1078,6 +1081,10 @@ fi
 %endif
 
 %changelog
+* Sat Sep 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-6.fc14
+- Fix python gdb.solib_address (BZ 634108, fix by Phil Muldoon).
+- Temporarily build with -O0 to workaround GCC BZ 634757 (cmove bug).
+
 * Tue Sep 14 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-5.fc14
 - Fix Ada regression when any .gdb_index library is present.
 
