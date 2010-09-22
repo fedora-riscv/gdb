@@ -38,7 +38,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{dist}
+Release: 7%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -440,6 +440,12 @@ Patch500: gdb-bz631158-cxx-this-lookup.patch
 # Fix Ada regression when any .gdb_index library is present.
 Patch501: gdb-gdbindex-ada-regression.patch
 
+# python: load *-gdb.py for shlibs during attach (BZ 634660).
+Patch502: gdb-bz634660-gdbpy-load-on-attach.patch
+
+# Fix double free crash during overload resolution (PR 12028, Sami Wagiaalla).
+Patch503: gdb-pr12028-double-free.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -697,6 +703,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch499 -p1
 %patch500 -p1
 %patch501 -p1
+%patch502 -p1
+%patch503 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1081,6 +1089,10 @@ fi
 %endif
 
 %changelog
+* Wed Sep 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-7.fc14
+- python: load *-gdb.py for shlibs during attach (BZ 634660).
+- Fix double free crash during overload resolution (PR 12028, Sami Wagiaalla).
+
 * Sat Sep 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-6.fc14
 - Fix python gdb.solib_address (BZ 634108, fix by Phil Muldoon).
 - Temporarily build with -O0 to workaround GCC BZ 634757 (cmove bug).
