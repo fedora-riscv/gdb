@@ -14,17 +14,6 @@
 %endif
 # RHEL-5 Brew does not set %{el5}.
 %if "%{dist}" == ".el5"
-# RHEL-5 ppc* python .so files are shipped only as ppc but gdb is ppc64 there.
-# Brew builds it fine as its ppc64 buildroot has full ppc64 package set.
-# Make this conditional so that Brew-built GDB has no python on any arch but
-# GDB rebuilt on native non-ppc64 host does have it.
-%if 0%{!?el5:1}
-%define _without_python 1
-%else
-%ifarch ppc64
-%define _without_python 1
-%endif
-%endif
 %define el5 1
 %endif
 
@@ -38,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{dist}
+Release: 8%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -460,7 +449,9 @@ BuildRequires: zlib-devel%{?_isa}
 %if 0%{!?el5:1}
 Requires: python-libs%{?_isa}
 %else
-Requires: python%{?_isa}
+# This RHEL-5.6 python version got split out python-libs for ppc64.
+# RHEL-5 rpm does not support .%{_arch} dependencies.
+Requires: python-libs-%{_arch} >= 2.4.3-32.el5
 %endif
 BuildRequires: python-devel%{?_isa}
 # Temporarily before python files get moved to libstdc++.rpm
@@ -1089,6 +1080,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-8.fc14
+- Enable python by default even in Brew and on all the arches (BZ 609157).
+
 * Wed Sep 22 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-7.fc14
 - python: load *-gdb.py for shlibs during attach (BZ 634660).
 - Fix double free crash during overload resolution (PR 12028, Sami Wagiaalla).
