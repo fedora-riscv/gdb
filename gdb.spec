@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{dist}
+Release: 11%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -438,6 +438,9 @@ Patch503: gdb-pr12028-double-free.patch
 # Fix gcore writer for -Wl,-z,relro (PR corefiles/11804).
 Patch504: gdb-bz623749-gcore-relro.patch
 
+# Fix infinite loop crash on self-referencing class (BZ 627432).
+Patch506: gdb-bz627432-loop-static-self-class.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -700,6 +703,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch502 -p1
 %patch503 -p1
 %patch504 -p1
+%patch506 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1084,6 +1088,9 @@ fi
 %endif
 
 %changelog
+* Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-11.fc14
+- Fix infinite loop crash on self-referencing class (BZ 627432).
+
 * Thu Sep 23 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-10.fc14
 - gcore/-Wl,-z,relro: Always write out all the pages until kernel gets a fix.
 
