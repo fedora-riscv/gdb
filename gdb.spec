@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{dist}
+Release: 14%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -993,6 +993,12 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
+for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb -name "*.py"`
+do
+  # Files could be also patched getting the current time.
+  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
+done
+
 # Disabled now for F-14 before rebase.
 #%if 0%{!?_without_python:1}
 ## Temporarily now:
@@ -1104,6 +1110,9 @@ fi
 %endif
 
 %changelog
+* Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-14.fc14
+- Fixup %{_datadir}/gdb/python/gdb timestamps for multilib conflicts.
+
 * Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-13.fc14
 - Fix .gdb_index for big-endian hosts (Tom Tromey).
 
