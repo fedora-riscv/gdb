@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?_with_upstream:.upstream}%{dist}
+Release: 15%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -470,10 +470,6 @@ Requires: python-libs%{?_isa}
 Requires: python-libs-%{_arch} >= 2.4.3-32.el5
 %endif
 BuildRequires: python-devel%{?_isa}
-# Temporarily before python files get moved to libstdc++.rpm
-# libstdc++%{bits_other} is not present in Koji, the .spec script generating
-# gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
-BuildRequires: libstdc++%{?_isa}
 %endif # 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
@@ -774,9 +770,6 @@ export CFLAGS="$RPM_OPT_FLAGS"
 CFLAGS="$CFLAGS -O0 -ggdb2"
 %endif
 
-# Temporarily build with -O0 to workaround GCC BZ 634757 (cmove bug).
-CFLAGS="$CFLAGS -O0"
-
 ../configure							\
 	--prefix=%{_prefix}					\
 	--libdir=%{_libdir}					\
@@ -999,23 +992,6 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
-# Disabled now for F-14 before rebase.
-#%if 0%{!?_without_python:1}
-## Temporarily now:
-#for LIB in lib lib64;do
-#  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
-#  mkdir -p $LIBPATH
-#  # basename is being run only for the native (non-biarch) file.
-#  sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
-#      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
-#      < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
-#      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
-#done
-#test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-#cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
-#      $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-#%endif # 0%{!?_without_python:1}
-
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -1110,6 +1086,11 @@ fi
 %endif
 
 %changelog
+* Mon Sep 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-15.fc14
+- Revert the -O0 switch formerly to workaround GCC BZ 634757 (cmove bug).
+- Remove no longer used BuildRequires: libstdc++.
+- Remove commented out python libstdc++ .spec code.
+
 * Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-14.fc14
 - Fixup %{_datadir}/gdb/python/gdb timestamps for multilib conflicts.
 
