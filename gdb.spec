@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{dist}
+Release: 16%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -451,6 +451,9 @@ Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 # Fix .gdb_index for big-endian hosts (Tom Tromey).
 Patch512: gdb-gdbindex-bigendian.patch
 
+# [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
+Patch513: gdb-bz637770-ifunc-watchpoint-delete.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -716,6 +719,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch510 -p1
 %patch511 -p1
 %patch512 -p1
+%patch513 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1086,6 +1090,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-16.fc14
+- [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
+
 * Mon Sep 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-15.fc14
 - Revert the -O0 switch formerly to workaround GCC BZ 634757 (cmove bug).
 - Remove no longer used BuildRequires: libstdc++.
