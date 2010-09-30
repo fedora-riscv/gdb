@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?_with_upstream:.upstream}%{dist}
+Release: 17%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -62,6 +62,9 @@ Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
 %endif # 0%{!?_with_upstream:1}
 %endif # 0%{!?el5:1}
+
+# eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
+Conflicts: elfutils < 0.149
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -1090,6 +1093,9 @@ fi
 %endif
 
 %changelog
+* Thu Sep 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-17.fc14
+- New Conflicts: elfutils < 0.149 due to the .gdb_index .debug support.
+
 * Wed Sep 29 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-16.fc14
 - [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
 
