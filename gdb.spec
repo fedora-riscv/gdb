@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?_with_upstream:.upstream}%{dist}
+Release: 18%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1093,6 +1093,9 @@ fi
 %endif
 
 %changelog
+* Wed Oct  6 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-18.fc14
+- Fix false warning: non-absolute filename: <the main exec. file> (BZ 640648).
+
 * Thu Sep 30 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-17.fc14
 - New Conflicts: elfutils < 0.149 due to the .gdb_index .debug support.
 
