@@ -452,7 +452,9 @@ Patch510: gdb-bz592031-siginfo-lost-4of5.patch
 Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 
 # Fix .gdb_index for big-endian hosts (Tom Tromey).
+Patch514: gdb-gdbindex-v1-to-v2.patch
 Patch512: gdb-gdbindex-bigendian.patch
+Patch515: gdb-gdbindex-v2-to-v3.patch
 
 # [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
 Patch513: gdb-bz637770-ifunc-watchpoint-delete.patch
@@ -721,7 +723,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch509 -p1
 %patch510 -p1
 %patch511 -p1
+%patch514 -p1
 %patch512 -p1
+%patch515 -p1
 %patch513 -p1
 
 %patch393 -p1
@@ -1093,6 +1097,9 @@ fi
 %endif
 
 %changelog
+* Tue Oct 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-19.fc14
+- Use .gdb_index v3 to fix excessive resources rqmnts (BZ 640634, Tom Tromey).
+
 * Wed Oct  6 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-18.fc14
 - Fix false warning: non-absolute filename: <the main exec. file> (BZ 640648).
 
