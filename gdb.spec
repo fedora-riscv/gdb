@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{dist}
+Release: 21%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -459,6 +459,12 @@ Patch515: gdb-gdbindex-v2-to-v3.patch
 # [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
 Patch513: gdb-bz637770-ifunc-watchpoint-delete.patch
 
+# Fix python stale error state, also fix its save/restore (BZ 639089).
+Patch516: gdb-python-error-state.patch
+
+# Fix inferior exec of new PIE x86_64 (BZ 638979).
+Patch517: gdb-exec-pie-amd64.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -727,6 +733,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch512 -p1
 %patch515 -p1
 %patch513 -p1
+%patch516 -p1
+%patch517 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1097,6 +1105,10 @@ fi
 %endif
 
 %changelog
+* Tue Oct 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-21.fc14
+- Fix python stale error state, also fix its save/restore (BZ 639089).
+- Fix inferior exec of new PIE x86_64 (BZ 638979).
+
 * Tue Oct 12 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-20.fc14
 - Fixup Release for 20.fc14.
 
