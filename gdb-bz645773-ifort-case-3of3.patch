@@ -1,0 +1,448 @@
+http://sourceware.org/ml/gdb-patches/2010-11/msg00108.html
+Subject: [patch 2/2] iFort compat.: case insensitive symbols (PR 11313)
+
+Hi,
+
+iFort (Intel Fortran compiler) produces DIEs like:
+
+ <1><1dc>: Abbrev Number: 6 (DW_TAG_module)
+    <1e0>   DW_AT_name        : MOD1    
+
+But Fortran is case insensitive, therefore GDB lowercases any user input
+first.  Symbols cannot match.  gfortran always produces lowercased DIE names.
+
+I was told by Jakub Jelinek GCC frontend will never be properly case
+preserving - to output "Mod1" if user stated it in such case in the sources.
+
+Therefore GDB will now lowercase any case insensitive symbol names on their
+read-in from DWARF.
+
+ELF symbol tables are currently not touched - their matching to their CU (and
+thus to their DW_AT_identifier_case / DW_AT_language) is expensive and it does
+not seem to me to be needed for iFort as only the module names are uppercased
+there.
+
+For the iFort compatibility there is also needed:
+	[new testcase] Regression 7.1->7.2 for iFort [Re: [RFA-v2] dwarf debug format: Support DW_AT_variable_parameter attribute]
+	http://sourceware.org/ml/gdb-patches/2010-11/msg00084.html
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora14snapshot-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+gdb/
+2010-11-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 11313 - case insensitive identifiers in DWARF not in lowercase.
+	* dwarf2read.c: Include ctype.h.
+	(struct dwarf2_cu) <case_sensitivity>: New.
+	(struct attribute) <string_is_canonical>: Update the comment.
+	(canonical_case): New declaration.
+	(read_partial_die): Call canonical_case.
+	(canonical_case): New function.
+	(dwarf2_canonicalize_name): Update the function comment.  Call
+	canonical_case, adjust the obstack allocation.
+	(dwarf2_name): Call canonical_case, set DW_STRING_IS_CANONICAL.
+	(init_one_comp_unit, prepare_one_comp_unit): Set cu->case_sensitivity.
+
+gdb/testsuite/
+2010-11-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 11313 - case insensitive identifiers in DWARF not in lowercase.
+	* gdb.dwarf2/dw2-case-insensitive-debug.S: New.
+	* gdb.dwarf2/dw2-case-insensitive.c: New.
+	* gdb.dwarf2/dw2-case-insensitive.exp: New.
+	* gdb.mi/mi-var-child-f.exp (mi_runto): Use lowercase main__.
+
+Index: gdb-7.2/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.2.orig/gdb/dwarf2read.c	2010-11-07 05:38:21.000000000 +0100
++++ gdb-7.2/gdb/dwarf2read.c	2010-11-07 05:38:47.000000000 +0100
+@@ -55,6 +55,7 @@
+ #include "gdb_stat.h"
+ #include "completer.h"
+ #include "top.h"
++#include <ctype.h>
+ 
+ #include <fcntl.h>
+ #include "gdb_string.h"
+@@ -376,6 +377,10 @@ struct dwarf2_cu
+      DIEs for namespaces, we don't need to try to infer them
+      from mangled names.  */
+   unsigned int has_namespace_info : 1;
++
++  /* Are identifiers in this CU case sensitive or should they be lowercased
++     before storing them into GDB symbol tables?  */
++  enum case_sensitivity case_sensitivity;
+ };
+ 
+ /* When using the index (and thus not using psymtabs), each CU has an
+@@ -621,9 +626,10 @@ struct attribute
+     ENUM_BITFIELD(dwarf_attribute) name : 16;
+     ENUM_BITFIELD(dwarf_form) form : 15;
+ 
+-    /* Has DW_STRING already been updated by dwarf2_canonicalize_name?  This
+-       field should be in u.str (existing only for DW_STRING) but it is kept
+-       here for better struct attribute alignment.  */
++    /* Has DW_STRING already been updated by dwarf2_canonicalize_name or
++       canonical_case?  This field should be in u.str (existing only for
++       DW_STRING) but it is kept here for better struct attribute alignment.
++       */
+     unsigned int string_is_canonical : 1;
+ 
+     union
+@@ -1109,6 +1115,9 @@ static gdb_byte *read_full_die (const st
+ 
+ static void process_die (struct die_info *, struct dwarf2_cu *);
+ 
++static char *canonical_case (char *name, struct dwarf2_cu *cu,
++			     struct obstack *obstack);
++
+ static char *dwarf2_canonicalize_name (char *, struct dwarf2_cu *,
+ 				       struct obstack *);
+ 
+@@ -8589,7 +8598,8 @@ read_partial_die (struct partial_die_inf
+ 	    case DW_TAG_enumerator:
+ 	      /* These tags always have simple identifiers already; no need
+ 		 to canonicalize them.  */
+-	      part_die->name = DW_STRING (&attr);
++	      part_die->name = canonical_case (DW_STRING (&attr), cu,
++					       &cu->objfile->objfile_obstack);
+ 	      break;
+ 	    default:
+ 	      part_die->name
+@@ -11043,7 +11053,36 @@ sibling_die (struct die_info *die)
+   return die->sibling;
+ }
+ 
+-/* Get name of a die, return NULL if not found.  */
++/* Convert NAME to the lower case if CU is case_sensitive_off.  Allocate
++   memory on OBSTACK if needed, otherwise return the NAME pointer.  */
++
++static char *
++canonical_case (char *name, struct dwarf2_cu *cu,
++		struct obstack *obstack)
++{
++  char *retval;
++  int i;
++
++  if (cu->case_sensitivity == case_sensitive_on)
++    return name;
++
++  for (i = 0; name[i] != 0; i++)
++    if (tolower (name[i]) != name[i])
++      break;
++  if (name[i] == 0)
++    return name;
++
++  retval = obstack_alloc (obstack, strlen (name) + 1);
++
++  for (i = 0; name[i] != 0; i++)
++    retval[i] = tolower (name[i]);
++  retval[i] = 0;
++
++  return retval;
++}
++
++/* Get name of a die, return NULL if not found.  canonical_case is always
++   already called for the returned string.  */
+ 
+ static char *
+ dwarf2_canonicalize_name (char *name, struct dwarf2_cu *cu,
+@@ -11055,14 +11094,26 @@ dwarf2_canonicalize_name (char *name, st
+ 
+       if (canon_name != NULL)
+ 	{
+-	  if (strcmp (canon_name, name) != 0)
+-	    name = obsavestring (canon_name, strlen (canon_name),
++	  char *cased_name;
++
++	  cased_name = canonical_case (canon_name, cu, obstack);
++
++	  /* Push CASED_NAME on OBSTACK only if it isn't already pushed there
++	     by canonical_case and if it was allocated using xmalloc by
++	     cp_canonicalize_string.  */
++	  if (strcmp (canon_name, cased_name) == 0
++	      && strcmp (canon_name, name) != 0)
++	    name = obsavestring (cased_name, strlen (cased_name),
+ 				 obstack);
++	  else
++	    name = cased_name;
+ 	  xfree (canon_name);
++
++	  return name;
+ 	}
+     }
+ 
+-  return name;
++  return canonical_case (name, cu, obstack);
+ }
+ 
+ /* Get name of a die, return NULL if not found.  */
+@@ -11088,7 +11139,13 @@ dwarf2_name (struct die_info *die, struc
+     case DW_TAG_enumeration_type:
+     case DW_TAG_enumerator:
+       /* These tags always have simple identifiers already; no need
+-	 to canonicalize them.  */
++	 to call dwarf2_canonicalize_name for them.  */
++      if (!DW_STRING_IS_CANONICAL (attr))
++	{
++	  DW_STRING (attr) = canonical_case (DW_STRING (attr), cu,
++					     &cu->objfile->objfile_obstack);
++	  DW_STRING_IS_CANONICAL (attr) = 1;
++	}
+       return DW_STRING (attr);
+ 
+     case DW_TAG_subprogram:
+@@ -13743,6 +13800,7 @@ init_one_comp_unit (struct dwarf2_cu *cu
+   memset (cu, 0, sizeof (*cu));
+   cu->objfile = objfile;
+   obstack_init (&cu->comp_unit_obstack);
++  cu->case_sensitivity = case_sensitive_on;
+ }
+ 
+ /* Initiailize basic fields of dwarf_cu CU according to DIE COMP_UNIT_DIE.  */
+@@ -13758,6 +13816,13 @@ prepare_one_comp_unit (struct dwarf2_cu 
+     set_cu_language (DW_UNSND (attr), cu);
+   else
+     set_cu_language (language_minimal, cu);
++
++  attr = dwarf2_attr (comp_unit_die, DW_AT_identifier_case, cu);
++  if (attr)
++    cu->case_sensitivity = (DW_UNSND (attr) == DW_ID_case_sensitive
++			    ? case_sensitive_on : case_sensitive_off);
++  else
++    cu->case_sensitivity = cu->language_defn->la_case_sensitivity;
+ }
+ 
+ /* Release one cached compilation unit, CU.  We unlink it from the tree
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S	2010-11-07 05:38:35.000000000 +0100
+@@ -0,0 +1,122 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++	.section .debug_info
++.Lcu1_begin:
++	/* CU header */
++	.4byte	.Lcu1_end - .Lcu1_start		/* Length of Compilation Unit */
++.Lcu1_start:
++	.2byte	2				/* DWARF Version */
++	.4byte	.Labbrev1_begin			/* Offset into abbrev section */
++	.byte	4				/* Pointer size */
++
++	/* CU die */
++	.uleb128 2				/* Abbrev: DW_TAG_compile_unit */
++	.ascii	"file1.txt\0"			/* DW_AT_name */
++	.ascii	"GNU C 3.3.3\0"			/* DW_AT_producer */
++	.byte	2				/* DW_AT_language (DW_LANG_C) */
++	.byte	3				/* DW_AT_identifier_case (DW_ID_case_insensitive) */
++	.4byte		FUNC_attr		/* DW_AT_low_pc */
++	.4byte		FUNC_lang 		/* DW_AT_high_pc */
++
++	.uleb128	3			/* Abbrev: DW_TAG_subprogram */
++	.byte		1			/* DW_AT_external */
++	.ascii		"FUNC_attr\0"		/* DW_AT_name */
++	.4byte		FUNC_attr		/* DW_AT_low_pc */
++	.4byte		FUNC_lang 		/* DW_AT_high_pc */
++
++	.byte		0			/* End of children of CU */
++.Lcu1_end:
++
++.Lcu2_begin:
++	/* CU header */
++	.4byte	.Lcu2_end - .Lcu2_start		/* Length of Compilation Unit */
++.Lcu2_start:
++	.2byte	2				/* DWARF Version */
++	.4byte	.Labbrev1_begin			/* Offset into abbrev section */
++	.byte	4				/* Pointer size */
++
++	/* CU die */
++	.uleb128 1				/* Abbrev: DW_TAG_compile_unit */
++	.ascii	"file1.txt\0"			/* DW_AT_name */
++	.ascii	"GNU C 3.3.3\0"			/* DW_AT_producer */
++	.byte	8				/* DW_AT_language (DW_LANG_Fortran90) */
++	.4byte		FUNC_lang		/* DW_AT_low_pc */
++	.4byte		main			/* DW_AT_high_pc */
++
++	.uleb128	3			/* Abbrev: DW_TAG_subprogram */
++	.byte		1			/* DW_AT_external */
++	.ascii		"FUNC_lang\0"		/* DW_AT_name */
++	.4byte		FUNC_lang		/* DW_AT_low_pc */
++	.4byte		main			/* DW_AT_high_pc */
++
++	.byte		0			/* End of children of CU */
++.Lcu2_end:
++
++/* Abbrev table */
++	.section .debug_abbrev
++.Labbrev1_begin:
++	.uleb128	1			/* Abbrev code */
++	.uleb128	0x11			/* DW_TAG_compile_unit */
++	.byte		1			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x25			/* DW_AT_producer */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x13			/* DW_AT_language */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	2			/* Abbrev code */
++	.uleb128	0x11			/* DW_TAG_compile_unit */
++	.byte		1			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x25			/* DW_AT_producer */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x13			/* DW_AT_language */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x42			/* DW_AT_identifier_case */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	3			/* Abbrev code */
++	.uleb128	0x2e			/* DW_TAG_subprogram */
++	.byte		0			/* has_children */
++	.uleb128	0x3f			/* DW_AT_external */
++	.uleb128	0xc			/* DW_FORM_flag */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c	2010-11-07 05:38:35.000000000 +0100
+@@ -0,0 +1,36 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2004, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* This one is DW_LANG_C but it uses DW_ID_case_insensitive.  */
++
++void
++FUNC_attr (void)
++{
++}
++
++/* This one has no DW_AT_identifier_case but it is DW_LANG_Fortran90.  */
++
++void
++FUNC_lang (void)
++{
++}
++
++int
++main()
++{
++  return 0;
++}
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp	2010-11-07 05:38:35.000000000 +0100
+@@ -0,0 +1,41 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This test can only be run on targets which support DWARF-2 and use gas.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0
++}
++
++set testfile "dw2-case-insensitive"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} [list ${testfile}.c ${testfile}-debug.S] {nodebug}] } {
++    return -1
++}
++
++gdb_test_no_output "set language fortran"
++
++if {[gdb_breakpoint "fuNC_attr"] == 1} {
++    pass "setting breakpoint at fuNC_attr"
++}
++
++if {[gdb_breakpoint "fuNC_lang"] == 1} {
++    pass "setting breakpoint at fuNC_lang"
++}
+Index: gdb-7.2/gdb/testsuite/gdb.mi/mi-var-child-f.exp
+===================================================================
+--- gdb-7.2.orig/gdb/testsuite/gdb.mi/mi-var-child-f.exp	2010-01-01 08:32:03.000000000 +0100
++++ gdb-7.2/gdb/testsuite/gdb.mi/mi-var-child-f.exp	2010-11-07 05:38:35.000000000 +0100
+@@ -36,7 +36,7 @@ if {[gdb_compile "${srcdir}/${subdir}/${
+ mi_gdb_reinitialize_dir $srcdir/$subdir
+ mi_gdb_load ${binfile}
+ 
+-mi_runto MAIN__
++mi_runto main__
+ 
+ mi_gdb_test "-var-create array * array" \
+     "\\^done,name=\"array\",numchild=\"3\",value=\".*\",type=\"integer \\(2,-1:1\\)\"" \

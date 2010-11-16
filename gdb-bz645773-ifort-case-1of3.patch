@@ -1,0 +1,313 @@
+http://sourceware.org/ml/gdb-patches/2010-11/msg00084.html
+Subject: [new testcase] Regression 7.1->7.2 for iFort  [Re: [RFA-v2] dwarf debug format: Support DW_AT_variable_parameter attribute]
+
+On Fri, 21 May 2010 22:45:35 +0200, Pierre Muller wrote:
+>   Thanks, I committed the patch.
+
+commit 570d5d01de35effada277a69552c0903a4928241
+Author: Pierre Muller <muller@ics.u-strasbg.fr>
+Date:   Fri May 21 20:45:18 2010 +0000
+
+	* dwarf2read.c (new_symbol): Handle DW_AT_variable_parameter
+	attribute.
+
+
+Please revert this patch.
+
+>From the DWARF-4 description of DW_AT_variable_parameter I do not think it
+changes the data structures meaning in any way.  It just states which data can
+be modified by whom.  I do not think this is useful for GDB in any way.
+
+
+> > I think it would be improved by a test case, but that is up to you.
+> 
+>   This test would be pascal specific anyhow,
+
+I believe the Pascal compiler should generate different debug info.  For the
+`var' keyword you can either (a) use DW_TAG_reference_type and point
+DW_AT_location at the pointer or (b) use DW_OP_deref (as iFort does) on the
+passed pointer and point DW_AT_location at the value itself.
+DW_AT_variable_parameter would be true only for the (a) choice.
+
+1	  subroutine f (i)
+2	  integer i
+3	  i = 2
+4	  end
+5	  program varparam
+6	  integer m
+7	  m = 1
+8	  call f (m)
+9	  write(*,*) m
+10	  end
+
+for iFort 11.1 20100806 it regressed this code, GDB-7.1 displayed:
+
+Breakpoint 1, f (i=1) at varparam.f90:3
+3	  i = 2
+(gdb) p i
+$1 = 1
+
+while GDB-7.2 displays:
+
+Breakpoint 2, f (i=@0x1) at varparam.f90:3
+3	  i = 2
+(gdb) p i
+$1 = (REF TO -> ( INTEGER(4) )) @0x1: <error reading variable>
+
+(note that `0x1' GDB considers as an address here)
+
+
+
+A new testcase for the iFort usage case is attached.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora14snapshot-linux-gnu.
+
+I will then check-in the testcase or you can or so.
+
+
+Regards,
+Jan
+
+
+gdb/
+2010-11-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2010-05-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+	* dwarf2read.c (new_symbol): Handle DW_AT_variable_parameter
+	attribute.
+
+gdb/testsuite/
+2010-11-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dw2-ifort-parameter-debug.S: New file.
+	* dw2-ifort-parameter.c: New file.
+	* dw2-ifort-parameter.exp: New file.
+
+Index: gdb-7.2/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.2.orig/gdb/dwarf2read.c	2010-11-07 05:24:01.000000000 +0100
++++ gdb-7.2/gdb/dwarf2read.c	2010-11-07 05:36:34.000000000 +0100
+@@ -10474,14 +10474,6 @@ new_symbol (struct die_info *die, struct
+ 	    {
+ 	      dwarf2_const_value (attr, sym, cu);
+ 	    }
+-	  attr = dwarf2_attr (die, DW_AT_variable_parameter, cu);
+-	  if (attr && DW_UNSND (attr))
+-	    {
+-	      struct type *ref_type;
+-
+-	      ref_type = lookup_reference_type (SYMBOL_TYPE (sym));
+-	      SYMBOL_TYPE (sym) = ref_type;
+-	    }
+ 
+ 	  add_symbol_to_list (sym, cu->list_in_scope);
+ 	  break;
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter-debug.S
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter-debug.S	2010-11-07 05:36:18.000000000 +0100
+@@ -0,0 +1,122 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++	.section .debug_info
++.Lcu1_begin:
++	/* CU header */
++	.4byte	.Lcu1_end - .Lcu1_start		/* Length of Compilation Unit */
++.Lcu1_start:
++	.2byte	2				/* DWARF Version */
++	.4byte	.Labbrev1_begin			/* Offset into abbrev section */
++	.byte	4				/* Pointer size */
++
++	/* CU die */
++	.uleb128 1				/* Abbrev: DW_TAG_compile_unit */
++	.ascii	"file1.txt\0"			/* DW_AT_name */
++	.ascii	"GNU C 3.3.3\0"			/* DW_AT_producer */
++	.byte	1				/* DW_AT_language (C) */
++	.4byte	func				/* DW_AT_low_pc */
++	.4byte	main				/* DW_AT_high_pc */
++
++	.uleb128	2			/* Abbrev: DW_TAG_subprogram */
++	.byte		1			/* DW_AT_external */
++	.ascii		"func\0"		/* DW_AT_name */
++	.4byte		func			/* DW_AT_low_pc */
++	.4byte		main			/* DW_AT_high_pc */
++
++	.uleb128	3			/* Abbrev: DW_TAG_formal_parameter */
++	.ascii		"param\0"		/* DW_AT_name */
++	.byte		1			/* DW_AT_variable_parameter */
++	.4byte		.Ltype_int - .Lcu1_begin	/* DW_AT_type */
++	.byte		2f - 1f			/* DW_AT_location */
++1:	.byte		3			/*   DW_OP_addr */
++	.4byte		ptr			/*   <addr> */
++	.byte		0x6			/*   DW_OP_deref */
++2:
++
++	.byte		0			/* End of children of func */
++
++.Ltype_int:
++	.uleb128	4			/* Abbrev: DW_TAG_base_type */
++	.ascii		"int\0"			/* DW_AT_name */
++	.byte		4			/* DW_AT_byte_size */
++	.byte		5			/* DW_AT_encoding */
++
++	.byte		0			/* End of children of CU */
++.Lcu1_end:
++
++/* Abbrev table */
++	.section .debug_abbrev
++.Labbrev1_begin:
++	.uleb128	1			/* Abbrev code */
++	.uleb128	0x11			/* DW_TAG_compile_unit */
++	.byte		1			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x25			/* DW_AT_producer */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x13			/* DW_AT_language */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	2			/* Abbrev code */
++	.uleb128	0x2e			/* DW_TAG_subprogram */
++	.byte		1			/* has_children */
++	.uleb128	0x3f			/* DW_AT_external */
++	.uleb128	0xc			/* DW_FORM_flag */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	3			/* Abbrev code */
++	.uleb128	0x05			/* DW_TAG_formal_parameter */
++	.byte		0			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x4b			/* DW_AT_variable_parameter */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x2			/* DW_AT_location */
++	.uleb128	0xa			/* DW_FORM_block1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.uleb128	4			/* Abbrev code */
++	.uleb128	0x24			/* DW_TAG_base_type */
++	.byte		0			/* has_children */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0xb			/* DW_AT_byte_size */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x3e			/* DW_AT_encoding */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter.c	2010-11-07 05:36:18.000000000 +0100
+@@ -0,0 +1,31 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int value = 0xdeadf00d;
++int *ptr = &value;
++
++void
++func (void)
++{
++}
++
++int
++main (void)
++{
++  func ();
++  return 0;
++}
+Index: gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2/gdb/testsuite/gdb.dwarf2/dw2-ifort-parameter.exp	2010-11-07 05:36:18.000000000 +0100
+@@ -0,0 +1,40 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Verify DW_AT_variable_parameter does not modify the data structures meaning
++# for GDB, as being used by iFort.
++
++# This test can only be run on targets which support DWARF-2 and use gas.
++# For now pick a sampling of likely targets.
++if {![istarget *-*-linux*]
++    && ![istarget *-*-gnu*]
++    && ![istarget *-*-elf*]
++    && ![istarget *-*-openbsd*]
++    && ![istarget arm-*-eabi*]
++    && ![istarget powerpc-*-eabi*]} {
++    return 0
++}
++
++set testfile "dw2-ifort-parameter"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} [list ${testfile}.c ${testfile}-debug.S] {nodebug}] } {
++    return -1
++}
++
++if ![runto func] {
++    return -1
++}
++
++gdb_test "p/x param" " = 0xdeadf00d"
