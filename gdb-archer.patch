@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 785d5ff442123643a925f1e5f54c3306929d7d91
+commit e77402373d43ec23661a16a134c94e6112b9d030
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
@@ -184,7 +184,7 @@ index 0348bf4..f01d0ee 100644
  
  /* Return the innermost stack frame executing inside of BLOCK,
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 6b55313..5a1659c 100644
+index 6b55313..30626a6 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -62,6 +62,7 @@
@@ -384,7 +384,7 @@ index 6b55313..5a1659c 100644
  	    b->related_breakpoint->watchpoint_triggered = watch_triggered_yes;
  	}
      }
-@@ -4108,14 +4137,27 @@ bpstat_stop_status (struct address_space *aspace,
+@@ -4108,12 +4137,26 @@ bpstat_stop_status (struct address_space *aspace,
  
    removed_any = 0;
  
@@ -397,9 +397,8 @@ index 6b55313..5a1659c 100644
        if (!bs->stop)
  	continue;
  
-       bpstat_check_watchpoint (bs);
-       if (!bs->stop)
--	continue;
+-      bpstat_check_watchpoint (bs);
++      if (!bpstat_check_watchpoint (bs))
 +	{
 +	  /* Ensure bpstat_explains_signal stays false if this BL could not be
 +	     the cause of this trap.  */
@@ -411,10 +410,10 @@ index 6b55313..5a1659c 100644
 +	  xfree (bs);
 +	  continue;
 +	}
+       if (!bs->stop)
+ 	continue;
  
-       b = bs->breakpoint_at;
- 
-@@ -4205,7 +4247,7 @@ handle_jit_event (void)
+@@ -4205,7 +4248,7 @@ handle_jit_event (void)
  /* Decide what infrun needs to do with this bpstat.  */
  
  struct bpstat_what
@@ -423,7 +422,7 @@ index 6b55313..5a1659c 100644
  {
    struct bpstat_what retval;
    /* We need to defer calling `solib_add', as adding new symbols
-@@ -4213,11 +4255,12 @@ bpstat_what (bpstat bs)
+@@ -4213,11 +4256,12 @@ bpstat_what (bpstat bs)
       and hence may clear unprocessed entries in the BS chain.  */
    int shlib_event = 0;
    int jit_event = 0;
@@ -437,7 +436,7 @@ index 6b55313..5a1659c 100644
      {
        /* Extract this BS's action.  After processing each BS, we check
  	 if its action overrides all we've seem so far.  */
-@@ -4342,6 +4385,20 @@ bpstat_what (bpstat bs)
+@@ -4342,6 +4386,20 @@ bpstat_what (bpstat bs)
  	     out already.  */
  	  internal_error (__FILE__, __LINE__,
  			  _("bpstat_what: tracepoint encountered"));
@@ -458,7 +457,7 @@ index 6b55313..5a1659c 100644
  	default:
  	  internal_error (__FILE__, __LINE__,
  			  _("bpstat_what: unhandled bptype %d"), (int) bptype);
-@@ -4379,6 +4436,21 @@ bpstat_what (bpstat bs)
+@@ -4379,6 +4437,21 @@ bpstat_what (bpstat bs)
        handle_jit_event ();
      }
  
@@ -480,7 +479,7 @@ index 6b55313..5a1659c 100644
    return retval;
  }
  
-@@ -4497,6 +4569,8 @@ bptype_string (enum bptype type)
+@@ -4497,6 +4570,8 @@ bptype_string (enum bptype type)
      {bp_fast_tracepoint, "fast tracepoint"},
      {bp_static_tracepoint, "static tracepoint"},
      {bp_jit_event, "jit events"},
@@ -489,7 +488,7 @@ index 6b55313..5a1659c 100644
    };
  
    if (((int) type >= (sizeof (bptypes) / sizeof (bptypes[0])))
-@@ -4643,6 +4717,8 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4643,6 +4718,8 @@ print_one_breakpoint_location (struct breakpoint *b,
        case bp_fast_tracepoint:
        case bp_static_tracepoint:
        case bp_jit_event:
@@ -498,7 +497,7 @@ index 6b55313..5a1659c 100644
  	if (opts.addressprint)
  	  {
  	    annotate_field (4);
-@@ -4923,7 +4999,8 @@ user_settable_breakpoint (const struct breakpoint *b)
+@@ -4923,7 +5000,8 @@ user_settable_breakpoint (const struct breakpoint *b)
  	  || b->type == bp_catchpoint
  	  || b->type == bp_hardware_breakpoint
  	  || is_tracepoint (b)
@@ -508,7 +507,7 @@ index 6b55313..5a1659c 100644
  }
  	
  /* Print information on user settable breakpoint (watchpoint, etc)
-@@ -5389,6 +5466,8 @@ allocate_bp_location (struct breakpoint *bpt)
+@@ -5389,6 +5467,8 @@ allocate_bp_location (struct breakpoint *bpt)
      case bp_jit_event:
      case bp_longjmp_master:
      case bp_std_terminate_master:
@@ -517,7 +516,7 @@ index 6b55313..5a1659c 100644
        loc->loc_type = bp_loc_software_breakpoint;
        break;
      case bp_hardware_breakpoint:
-@@ -5477,6 +5556,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
+@@ -5477,6 +5557,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
    b->ops = NULL;
    b->condition_not_parsed = 0;
    b->py_bp_object = NULL;
@@ -525,7 +524,7 @@ index 6b55313..5a1659c 100644
  
    /* Add this breakpoint to the end of the chain
       so that a list of breakpoints will come out in order
-@@ -5496,7 +5576,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
+@@ -5496,7 +5577,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
  
  /* Initialize loc->function_name.  */
  static void
@@ -534,7 +533,7 @@ index 6b55313..5a1659c 100644
  {
    gdb_assert (loc->owner != NULL);
  
-@@ -5504,8 +5584,29 @@ set_breakpoint_location_function (struct bp_location *loc)
+@@ -5504,8 +5585,29 @@ set_breakpoint_location_function (struct bp_location *loc)
        || loc->owner->type == bp_hardware_breakpoint
        || is_tracepoint (loc->owner))
      {
@@ -566,7 +565,7 @@ index 6b55313..5a1659c 100644
        if (loc->function_name)
  	loc->function_name = xstrdup (loc->function_name);
      }
-@@ -5578,7 +5679,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
+@@ -5578,7 +5680,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
    b->loc->section = sal.section;
    b->line_number = sal.line;
  
@@ -576,7 +575,7 @@ index 6b55313..5a1659c 100644
  
    breakpoints_changed ();
  
-@@ -6652,7 +6754,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
+@@ -6652,7 +6755,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
  
    copy = set_raw_breakpoint_without_location (orig->gdbarch, orig->type);
    copy->loc = allocate_bp_location (copy);
@@ -585,7 +584,7 @@ index 6b55313..5a1659c 100644
  
    copy->loc->gdbarch = orig->loc->gdbarch;
    copy->loc->requested_address = orig->loc->requested_address;
-@@ -6751,6 +6853,7 @@ mention (struct breakpoint *b)
+@@ -6751,6 +6854,7 @@ mention (struct breakpoint *b)
  	do_cleanups (ui_out_chain);
  	break;
        case bp_breakpoint:
@@ -593,7 +592,7 @@ index 6b55313..5a1659c 100644
  	if (ui_out_is_mi_like_p (uiout))
  	  {
  	    say_where = 0;
-@@ -6761,6 +6864,8 @@ mention (struct breakpoint *b)
+@@ -6761,6 +6865,8 @@ mention (struct breakpoint *b)
  	else
  	  printf_filtered (_("Breakpoint"));
  	printf_filtered (_(" %d"), b->number);
@@ -602,7 +601,7 @@ index 6b55313..5a1659c 100644
  	say_where = 1;
  	break;
        case bp_hardware_breakpoint:
-@@ -6817,6 +6922,7 @@ mention (struct breakpoint *b)
+@@ -6817,6 +6923,7 @@ mention (struct breakpoint *b)
        case bp_jit_event:
        case bp_longjmp_master:
        case bp_std_terminate_master:
@@ -610,7 +609,7 @@ index 6b55313..5a1659c 100644
  	break;
        }
  
-@@ -6877,7 +6983,8 @@ add_location_to_breakpoint (struct breakpoint *b,
+@@ -6877,7 +6984,8 @@ add_location_to_breakpoint (struct breakpoint *b,
    gdb_assert (loc->pspace != NULL);
    loc->section = sal->section;
  
@@ -620,7 +619,7 @@ index 6b55313..5a1659c 100644
    return loc;
  }
  
-@@ -9712,12 +9819,22 @@ delete_breakpoint (struct breakpoint *bpt)
+@@ -9712,12 +9820,22 @@ delete_breakpoint (struct breakpoint *bpt)
  
    /* At least avoid this stale reference until the reference counting of
       breakpoints gets resolved.  */
@@ -648,7 +647,7 @@ index 6b55313..5a1659c 100644
      }
  
    observer_notify_breakpoint_deleted (bpt->number);
-@@ -10049,6 +10166,9 @@ update_breakpoint_locations (struct breakpoint *b,
+@@ -10049,6 +10167,9 @@ update_breakpoint_locations (struct breakpoint *b,
      return;
  
    b->loc = NULL;
@@ -658,7 +657,7 @@ index 6b55313..5a1659c 100644
  
    for (i = 0; i < sals.nelts; ++i)
      {
-@@ -10075,11 +10195,7 @@ update_breakpoint_locations (struct breakpoint *b,
+@@ -10075,11 +10196,7 @@ update_breakpoint_locations (struct breakpoint *b,
  	    }
  	}
  
@@ -671,7 +670,7 @@ index 6b55313..5a1659c 100644
  	b->source_file = xstrdup (sals.sals[i].symtab->filename);
  
        if (b->line_number == 0)
-@@ -10161,6 +10277,7 @@ breakpoint_re_set_one (void *bint)
+@@ -10161,6 +10278,7 @@ breakpoint_re_set_one (void *bint)
      case bp_tracepoint:
      case bp_fast_tracepoint:
      case bp_static_tracepoint:
@@ -679,7 +678,7 @@ index 6b55313..5a1659c 100644
        /* Do not attempt to re-set breakpoints disabled during startup.  */
        if (b->enable_state == bp_startup_disabled)
  	return 0;
-@@ -10325,6 +10442,7 @@ breakpoint_re_set_one (void *bint)
+@@ -10325,6 +10443,7 @@ breakpoint_re_set_one (void *bint)
      case bp_longjmp:
      case bp_longjmp_resume:
      case bp_jit_event:
@@ -687,7 +686,7 @@ index 6b55313..5a1659c 100644
        break;
      }
  
-@@ -10496,11 +10614,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
+@@ -10496,11 +10615,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
  	  ALL_BREAKPOINTS_SAFE (b, tmp)
  	    if (b->number == num)
  	      {
@@ -717,7 +716,7 @@ index 6b55313..5a1659c 100644
  		break;
  	      }
  	  if (match == 0)
-@@ -11604,6 +11736,22 @@ all_tracepoints ()
+@@ -11604,6 +11737,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -740,7 +739,7 @@ index 6b55313..5a1659c 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak commands.
     It is defined as a macro to prevent duplication.
-@@ -11673,6 +11821,107 @@ save_command (char *arg, int from_tty)
+@@ -11673,6 +11822,107 @@ save_command (char *arg, int from_tty)
    help_list (save_cmdlist, "save ", -1, gdb_stdout);
  }
  
@@ -848,7 +847,7 @@ index 6b55313..5a1659c 100644
  struct breakpoint *
  iterate_over_breakpoints (int (*callback) (struct breakpoint *, void *),
  			  void *data)
-@@ -12222,4 +12471,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -12222,4 +12472,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
