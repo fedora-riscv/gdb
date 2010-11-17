@@ -23,18 +23,19 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2
+Version: 7.2.50.20101117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{dist}
+Release: 1%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
+# ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -276,8 +277,8 @@ Patch229: gdb-6.3-bz140532-ppc-unwinding-test.patch
 Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
-#=drop: Just backports.
-Patch232: gdb-upstream.patch
+#Xdrop: Just backports.
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -290,10 +291,6 @@ Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 # Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
 #=push
 Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
-
-# Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
-#=fedoratest: Drop the obsoleted gdb_gcore.sh change.
-Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 
 # Notify user of a child forked process being detached (BZ 235197).
 #=push: This is more about discussion if/what should be printed.
@@ -357,8 +354,6 @@ Patch289: gdb-6.5-ia64-libunwind-leak-test.patch
 Patch290: gdb-6.5-missed-trap-on-step-test.patch
 
 # Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
-#=maybepush
-Patch293: gdb-6.7-bz426600-DW_TAG_interface_type-fix.patch
 #=fedoratest
 Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
 
@@ -419,10 +414,6 @@ Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 #=push: Useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
 Patch331: gdb-6.8-quit-never-aborts.patch
 
-# Support DW_TAG_constant for Fortran in recent Fedora/RH GCCs.
-#=push
-Patch332: gdb-6.8-fortran-tag-constant.patch
-
 # Fix attaching to stopped processes and/or pending signals.
 #=push+work
 Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
@@ -435,19 +426,14 @@ Patch343: gdb-6.8-watchpoint-conditionals-test.patch
 #=fedoratest
 Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
-# The merged branch `archer' of: http://sourceware.org/gdb/wiki/ProjectArcher
+# The merged branch `archer-jankratochvil-fedora15' of:
+# http://sourceware.org/gdb/wiki/ProjectArcher
 #=push
 #archer-jankratochvil-vla
 #=push
 #archer-jankratochvil-watchpoint3
 #=push
 #archer-jankratochvil-ifunc
-#=push
-#archer-pmuldoon-next-over-throw2
-#=maybepush
-#archer-tromey-python
-#=maybepush
-#archer-tromey-optional-psymtab
 Patch349: gdb-archer.patch
 #=maybepush
 Patch420: gdb-archer-ada.patch
@@ -512,12 +498,6 @@ Patch412: gdb-unused-revert.patch
 #=push+work: It should be fixed properly instead.
 Patch417: gdb-bz541866-rwatch-before-run.patch
 
-# Fix crash on C++ types in some debug info files (BZ 575292, Keith Seitz).
-# Temporarily workaround the crash of BZ 575292 as there was now BZ 585445.
-# Re-enable the BZ 575292 and BZ 585445 C++ fix using an updated patch.
-#=maybepush: Not sure if all the parts are upstream.
-Patch451: gdb-bz575292-delayed-physname.patch
-
 # Fix crash when using GNU IFUNC call from breakpoint condition.
 #=drop: After archer-jankratochvil-ifunc gets in this one gets obsoleted.
 Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
@@ -525,10 +505,6 @@ Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
 # Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
 #=push+work: Currently it is still not fully safe.
 Patch459: gdb-moribund-utrace-workaround.patch
-
-# Remove core file when starting a process (BZ 594560).
-#=maybepush
-Patch461: gdb-bz594560-core-vs-process.patch
 
 # Fix follow-exec for C++ programs (bugreported by Martin Stransky).
 #=fedoratest
@@ -544,17 +520,9 @@ Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
 #=push+work: There are some outstanding issues, check the mails.
 Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 
-# Fix prelinked executables with sepdebug and copy relocations (BZ 614659).
-#=drop: Upstreamed.
-Patch489: gdb-bz614659-prelink-dynbss.patch
-
 # Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
 #=drop: Re-check against the upstream version.
 Patch491: gdb-gdb-add-index-script.patch
-
-# Fix gcore from very small terminal windows (BZ 555076).
-#=drop: Upstreamed.
-Patch493: gdb-bz555076-gcore-small-height.patch
 
 # Out of memory is just an error, not fatal (uninitialized VLS vars, BZ 568248).
 #=drop+work: Inferior objects should be read in parts, then this patch gets obsoleted.
@@ -564,76 +532,23 @@ Patch496: gdb-bz568248-oom-is-error.patch
 #=push
 Patch497: gdb-false-gcc-warning.patch
 
-# Do not crash on broken separate debuginfo due to old elfutils (BZ 631575).
-#=drop: Upstreamed.
-Patch499: gdb-bz631575-gdb-index-nobits.patch
-
-# Fix symbol lookup misses methods of current class (BZ 631158, Sami Wagiaalla).
-#=maybepush
-Patch500: gdb-bz631158-cxx-this-lookup.patch
-
-# Fix Ada regression when any .gdb_index library is present.
-#=drop: Upstreamed.
-Patch501: gdb-gdbindex-ada-regression.patch
-
-# python: load *-gdb.py for shlibs during attach (BZ 634660).
-#=drop: Upstreamed.
-Patch502: gdb-bz634660-gdbpy-load-on-attach.patch
-
-# Fix double free crash during overload resolution (PR 12028, Sami Wagiaalla).
-#=drop: Upstreamed.
-Patch503: gdb-pr12028-double-free.patch
-
 # Fix gcore writer for -Wl,-z,relro (PR corefiles/11804).
 #=push: There is different patch on gdb-patches, waiting now for resolution in kernel.
 Patch504: gdb-bz623749-gcore-relro.patch
 
-# Fix infinite loop crash on self-referencing class (BZ 627432).
-#=drop: Upstreamed.
-Patch506: gdb-bz627432-loop-static-self-class.patch
-
 # Fix lost siginfo_t in linux-nat (BZ 592031).
-#=drop: Upstreamed.
-Patch507: gdb-bz592031-siginfo-lost-1of5.patch
-#=drop: Upstreamed.
-Patch508: gdb-bz592031-siginfo-lost-2of5.patch
-#=drop: Upstreamed.
-Patch509: gdb-bz592031-siginfo-lost-3of5.patch
 #=push
 Patch510: gdb-bz592031-siginfo-lost-4of5.patch
 #=push
 Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 
-# Fix .gdb_index for big-endian hosts (Tom Tromey).
-#=drop: Upstreamed.
-Patch514: gdb-gdbindex-v1-to-v2.patch
-#=drop: Upstreamed.
-Patch512: gdb-gdbindex-bigendian.patch
-#=drop: Upstreamed.
-Patch515: gdb-gdbindex-v2-to-v3.patch
-
-# [ifunc] Fix crash on deleting watchpoint of an autovariable (BZ 637770).
-#=drop: A part of archer-jankratochvil-ifunc work.
-Patch513: gdb-bz637770-ifunc-watchpoint-delete.patch
-
-# Fix python stale error state, also fix its save/restore (BZ 639089).
-#=drop: Just a backport.
-Patch518: gdb-testsuite-lib-python.patch
-#=drop: Upstreamed.
-Patch516: gdb-python-error-state.patch
-
-# Fix inferior exec of new PIE x86_64 (BZ 638979).
-#=drop: Upstreamed.
-Patch517: gdb-exec-pie-amd64.patch
-
 # Fix crash on CTRL-C while reading an ELF symbol file (BZ 642879).
 #=push
 Patch520: gdb-bz642879-elfread-sigint-stale.patch
 
-# iFort compat. - case insensitive DWARF not in lowercase (BZ 645773).
-Patch522: gdb-bz645773-ifort-case-1of3.patch
-Patch523: gdb-bz645773-ifort-case-2of3.patch
-Patch524: gdb-bz645773-ifort-case-3of3.patch
+# Fix next/finish/etc -vs- exceptions (Tom Tromey).
+#=push
+Patch525: gdb-next-over-throw.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -769,7 +684,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch420 -p1
 %patch1 -p1
@@ -820,7 +735,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch234 -p1
 %patch235 -p1
 %patch241 -p1
-%patch245 -p1
 %patch247 -p1
 %patch254 -p1
 %patch258 -p1
@@ -837,7 +751,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch287 -p1
 %patch289 -p1
 %patch290 -p1
-%patch293 -p1
 %patch294 -p1
 %patch296 -p1
 %patch298 -p1
@@ -853,7 +766,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
-%patch332 -p1
 %patch337 -p1
 %patch343 -p1
 %patch348 -p1
@@ -872,10 +784,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch408 -p1
 %patch412 -p1
 %patch417 -p1
-%patch451 -p1
 %patch454 -p1
 %patch459 -p1
-%patch461 -p1
 %patch470 -p1
 %patch475 -p1
 %patch486 -p1
@@ -883,34 +793,14 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 #patch487 -p1
 %patch415 -p1
 %patch519 -p1
-%patch489 -p1
 %patch491 -p1
-%patch493 -p1
 %patch496 -p1
 %patch497 -p1
-%patch499 -p1
-%patch500 -p1
-%patch501 -p1
-%patch502 -p1
-%patch503 -p1
 %patch504 -p1
-%patch506 -p1
-%patch507 -p1
-%patch508 -p1
-%patch509 -p1
 %patch510 -p1
 %patch511 -p1
-%patch514 -p1
-%patch512 -p1
-%patch515 -p1
-%patch513 -p1
-%patch516 -p1
-%patch517 -p1
-%patch518 -p1
 %patch520 -p1
-%patch522 -p1
-%patch523 -p1
-%patch524 -p1
+%patch525 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1281,6 +1171,9 @@ fi
 %endif
 
 %changelog
+* Wed Nov 17 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
+- Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
+
 * Sun Nov  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-25.fc14
 - iFort compat. - case insensitive DWARF not in lowercase (BZ 645773).
 

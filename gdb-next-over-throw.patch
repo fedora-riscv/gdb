@@ -1,0 +1,1283 @@
+http://sourceware.org/ml/gdb-patches/2010-10/msg00109.html
+Subject: RFC: next/finish/etc -vs- exceptions
+
+This is a refresh of:
+
+    http://www.sourceware.org/ml/gdb-patches/2009-05/msg00635.html
+
+(The thread continues in the following month.)
+
+I rebased the patch and addressed Pedro's comments.
+
+I did not add the user notification that Doug asked for.
+
+This version does work if an exception is thrown from a signal handler.
+The included Java test case checks that (on most platforms).
+
+Built and regtested on x86-64 (compile farm).
+Tests for the new functionality are included.
+
+I'd appreciate comments.  I don't want to commit this without a review,
+as my experience is that I usually err when touching breakpoints or
+infrun.
+
+If you want to try this yourself, you will need a new-enough libgcc, one
+that includes the necessary debugging hook.
+
+Tom
+
+2010-10-06  Tom Tromey  <tromey@redhat.com>
+
+	* infrun.c (handle_inferior_event): Handle exception breakpoints.
+	(handle_inferior_event): Likewise.
+	(insert_exception_resume_breakpoint): New function.
+	(check_exception_resume): Likewise.
+	* inferior.h (delete_longjmp_breakpoint_cleanup): Declare.
+	* infcmd.c (delete_longjmp_breakpoint_cleanup): No longer static.
+	(step_1): Set thread's initiating frame.
+	(until_next_continuation): New function.
+	(until_next_command): Support exception breakpoints.
+	(finish_command_continuation): Delete longjmp breakpoint.
+	(finish_forward): Support exception breakpoints.
+	* gdbthread.h (struct thread_info) <initiating_frame>: New field.
+	* breakpoint.h (enum bptype) <bp_exception, bp_exception_resume,
+	bp_exception_master>: New constants.
+	(struct bpstat_what) <is_longjmp>: New field.
+	* breakpoint.c (create_exception_master_breakpoint): New function.
+	(update_breakpoints_after_exec): Handle bp_exception_master.  Call
+	create_exception_master_breakpoint.
+	(print_it_typical): Handle bp_exception_master, bp_exception.
+	(bpstat_stop_status): Handle bp_exception_master.
+	(bpstat_what): Handle bp_exception_master, bp_exception,
+	bp_exception_resume.
+	(bptype_string): Likewise.
+	(print_one_breakpoint_location): Likewise.
+	(allocate_bp_location): Likewise.
+	(set_longjmp_breakpoint): Handle exception breakpoints.
+	(delete_longjmp_breakpoint): Likewise.
+	(mention): Likewise.
+	(struct until_break_command_continuation_args) <thread_num>: New
+	field.
+	(until_break_command_continuation): Call
+	delete_longjmp_breakpoint.
+	(until_break_command): Support exception breakpoints.
+	(delete_command): Likewise.
+	(breakpoint_re_set_one): Likewise.
+	(breakpoint_re_set): Likewise.
+
+2010-10-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.java/jnpe.java: New file.
+	* gdb.java/jnpe.exp: New file.
+	* gdb.cp/gdb9593.exp: New file.
+	* gdb.cp/gdb9593.cc: New file.
+
+Index: gdb-7.2.50.20101116/gdb/breakpoint.c
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/breakpoint.c	2010-11-17 02:38:59.000000000 +0100
++++ gdb-7.2.50.20101116/gdb/breakpoint.c	2010-11-17 02:41:53.000000000 +0100
+@@ -2232,6 +2232,33 @@ create_std_terminate_master_breakpoint (
+   do_cleanups (old_chain);
+ }
+ 
++/* Install a master breakpoint on the unwinder's debug hook.  */
++
++void
++create_exception_master_breakpoint (void)
++{
++  struct objfile *objfile;
++
++  ALL_OBJFILES (objfile)
++    {
++      struct minimal_symbol *debug_hook;
++
++      debug_hook = lookup_minimal_symbol_text ("_Unwind_DebugHook", objfile);
++      if (debug_hook != NULL)
++	{
++	  struct breakpoint *b;
++
++	  b = create_internal_breakpoint (get_objfile_arch (objfile),
++					  SYMBOL_VALUE_ADDRESS (debug_hook),
++					  bp_exception_master);
++	  b->addr_string = xstrdup ("_Unwind_DebugHook");
++	  b->enable_state = bp_disabled;
++	}
++    }
++
++  update_global_location_list (1);
++}
++
+ void
+ update_breakpoints_after_exec (void)
+ {
+@@ -2273,7 +2300,8 @@ update_breakpoints_after_exec (void)
+     /* Thread event breakpoints must be set anew after an exec(),
+        as must overlay event and longjmp master breakpoints.  */
+     if (b->type == bp_thread_event || b->type == bp_overlay_event
+-	|| b->type == bp_longjmp_master || b->type == bp_std_terminate_master)
++	|| b->type == bp_longjmp_master || b->type == bp_std_terminate_master
++	|| b->type == bp_exception_master)
+       {
+ 	delete_breakpoint (b);
+ 	continue;
+@@ -2288,7 +2316,8 @@ update_breakpoints_after_exec (void)
+ 
+     /* Longjmp and longjmp-resume breakpoints are also meaningless
+        after an exec.  */
+-    if (b->type == bp_longjmp || b->type == bp_longjmp_resume)
++    if (b->type == bp_longjmp || b->type == bp_longjmp_resume
++	|| b->type == bp_exception || b->type == bp_exception_resume)
+       {
+ 	delete_breakpoint (b);
+ 	continue;
+@@ -2350,6 +2379,7 @@ update_breakpoints_after_exec (void)
+   create_longjmp_master_breakpoint ("siglongjmp");
+   create_longjmp_master_breakpoint ("_siglongjmp");
+   create_std_terminate_master_breakpoint ("std::terminate()");
++  create_exception_master_breakpoint ();
+ }
+ 
+ int
+@@ -3275,6 +3305,12 @@ print_it_typical (bpstat bs)
+       result = PRINT_NOTHING;
+       break;
+ 
++    case bp_exception_master:
++      /* These should never be enabled.  */
++      printf_filtered (_("Exception Master Breakpoint: gdb should not stop!\n"));
++      result = PRINT_NOTHING;
++      break;
++
+     case bp_watchpoint:
+     case bp_hardware_watchpoint:
+       annotate_watchpoint (b->number);
+@@ -3362,6 +3398,8 @@ print_it_typical (bpstat bs)
+     case bp_none:
+     case bp_longjmp:
+     case bp_longjmp_resume:
++    case bp_exception:
++    case bp_exception_resume:
+     case bp_step_resume:
+     case bp_watchpoint_scope:
+     case bp_call_dummy:
+@@ -4164,7 +4202,8 @@ bpstat_stop_status (struct address_space
+ 
+ 	  if (b->type == bp_thread_event || b->type == bp_overlay_event
+ 	      || b->type == bp_longjmp_master
+-	      || b->type == bp_std_terminate_master)
++	      || b->type == bp_std_terminate_master
++	      || b->type == bp_exception_master)
+ 	    /* We do not stop for these.  */
+ 	    bs->stop = 0;
+ 	  else
+@@ -4260,6 +4299,7 @@ bpstat_what (bpstat bs_head)
+ 
+   retval.main_action = BPSTAT_WHAT_KEEP_CHECKING;
+   retval.call_dummy = STOP_NONE;
++  retval.is_longjmp = 0;
+ 
+   for (bs = bs_head; bs != NULL; bs = bs->next)
+     {
+@@ -4315,10 +4355,14 @@ bpstat_what (bpstat bs_head)
+ 	    }
+ 	  break;
+ 	case bp_longjmp:
++	case bp_exception:
+ 	  this_action = BPSTAT_WHAT_SET_LONGJMP_RESUME;
++	  retval.is_longjmp = bptype == bp_longjmp;
+ 	  break;
+ 	case bp_longjmp_resume:
++	case bp_exception_resume:
+ 	  this_action = BPSTAT_WHAT_CLEAR_LONGJMP_RESUME;
++	  retval.is_longjmp = bptype == bp_longjmp_resume;
+ 	  break;
+ 	case bp_step_resume:
+ 	  if (bs->stop)
+@@ -4334,6 +4378,7 @@ bpstat_what (bpstat bs_head)
+ 	case bp_overlay_event:
+ 	case bp_longjmp_master:
+ 	case bp_std_terminate_master:
++	case bp_exception_master:
+ 	  this_action = BPSTAT_WHAT_SINGLE;
+ 	  break;
+ 	case bp_catchpoint:
+@@ -4556,6 +4601,8 @@ bptype_string (enum bptype type)
+     {bp_access_watchpoint, "acc watchpoint"},
+     {bp_longjmp, "longjmp"},
+     {bp_longjmp_resume, "longjmp resume"},
++    {bp_exception, "exception"},
++    {bp_exception_resume, "exception resume"},
+     {bp_step_resume, "step resume"},
+     {bp_watchpoint_scope, "watchpoint scope"},
+     {bp_call_dummy, "call dummy"},
+@@ -4565,6 +4612,7 @@ bptype_string (enum bptype type)
+     {bp_overlay_event, "overlay events"},
+     {bp_longjmp_master, "longjmp master"},
+     {bp_std_terminate_master, "std::terminate master"},
++    {bp_exception_master, "exception master"},
+     {bp_catchpoint, "catchpoint"},
+     {bp_tracepoint, "tracepoint"},
+     {bp_fast_tracepoint, "fast tracepoint"},
+@@ -4705,6 +4753,8 @@ print_one_breakpoint_location (struct br
+       case bp_finish:
+       case bp_longjmp:
+       case bp_longjmp_resume:
++      case bp_exception:
++      case bp_exception_resume:
+       case bp_step_resume:
+       case bp_watchpoint_scope:
+       case bp_call_dummy:
+@@ -4714,6 +4764,7 @@ print_one_breakpoint_location (struct br
+       case bp_overlay_event:
+       case bp_longjmp_master:
+       case bp_std_terminate_master:
++      case bp_exception_master:
+       case bp_tracepoint:
+       case bp_fast_tracepoint:
+       case bp_static_tracepoint:
+@@ -5457,6 +5508,8 @@ allocate_bp_location (struct breakpoint 
+     case bp_finish:
+     case bp_longjmp:
+     case bp_longjmp_resume:
++    case bp_exception:
++    case bp_exception_resume:
+     case bp_step_resume:
+     case bp_watchpoint_scope:
+     case bp_call_dummy:
+@@ -5469,6 +5522,7 @@ allocate_bp_location (struct breakpoint 
+     case bp_std_terminate_master:
+     case bp_gnu_ifunc_resolver:
+     case bp_gnu_ifunc_resolver_return:
++    case bp_exception_master:
+       loc->loc_type = bp_loc_software_breakpoint;
+       break;
+     case bp_hardware_breakpoint:
+@@ -5708,8 +5762,7 @@ make_breakpoint_permanent (struct breakp
+ }
+ 
+ /* Call this routine when stepping and nexting to enable a breakpoint
+-   if we do a longjmp() in THREAD.  When we hit that breakpoint, call
+-   set_longjmp_resume_breakpoint() to figure out where we are going. */
++   if we do a longjmp() or 'throw' in THREAD.  */
+ 
+ void
+ set_longjmp_breakpoint (int thread)
+@@ -5722,11 +5775,12 @@ set_longjmp_breakpoint (int thread)
+      clones of those and enable them for the requested thread.  */
+   ALL_BREAKPOINTS_SAFE (b, temp)
+     if (b->pspace == current_program_space
+-	&& b->type == bp_longjmp_master)
++	&& (b->type == bp_longjmp_master
++	    || b->type == bp_exception_master))
+       {
+ 	struct breakpoint *clone = clone_momentary_breakpoint (b);
+ 
+-	clone->type = bp_longjmp;
++	clone->type = b->type == bp_longjmp_master ? bp_longjmp : bp_exception;
+ 	clone->thread = thread;
+       }
+ }
+@@ -5738,7 +5792,7 @@ delete_longjmp_breakpoint (int thread)
+   struct breakpoint *b, *temp;
+ 
+   ALL_BREAKPOINTS_SAFE (b, temp)
+-    if (b->type == bp_longjmp)
++    if (b->type == bp_longjmp || b->type == bp_exception)
+       {
+ 	if (b->thread == thread)
+ 	  delete_breakpoint (b);
+@@ -6913,6 +6967,8 @@ mention (struct breakpoint *b)
+       case bp_finish:
+       case bp_longjmp:
+       case bp_longjmp_resume:
++      case bp_exception:
++      case bp_exception_resume:
+       case bp_step_resume:
+       case bp_call_dummy:
+       case bp_std_terminate:
+@@ -6924,6 +6980,7 @@ mention (struct breakpoint *b)
+       case bp_longjmp_master:
+       case bp_std_terminate_master:
+       case bp_gnu_ifunc_resolver_return:
++      case bp_exception_master:
+ 	break;
+       }
+ 
+@@ -8598,6 +8655,7 @@ struct until_break_command_continuation_
+ {
+   struct breakpoint *breakpoint;
+   struct breakpoint *breakpoint2;
++  int thread_num;
+ };
+ 
+ /* This function is called by fetch_inferior_event via the
+@@ -8612,6 +8670,7 @@ until_break_command_continuation (void *
+   delete_breakpoint (a->breakpoint);
+   if (a->breakpoint2)
+     delete_breakpoint (a->breakpoint2);
++  delete_longjmp_breakpoint (a->thread_num);
+ }
+ 
+ void
+@@ -8623,6 +8682,8 @@ until_break_command (char *arg, int from
+   struct breakpoint *breakpoint;
+   struct breakpoint *breakpoint2 = NULL;
+   struct cleanup *old_chain;
++  int thread;
++  struct thread_info *tp;
+ 
+   clear_proceed_status ();
+ 
+@@ -8661,6 +8722,9 @@ until_break_command (char *arg, int from
+ 
+   old_chain = make_cleanup_delete_breakpoint (breakpoint);
+ 
++  tp = inferior_thread ();
++  thread = tp->num;
++
+   /* Keep within the current frame, or in frames called by the current
+      one.  */
+ 
+@@ -8673,6 +8737,10 @@ until_break_command (char *arg, int from
+ 					      frame_unwind_caller_id (frame),
+ 					      bp_until);
+       make_cleanup_delete_breakpoint (breakpoint2);
++
++      set_longjmp_breakpoint (thread);
++      tp->initiating_frame = frame_unwind_caller_id (frame);
++      make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
+     }
+ 
+   proceed (-1, TARGET_SIGNAL_DEFAULT, 0);
+@@ -8689,6 +8757,7 @@ until_break_command (char *arg, int from
+ 
+       args->breakpoint = breakpoint;
+       args->breakpoint2 = breakpoint2;
++      args->thread_num = thread;
+ 
+       discard_cleanups (old_chain);
+       add_continuation (inferior_thread (),
+@@ -9940,6 +10009,7 @@ delete_command (char *arg, int from_tty)
+ 	    && b->type != bp_overlay_event
+ 	    && b->type != bp_longjmp_master
+ 	    && b->type != bp_std_terminate_master
++	    && b->type != bp_exception_master
+ 	    && b->number >= 0)
+ 	  {
+ 	    breaks_to_delete = 1;
+@@ -9961,6 +10031,7 @@ delete_command (char *arg, int from_tty)
+ 		&& b->type != bp_overlay_event
+ 		&& b->type != bp_longjmp_master
+ 		&& b->type != bp_std_terminate_master
++		&& b->type != bp_exception_master
+ 		&& b->number >= 0)
+ 	      delete_breakpoint (b);
+ 	  }
+@@ -10470,6 +10541,7 @@ breakpoint_re_set_one (void *bint)
+     case bp_overlay_event:
+     case bp_longjmp_master:
+     case bp_std_terminate_master:
++    case bp_exception_master:
+       delete_breakpoint (b);
+       break;
+ 
+@@ -10493,6 +10565,8 @@ breakpoint_re_set_one (void *bint)
+     case bp_step_resume:
+     case bp_longjmp:
+     case bp_longjmp_resume:
++    case bp_exception:
++    case bp_exception_resume:
+     case bp_jit_event:
+     case bp_gnu_ifunc_resolver_return:
+       break;
+@@ -10537,6 +10611,7 @@ breakpoint_re_set (void)
+   create_longjmp_master_breakpoint ("siglongjmp");
+   create_longjmp_master_breakpoint ("_siglongjmp");
+   create_std_terminate_master_breakpoint ("std::terminate()");
++  create_exception_master_breakpoint ();
+ }
+ 
+ /* Reset the thread number of this breakpoint:
+Index: gdb-7.2.50.20101116/gdb/breakpoint.h
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/breakpoint.h	2010-11-17 02:38:59.000000000 +0100
++++ gdb-7.2.50.20101116/gdb/breakpoint.h	2010-11-17 02:39:19.000000000 +0100
+@@ -61,6 +61,13 @@ enum bptype
+     bp_longjmp,			/* secret breakpoint to find longjmp() */
+     bp_longjmp_resume,		/* secret breakpoint to escape longjmp() */
+ 
++    /* An internal breakpoint that is installed on the unwinder's
++       debug hook.  */
++    bp_exception,
++    /* An internal breakpoint that is set at the point where an
++       exception will land.  */
++    bp_exception_resume,
++
+     /* Used by wait_for_inferior for stepping over subroutine calls, for
+        stepping over signal handlers, and for skipping prologues.  */
+     bp_step_resume,
+@@ -130,6 +137,9 @@ enum bptype
+     /* Master copies of std::terminate breakpoints.  */
+     bp_std_terminate_master,
+ 
++    /* Like bp_longjmp_master, but for exceptions.  */
++    bp_exception_master,
++
+     bp_catchpoint,
+ 
+     bp_tracepoint,
+@@ -672,6 +682,10 @@ struct bpstat_what
+        continuing from a call dummy without popping the frame is not a
+        useful one).  */
+     enum stop_stack_kind call_dummy;
++
++    /* Used for BPSTAT_WHAT_SET_LONGJMP_RESUME.  True if we are
++       handling a longjmp, false if we are handling an exception.  */
++    int is_longjmp;
+   };
+ 
+ /* The possible return values for print_bpstat, print_it_normal,
+Index: gdb-7.2.50.20101116/gdb/gdbthread.h
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/gdbthread.h	2010-11-02 02:37:31.000000000 +0100
++++ gdb-7.2.50.20101116/gdb/gdbthread.h	2010-11-17 02:39:19.000000000 +0100
+@@ -185,6 +185,10 @@ struct thread_info
+   /* True if this thread has been explicitly requested to stop.  */
+   int stop_requested;
+ 
++  /* The initiating frame of a nexting operation, used for deciding
++     which exceptions to intercept.  */
++  struct frame_id initiating_frame;
++
+   /* Private data used by the target vector implementation.  */
+   struct private_thread_info *private;
+ 
+Index: gdb-7.2.50.20101116/gdb/infcmd.c
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/infcmd.c	2010-07-01 17:36:15.000000000 +0200
++++ gdb-7.2.50.20101116/gdb/infcmd.c	2010-11-17 02:39:19.000000000 +0100
+@@ -822,7 +822,7 @@ nexti_command (char *count_string, int f
+   step_1 (1, 1, count_string);
+ }
+ 
+-static void
++void
+ delete_longjmp_breakpoint_cleanup (void *arg)
+ {
+   int thread = * (int *) arg;
+@@ -862,10 +862,13 @@ step_1 (int skip_subroutines, int single
+ 
+   if (!single_inst || skip_subroutines)		/* leave si command alone */
+     {
++      struct thread_info *tp = inferior_thread ();
++
+       if (in_thread_list (inferior_ptid))
+  	thread = pid_to_thread_id (inferior_ptid);
+ 
+       set_longjmp_breakpoint (thread);
++      tp->initiating_frame = get_frame_id (get_current_frame ());
+ 
+       make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
+     }
+@@ -1219,6 +1222,15 @@ signal_command (char *signum_exp, int fr
+   proceed ((CORE_ADDR) -1, oursig, 0);
+ }
+ 
++/* A continuation callback for until_next_command.  */
++
++static void
++until_next_continuation (void *arg)
++{
++  struct thread_info *tp = arg;
++  delete_longjmp_breakpoint (tp->num);
++}
++
+ /* Proceed until we reach a different source line with pc greater than
+    our current one or exit the function.  We skip calls in both cases.
+ 
+@@ -1235,6 +1247,8 @@ until_next_command (int from_tty)
+   struct symbol *func;
+   struct symtab_and_line sal;
+   struct thread_info *tp = inferior_thread ();
++  int thread = tp->num;
++  struct cleanup *old_chain;
+ 
+   clear_proceed_status ();
+   set_step_frame ();
+@@ -1270,7 +1284,19 @@ until_next_command (int from_tty)
+ 
+   tp->step_multi = 0;		/* Only one call to proceed */
+ 
++  set_longjmp_breakpoint (thread);
++  tp->initiating_frame = get_frame_id (frame);
++  old_chain = make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
++
+   proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 1);
++
++  if (target_can_async_p () && is_running (inferior_ptid))
++    {
++      discard_cleanups (old_chain);
++      add_continuation (tp, until_next_continuation, tp, NULL);
++    }
++  else
++    do_cleanups (old_chain);
+ }
+ 
+ static void
+@@ -1463,6 +1489,7 @@ finish_command_continuation (void *arg)
+   if (bs != NULL && tp->proceed_to_finish)
+     observer_notify_normal_stop (bs, 1 /* print frame */);
+   delete_breakpoint (a->breakpoint);
++  delete_longjmp_breakpoint (inferior_thread ()->num);
+ }
+ 
+ static void
+@@ -1546,6 +1573,7 @@ finish_forward (struct symbol *function,
+   struct breakpoint *breakpoint;
+   struct cleanup *old_chain;
+   struct finish_command_continuation_args *cargs;
++  int thread = tp->num;
+ 
+   sal = find_pc_line (get_frame_pc (frame), 0);
+   sal.pc = get_frame_pc (frame);
+@@ -1556,6 +1584,10 @@ finish_forward (struct symbol *function,
+ 
+   old_chain = make_cleanup_delete_breakpoint (breakpoint);
+ 
++  set_longjmp_breakpoint (thread);
++  tp->initiating_frame = get_frame_id (frame);
++  make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
++
+   tp->proceed_to_finish = 1;    /* We want stop_registers, please...  */
+   cargs = xmalloc (sizeof (*cargs));
+ 
+Index: gdb-7.2.50.20101116/gdb/inferior.h
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/inferior.h	2010-11-17 02:38:55.000000000 +0100
++++ gdb-7.2.50.20101116/gdb/inferior.h	2010-11-17 02:39:19.000000000 +0100
+@@ -299,6 +299,8 @@ extern void interrupt_target_command (ch
+ 
+ extern void interrupt_target_1 (int all_threads);
+ 
++extern void delete_longjmp_breakpoint_cleanup (void *arg);
++
+ extern void detach_command (char *, int);
+ 
+ extern void notice_new_inferior (ptid_t, int, int);
+Index: gdb-7.2.50.20101116/gdb/infrun.c
+===================================================================
+--- gdb-7.2.50.20101116.orig/gdb/infrun.c	2010-11-17 02:38:59.000000000 +0100
++++ gdb-7.2.50.20101116/gdb/infrun.c	2010-11-17 02:39:19.000000000 +0100
+@@ -45,6 +45,8 @@
+ #include "language.h"
+ #include "solib.h"
+ #include "main.h"
++#include "dictionary.h"
++#include "block.h"
+ #include "gdb_assert.h"
+ #include "mi/mi-common.h"
+ #include "event-top.h"
+@@ -2229,6 +2231,8 @@ static void insert_step_resume_breakpoin
+ 						  struct symtab_and_line sr_sal,
+ 						  struct frame_id sr_id);
+ static void insert_longjmp_resume_breakpoint (struct gdbarch *, CORE_ADDR);
++static void check_exception_resume (struct execution_control_state *,
++				    struct frame_info *, struct symbol *);
+ 
+ static void stop_stepping (struct execution_control_state *ecs);
+ static void prepare_to_wait (struct execution_control_state *ecs);
+@@ -4121,23 +4125,33 @@ process_event_stop_test:
+ 
+ 	ecs->event_thread->stepping_over_breakpoint = 1;
+ 
+-	if (!gdbarch_get_longjmp_target_p (gdbarch)
+-	    || !gdbarch_get_longjmp_target (gdbarch, frame, &jmp_buf_pc))
++	if (what.is_longjmp)
+ 	  {
+-	    if (debug_infrun)
+-	      fprintf_unfiltered (gdb_stdlog, "\
++	    if (!gdbarch_get_longjmp_target_p (gdbarch)
++		|| !gdbarch_get_longjmp_target (gdbarch,
++						frame, &jmp_buf_pc))
++	      {
++		if (debug_infrun)
++		  fprintf_unfiltered (gdb_stdlog, "\
+ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (!gdbarch_get_longjmp_target)\n");
+-	    keep_going (ecs);
+-	    return;
+-	  }
++		keep_going (ecs);
++		return;
++	      }
+ 
+-	/* We're going to replace the current step-resume breakpoint
+-	   with a longjmp-resume breakpoint.  */
+-	delete_step_resume_breakpoint (ecs->event_thread);
++	    /* We're going to replace the current step-resume breakpoint
++	       with a longjmp-resume breakpoint.  */
++	    delete_step_resume_breakpoint (ecs->event_thread);
+ 
+-	/* Insert a breakpoint at resume address.  */
+-	insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
++	    /* Insert a breakpoint at resume address.  */
++	    insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
++	  }
++	else
++	  {
++	    struct symbol *func = get_frame_function (frame);
+ 
++	    if (func)
++	      check_exception_resume (ecs, frame, func);
++	  }
+ 	keep_going (ecs);
+ 	return;
+ 
+@@ -4149,6 +4163,53 @@ infrun: BPSTAT_WHAT_SET_LONGJMP_RESUME (
+ 	gdb_assert (ecs->event_thread->step_resume_breakpoint != NULL);
+ 	delete_step_resume_breakpoint (ecs->event_thread);
+ 
++	if (!what.is_longjmp)
++	  {
++	    /* There are several cases to consider.
++	       
++	       1. The initiating frame no longer exists.  In this case
++	       we must stop, because the exception has gone too far.
++	       
++	       2. The initiating frame exists, and is the same as the
++	       current frame.
++	       
++	       2.1. If we are stepping, defer to the stepping logic.
++	       
++	       2.2. Otherwise, we are not stepping, so we are doing a
++	       "finish" and we have reached the calling frame.  So,
++	       stop.
++	       
++	       3. The initiating frame exists and is different from
++	       the current frame.  This means the exception has been
++	       caught beneath the initiating frame, so keep going.  */
++	    struct frame_info *init_frame
++	      = frame_find_by_id (ecs->event_thread->initiating_frame);
++	    if (init_frame)
++	      {
++		struct frame_id current_id
++		  = get_frame_id (get_current_frame ());
++		if (frame_id_eq (current_id,
++				 ecs->event_thread->initiating_frame))
++		  {
++		    if (ecs->event_thread->step_range_start)
++		      {
++			/* Case 2.1.  */
++			break;
++		      }
++		    else
++		      {
++			/* Case 2.2: fall through.  */
++		      }
++		  }
++		else
++		  {
++		    /* Case 3.  */
++		    keep_going (ecs);
++		    return;
++		  }
++	      }
++	  }
++
+ 	ecs->event_thread->stop_step = 1;
+ 	print_end_stepping_range_reason ();
+ 	stop_stepping (ecs);
+@@ -5127,6 +5188,100 @@ insert_longjmp_resume_breakpoint (struct
+     set_momentary_breakpoint_at_pc (gdbarch, pc, bp_longjmp_resume);
+ }
+ 
++/* Insert an exception resume breakpoint.  TP is the thread throwing
++   the exception.  The block B is the block of the unwinder debug hook
++   function.  FRAME is the frame corresponding to the call to this
++   function.  SYM is the symbol of the function argument holding the
++   target PC of the exception.  */
++
++static void
++insert_exception_resume_breakpoint (struct thread_info *tp,
++				    struct block *b,
++				    struct frame_info *frame,
++				    struct symbol *sym)
++{
++  struct gdb_exception e;
++
++  /* We want to ignore errors here.  */
++  TRY_CATCH (e, RETURN_MASK_ALL)
++    {
++      struct symbol *vsym;
++      struct value *value;
++      CORE_ADDR handler;
++      struct breakpoint *bp;
++
++      vsym = lookup_symbol (SYMBOL_LINKAGE_NAME (sym), b, VAR_DOMAIN, NULL);
++      value = read_var_value (vsym, frame);
++      /* If the value was optimized out, revert to the old behavior.  */
++      if (! value_optimized_out (value))
++	{
++	  handler = value_as_address (value);
++
++	  /* We're going to replace the current step-resume breakpoint
++	     with an exception-resume breakpoint.  */
++	  delete_step_resume_breakpoint (tp);
++
++	  if (debug_infrun)
++	    fprintf_unfiltered (gdb_stdlog,
++				"infrun: exception resume at %lx\n",
++				(unsigned long) handler);
++
++	  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
++					       handler, bp_exception_resume);
++	  inferior_thread ()->step_resume_breakpoint = bp;
++	}
++    }
++}
++
++/* This is called when an exception has been intercepted.  Check to
++   see whether the exception's destination is of interest, and if so,
++   set an exception resume breakpoint there.  */
++
++static void
++check_exception_resume (struct execution_control_state *ecs,
++			struct frame_info *frame, struct symbol *func)
++{
++  struct gdb_exception e;
++
++  TRY_CATCH (e, RETURN_MASK_ALL)
++    {
++      struct block *b;
++      struct dict_iterator iter;
++      struct symbol *sym;
++      int argno = 0;
++
++      /* The exception breakpoint is a thread-specific breakpoint on
++	 the unwinder's debug hook, declared as:
++	 
++	 void _Unwind_DebugHook (void *cfa, void *handler);
++	 
++	 The CFA argument indicates the frame to which control is
++	 about to be transferred.  HANDLER is the destination PC.
++	 
++	 We ignore the CFA and set a temporary breakpoint at HANDLER.
++	 This is not extremely efficient but it avoids issues in gdb
++	 with computing the DWARF CFA, and it also works even in weird
++	 cases such as throwing an exception from inside a signal
++	 handler.  */
++
++      b = SYMBOL_BLOCK_VALUE (func);
++      ALL_BLOCK_SYMBOLS (b, iter, sym)
++	{
++	  if (!SYMBOL_IS_ARGUMENT (sym))
++	    continue;
++
++	  if (argno == 0)
++	    ++argno;
++	  else
++	    {
++	      insert_exception_resume_breakpoint (ecs->event_thread,
++						  b, frame, sym);
++	      break;
++	    }
++	}
++    }
++}
++
+ static void
+ stop_stepping (struct execution_control_state *ecs)
+ {
+Index: gdb-7.2.50.20101116/gdb/testsuite/gdb.cp/gdb9593.cc
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2.50.20101116/gdb/testsuite/gdb.cp/gdb9593.cc	2010-11-17 02:39:19.000000000 +0100
+@@ -0,0 +1,180 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2008, 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++   */
++#include <iostream>
++
++using namespace std;
++
++class NextOverThrowDerivates
++{
++
++public:
++
++
++  // Single throw an exception in this function.
++  void function1() 
++  {
++    throw 20;
++  }
++
++  // Throw an exception in another function.
++  void function2() 
++  {
++    function1();
++  }
++
++  // Throw an exception in another function, but handle it
++  // locally.
++  void function3 () 
++  {
++    {
++      try
++	{
++	  function1 ();
++	}
++      catch (...) 
++	{
++	  cout << "Caught and handled function1 exception" << endl;
++	}
++    }
++  }
++
++  void rethrow ()
++  {
++    try
++      {
++	function1 ();
++      }
++    catch (...)
++      {
++	throw;
++      }
++  }
++
++  void finish ()
++  {
++    // We use this to test that a "finish" here does not end up in
++    // this frame, but in the one above.
++    try
++      {
++	function1 ();
++      }
++    catch (int x)
++      {
++      }
++    function1 ();		// marker for until
++  }
++
++  void until ()
++  {
++    function1 ();
++    function1 ();		// until here
++  }
++
++};
++NextOverThrowDerivates next_cases;
++
++
++int main () 
++{ 
++  try
++    {
++      next_cases.function1 ();
++    }
++  catch (...)
++    {
++      // Discard
++    }
++
++  try
++    {
++      next_cases.function2 ();
++    }
++  catch (...)
++    {
++      // Discard
++    }
++
++  try
++    {
++      // This is duplicated so we can next over one but step into
++      // another.
++      next_cases.function2 ();
++    }
++  catch (...)
++    {
++      // Discard
++    }
++
++  next_cases.function3 ();
++
++  try
++    {
++      next_cases.rethrow ();
++    }
++  catch (...)
++    {
++      // Discard
++    }
++
++  try
++    {
++      // Another duplicate so we can test "finish".
++      next_cases.function2 ();
++    }
++  catch (...)
++    {
++      // Discard
++    }
++
++  // Another test for "finish".
++  try
++    {
++      next_cases.finish ();
++    }
++  catch (...)
++    {
++    }
++
++  // Test of "until".
++  try
++    {
++      next_cases.finish ();
++    }
++  catch (...)
++    {
++    }
++
++  // Test of "until" with an argument.
++  try
++    {
++      next_cases.until ();
++    }
++  catch (...)
++    {
++    }
++
++  // Test of "advance".
++  try
++    {
++      next_cases.until ();
++    }
++  catch (...)
++    {
++    }
++}
++
+Index: gdb-7.2.50.20101116/gdb/testsuite/gdb.cp/gdb9593.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2.50.20101116/gdb/testsuite/gdb.cp/gdb9593.exp	2010-11-17 02:39:19.000000000 +0100
+@@ -0,0 +1,182 @@
++# Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++
++if $tracelevel then {
++    strace $tracelevel
++}
++
++if { [skip_cplus_tests] } { continue }
++
++set testfile "gdb9593"
++set srcfile ${testfile}.cc
++set binfile $objdir/$subdir/$testfile
++
++# Create and source the file that provides information about the compiler
++# used to compile the test case.
++if [get_compiler_info ${binfile} "c++"] {
++    untested gdb9593.exp
++    return -1
++}
++
++if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
++    untested gdb9593.exp
++    return -1
++}
++
++# Some targets can't do function calls, so don't even bother with this
++# test.
++if [target_info exists gdb,cannot_call_functions] {
++    setup_xfail "*-*-*" 9593
++    fail "This target can not call functions"
++    continue
++}
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++if ![runto_main] then {
++    perror "couldn't run to main"
++    continue
++} 
++
++# See whether we have the needed unwinder hooks.
++set ok 1
++gdb_test_multiple "print _Unwind_DebugHook" "check for unwinder hook" {
++    -re "= .*_Unwind_DebugHook.*\r\n$gdb_prompt $" {
++	pass "check for unwinder hook"
++    }
++    -re "No symbol .* in current context.\r\n$gdb_prompt $" {
++	# Pass the test so we don't get bogus fails in the results.
++	pass "check for unwinder hook"
++	set ok 0
++    }
++}
++if {!$ok} {
++    untested gdb9593.exp
++    return -1
++}
++
++# See http://sourceware.org/bugzilla/show_bug.cgi?id=9593
++
++gdb_test "next" \
++    ".*catch (...).*" \
++    "next over a throw 1"
++
++gdb_test "next" \
++  ".*next_cases.function2.*" \
++  "next past catch 1"
++
++gdb_test "next" \
++    ".*catch (...).*" \
++    "next over a throw 2"
++
++gdb_test "next" \
++  ".*next_cases.function2.*" \
++  "next past catch 2"
++
++gdb_test "step" \
++  ".*function1().*" \
++  "step into function2 1"
++
++gdb_test "next" \
++    ".*catch (...).*" \
++    "next over a throw 3"
++
++gdb_test "next" \
++  ".*next_cases.function3.*" \
++  "next past catch 3"
++
++gdb_test "next" \
++  ".*next_cases.rethrow.*" \
++    "next over a throw 4"
++
++gdb_test "next" \
++  ".*catch (...).*" \
++  "next over a rethrow"
++
++gdb_test "next" \
++  ".*next_cases.function2.*" \
++  "next after a rethrow"
++
++gdb_test "step" \
++  ".*function1().*" \
++  "step into function2 2"
++
++gdb_test "finish" \
++  ".*catch (...).*" \
++  "finish 1"
++
++gdb_test "next" \
++  ".*next_cases.finish ().*" \
++  "next past catch 4"
++
++gdb_test "step" \
++  ".*function1 ().*" \
++  "step into finish method"
++
++gdb_test "finish" \
++  ".*catch (...).*" \
++  "finish 2"
++
++gdb_test "next" \
++  ".*next_cases.finish ().*" \
++  "next past catch 5"
++
++gdb_test "step" \
++  ".*function1 ().*" \
++  "step into finish, for until"
++
++gdb_test "until" \
++  ".*catch .int x.*" \
++  "until with no argument 1"
++
++set line [gdb_get_line_number "marker for until" $testfile.cc]
++
++gdb_test "until $line" \
++  ".*function1 ().*" \
++  "next past catch 6"
++
++gdb_test "until" \
++  ".*catch (...).*" \
++  "until with no argument 2"
++
++set line [gdb_get_line_number "until here" $testfile.cc]
++
++gdb_test "next" \
++  ".*next_cases.until ().*" \
++  "next past catch 6"
++
++gdb_test "step" \
++  ".*function1 ().*" \
++  "step into until"
++
++gdb_test "until $line" \
++  ".*catch (...).*" \
++  "until-over-throw"
++
++gdb_test "next" \
++  ".*next_cases.until ().*" \
++  "next past catch 7"
++
++gdb_test "step" \
++  ".*function1 ().*" \
++  "step into until, for advance"
++
++gdb_test "advance $line" \
++  ".*catch (...).*" \
++  "advance-over-throw"
+Index: gdb-7.2.50.20101116/gdb/testsuite/gdb.java/jnpe.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2.50.20101116/gdb/testsuite/gdb.java/jnpe.exp	2010-11-17 02:39:19.000000000 +0100
+@@ -0,0 +1,74 @@
++# Copyright 2009, 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if $tracelevel then {
++  strace $tracelevel
++}
++
++load_lib "java.exp"
++
++set testfile "jnpe"
++set srcfile ${testfile}.java
++set binfile ${objdir}/${subdir}/${testfile}
++if  { [compile_java_from_source ${srcdir}/$subdir/${srcfile} ${binfile} "-g"] != "" } {
++    untested "Couldn't compile ${srcdir}/$subdir/${srcfile}"
++    return -1
++}
++
++# Start with a fresh gdb.
++
++gdb_exit
++gdb_start
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_load ${binfile}
++
++set line [gdb_get_line_number "break here" $testfile.java]
++gdb_test "break $testfile.java:$line" ""
++
++gdb_test "run" \
++  "// break here.*" \
++  "run java next-over-throw"
++
++# See whether we have the needed unwinder hooks.
++set ok 1
++gdb_test_multiple "print _Unwind_DebugHook" "check for unwinder hook in java" {
++    -re "= .*_Unwind_DebugHook.*\r\n$gdb_prompt $" {
++	pass "check for unwinder hook in java"
++    }
++    -re "No symbol .* in current context.?\r\n$gdb_prompt $" {
++	# Pass the test so we don't get bogus fails in the results.
++	setup_xfail *-*-*
++	fail "check for unwinder hook in java"
++	set ok 0
++    }
++}
++if {!$ok} {
++    untested jnpe.exp
++    return -1
++}
++
++gdb_test "handle SIGSEGV nostop noprint" \
++  "SIGSEGV.*fault" \
++  "disable SIGSEGV for next-over-NPE"
++
++# The line where we stop differ according to gcj; check just we did not already
++# execute the catch point.
++
++gdb_test "next" \
++  "" \
++  "next over NPE"
++
++gdb_breakpoint [gdb_get_line_number "catch point"]
++gdb_continue_to_breakpoint "catch point" ".*// catch point.*"
+Index: gdb-7.2.50.20101116/gdb/testsuite/gdb.java/jnpe.java
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.2.50.20101116/gdb/testsuite/gdb.java/jnpe.java	2010-11-17 02:39:19.000000000 +0100
+@@ -0,0 +1,38 @@
++// Test next-over-NPE.
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2009 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++   */
++
++public class jnpe
++{
++  public static String npe ()
++  {
++    return ((Object) null).toString();
++  }
++
++  public static void main (String[] args)
++  {
++    try
++      {
++	System.out.println (npe ()); // break here
++      }
++    catch (NullPointerException n)
++      {
++	System.out.println ("success"); // catch point
++      }
++  }
++}
