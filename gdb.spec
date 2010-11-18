@@ -159,10 +159,6 @@ Patch141: gdb-6.6-step-thread-exit.patch
 #=push
 Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
-# Prevent gdb from being pushed into background
-#=maybepush
-Patch142: gdb-6.3-terminal-fix-20050214.patch
-
 # Test sibling threads to set threaded watchpoints for x86 and x86-64
 #=fedoratest
 Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
@@ -706,7 +702,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch140 -p1
 %patch141 -p1
 %patch259 -p1
-%patch142 -p1
 %patch145 -p1
 %patch148 -p1
 %patch153 -p1
