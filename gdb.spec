@@ -27,7 +27,7 @@ Version: 7.2.50.20101117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{dist}
+Release: 2%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -398,10 +398,6 @@ Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
 #=fedoratest
 Patch320: gdb-6.5-section-num-fixup-test.patch
 
-# Fix compatibility with recent glibc headers.
-#=push
-Patch324: gdb-6.8-glibc-headers-compat.patch
-
 # Create a single binary `gdb' autodetecting --tui by its argv[0].
 #=push+work: IIRC Tom told argv[0] should not be used by GNU programs, also drop libgdb.a.
 Patch326: gdb-6.8-tui-singlebinary.patch
@@ -769,7 +765,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch317 -p1
 %patch318 -p1
 %patch320 -p1
-%patch324 -p1
 %patch326 -p1
 %patch329 -p1
 %patch330 -p1
@@ -1180,6 +1175,9 @@ fi
 %endif
 
 %changelog
+* Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-2.fc15
+- Drop gdb-6.8-glibc-headers-compat.patch: GNU/Linux irrelevant (Tom Tromey).
+
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
 
