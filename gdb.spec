@@ -108,10 +108,6 @@ Patch104: gdb-6.3-ppcdotsolib-20041022.patch
 #=maybepush+ppc: Write new testcase.
 Patch105: gdb-6.3-ppc64syscall-20040622.patch
 
-# Stop a backtrace when a zero PC is encountered.
-#=maybepush: Write new testcase.
-Patch106: gdb-6.3-framepczero-20040927.patch
-
 # Include the pc's section when doing a symbol lookup so that the
 # correct symbol is found.
 #=maybepush: Write new testcase.
@@ -202,10 +198,6 @@ Patch164: gdb-6.3-readnever-20050907.patch
 # Fix ia64 gdb problem with user-specified SIGILL handling
 #=ia64
 Patch169: gdb-6.3-ia64-sigill-20051115.patch
-
-# Allow option to continue backtracing past a zero pc value
-#=maybepush
-Patch170: gdb-6.3-bt-past-zero-20051201.patch
 
 # Use bigger numbers than int.
 #=push
@@ -684,7 +676,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %patch104 -p1
 %patch105 -p1
-%patch106 -p1
 %patch111 -p1
 %patch112 -p1
 %patch118 -p1
@@ -706,7 +697,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch163 -p1
 %patch164 -p1
 %patch169 -p1
-%patch170 -p1
 %patch176 -p1
 %patch188 -p1
 %patch190 -p1
@@ -1167,6 +1157,8 @@ fi
 - Drop gdb-6.3-terminal-fix-20050214.patch: The bug is not reproducible.
 - Drop gdb-6.7-kernel-headers-compat.patch: kernel-headers seem to be fixed.
 - Drop gdb-archer-ada.patch: No longer needed for Ada (Keith Seitz).
+- New PR backtrace/12237, drop gdb-6.3-framepczero-20040927.patch
+  gdb-6.3-bt-past-zero-20051201.patch as they already had no effect.
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
