@@ -427,8 +427,6 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 #=push
 #archer-jankratochvil-ifunc
 Patch349: gdb-archer.patch
-#=maybepush
-Patch420: gdb-archer-ada.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
 # - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
@@ -681,7 +679,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 #patch232 -p1
 %patch349 -p1
-%patch420 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1169,6 +1166,7 @@ fi
 - Drop gdb-6.8-glibc-headers-compat.patch: GNU/Linux irrelevant (Tom Tromey).
 - Drop gdb-6.3-terminal-fix-20050214.patch: The bug is not reproducible.
 - Drop gdb-6.7-kernel-headers-compat.patch: kernel-headers seem to be fixed.
+- Drop gdb-archer-ada.patch: No longer needed for Ada (Keith Seitz).
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
