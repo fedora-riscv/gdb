@@ -366,10 +366,6 @@ Patch296: gdb-6.5-gcore-buffer-limit-test.patch
 #=fedoratest
 Patch298: gdb-6.6-threads-static-test.patch
 
-# Fix #include <asm/ptrace.h> on kernel-headers-2.6.25-0.40.rc1.git2.fc9.x86_64.
-#=push
-Patch304: gdb-6.7-kernel-headers-compat.patch
-
 # Test GCORE for shmid 0 shared memory mappings.
 #=fedoratest: But it is broken anyway, sometimes the case being tested is not reproducible.
 Patch309: gdb-6.3-mapping-zero-inode-test.patch
@@ -753,7 +749,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch294 -p1
 %patch296 -p1
 %patch298 -p1
-%patch304 -p1
 %patch309 -p1
 %patch311 -p1
 %patch315 -p1
@@ -1173,6 +1168,7 @@ fi
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-2.fc15
 - Drop gdb-6.8-glibc-headers-compat.patch: GNU/Linux irrelevant (Tom Tromey).
 - Drop gdb-6.3-terminal-fix-20050214.patch: The bug is not reproducible.
+- Drop gdb-6.7-kernel-headers-compat.patch: kernel-headers seem to be fixed.
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
