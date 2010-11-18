@@ -1172,6 +1172,7 @@ fi
 %changelog
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-2.fc15
 - Drop gdb-6.8-glibc-headers-compat.patch: GNU/Linux irrelevant (Tom Tromey).
+- Drop gdb-6.3-terminal-fix-20050214.patch: The bug is not reproducible.
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
