@@ -292,6 +292,10 @@ Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 #=push
 Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
 
+# Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
+#=fedoratest
+Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
+
 # Notify user of a child forked process being detached (BZ 235197).
 #=push: This is more about discussion if/what should be printed.
 Patch247: gdb-6.6-bz235197-fork-detach-info.patch
@@ -550,6 +554,9 @@ Patch520: gdb-bz642879-elfread-sigint-stale.patch
 #=push
 Patch525: gdb-next-over-throw.patch
 
+# Verify GDB Python built-in function gdb.solib_address exists (BZ # 634108).
+Patch526: gdb-bz634108-solib_address.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -735,6 +742,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch234 -p1
 %patch235 -p1
 %patch241 -p1
+%patch245 -p1
 %patch247 -p1
 %patch254 -p1
 %patch258 -p1
@@ -801,6 +809,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch511 -p1
 %patch520 -p1
 %patch525 -p1
+%patch526 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1171,7 +1180,7 @@ fi
 %endif
 
 %changelog
-* Wed Nov 17 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
+* Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
 
 * Sun Nov  7 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-25.fc14
