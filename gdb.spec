@@ -374,10 +374,6 @@ Patch315: gdb-6.8-bz442765-threaded-exec-test.patch
 #=push: But it is just a GCC workaround, look up the existing GCC PR for it.
 Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 
-# Fix memory trashing on binaries from GCC Ada (workaround GCC PR 35998).
-#=push
-Patch318: gdb-6.8-gcc35998-ada-memory-trash.patch
-
 # Test a crash on libraries missing the .text section.
 #=fedoratest
 Patch320: gdb-6.5-section-num-fixup-test.patch
@@ -740,7 +736,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch311 -p1
 %patch315 -p1
 %patch317 -p1
-%patch318 -p1
 %patch320 -p1
 %patch326 -p1
 %patch329 -p1
@@ -1159,6 +1154,7 @@ fi
 - Drop gdb-archer-ada.patch: No longer needed for Ada (Keith Seitz).
 - New PR backtrace/12237, drop gdb-6.3-framepczero-20040927.patch
   gdb-6.3-bt-past-zero-20051201.patch as they already had no effect.
+- Drop gdb-6.8-gcc35998-ada-memory-trash.patch as a different fix is upstream.
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
