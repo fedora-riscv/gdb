@@ -159,10 +159,6 @@ Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 #=fedoratest
 Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 
-# Fix printing of inherited members
-#=maybepush
-Patch148: gdb-6.3-inheritance-20050324.patch
-
 # Do not issue warning message about first page of storage for ia64 gcore
 #=ia64
 Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
@@ -683,7 +679,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch141 -p1
 %patch259 -p1
 %patch145 -p1
-%patch148 -p1
 %patch153 -p1
 %patch157 -p1
 %patch158 -p1
@@ -1155,6 +1150,7 @@ fi
 - New PR backtrace/12237, drop gdb-6.3-framepczero-20040927.patch
   gdb-6.3-bt-past-zero-20051201.patch as they already had no effect.
 - Drop gdb-6.8-gcc35998-ada-memory-trash.patch as a different fix is upstream.
+- Drop gdb-6.3-inheritance-20050324.patch: the call is redundent (Tom Tromey).
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
