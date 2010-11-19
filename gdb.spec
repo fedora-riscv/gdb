@@ -195,10 +195,6 @@ Patch164: gdb-6.3-readnever-20050907.patch
 #=ia64
 Patch169: gdb-6.3-ia64-sigill-20051115.patch
 
-# Use bigger numbers than int.
-#=push
-Patch176: gdb-6.3-large-core-20051206.patch
-
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 #=push+work: There was some mail thread about it, this patch may be a hack.
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
@@ -688,7 +684,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch163 -p1
 %patch164 -p1
 %patch169 -p1
-%patch176 -p1
 %patch188 -p1
 %patch190 -p1
 %patch194 -p1
@@ -1151,6 +1146,7 @@ fi
   gdb-6.3-bt-past-zero-20051201.patch as they already had no effect.
 - Drop gdb-6.8-gcc35998-ada-memory-trash.patch as a different fix is upstream.
 - Drop gdb-6.3-inheritance-20050324.patch: the call is redundent (Tom Tromey).
+- Drop gdb-6.3-large-core-20051206.patch: obsoleted by MAX_COPY_BYTES.
 
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-1.fc15
 - Rebase to FSF GDB 7.2.50.20101117 (which is a 7.3 pre-release).
