@@ -27,7 +27,7 @@ Version: 7.2.50.20101117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{dist}
+Release: 3%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1131,12 +1131,16 @@ fi
 %endif
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
-%ifnarch s390 s390x %{sparc}
+%ifarch %{ix86} x86_64
 %{_libdir}/libinproctrace.so
 %endif
 %endif
 
 %changelog
+* Mon Dec 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-3.fc15
+- Fix ppc* compilation of PRPSINFO in the core files (BZ 662995, for BZ 254229).
+- Fix (disable) non-x86* compilation of libinproctrace.so (for BZ 662995).
+
 * Thu Nov 18 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-2.fc15
 - Drop gdb-6.8-glibc-headers-compat.patch: GNU/Linux irrelevant (Tom Tromey).
 - Drop gdb-6.3-terminal-fix-20050214.patch: The bug is not reproducible.
