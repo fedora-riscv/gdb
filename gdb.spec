@@ -27,7 +27,7 @@ Version: 7.2.50.20101117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{dist}
+Release: 4%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -86,6 +86,10 @@ Source2: gdb-orphanripper.c
 # Man page for gstack(1).
 #=push
 Source3: gdb-gstack.man
+
+# /etc/gdbinit (from Debian but with Fedora compliant location).
+#=fedora
+Source4: gdbinit
 
 # Work around out-of-date dejagnu that does not have KFAIL
 #=drop: That dejagnu is too old to be supported.
@@ -827,6 +831,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--sysconfdir=%{_sysconfdir}				\
 	--mandir=%{_mandir}					\
 	--infodir=%{_infodir}					\
+	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--with-pythondir=%{_datadir}/gdb/python			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
@@ -1037,6 +1042,9 @@ ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
 cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
 
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
+sed 's#%%{_sysconfdir}#%{_sysconfdir}#g' <%{SOURCE4} >$RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
+
 for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb -name "*.py"`
 do
   # Files could be also patched getting the current time.
@@ -1105,6 +1113,8 @@ fi
 %{_bindir}/gcore
 %{_bindir}/gdb
 %{_bindir}/gdbtui
+%{_sysconfdir}/gdbinit
+%{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdb.1*
 %{_mandir}/*/gdbtui.1*
 %if 0%{!?_with_upstream:1}
@@ -1137,6 +1147,9 @@ fi
 %endif
 
 %changelog
+* Mon Dec 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-4.fc15
+- Provide stub %%{_sysconfdir}/gdbinit (BZ 651232).
+
 * Mon Dec 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-3.fc15
 - Fix ppc* compilation of PRPSINFO in the core files (BZ 662995, for BZ 254229).
 - Fix (disable) non-x86* compilation of libinproctrace.so (for BZ 662995).
