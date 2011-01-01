@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit e77402373d43ec23661a16a134c94e6112b9d030
+commit 18d3d5d564eac7ad10bc972c957e6159a4276d3f
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
@@ -14,10 +14,10 @@ archer-jankratochvil-ifunc
 
 
 diff --git a/gdb/ada-lang.c b/gdb/ada-lang.c
-index ea71ea2..ccd7b29 100644
+index 3efff2e..99097bf 100644
 --- a/gdb/ada-lang.c
 +++ b/gdb/ada-lang.c
-@@ -11250,6 +11250,7 @@ ada_operator_length (const struct expression *exp, int pc, int *oplenp,
+@@ -11356,6 +11356,7 @@ ada_operator_length (const struct expression *exp, int pc, int *oplenp,
  
  static int
  ada_operator_check (struct expression *exp, int pos,
@@ -25,7 +25,7 @@ index ea71ea2..ccd7b29 100644
  		    int (*objfile_func) (struct objfile *objfile, void *data),
  		    void *data)
  {
-@@ -11264,12 +11265,15 @@ ada_operator_check (struct expression *exp, int pos,
+@@ -11370,12 +11371,15 @@ ada_operator_check (struct expression *exp, int pos,
  	break;
  
        default:
@@ -44,40 +44,229 @@ index ea71ea2..ccd7b29 100644
      return 1;
  
 diff --git a/gdb/amd64-linux-nat.c b/gdb/amd64-linux-nat.c
-index 16e97a2..3a5d57e 100644
+index 16e97a2..784a476 100644
 --- a/gdb/amd64-linux-nat.c
 +++ b/gdb/amd64-linux-nat.c
-@@ -375,6 +375,20 @@ amd64_linux_dr_unset_status (unsigned long mask)
-     }
+@@ -265,18 +265,11 @@ amd64_linux_store_inferior_registers (struct target_ops *ops,
+ 
+ /* Support for debug registers.  */
+ 
+-static unsigned long amd64_linux_dr[DR_CONTROL + 1];
+-
+ static unsigned long
+-amd64_linux_dr_get (ptid_t ptid, int regnum)
++amd64_linux_dr_get (int tid, int regnum)
+ {
+-  int tid;
+   unsigned long value;
+ 
+-  tid = TIDGET (ptid);
+-  if (tid == 0)
+-    tid = PIDGET (ptid);
+-
+   /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
+      ptrace call fails breaks debugging remote targets.  The correct
+      way to fix this is to add the hardware breakpoint and watchpoint
+@@ -298,14 +291,8 @@ amd64_linux_dr_get (ptid_t ptid, int regnum)
+ /* Set debug register REGNUM to VALUE in only the one LWP of PTID.  */
+ 
+ static void
+-amd64_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
++amd64_linux_dr_set (int tid, int regnum, unsigned long value)
+ {
+-  int tid;
+-
+-  tid = TIDGET (ptid);
+-  if (tid == 0)
+-    tid = PIDGET (ptid);
+-
+   errno = 0;
+   ptrace (PTRACE_POKEUSER, tid,
+ 	  offsetof (struct user, u_debugreg[regnum]), value);
+@@ -313,35 +300,96 @@ amd64_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+     perror_with_name (_("Couldn't write debug register"));
  }
  
-+/* See i386_dr_low_type.detach.  Do not use wrappers amd64_linux_dr_set_control
-+   or amd64_linux_dr_reset_addr as they would modify the register cache
-+   (amd64_linux_dr).  */
+-/* Set DR_CONTROL to ADDR in all LWPs of LWP_LIST.  */
++/* Helper for amd64_linux_dr_set_control.  */
 +
 +static void
-+amd64_linux_dr_detach (void)
++amd64_linux_dr_set_control_callback (int tid, void *control_voidp)
 +{
-+  int regnum;
++  unsigned long control = *(unsigned long *) control_voidp;
 +
-+  amd64_linux_dr_set (inferior_ptid, DR_CONTROL, 0);
-+  amd64_linux_dr_unset_status (~0UL);
-+  for (regnum = DR_FIRSTADDR; regnum <= DR_LASTADDR; regnum++)
-+    amd64_linux_dr_set (inferior_ptid, regnum, 0);
++  amd64_linux_dr_set (tid, DR_CONTROL, control);
++}
++
++static void amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr);
++
++/* Set DR_CONTROL to ADDR in all LWPs of CURRENT_INFERIOR.  */
+ 
+ static void
+ amd64_linux_dr_set_control (unsigned long control)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
++  int inferior_pid = ptid_get_pid (inferior_ptid);
++  struct inferior *inf = current_inferior ();
++
++  /* Are we detaching breakpoints from a fork-ed child?
++     See linux_nat_iterate_watchpoint_lwps for the fork-ed child description.
++     The i386 counterpart is i386_linux_dr_set_control.  */
++  if (inf->pid != inferior_pid)
++    {
++      struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
++      int i;
++
++      /* There were two changes in Linux kernel 2.6.33 by the commit:
++         72f674d203cd230426437cdcf7dd6f681dad8b0d
++
++         (1) After fork/vfork/clone the new task no longer inherits the debug
++	 registers.  It has them zeroed instead.  Either case is OK for GDB as
++	 GDB already registers a fix up by linux_nat_set_new_thread.
++
++	 (2) If you enable a breakpoint by the CONTROL bits you have already
++	 written its ADDRESS.  Otherwise Linux kernel will report EINVAL.
++	 For this case the workaround here ensures that during resetting
++	 (detaching) watchpoints for a fork-ed child we can set CONTROL
++	 arbitrarily as the addresses get pre-set here just to be sure.
++
++	 The second issue is hopefully going to be fixed in Linux kernel:
++	 https://bugzilla.redhat.com/show_bug.cgi?id=660204  */
++
++      if (!dr_mirror->addr_preset)
++	{
++	  dr_mirror->addr_preset = 1;
++
++	  for (i = 0; i < DR_LASTADDR - DR_FIRSTADDR; i++)
++	    amd64_linux_dr_set_addr (i, dr_mirror->addr[i]);
++	}
++    }
++
++  linux_nat_iterate_watchpoint_lwps (amd64_linux_dr_set_control_callback,
++				     &control);
++}
++
++/* Helper for amd64_linux_dr_set_addr.  */
++
++struct amd64_linux_dr_set_addr_data
++  {
++    int regnum;
++    CORE_ADDR addr;
++  };
++
++static void
++amd64_linux_dr_set_addr_callback (int tid, void *datap_voidp)
++{
++  const struct amd64_linux_dr_set_addr_data *datap = datap_voidp;
+ 
+-  amd64_linux_dr[DR_CONTROL] = control;
+-  ALL_LWPS (lp, ptid)
+-    amd64_linux_dr_set (ptid, DR_CONTROL, control);
++  amd64_linux_dr_set (tid, DR_FIRSTADDR + datap->regnum, datap->addr);
+ }
+ 
+-/* Set address REGNUM (zero based) to ADDR in all LWPs of LWP_LIST.  */
++/* Set address REGNUM (zero based) to ADDR in all LWPs of CURRENT_INFERIOR.
++   */
+ 
+ static void
+ amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
++  struct amd64_linux_dr_set_addr_data data;
+ 
+   gdb_assert (regnum >= 0 && regnum <= DR_LASTADDR - DR_FIRSTADDR);
+ 
+-  amd64_linux_dr[DR_FIRSTADDR + regnum] = addr;
+-  ALL_LWPS (lp, ptid)
+-    amd64_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
++  data.regnum = regnum;
++  data.addr = addr;
++  linux_nat_iterate_watchpoint_lwps (amd64_linux_dr_set_addr_callback, &data);
+ }
+ 
+-/* Set address REGNUM (zero based) to zero in all LWPs of LWP_LIST.  */
++/* Set address REGNUM (zero based) to zero in all LWPs of CURRENT_INFERIOR.
++   */
+ 
+ static void
+ amd64_linux_dr_reset_addr (int regnum)
+@@ -354,37 +402,54 @@ amd64_linux_dr_reset_addr (int regnum)
+ static unsigned long
+ amd64_linux_dr_get_status (void)
+ {
+-  return amd64_linux_dr_get (inferior_ptid, DR_STATUS);
++  int tid;
++
++  tid = TIDGET (inferior_ptid);
++  if (tid == 0)
++    tid = PIDGET (inferior_ptid);
++
++  return amd64_linux_dr_get (tid, DR_STATUS);
+ }
+ 
+-/* Unset MASK bits in DR_STATUS in all LWPs of LWP_LIST.  */
++/* Helper for amd64_linux_dr_unset_status.  */
+ 
+ static void
+-amd64_linux_dr_unset_status (unsigned long mask)
++amd64_linux_dr_unset_status_callback (int tid, void *mask_voidp)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
+-
+-  ALL_LWPS (lp, ptid)
+-    {
+-      unsigned long value;
++  unsigned long mask = *(unsigned long *) mask_voidp;
++  unsigned long value;
+       
+-      value = amd64_linux_dr_get (ptid, DR_STATUS);
+-      value &= ~mask;
+-      amd64_linux_dr_set (ptid, DR_STATUS, value);
+-    }
++  value = amd64_linux_dr_get (tid, DR_STATUS);
++  value &= ~mask;
++  amd64_linux_dr_set (tid, DR_STATUS, value);
+ }
+ 
++/* Unset MASK bits in DR_STATUS in all LWPs of CURRENT_INFERIOR.  */
++
++static void
++amd64_linux_dr_unset_status (unsigned long mask)
++{
++  linux_nat_iterate_watchpoint_lwps (amd64_linux_dr_unset_status_callback,
++				     &mask);
 +}
  
  static void
  amd64_linux_new_thread (ptid_t ptid)
-@@ -800,6 +814,7 @@ _initialize_amd64_linux_nat (void)
-   i386_dr_low.reset_addr = amd64_linux_dr_reset_addr;
-   i386_dr_low.get_status = amd64_linux_dr_get_status;
-   i386_dr_low.unset_status = amd64_linux_dr_unset_status;
-+  i386_dr_low.detach = amd64_linux_dr_detach;
-   i386_set_debug_register_length (8);
+ {
+-  int i;
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
++  int i, tid;
++
++  /* Verify DR_MIRROR is valid.  */
++  gdb_assert (PIDGET (ptid) == PIDGET (inferior_ptid));
++
++  tid = TIDGET (ptid);
++  if (tid == 0)
++    tid = PIDGET (ptid);
  
-   /* Override the GNU/Linux inferior startup hook.  */
+-  for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
+-    amd64_linux_dr_set (ptid, i, amd64_linux_dr[i]);
++  for (i = 0; i < DR_LASTADDR - DR_FIRSTADDR; i++)
++    amd64_linux_dr_set (tid, DR_FIRSTADDR + i, dr_mirror->addr[i]);
+ 
+-  amd64_linux_dr_set (ptid, DR_CONTROL, amd64_linux_dr[DR_CONTROL]);
++  amd64_linux_dr_set (tid, DR_CONTROL, dr_mirror->control);
+ }
+ 
+ 
 diff --git a/gdb/block.c b/gdb/block.c
-index 48ac21b..ffcc97f 100644
+index f932d41..6e2cd88 100644
 --- a/gdb/block.c
 +++ b/gdb/block.c
 @@ -321,3 +321,21 @@ allocate_block (struct obstack *obstack)
@@ -114,26 +303,18 @@ index 7eedb6c..a517e80 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/blockframe.c b/gdb/blockframe.c
-index 0348bf4..f01d0ee 100644
+index 366bedd..97f418a 100644
 --- a/gdb/blockframe.c
 +++ b/gdb/blockframe.c
-@@ -38,6 +38,7 @@
- #include "block.h"
- #include "inline-frame.h"
- #include "psymtab.h"
-+#include "elf-bfd.h"
- 
- /* Return the innermost lexical block in execution
-    in a specified stack frame.  The frame address is assumed valid.
-@@ -159,6 +160,7 @@ static CORE_ADDR cache_pc_function_low = 0;
+@@ -160,6 +160,7 @@ static CORE_ADDR cache_pc_function_low = 0;
  static CORE_ADDR cache_pc_function_high = 0;
  static char *cache_pc_function_name = 0;
  static struct obj_section *cache_pc_function_section = NULL;
 +static int cache_pc_function_is_gnu_ifunc = 0;
  
- /* Clear cache, e.g. when symbol table is discarded. */
+ /* Clear cache, e.g. when symbol table is discarded.  */
  
-@@ -169,6 +171,7 @@ clear_pc_function_cache (void)
+@@ -170,6 +171,7 @@ clear_pc_function_cache (void)
    cache_pc_function_high = 0;
    cache_pc_function_name = (char *) 0;
    cache_pc_function_section = NULL;
@@ -141,7 +322,7 @@ index 0348bf4..f01d0ee 100644
  }
  
  /* Finds the "function" (text symbol) that is smaller than PC but
-@@ -184,7 +187,7 @@ clear_pc_function_cache (void)
+@@ -185,7 +187,7 @@ clear_pc_function_cache (void)
  
  /* Backward compatibility, no section argument.  */
  
@@ -150,7 +331,7 @@ index 0348bf4..f01d0ee 100644
  find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
  			  CORE_ADDR *endaddr)
  {
-@@ -236,6 +239,7 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
+@@ -237,6 +239,7 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
  	  cache_pc_function_high = BLOCK_END (SYMBOL_BLOCK_VALUE (f));
  	  cache_pc_function_name = SYMBOL_LINKAGE_NAME (f);
  	  cache_pc_function_section = section;
@@ -158,7 +339,7 @@ index 0348bf4..f01d0ee 100644
  	  goto return_cached_value;
  	}
      }
-@@ -258,12 +262,13 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
+@@ -259,12 +262,13 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
  	*address = 0;
        if (endaddr != NULL)
  	*endaddr = 0;
@@ -173,7 +354,7 @@ index 0348bf4..f01d0ee 100644
  
    /* If the minimal symbol has a size, use it for the cache.
       Otherwise use the lesser of the next minimal symbol in the same
-@@ -323,7 +328,8 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
+@@ -324,7 +328,8 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
  	*endaddr = cache_pc_function_high;
      }
  
@@ -182,9 +363,9 @@ index 0348bf4..f01d0ee 100644
 +					: FIND_PC_PARTIAL_FUNCTION_NORMAL;
  }
  
- /* Return the innermost stack frame executing inside of BLOCK,
+ /* Return the innermost stack frame executing inside of BLOCK, or NULL
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 6b55313..30626a6 100644
+index 809eb53..8f92c4e 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -62,6 +62,7 @@
@@ -195,27 +376,17 @@ index 6b55313..30626a6 100644
  
  /* readline include files */
  #include "readline/readline.h"
-@@ -92,6 +93,9 @@ static void map_breakpoint_numbers (char *, void (*) (struct breakpoint *,
- 
- static void ignore_command (char *, int);
- 
-+static void update_breakpoint_locations (struct breakpoint *b,
-+					 struct symtabs_and_lines sals);
-+
- static int breakpoint_re_set_one (void *);
- 
- static void clear_command (char *, int);
-@@ -104,6 +108,9 @@ static void break_command_1 (char *, int, int);
+@@ -104,6 +105,9 @@ static void break_command_1 (char *, int, int);
  
  static void mention (struct breakpoint *);
  
 +static struct bp_location *add_location_to_breakpoint (struct breakpoint *b,
 +					     const struct symtab_and_line *sal);
 +
- /* This function is used in gdbtk sources and thus can not be made static.  */
+ /* This function is used in gdbtk sources and thus can not be made
+    static.  */
  struct breakpoint *set_raw_breakpoint (struct gdbarch *gdbarch,
- 					      struct symtab_and_line,
-@@ -219,6 +226,10 @@ static void disable_trace_command (char *, int);
+@@ -220,6 +224,10 @@ static void disable_trace_command (char *, int);
  
  static void trace_pass_command (char *, int);
  
@@ -226,7 +397,7 @@ index 6b55313..30626a6 100644
  /* Assuming we're creating a static tracepoint, does S look like a
     static tracepoint marker spec ("-m MARKER_ID")?  */
  #define is_marker_spec(s)						\
-@@ -1241,6 +1252,22 @@ watchpoint_in_thread_scope (struct breakpoint *b)
+@@ -1270,6 +1278,22 @@ watchpoint_in_thread_scope (struct breakpoint *b)
  	      && !is_executing (inferior_ptid)));
  }
  
@@ -249,7 +420,7 @@ index 6b55313..30626a6 100644
  /* Assuming that B is a watchpoint:
     - Reparse watchpoint expression, if REPARSE is non-zero
     - Evaluate expression and store the result in B->val
-@@ -1296,6 +1323,8 @@ update_watchpoint (struct breakpoint *b, int reparse)
+@@ -1329,12 +1353,17 @@ update_watchpoint (struct breakpoint *b, int reparse)
    struct frame_id saved_frame_id;
    int frame_saved;
  
@@ -258,7 +429,16 @@ index 6b55313..30626a6 100644
    /* If this is a local watchpoint, we only want to check if the
       watchpoint frame is in scope if the current thread is the thread
       that was used to create the watchpoint.  */
-@@ -1500,13 +1529,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
+   if (!watchpoint_in_thread_scope (b))
+     return;
+ 
++  if (b->pspace != current_program_space)
++    return;
++
+   /* We don't free locations.  They are stored in bp_location array
+      and update_global_locations will eventually delete them and
+      remove breakpoints if needed.  */
+@@ -1534,13 +1563,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
  Watchpoint %d deleted because the program has left the block\n\
  in which its expression is valid.\n"),
  		       b->number);
@@ -273,30 +453,67 @@ index 6b55313..30626a6 100644
      }
  
    /* Restore the selected frame.  */
-@@ -2354,6 +2377,8 @@ detach_breakpoints (int pid)
-   /* Detach single-step breakpoints as well.  */
-   detach_single_step_breakpoints ();
+@@ -1916,6 +1939,7 @@ insert_breakpoint_locations (void)
+   int val = 0;
+   int disabled_breaks = 0;
+   int hw_breakpoint_error = 0;
++  struct program_space *saved_current_program_space = current_program_space;
  
-+  val |= target_detach_watchpoints ();
+   struct ui_file *tmp_error_stream = mem_fileopen ();
+   struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
+@@ -1943,9 +1967,13 @@ insert_breakpoint_locations (void)
+       /* For targets that support global breakpoints, there's no need
+ 	 to select an inferior to insert breakpoint to.  In fact, even
+ 	 if we aren't attached to any process yet, we should still
+-	 insert breakpoints.  */
++	 insert breakpoints.
 +
-   do_cleanups (old_chain);
-   return val;
- }
-@@ -2455,9 +2480,11 @@ remove_breakpoint_1 (struct bp_location *b, insertion_state_t is)
- 	return val;
-       b->inserted = (is == mark_inserted);
-     }
--  else if (b->loc_type == bp_loc_hardware_watchpoint)
-+  /* bp_loc_hardware_watchpoint with mark_inserted is being handled by
-+     target_detach_watchpoints.  */
-+  else if (b->loc_type == bp_loc_hardware_watchpoint && is == mark_uninserted)
-     {
--      b->inserted = (is == mark_inserted);
-+      b->inserted = 0;
-       val = target_remove_watchpoint (b->address, b->length,
- 				      b->watchpoint_type, b->owner->cond_exp);
++	 Also inserting breakpoints into inappropriate inferior must be
++	 prevented.  */
+       if (!gdbarch_has_global_breakpoints (target_gdbarch)
+-	  && ptid_equal (inferior_ptid, null_ptid))
++	  && (ptid_equal (inferior_ptid, null_ptid)
++	      || bl->pspace != saved_current_program_space))
+ 	continue;
  
-@@ -3342,6 +3369,8 @@ print_it_typical (bpstat bs)
+       val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
+@@ -1969,13 +1997,19 @@ insert_breakpoint_locations (void)
+ 
+       if (bpt->disposition == disp_del_at_next_stop)
+ 	continue;
+-      
++
+       for (loc = bpt->loc; loc; loc = loc->next)
+-	if (!loc->inserted && should_be_inserted (loc))
+-	  {
+-	    some_failed = 1;
+-	    break;
+-	  }
++	{
++	  /* Verify the first loop above really tried to insert this LOC.  */
++	  if (!loc->inserted && should_be_inserted (loc)
++	      && (gdbarch_has_global_breakpoints (target_gdbarch)
++		  || (!ptid_equal (inferior_ptid, null_ptid)
++		      && loc->pspace == saved_current_program_space)))
++	    {
++	      some_failed = 1;
++	      break;
++	    }
++	}
+       if (some_failed)
+ 	{
+ 	  for (loc = bpt->loc; loc; loc = loc->next)
+@@ -2525,8 +2559,7 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
+     {
+       bl->inserted = (is == mark_inserted);
+       val = target_remove_watchpoint (bl->address, bl->length,
+-				      bl->watchpoint_type, 
+-				      bl->owner->cond_exp);
++				      bl->watchpoint_type, bl->owner->cond_exp);
+ 
+       /* Failure to remove any of the hardware watchpoints comes here.  */
+       if ((is == mark_uninserted) && (bl->inserted))
+@@ -3419,6 +3452,8 @@ print_it_typical (bpstat bs)
      case bp_tracepoint:
      case bp_fast_tracepoint:
      case bp_jit_event:
@@ -305,7 +522,7 @@ index 6b55313..30626a6 100644
      default:
        result = PRINT_UNKNOWN;
        break;
-@@ -3562,6 +3591,8 @@ watchpoint_check (void *p)
+@@ -3640,6 +3675,8 @@ watchpoint_check (void *p)
    gdb_assert (bs->breakpoint_at != NULL);
    b = bs->breakpoint_at;
  
@@ -314,7 +531,7 @@ index 6b55313..30626a6 100644
    /* If this is a local watchpoint, we only want to check if the
       watchpoint frame is in scope if the current thread is the thread
       that was used to create the watchpoint.  */
-@@ -3668,13 +3699,7 @@ watchpoint_check (void *p)
+@@ -3748,13 +3785,7 @@ watchpoint_check (void *p)
        ui_out_text (uiout, " deleted because the program has left the block in\n\
  which its expression is valid.\n");     
  
@@ -329,22 +546,7 @@ index 6b55313..30626a6 100644
  
        return WP_DELETED;
      }
-@@ -3743,8 +3768,12 @@ bpstat_check_location (const struct bp_location *bl,
- 
- /* If BS refers to a watchpoint, determine if the watched values
-    has actually changed, and we should stop.  If not, set BS->stop
--   to 0.  */
--static void
-+   to 0.
-+   Return 0 for watchpoints which could not be the cause of this trap.
-+   In such case PRINT_IT will be print_it_noop and STOP will be 0.
-+   Otherwise return 1 but in such case it is not guaranteed whether this
-+   breakpoint did or did not trigger this trap.  */
-+static int
- bpstat_check_watchpoint (bpstat bs)
- {
-   const struct bp_location *bl;
-@@ -3878,9 +3907,7 @@ bpstat_check_watchpoint (bpstat bs)
+@@ -3958,9 +3989,7 @@ bpstat_check_watchpoint (bpstat bs)
  	    case 0:
  	      /* Error from catch_errors.  */
  	      printf_filtered (_("Watchpoint %d deleted.\n"), b->number);
@@ -355,27 +557,7 @@ index 6b55313..30626a6 100644
  	      /* We've already printed what needs to be printed.  */
  	      bs->print_it = print_it_done;
  	      break;
-@@ -3894,8 +3921,10 @@ bpstat_check_watchpoint (bpstat bs)
- 	     anything for this watchpoint.  */
- 	  bs->print_it = print_it_noop;
- 	  bs->stop = 0;
-+	  return 0;
- 	}
-     }
-+  return 1;
- }
- 
- 
-@@ -4035,7 +4064,7 @@ bpstat_stop_status (struct address_space *aspace,
-   struct bp_location *bl;
-   struct bp_location *loc;
-   /* First item of allocated bpstat's.  */
--  bpstat bs_head = NULL, *bs_link = &bs_head;
-+  bpstat bs_head = NULL, *bs_link = &bs_head, *bs_link_next;
-   /* Pointer to the last thing in the chain currently.  */
-   bpstat bs;
-   int ix;
-@@ -4084,7 +4113,7 @@ bpstat_stop_status (struct address_space *aspace,
+@@ -4166,7 +4195,7 @@ bpstat_stop_status (struct address_space *aspace,
  	     watchpoint as triggered so that we will handle the
  	     out-of-scope event.  We'll get to the watchpoint next
  	     iteration.  */
@@ -384,36 +566,7 @@ index 6b55313..30626a6 100644
  	    b->related_breakpoint->watchpoint_triggered = watch_triggered_yes;
  	}
      }
-@@ -4108,12 +4137,26 @@ bpstat_stop_status (struct address_space *aspace,
- 
-   removed_any = 0;
- 
--  for (bs = bs_head; bs != NULL; bs = bs->next)
-+  for (bs_link = &bs_head; *bs_link != NULL; bs_link = bs_link_next)
-     {
-+      bs = *bs_link;
-+      bs_link_next = &bs->next;
-+
-       if (!bs->stop)
- 	continue;
- 
--      bpstat_check_watchpoint (bs);
-+      if (!bpstat_check_watchpoint (bs))
-+	{
-+	  /* Ensure bpstat_explains_signal stays false if this BL could not be
-+	     the cause of this trap.  */
-+
-+	  gdb_assert (bs->print_it == print_it_noop);
-+	  gdb_assert (!bs->stop);
-+	  *bs_link = bs->next;
-+	  bs_link_next = bs_link;
-+	  xfree (bs);
-+	  continue;
-+	}
-       if (!bs->stop)
- 	continue;
- 
-@@ -4205,7 +4248,7 @@ handle_jit_event (void)
+@@ -4288,7 +4317,7 @@ handle_jit_event (void)
  /* Decide what infrun needs to do with this bpstat.  */
  
  struct bpstat_what
@@ -422,7 +575,7 @@ index 6b55313..30626a6 100644
  {
    struct bpstat_what retval;
    /* We need to defer calling `solib_add', as adding new symbols
-@@ -4213,11 +4256,12 @@ bpstat_what (bpstat bs)
+@@ -4296,12 +4325,13 @@ bpstat_what (bpstat bs)
       and hence may clear unprocessed entries in the BS chain.  */
    int shlib_event = 0;
    int jit_event = 0;
@@ -430,13 +583,14 @@ index 6b55313..30626a6 100644
  
    retval.main_action = BPSTAT_WHAT_KEEP_CHECKING;
    retval.call_dummy = STOP_NONE;
+   retval.is_longjmp = 0;
  
 -  for (; bs != NULL; bs = bs->next)
 +  for (bs = bs_head; bs != NULL; bs = bs->next)
      {
        /* Extract this BS's action.  After processing each BS, we check
  	 if its action overrides all we've seem so far.  */
-@@ -4342,6 +4386,20 @@ bpstat_what (bpstat bs)
+@@ -4431,6 +4461,20 @@ bpstat_what (bpstat bs)
  	     out already.  */
  	  internal_error (__FILE__, __LINE__,
  			  _("bpstat_what: tracepoint encountered"));
@@ -457,7 +611,7 @@ index 6b55313..30626a6 100644
  	default:
  	  internal_error (__FILE__, __LINE__,
  			  _("bpstat_what: unhandled bptype %d"), (int) bptype);
-@@ -4379,6 +4437,21 @@ bpstat_what (bpstat bs)
+@@ -4468,6 +4512,21 @@ bpstat_what (bpstat bs)
        handle_jit_event ();
      }
  
@@ -479,7 +633,7 @@ index 6b55313..30626a6 100644
    return retval;
  }
  
-@@ -4497,6 +4570,8 @@ bptype_string (enum bptype type)
+@@ -4589,6 +4648,8 @@ bptype_string (enum bptype type)
      {bp_fast_tracepoint, "fast tracepoint"},
      {bp_static_tracepoint, "static tracepoint"},
      {bp_jit_event, "jit events"},
@@ -488,7 +642,7 @@ index 6b55313..30626a6 100644
    };
  
    if (((int) type >= (sizeof (bptypes) / sizeof (bptypes[0])))
-@@ -4643,6 +4718,8 @@ print_one_breakpoint_location (struct breakpoint *b,
+@@ -4736,6 +4797,8 @@ print_one_breakpoint_location (struct breakpoint *b,
        case bp_fast_tracepoint:
        case bp_static_tracepoint:
        case bp_jit_event:
@@ -497,7 +651,7 @@ index 6b55313..30626a6 100644
  	if (opts.addressprint)
  	  {
  	    annotate_field (4);
-@@ -4923,7 +5000,8 @@ user_settable_breakpoint (const struct breakpoint *b)
+@@ -5017,7 +5080,8 @@ user_settable_breakpoint (const struct breakpoint *b)
  	  || b->type == bp_catchpoint
  	  || b->type == bp_hardware_breakpoint
  	  || is_tracepoint (b)
@@ -505,26 +659,26 @@ index 6b55313..30626a6 100644
 +	  || is_watchpoint (b)
 +	  || b->type == bp_gnu_ifunc_resolver);
  }
- 	
+ 
  /* Print information on user settable breakpoint (watchpoint, etc)
-@@ -5389,6 +5467,8 @@ allocate_bp_location (struct breakpoint *bpt)
-     case bp_jit_event:
+@@ -5497,6 +5561,8 @@ allocate_bp_location (struct breakpoint *bpt)
      case bp_longjmp_master:
      case bp_std_terminate_master:
+     case bp_exception_master:
 +    case bp_gnu_ifunc_resolver:
 +    case bp_gnu_ifunc_resolver_return:
        loc->loc_type = bp_loc_software_breakpoint;
        break;
      case bp_hardware_breakpoint:
-@@ -5477,6 +5557,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
+@@ -5586,6 +5652,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
    b->ops = NULL;
    b->condition_not_parsed = 0;
    b->py_bp_object = NULL;
 +  b->related_breakpoint = b;
  
-   /* Add this breakpoint to the end of the chain
-      so that a list of breakpoints will come out in order
-@@ -5496,7 +5577,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
+   /* Add this breakpoint to the end of the chain so that a list of
+      breakpoints will come out in order of increasing numbers.  */
+@@ -5604,7 +5671,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
  
  /* Initialize loc->function_name.  */
  static void
@@ -533,7 +687,7 @@ index 6b55313..30626a6 100644
  {
    gdb_assert (loc->owner != NULL);
  
-@@ -5504,8 +5585,29 @@ set_breakpoint_location_function (struct bp_location *loc)
+@@ -5612,8 +5679,29 @@ set_breakpoint_location_function (struct bp_location *loc)
        || loc->owner->type == bp_hardware_breakpoint
        || is_tracepoint (loc->owner))
      {
@@ -565,7 +719,7 @@ index 6b55313..30626a6 100644
        if (loc->function_name)
  	loc->function_name = xstrdup (loc->function_name);
      }
-@@ -5578,7 +5680,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
+@@ -5688,7 +5776,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
    b->loc->section = sal.section;
    b->line_number = sal.line;
  
@@ -575,7 +729,7 @@ index 6b55313..30626a6 100644
  
    breakpoints_changed ();
  
-@@ -6652,7 +6755,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
+@@ -6775,7 +6864,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
  
    copy = set_raw_breakpoint_without_location (orig->gdbarch, orig->type);
    copy->loc = allocate_bp_location (copy);
@@ -584,7 +738,7 @@ index 6b55313..30626a6 100644
  
    copy->loc->gdbarch = orig->loc->gdbarch;
    copy->loc->requested_address = orig->loc->requested_address;
-@@ -6751,6 +6854,7 @@ mention (struct breakpoint *b)
+@@ -6874,6 +6963,7 @@ mention (struct breakpoint *b)
  	do_cleanups (ui_out_chain);
  	break;
        case bp_breakpoint:
@@ -592,7 +746,7 @@ index 6b55313..30626a6 100644
  	if (ui_out_is_mi_like_p (uiout))
  	  {
  	    say_where = 0;
-@@ -6761,6 +6865,8 @@ mention (struct breakpoint *b)
+@@ -6884,6 +6974,8 @@ mention (struct breakpoint *b)
  	else
  	  printf_filtered (_("Breakpoint"));
  	printf_filtered (_(" %d"), b->number);
@@ -601,15 +755,15 @@ index 6b55313..30626a6 100644
  	say_where = 1;
  	break;
        case bp_hardware_breakpoint:
-@@ -6817,6 +6923,7 @@ mention (struct breakpoint *b)
-       case bp_jit_event:
+@@ -6943,6 +7035,7 @@ mention (struct breakpoint *b)
        case bp_longjmp_master:
        case bp_std_terminate_master:
+       case bp_exception_master:
 +      case bp_gnu_ifunc_resolver_return:
  	break;
        }
  
-@@ -6877,7 +6984,8 @@ add_location_to_breakpoint (struct breakpoint *b,
+@@ -7003,7 +7096,8 @@ add_location_to_breakpoint (struct breakpoint *b,
    gdb_assert (loc->pspace != NULL);
    loc->section = sal->section;
  
@@ -619,10 +773,28 @@ index 6b55313..30626a6 100644
    return loc;
  }
  
-@@ -9712,12 +9820,22 @@ delete_breakpoint (struct breakpoint *bpt)
+@@ -8397,6 +8491,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
+   b = set_raw_breakpoint_without_location (NULL, bp_type);
+   set_breakpoint_number (internal, b);
+   b->thread = thread;
++  b->pspace = current_program_space;
+   b->disposition = disp_donttouch;
+   b->exp = exp;
+   b->exp_valid_block = exp_valid_block;
+@@ -9550,6 +9645,9 @@ update_global_location_list (int should_insert)
+       int keep_in_target = 0;
+       int removed = 0;
  
-   /* At least avoid this stale reference until the reference counting of
-      breakpoints gets resolved.  */
++      if (old_loc->pspace != current_program_space)
++	continue;
++
+       /* Skip LOCP entries which will definitely never be needed.
+ 	 Stop either at or being the one matching OLD_LOC.  */
+       while (locp < bp_location + bp_location_count
+@@ -9865,12 +9963,22 @@ delete_breakpoint (struct breakpoint *bpt)
+ 
+   /* At least avoid this stale reference until the reference counting
+      of breakpoints gets resolved.  */
 -  if (bpt->related_breakpoint != NULL)
 +  if (bpt->related_breakpoint != bpt)
      {
@@ -647,7 +819,7 @@ index 6b55313..30626a6 100644
      }
  
    observer_notify_breakpoint_deleted (bpt->number);
-@@ -10049,6 +10167,9 @@ update_breakpoint_locations (struct breakpoint *b,
+@@ -10201,6 +10309,9 @@ update_breakpoint_locations (struct breakpoint *b,
      return;
  
    b->loc = NULL;
@@ -657,7 +829,7 @@ index 6b55313..30626a6 100644
  
    for (i = 0; i < sals.nelts; ++i)
      {
-@@ -10075,11 +10196,7 @@ update_breakpoint_locations (struct breakpoint *b,
+@@ -10227,11 +10338,7 @@ update_breakpoint_locations (struct breakpoint *b,
  	    }
  	}
  
@@ -670,7 +842,7 @@ index 6b55313..30626a6 100644
  	b->source_file = xstrdup (sals.sals[i].symtab->filename);
  
        if (b->line_number == 0)
-@@ -10161,6 +10278,7 @@ breakpoint_re_set_one (void *bint)
+@@ -10314,6 +10421,7 @@ breakpoint_re_set_one (void *bint)
      case bp_tracepoint:
      case bp_fast_tracepoint:
      case bp_static_tracepoint:
@@ -678,15 +850,15 @@ index 6b55313..30626a6 100644
        /* Do not attempt to re-set breakpoints disabled during startup.  */
        if (b->enable_state == bp_startup_disabled)
  	return 0;
-@@ -10325,6 +10443,7 @@ breakpoint_re_set_one (void *bint)
-     case bp_longjmp:
-     case bp_longjmp_resume:
+@@ -10484,6 +10592,7 @@ breakpoint_re_set_one (void *bint)
+     case bp_exception:
+     case bp_exception_resume:
      case bp_jit_event:
 +    case bp_gnu_ifunc_resolver_return:
        break;
      }
  
-@@ -10496,11 +10615,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
+@@ -10656,11 +10765,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
  	  ALL_BREAKPOINTS_SAFE (b, tmp)
  	    if (b->number == num)
  	      {
@@ -716,7 +888,7 @@ index 6b55313..30626a6 100644
  		break;
  	      }
  	  if (match == 0)
-@@ -11604,6 +11737,22 @@ all_tracepoints ()
+@@ -11769,6 +11892,22 @@ all_tracepoints ()
    return tp_vec;
  }
  
@@ -737,10 +909,10 @@ index 6b55313..30626a6 100644
 +}
 +
  
- /* This help string is used for the break, hbreak, tbreak and thbreak commands.
-    It is defined as a macro to prevent duplication.
-@@ -11673,6 +11822,107 @@ save_command (char *arg, int from_tty)
-   help_list (save_cmdlist, "save ", -1, gdb_stdout);
+ /* This help string is used for the break, hbreak, tbreak and thbreak
+    commands.  It is defined as a macro to prevent duplication.
+@@ -11854,6 +11993,107 @@ iterate_over_breakpoints (int (*callback) (struct breakpoint *, void *),
+   return NULL;
  }
  
 +static void
@@ -844,20 +1016,20 @@ index 6b55313..30626a6 100644
 +  update_breakpoint_locations (b, sals);
 +}
 +
- struct breakpoint *
- iterate_over_breakpoints (int (*callback) (struct breakpoint *, void *),
- 			  void *data)
-@@ -12222,4 +12472,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+ void
+ _initialize_breakpoint (void)
+ {
+@@ -12388,4 +12628,5 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
 +  observer_attach_mark_used (breakpoint_types_mark_used);
  }
 diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
-index e34c2d3..4aadd57 100644
+index bfae8d9..a058e46 100644
 --- a/gdb/breakpoint.h
 +++ b/gdb/breakpoint.h
-@@ -138,6 +138,9 @@ enum bptype
+@@ -147,6 +147,9 @@ enum bptype
  
      /* Event for JIT compiled code generation or deletion.  */
      bp_jit_event,
@@ -885,6 +1057,19 @@ index 04f8127..2e29eb2 100644
 +	else if (get_array_bounds (type, &low_bound, &high_bound))
  	  fprintf_filtered (stream, "%d", (int) (high_bound - low_bound + 1));
  	fprintf_filtered (stream, "]");
+ 
+diff --git a/gdb/defs.h b/gdb/defs.h
+index 489de74..335d3f5 100644
+--- a/gdb/defs.h
++++ b/gdb/defs.h
+@@ -398,6 +398,8 @@ extern struct cleanup *make_cleanup_restore_page_info (void);
+ extern struct cleanup *
+   set_batch_flag_and_make_cleanup_restore_page_info (void);
+ 
++extern struct cleanup *make_cleanup_restore_selected_frame (void);
++
+ extern char *gdb_realpath (const char *);
+ extern char *xfullpath (const char *);
  
 diff --git a/gdb/doc/gdbint.texinfo b/gdb/doc/gdbint.texinfo
 index 4a112aa..7b6bed4 100644
@@ -1032,10 +1217,10 @@ index e19b8ed..343e160 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dwarf2expr.c b/gdb/dwarf2expr.c
-index b9ae108..2555908 100644
+index 29bfcf4..c339378 100644
 --- a/gdb/dwarf2expr.c
 +++ b/gdb/dwarf2expr.c
-@@ -875,6 +875,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
+@@ -900,6 +900,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
  	  ctx->dwarf_call (ctx, result);
  	  goto no_push;
  
@@ -1050,10 +1235,10 @@ index b9ae108..2555908 100644
  	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
  	}
 diff --git a/gdb/dwarf2expr.h b/gdb/dwarf2expr.h
-index 61b8f00..d94c03c 100644
+index 68cc667..5b5f29c 100644
 --- a/gdb/dwarf2expr.h
 +++ b/gdb/dwarf2expr.h
-@@ -108,9 +108,15 @@ struct dwarf_expr_context
+@@ -114,9 +114,15 @@ struct dwarf_expr_context
  #if 0
    /* Not yet implemented.  */
  
@@ -1071,10 +1256,10 @@ index 61b8f00..d94c03c 100644
    /* The current depth of dwarf expression recursion, via DW_OP_call*,
       DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index b2aecf2..afc7907 100644
+index f0e08c7..d5c0c36 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
-@@ -127,6 +127,9 @@ struct dwarf_expr_baton
+@@ -133,6 +133,9 @@ struct dwarf_expr_baton
  {
    struct frame_info *frame;
    struct dwarf2_per_cu_data *per_cu;
@@ -1084,9 +1269,9 @@ index b2aecf2..afc7907 100644
  };
  
  /* Helper functions for dwarf2_evaluate_loc_desc.  */
-@@ -195,23 +198,33 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
+@@ -201,23 +204,33 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
        symbaton = SYMBOL_LOCATION_BATON (framefunc);
-       *start = find_location_expression (symbaton, length, pc);
+       *start = dwarf2_find_location_expression (symbaton, length, pc);
      }
 -  else
 +  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_locexpr_funcs)
@@ -1127,8 +1312,8 @@ index b2aecf2..afc7907 100644
  }
  
  /* Helper function for dwarf2_evaluate_loc_desc.  Computes the CFA for
-@@ -263,6 +276,158 @@ dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
-   return per_cu_dwarf_call (ctx, die_offset, debaton->per_cu);
+@@ -284,6 +297,159 @@ dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
+ 			    ctx->get_frame_pc, ctx->baton);
  }
  
 +static CORE_ADDR
@@ -1209,6 +1394,7 @@ index b2aecf2..afc7907 100644
 +  ctx->read_mem = dwarf_expr_read_mem;
 +  ctx->get_frame_base = dwarf_expr_frame_base;
 +  ctx->get_frame_cfa = dwarf_expr_frame_cfa;
++  ctx->get_frame_pc = dwarf_expr_frame_pc;
 +  ctx->get_tls_address = dwarf_expr_tls_address;
 +  ctx->dwarf_call = dwarf_expr_dwarf_call;
 +  ctx->get_object_address = dwarf_expr_object_address;
@@ -1270,8 +1456,8 @@ index b2aecf2..afc7907 100644
 +  if (!dllbaton)
 +    return 0;
 +
-+  data = find_location_expression (dllbaton, &size,
-+				   get_frame_address_in_block (frame));
++  data = dwarf2_find_location_expression (dllbaton, &size,
++					  get_frame_address_in_block (frame));
 +  if (data == NULL)
 +    return 0;
 +
@@ -1286,29 +1472,29 @@ index b2aecf2..afc7907 100644
  struct piece_closure
  {
    /* Reference count.  */
-@@ -887,10 +1052,8 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
- 			  struct dwarf2_per_cu_data *per_cu)
+@@ -1038,10 +1204,8 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
+ 			       LONGEST byte_offset)
  {
    struct value *retval;
 -  struct dwarf_expr_baton baton;
    struct dwarf_expr_context *ctx;
--  struct cleanup *old_chain;
+   struct cleanup *old_chain;
 -  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
-+  struct cleanup *old_chain = make_cleanup (null_cleanup, 0);
  
-   if (size == 0)
-     {
-@@ -900,24 +1063,8 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
+   if (byte_offset < 0)
+     invalid_synthetic_pointer ();
+@@ -1054,25 +1218,10 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
        return retval;
      }
  
 -  baton.frame = frame;
 -  baton.per_cu = per_cu;
-+  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
++  old_chain = make_cleanup (null_cleanup, 0);
  
 -  ctx = new_dwarf_expr_context ();
 -  old_chain = make_cleanup_free_dwarf_expr_context (ctx);
--
++  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
+ 
 -  ctx->gdbarch = get_objfile_arch (objfile);
 -  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
 -  ctx->offset = dwarf2_per_cu_text_offset (per_cu);
@@ -1317,6 +1503,7 @@ index b2aecf2..afc7907 100644
 -  ctx->read_mem = dwarf_expr_read_mem;
 -  ctx->get_frame_base = dwarf_expr_frame_base;
 -  ctx->get_frame_cfa = dwarf_expr_frame_cfa;
+-  ctx->get_frame_pc = dwarf_expr_frame_pc;
 -  ctx->get_tls_address = dwarf_expr_tls_address;
 -  ctx->dwarf_call = dwarf_expr_dwarf_call;
 -
@@ -1324,10 +1511,14 @@ index b2aecf2..afc7907 100644
    if (ctx->num_pieces > 0)
      {
        struct piece_closure *c;
-@@ -951,6 +1098,11 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
+@@ -1116,6 +1265,15 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
  	    CORE_ADDR address = dwarf_expr_fetch_address (ctx, 0);
  	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
  
++	    /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
++	    make_cleanup_restore_selected_frame ();
++	    select_frame (frame);
++
 +	    /* object_address_set called here is required in ALLOCATE_VALUE's
 +	       CHECK_TYPEDEF for the object's possible
 +	       DW_OP_push_object_address.  */
@@ -1336,7 +1527,7 @@ index b2aecf2..afc7907 100644
  	    retval = allocate_value (type);
  	    VALUE_LVAL (retval) = lval_memory;
  	    set_value_lazy (retval, 1);
-@@ -2587,11 +2739,51 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
+@@ -2810,11 +2968,51 @@ loclist_tracepoint_var_ref (struct symbol *symbol, struct gdbarch *gdbarch,
  			 dlbaton->per_cu);
  }
  
@@ -1391,10 +1582,10 @@ index b2aecf2..afc7907 100644
 +  missing_tracepoint_var_ref
 +};
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index a2cfe7f..f2d07ef 100644
+index e94346c..55beec2 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
-@@ -96,5 +96,14 @@ struct dwarf2_loclist_baton
+@@ -105,5 +105,14 @@ struct dwarf2_loclist_baton
  
  extern const struct symbol_computed_ops dwarf2_locexpr_funcs;
  extern const struct symbol_computed_ops dwarf2_loclist_funcs;
@@ -1410,12 +1601,12 @@ index a2cfe7f..f2d07ef 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 404faf8..e372afb 100644
+index 80770f8..9908495 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -1221,6 +1221,9 @@ static int attr_form_is_section_offset (struct attribute *);
- 
- static int attr_form_is_constant (struct attribute *);
+@@ -1206,6 +1206,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
+ 				   struct dwarf2_loclist_baton *baton,
+ 				   struct attribute *attr);
  
 +static struct dwarf2_loclist_baton *dwarf2_attr_to_loclist_baton
 +  (struct attribute *attr, struct dwarf2_cu *cu);
@@ -1423,7 +1614,7 @@ index 404faf8..e372afb 100644
  static void dwarf2_symbol_mark_computed (struct attribute *attr,
  					 struct symbol *sym,
  					 struct dwarf2_cu *cu);
-@@ -1251,6 +1254,9 @@ static void age_cached_comp_units (void);
+@@ -1240,6 +1243,9 @@ static void age_cached_comp_units (void);
  
  static void free_one_cached_comp_unit (void *);
  
@@ -1433,7 +1624,7 @@ index 404faf8..e372afb 100644
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1275,6 +1281,9 @@ static struct type *get_die_type_at_offset (unsigned int,
+@@ -1264,6 +1270,9 @@ static struct type *get_die_type_at_offset (unsigned int,
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -1443,7 +1634,7 @@ index 404faf8..e372afb 100644
  static void dwarf2_release_queue (void *dummy);
  
  static void queue_comp_unit (struct dwarf2_per_cu_data *per_cu,
-@@ -7112,6 +7121,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7237,6 +7246,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -1473,7 +1664,7 @@ index 404faf8..e372afb 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -7125,7 +7157,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7250,7 +7282,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -1482,7 +1673,7 @@ index 404faf8..e372afb 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -7178,17 +7210,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7303,17 +7335,11 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -1505,7 +1696,7 @@ index 404faf8..e372afb 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -7681,29 +7707,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7806,29 +7832,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -1634,7 +1825,7 @@ index 404faf8..e372afb 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -7985,8 +8096,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8110,8 +8221,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -1644,7 +1835,7 @@ index 404faf8..e372afb 100644
    char *name;
    LONGEST negative_mask;
  
-@@ -7999,48 +8109,125 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8124,48 +8234,125 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    if (range_type)
      return range_type;
  
@@ -1802,7 +1993,7 @@ index 404faf8..e372afb 100644
      }
  
    /* Dwarf-2 specifications explicitly allows to create subrange types
-@@ -8082,20 +8269,41 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8207,20 +8394,41 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  	}
      }
  
@@ -1856,7 +2047,7 @@ index 404faf8..e372afb 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -10559,10 +10767,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -10686,10 +10894,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -1871,7 +2062,7 @@ index 404faf8..e372afb 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -10600,6 +10810,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
+@@ -10727,6 +10937,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
        else
  	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
        OBJSTAT (objfile, n_syms++);
@@ -1880,7 +2071,7 @@ index 404faf8..e372afb 100644
  
        /* Cache this symbol's name and the name's demangled form (if any).  */
        SYMBOL_SET_LANGUAGE (sym, cu->language);
-@@ -11367,6 +11579,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11494,6 +11706,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -1890,8 +2081,8 @@ index 404faf8..e372afb 100644
    return this_type;
  }
  
-@@ -14119,67 +14334,102 @@ attr_form_is_constant (struct attribute *attr)
-     }
+@@ -14292,59 +14507,97 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
+   baton->base_address = cu->base_address;
  }
  
 -static void
@@ -1911,27 +2102,15 @@ index 404faf8..e372afb 100644
 -    {
 -      struct dwarf2_loclist_baton *baton;
 +  struct dwarf2_locexpr_baton *baton;
- 
--      baton = obstack_alloc (&cu->objfile->objfile_obstack,
--			     sizeof (struct dwarf2_loclist_baton));
--      baton->per_cu = cu->per_cu;
--      gdb_assert (baton->per_cu);
++
 +  gdb_assert (attr_form_is_block (attr));
- 
--      dwarf2_read_section (dwarf2_per_objfile->objfile,
--			   &dwarf2_per_objfile->loc);
++
 +  baton = obstack_alloc (&cu->objfile->objfile_obstack, sizeof (*baton));
 +  baton->per_cu = cu->per_cu;
 +  gdb_assert (baton->per_cu);
  
--      /* We don't know how long the location list is, but make sure we
--	 don't run off the edge of the section.  */
--      baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
--      baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
--      baton->base_address = cu->base_address;
--      if (cu->base_known == 0)
--	complaint (&symfile_complaints,
--		   _("Location list used without specifying the CU base address."));
+-      baton = obstack_alloc (&cu->objfile->objfile_obstack,
+-			     sizeof (struct dwarf2_loclist_baton));
 +  /* Note that we're just copying the block's data pointer
 +     here, not the actual data.  We're still pointing into the
 +     info_buffer for SYM's objfile; right now we never release
@@ -1940,20 +2119,24 @@ index 404faf8..e372afb 100644
 +  baton->size = DW_BLOCK (attr)->size;
 +  baton->data = DW_BLOCK (attr)->data;
 +  gdb_assert (baton->size == 0 || baton->data != NULL);
-+
+ 
+-      fill_in_loclist_baton (cu, baton, attr);
 +  return baton;
 +}
-+
+ 
+-      if (cu->base_known == 0)
+-	complaint (&symfile_complaints,
+-		   _("Location list used without specifying the CU base address."));
 +static struct dwarf2_loclist_baton *
 +dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
 +{
 +  struct dwarf2_loclist_baton *baton;
-+
+ 
 +  /* DW_AT_location of the referenced DIE may be missing if the referenced
 +     variable has been optimized out.  */
 +  if (!attr)
 +    return NULL;
- 
++
 +  dwarf2_read_section (dwarf2_per_objfile->objfile,
 +		       &dwarf2_per_objfile->loc);
 +
@@ -1966,14 +2149,9 @@ index 404faf8..e372afb 100644
 +
 +  baton = obstack_alloc (&cu->objfile->objfile_obstack,
 +			 sizeof (struct dwarf2_loclist_baton));
-+  baton->per_cu = cu->per_cu;
-+  gdb_assert (baton->per_cu);
 +
-+  /* We don't know how long the location list is, but make sure we
-+     don't run off the edge of the section.  */
-+  baton->size = dwarf2_per_objfile->loc.size - DW_UNSND (attr);
-+  baton->data = dwarf2_per_objfile->loc.buffer + DW_UNSND (attr);
-+  baton->base_address = cu->base_address;
++  fill_in_loclist_baton (cu, baton, attr);
++
 +  if (cu->base_known == 0)
 +    complaint (&symfile_complaints,
 +	       _("Location list used without specifying the CU base address."));
@@ -2042,7 +2220,7 @@ index 404faf8..e372afb 100644
      }
  }
  
-@@ -14533,6 +14783,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -14690,6 +14943,31 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -2074,7 +2252,7 @@ index 404faf8..e372afb 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.
  
-@@ -14558,6 +14833,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -14715,6 +14993,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    struct objfile *objfile = cu->objfile;
    htab_t *type_hash_ptr;
  
@@ -2084,7 +2262,7 @@ index 404faf8..e372afb 100644
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
 diff --git a/gdb/elfread.c b/gdb/elfread.c
-index 270f93f..a589c23 100644
+index d607b87..2aa7dd9 100644
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
 @@ -37,6 +37,7 @@
@@ -2368,7 +2546,7 @@ index 270f93f..a589c23 100644
  struct build_id
    {
      size_t size;
-@@ -800,6 +1049,8 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
+@@ -806,6 +1055,8 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
  	       bfd_errmsg (bfd_get_error ()));
  
        elf_symtab_read (objfile, ST_DYNAMIC, dynsymcount, dyn_symbol_table, 0);
@@ -3038,7 +3216,7 @@ index e0ca12c..de6311a 100644
    else
      {
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index d96d0f8..4bebcda 100644
+index b651098..70269d6 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -39,6 +39,9 @@
@@ -3322,7 +3500,7 @@ index d96d0f8..4bebcda 100644
 +	TYPE_TARGET_TYPE (type) = target_type;
        if (TYPE_STUB (target_type) || TYPE_TARGET_STUB (target_type))
  	{
- 	  /* Empty.  */
+ 	  /* Nothing we can do.  */
  	}
        else if (TYPE_CODE (type) == TYPE_CODE_ARRAY
 -	       && TYPE_NFIELDS (type) == 1
@@ -3968,7 +4146,7 @@ index d96d0f8..4bebcda 100644
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 51eb445..627e5af 100644
+index 1ce2d91..133f583 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -170,6 +170,7 @@ enum type_flag_value
@@ -4182,7 +4360,7 @@ index 51eb445..627e5af 100644
  
  /* C++ */
  
-@@ -1176,6 +1285,10 @@ struct builtin_type
+@@ -1177,6 +1286,10 @@ struct builtin_type
       (*) () can server as a generic function pointer.  */
    struct type *builtin_func_ptr;
  
@@ -4193,7 +4371,7 @@ index 51eb445..627e5af 100644
  
    /* Special-purpose types.  */
  
-@@ -1216,6 +1329,8 @@ struct objfile_type
+@@ -1217,6 +1330,8 @@ struct objfile_type
  
    /* Types used for symbols with no debug information.  */
    struct type *nodebug_text_symbol;
@@ -4202,7 +4380,7 @@ index 51eb445..627e5af 100644
    struct type *nodebug_data_symbol;
    struct type *nodebug_unknown_symbol;
    struct type *nodebug_tls_symbol;
-@@ -1363,6 +1478,18 @@ extern struct type *create_array_type (struct type *, struct type *,
+@@ -1364,6 +1479,18 @@ extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  extern struct type *lookup_array_range_type (struct type *, int, int);
  
@@ -4221,7 +4399,7 @@ index 51eb445..627e5af 100644
  extern struct type *create_string_type (struct type *, struct type *,
  					struct type *);
  extern struct type *lookup_string_range_type (struct type *, int, int);
-@@ -1408,6 +1535,8 @@ extern int is_public_ancestor (struct type *, struct type *);
+@@ -1409,6 +1536,8 @@ extern int is_public_ancestor (struct type *, struct type *);
  
  extern int is_unique_ancestor (struct type *, struct value *);
  
@@ -4230,7 +4408,7 @@ index 51eb445..627e5af 100644
  /* Overload resolution */
  
  #define LENGTH_MATCH(bv) ((bv)->rank[0])
-@@ -1478,10 +1607,11 @@ extern void maintenance_print_type (char *, int);
+@@ -1479,10 +1608,11 @@ extern void maintenance_print_type (char *, int);
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -4245,94 +4423,603 @@ index 51eb445..627e5af 100644
 +
  #endif /* GDBTYPES_H */
 diff --git a/gdb/i386-linux-nat.c b/gdb/i386-linux-nat.c
-index 4fce1ac..144a899 100644
+index 4fce1ac..7b6961e 100644
 --- a/gdb/i386-linux-nat.c
 +++ b/gdb/i386-linux-nat.c
-@@ -747,6 +747,21 @@ i386_linux_dr_unset_status (unsigned long mask)
-     }
+@@ -633,22 +633,13 @@ i386_linux_store_inferior_registers (struct target_ops *ops,
+ }
+ 
+ 
+-/* Support for debug registers.  */
+-
+-static unsigned long i386_linux_dr[DR_CONTROL + 1];
+-
+ /* Get debug register REGNUM value from only the one LWP of PTID.  */
+ 
+ static unsigned long
+-i386_linux_dr_get (ptid_t ptid, int regnum)
++i386_linux_dr_get (int tid, int regnum)
+ {
+-  int tid;
+   unsigned long value;
+ 
+-  tid = TIDGET (ptid);
+-  if (tid == 0)
+-    tid = PIDGET (ptid);
+-
+   /* FIXME: kettenis/2001-03-27: Calling perror_with_name if the
+      ptrace call fails breaks debugging remote targets.  The correct
+      way to fix this is to add the hardware breakpoint and watchpoint
+@@ -670,14 +661,8 @@ i386_linux_dr_get (ptid_t ptid, int regnum)
+ /* Set debug register REGNUM to VALUE in only the one LWP of PTID.  */
+ 
+ static void
+-i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
++i386_linux_dr_set (int tid, int regnum, unsigned long value)
+ {
+-  int tid;
+-
+-  tid = TIDGET (ptid);
+-  if (tid == 0)
+-    tid = PIDGET (ptid);
+-
+   errno = 0;
+   ptrace (PTRACE_POKEUSER, tid,
+ 	  offsetof (struct user, u_debugreg[regnum]), value);
+@@ -685,35 +670,78 @@ i386_linux_dr_set (ptid_t ptid, int regnum, unsigned long value)
+     perror_with_name (_("Couldn't write debug register"));
  }
  
-+/* See i386_dr_low_type.detach.  Do not use wrappers i386_linux_dr_set_control
-+   or i386_linux_dr_reset_addr as they would modify the register cache
-+   (i386_linux_dr).  */
+-/* Set DR_CONTROL to ADDR in all LWPs of LWP_LIST.  */
++/* Helper for i386_linux_dr_set_control.  */
 +
 +static void
-+i386_linux_dr_detach (void)
++i386_linux_dr_set_control_callback (int tid, void *control_voidp)
 +{
-+  int regnum;
++  unsigned long control = *(unsigned long *) control_voidp;
 +
-+  i386_linux_dr_set (inferior_ptid, DR_CONTROL, 0);
-+  i386_linux_dr_unset_status (~0UL);
-+  for (regnum = DR_FIRSTADDR; regnum <= DR_LASTADDR; regnum++)
-+    i386_linux_dr_set (inferior_ptid, regnum, 0);
++  i386_linux_dr_set (tid, DR_CONTROL, control);
 +}
 +
++static void i386_linux_dr_set_addr (int regnum, CORE_ADDR addr);
++
++/* Set DR_CONTROL to ADDR in all LWPs of CURRENT_INFERIOR.  */
+ 
+ static void
+ i386_linux_dr_set_control (unsigned long control)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
++  int inferior_pid = ptid_get_pid (inferior_ptid);
++  struct inferior *inf = current_inferior ();
++
++  /* The amd64 counterpart and description is amd64_linux_dr_set_control.  */
++  if (inf->pid != inferior_pid)
++    {
++      struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
++      int i;
++
++      if (!dr_mirror->addr_preset)
++	{
++	  dr_mirror->addr_preset = 1;
+ 
+-  i386_linux_dr[DR_CONTROL] = control;
+-  ALL_LWPS (lp, ptid)
+-    i386_linux_dr_set (ptid, DR_CONTROL, control);
++	  for (i = 0; i < DR_LASTADDR - DR_FIRSTADDR; i++)
++	    i386_linux_dr_set_addr (i, dr_mirror->addr[i]);
++	}
++    }
++
++  linux_nat_iterate_watchpoint_lwps (i386_linux_dr_set_control_callback,
++				     &control);
+ }
+ 
+-/* Set address REGNUM (zero based) to ADDR in all LWPs of LWP_LIST.  */
++/* Helper for i386_linux_dr_set_addr.  */
++
++struct i386_linux_dr_set_addr_data
++  {
++    int regnum;
++    CORE_ADDR addr;
++  };
++
++static void
++i386_linux_dr_set_addr_callback (int tid, void *datap_voidp)
++{
++  const struct i386_linux_dr_set_addr_data *datap = datap_voidp;
++
++  i386_linux_dr_set (tid, DR_FIRSTADDR + datap->regnum, datap->addr);
++}
++
++/* Set address REGNUM (zero based) to ADDR in all LWPs of CURRENT_INFERIOR.
++   */
+ 
+ static void
+ i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
++  struct i386_linux_dr_set_addr_data data;
+ 
+   gdb_assert (regnum >= 0 && regnum <= DR_LASTADDR - DR_FIRSTADDR);
+ 
+-  i386_linux_dr[DR_FIRSTADDR + regnum] = addr;
+-  ALL_LWPS (lp, ptid)
+-    i386_linux_dr_set (ptid, DR_FIRSTADDR + regnum, addr);
++  data.regnum = regnum;
++  data.addr = addr;
++  linux_nat_iterate_watchpoint_lwps (i386_linux_dr_set_addr_callback, &data);
+ }
+ 
+-/* Set address REGNUM (zero based) to zero in all LWPs of LWP_LIST.  */
++/* Set address REGNUM (zero based) to zero in all LWPs of CURRENT_INFERIOR.
++   */
+ 
+ static void
+ i386_linux_dr_reset_addr (int regnum)
+@@ -726,36 +754,54 @@ i386_linux_dr_reset_addr (int regnum)
+ static unsigned long
+ i386_linux_dr_get_status (void)
+ {
+-  return i386_linux_dr_get (inferior_ptid, DR_STATUS);
++  int tid;
++
++  tid = TIDGET (inferior_ptid);
++  if (tid == 0)
++    tid = PIDGET (inferior_ptid);
++
++  return i386_linux_dr_get (tid, DR_STATUS);
+ }
+ 
+-/* Unset MASK bits in DR_STATUS in all LWPs of LWP_LIST.  */
++/* Helper for i386_linux_dr_unset_status.  */
+ 
+ static void
+-i386_linux_dr_unset_status (unsigned long mask)
++i386_linux_dr_unset_status_callback (int tid, void *mask_voidp)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
+-
+-  ALL_LWPS (lp, ptid)
+-    {
+-      unsigned long value;
++  unsigned long mask = *(unsigned long *) mask_voidp;
++  unsigned long value;
+       
+-      value = i386_linux_dr_get (ptid, DR_STATUS);
+-      value &= ~mask;
+-      i386_linux_dr_set (ptid, DR_STATUS, value);
+-    }
++  value = i386_linux_dr_get (tid, DR_STATUS);
++  value &= ~mask;
++  i386_linux_dr_set (tid, DR_STATUS, value);
++}
++
++/* Unset MASK bits in DR_STATUS in all LWPs of CURRENT_INFERIOR.  */
++
++static void
++i386_linux_dr_unset_status (unsigned long mask)
++{
++  linux_nat_iterate_watchpoint_lwps (i386_linux_dr_unset_status_callback,
++				     &mask);
+ }
+ 
  static void
  i386_linux_new_thread (ptid_t ptid)
  {
-@@ -976,6 +991,7 @@ _initialize_i386_linux_nat (void)
-   i386_dr_low.reset_addr = i386_linux_dr_reset_addr;
-   i386_dr_low.get_status = i386_linux_dr_get_status;
-   i386_dr_low.unset_status = i386_linux_dr_unset_status;
-+  i386_dr_low.detach = i386_linux_dr_detach;
-   i386_set_debug_register_length (4);
+-  int i;
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
++  int i, tid;
++
++  /* Verify DR_MIRROR is valid.  */
++  gdb_assert (PIDGET (ptid) == PIDGET (inferior_ptid));
++
++  tid = TIDGET (ptid);
++  if (tid == 0)
++    tid = PIDGET (ptid);
  
-   /* Override the default ptrace resume method.  */
+-  for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
+-    i386_linux_dr_set (ptid, i, i386_linux_dr[i]);
++  for (i = 0; i < DR_LASTADDR - DR_FIRSTADDR; i++)
++    i386_linux_dr_set (tid, DR_FIRSTADDR + i, dr_mirror->addr[i]);
+ 
+-  i386_linux_dr_set (ptid, DR_CONTROL, i386_linux_dr[DR_CONTROL]);
++  i386_linux_dr_set (tid, DR_CONTROL, dr_mirror->control);
+ }
+ 
+ 
 diff --git a/gdb/i386-nat.c b/gdb/i386-nat.c
-index eaa3644..0921c7e 100644
+index eaa3644..7f32bd2 100644
 --- a/gdb/i386-nat.c
 +++ b/gdb/i386-nat.c
-@@ -533,6 +533,17 @@ i386_remove_watchpoint (CORE_ADDR addr, int len, int type,
-   return retval;
- }
+@@ -25,6 +25,7 @@
+ #include "gdbcmd.h"
+ #include "target.h"
+ #include "gdb_assert.h"
++#include "inferior.h"
  
-+/* See target_detach_watchpoints.  */
+ /* Support for hardware watchpoints and breakpoints using the i386
+    debug registers.
+@@ -44,7 +45,6 @@ struct i386_dr_low_type i386_dr_low;
+ #define TARGET_HAS_DR_LEN_8 (i386_dr_low.debug_register_length == 8)
+ 
+ /* Debug registers' indices.  */
+-#define DR_NADDR	4	/* The number of debug address registers.  */
+ #define DR_STATUS	6	/* Index of debug status register (DR6).  */
+ #define DR_CONTROL	7	/* Index of debug control register (DR7). */
+ 
+@@ -111,49 +111,60 @@ struct i386_dr_low_type i386_dr_low;
+ 
+ /* The I'th debug register is vacant if its Local and Global Enable
+    bits are reset in the Debug Control register.  */
+-#define I386_DR_VACANT(i) \
+-  ((dr_control_mirror & (3 << (DR_ENABLE_SIZE * (i)))) == 0)
 +
-+static int
-+i386_detach_watchpoints (void)
++static inline int
++i386_dr_vacant (struct i386_dr_mirror *dr_mirror, int i)
 +{
-+  if (i386_dr_low.detach)
-+    i386_dr_low.detach ();
++  return (dr_mirror->control & (3 << (DR_ENABLE_SIZE * i))) == 0;
++}
+ 
+ /* Locally enable the break/watchpoint in the I'th debug register.  */
+-#define I386_DR_LOCAL_ENABLE(i) \
+-  dr_control_mirror |= (1 << (DR_LOCAL_ENABLE_SHIFT + DR_ENABLE_SIZE * (i)))
+ 
+-/* Globally enable the break/watchpoint in the I'th debug register.  */
+-#define I386_DR_GLOBAL_ENABLE(i) \
+-  dr_control_mirror |= (1 << (DR_GLOBAL_ENABLE_SHIFT + DR_ENABLE_SIZE * (i)))
++static inline void
++i386_dr_local_enable (struct i386_dr_mirror *dr_mirror, int i)
++{
++  dr_mirror->control |= 1 << (DR_LOCAL_ENABLE_SHIFT + DR_ENABLE_SIZE * i);
++}
+ 
+ /* Disable the break/watchpoint in the I'th debug register.  */
+-#define I386_DR_DISABLE(i) \
+-  dr_control_mirror &= ~(3 << (DR_ENABLE_SIZE * (i)))
 +
-+  return 0;
++static inline void
++i386_dr_disable (struct i386_dr_mirror *dr_mirror, int i)
++{
++  dr_mirror->control &= ~(3 << (DR_ENABLE_SIZE * i));
++}
+ 
+ /* Set in DR7 the RW and LEN fields for the I'th debug register.  */
+-#define I386_DR_SET_RW_LEN(i,rwlen) \
+-  do { \
+-    dr_control_mirror &= ~(0x0f << (DR_CONTROL_SHIFT+DR_CONTROL_SIZE*(i)));   \
+-    dr_control_mirror |= ((rwlen) << (DR_CONTROL_SHIFT+DR_CONTROL_SIZE*(i))); \
+-  } while (0)
++
++static inline void
++i386_dr_set_rw_len (struct i386_dr_mirror *dr_mirror, int i, unsigned rwlen)
++{
++  dr_mirror->control &= ~(0x0f << (DR_CONTROL_SHIFT + DR_CONTROL_SIZE * i));
++  dr_mirror->control |= rwlen << (DR_CONTROL_SHIFT + DR_CONTROL_SIZE * i);
++}
+ 
+ /* Get from DR7 the RW and LEN fields for the I'th debug register.  */
+-#define I386_DR_GET_RW_LEN(i) \
+-  ((dr_control_mirror >> (DR_CONTROL_SHIFT + DR_CONTROL_SIZE * (i))) & 0x0f)
++
++static inline unsigned
++i386_dr_get_rw_len (struct i386_dr_mirror *dr_mirror, int i)
++{
++  return ((dr_mirror->control >> (DR_CONTROL_SHIFT + DR_CONTROL_SIZE * i))
++	  & 0x0f);
++}
+ 
+ /* Mask that this I'th watchpoint has triggered.  */
+ #define I386_DR_WATCH_MASK(i)	(1 << (i))
+ 
+ /* Did the watchpoint whose address is in the I'th register break?  */
+-#define I386_DR_WATCH_HIT(i)	(dr_status_mirror & I386_DR_WATCH_MASK (i))
++static inline int
++i386_dr_watch_hit (struct i386_dr_mirror *dr_mirror, int i)
++{
++  return (dr_mirror->status & I386_DR_WATCH_MASK (i)) != 0;
++}
+ 
+ /* A macro to loop over all debug registers.  */
+ #define ALL_DEBUG_REGISTERS(i)	for (i = 0; i < DR_NADDR; i++)
+ 
+-/* Mirror the inferior's DRi registers.  We keep the status and
+-   control registers separated because they don't hold addresses.  */
+-static CORE_ADDR dr_mirror[DR_NADDR];
+-static unsigned long dr_status_mirror, dr_control_mirror;
+-
+-/* Reference counts for each debug register.  */
+-static int dr_ref_count[DR_NADDR];
+-
+ /* Whether or not to print the mirrored debug registers.  */
+ static int maint_show_dr;
+ 
+@@ -195,21 +206,80 @@ static int i386_handle_nonaligned_watchpoint (i386_wp_op_t what,
+ 
+ /* Implementation.  */
+ 
++/* Per-inferior data key.  */
++static const struct inferior_data *i386_inferior_data;
++
++struct i386_inferior_data
++  {
++    /* Copy of i386 hardware debug registers for performance reasons.  */
++    struct i386_dr_mirror dr_mirror;
++  };
++
++static void
++i386_inferior_data_cleanup (struct inferior *inf, void *arg)
++{
++  struct i386_inferior_data *inf_data = arg;
++
++  xfree (inf_data);
 +}
 +
- /* Return non-zero if we can watch a memory region that starts at
-    address ADDR and whose length is LEN bytes.  */
++static struct i386_inferior_data *
++i386_inferior_data_get (void)
++{
++  struct inferior *inf = current_inferior ();
++  struct i386_inferior_data *inf_data;
++
++  inf_data = inferior_data (inf, i386_inferior_data);
++  if (inf_data == NULL)
++    {
++      inf_data = xzalloc (sizeof (*inf_data));
++      set_inferior_data (current_inferior (), i386_inferior_data, inf_data);
++    }
++
++  if (inf->pid != ptid_get_pid (inferior_ptid))
++    {
++      static struct i386_inferior_data detached_inf_data_local;
++      static int detached_inf_pid = -1;
++
++      if (detached_inf_pid != ptid_get_pid (inferior_ptid))
++	{
++	  detached_inf_pid = ptid_get_pid (inferior_ptid);
++
++	  /* Forked processes get a copy of the debug registers.  */
++	  memcpy (&detached_inf_data_local, inf_data,
++		  sizeof (detached_inf_data_local));
++	  detached_inf_data_local.dr_mirror.addr_preset = 0;
++	}
++
++      return &detached_inf_data_local;
++    }
++
++  return inf_data;
++}
++
+ /* Clear the reference counts and forget everything we knew about the
+    debug registers.  */
  
-@@ -685,6 +696,7 @@ i386_use_watchpoints (struct target_ops *t)
-   t->to_stopped_data_address = i386_stopped_data_address;
-   t->to_insert_watchpoint = i386_insert_watchpoint;
++struct i386_dr_mirror *
++i386_dr_mirror_get (void)
++{
++  return &i386_inferior_data_get ()->dr_mirror;
++}
++
+ void
+ i386_cleanup_dregs (void)
+ {
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
+   int i;
+ 
+   ALL_DEBUG_REGISTERS(i)
+     {
+-      dr_mirror[i] = 0;
+-      dr_ref_count[i] = 0;
++      dr_mirror->addr[i] = 0;
++      dr_mirror->ref_count[i] = 0;
+     }
+-  dr_control_mirror = 0;
+-  dr_status_mirror  = 0;
++  dr_mirror->addr_preset = 0;
++  dr_mirror->control = 0;
++  dr_mirror->status = 0;
+ }
+ 
+ /* Print the values of the mirrored debug registers.  This is called
+@@ -220,6 +290,7 @@ static void
+ i386_show_dr (const char *func, CORE_ADDR addr,
+ 	      int len, enum target_hw_bp_type type)
+ {
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
+   int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
+   int i;
+ 
+@@ -239,13 +310,16 @@ i386_show_dr (const char *func, CORE_ADDR addr,
+ 				: "??unknown??"))));
+   puts_unfiltered (":\n");
+   printf_unfiltered ("\tCONTROL (DR7): %s          STATUS (DR6): %s\n",
+-		     phex (dr_control_mirror, 8), phex (dr_status_mirror, 8));
++		     phex (dr_mirror->control, 8),
++		     phex (dr_mirror->status, 8));
+   ALL_DEBUG_REGISTERS(i)
+     {
+       printf_unfiltered ("\
+ \tDR%d: addr=0x%s, ref.count=%d  DR%d: addr=0x%s, ref.count=%d\n",
+-		 i, phex (dr_mirror[i], addr_size), dr_ref_count[i],
+-		 i+1, phex (dr_mirror[i+1], addr_size), dr_ref_count[i+1]);
++			 i, phex (dr_mirror->addr[i], addr_size),
++			 dr_mirror->ref_count[i], i + 1,
++			 phex (dr_mirror->addr[i + 1], addr_size),
++			 dr_mirror->ref_count[i + 1]);
+       i++;
+     }
+ }
+@@ -311,6 +385,7 @@ Invalid hardware breakpoint length %d in i386_length_and_rw_bits.\n"), len);
+ static int
+ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+ {
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
+   int i;
+ 
+   if (!i386_dr_low.set_addr || !i386_dr_low.set_control)
+@@ -321,11 +396,10 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+      reuse it for this watchpoint as well (and save a register).  */
+   ALL_DEBUG_REGISTERS(i)
+     {
+-      if (!I386_DR_VACANT (i)
+-	  && dr_mirror[i] == addr
+-	  && I386_DR_GET_RW_LEN (i) == len_rw_bits)
++      if (!i386_dr_vacant (dr_mirror, i) && dr_mirror->addr[i] == addr
++	  && i386_dr_get_rw_len (dr_mirror, i) == len_rw_bits)
+ 	{
+-	  dr_ref_count[i]++;
++	  dr_mirror->ref_count[i]++;
+ 	  return 0;
+ 	}
+     }
+@@ -333,7 +407,7 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+   /* Next, look for a vacant debug register.  */
+   ALL_DEBUG_REGISTERS(i)
+     {
+-      if (I386_DR_VACANT (i))
++      if (i386_dr_vacant (dr_mirror, i))
+ 	break;
+     }
+ 
+@@ -344,9 +418,9 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+   /* Now set up the register I to watch our region.  */
+ 
+   /* Record the info in our local mirrored array.  */
+-  dr_mirror[i] = addr;
+-  dr_ref_count[i] = 1;
+-  I386_DR_SET_RW_LEN (i, len_rw_bits);
++  dr_mirror->addr[i] = addr;
++  dr_mirror->ref_count[i] = 1;
++  i386_dr_set_rw_len (dr_mirror, i, len_rw_bits);
+   /* Note: we only enable the watchpoint locally, i.e. in the current
+      task.  Currently, no i386 target allows or supports global
+      watchpoints; however, if any target would want that in the
+@@ -354,13 +428,13 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+      to enable watchpoints globally or locally, and the code below
+      should use global or local enable and slow-down flags as
+      appropriate.  */
+-  I386_DR_LOCAL_ENABLE (i);
+-  dr_control_mirror |= DR_LOCAL_SLOWDOWN;
+-  dr_control_mirror &= I386_DR_CONTROL_MASK;
++  i386_dr_local_enable (dr_mirror, i);
++  dr_mirror->control |= DR_LOCAL_SLOWDOWN;
++  dr_mirror->control &= I386_DR_CONTROL_MASK;
+ 
+   /* Finally, actually pass the info to the inferior.  */
+   i386_dr_low.set_addr (i, addr);
+-  i386_dr_low.set_control (dr_control_mirror);
++  i386_dr_low.set_control (dr_mirror->control);
+ 
+   /* Only a sanity check for leftover bits (set possibly only by inferior).  */
+   if (i386_dr_low.unset_status)
+@@ -378,21 +452,21 @@ i386_insert_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+ static int
+ i386_remove_aligned_watchpoint (CORE_ADDR addr, unsigned len_rw_bits)
+ {
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
+   int i, retval = -1;
+ 
+   ALL_DEBUG_REGISTERS(i)
+     {
+-      if (!I386_DR_VACANT (i)
+-	  && dr_mirror[i] == addr
+-	  && I386_DR_GET_RW_LEN (i) == len_rw_bits)
++      if (!i386_dr_vacant (dr_mirror, i) && dr_mirror->addr[i] == addr
++	  && i386_dr_get_rw_len (dr_mirror, i) == len_rw_bits)
+ 	{
+-	  if (--dr_ref_count[i] == 0) /* no longer in use? */
++	  if (--dr_mirror->ref_count[i] == 0) /* no longer in use? */
+ 	    {
+ 	      /* Reset our mirror.  */
+-	      dr_mirror[i] = 0;
+-	      I386_DR_DISABLE (i);
++	      dr_mirror->addr[i] = 0;
++	      i386_dr_disable (dr_mirror, i);
+ 	      /* Reset it in the inferior.  */
+-	      i386_dr_low.set_control (dr_control_mirror);
++	      i386_dr_low.set_control (dr_mirror->control);
+ 	      if (i386_dr_low.reset_addr)
+ 		i386_dr_low.reset_addr (i);
+ 	    }
+@@ -554,26 +628,27 @@ i386_region_ok_for_watchpoint (CORE_ADDR addr, int len)
+ static int
+ i386_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+ {
++  struct i386_dr_mirror *dr_mirror = i386_dr_mirror_get ();
+   CORE_ADDR addr = 0;
+   int i;
+   int rc = 0;
+ 
+-  dr_status_mirror = i386_dr_low.get_status ();
++  dr_mirror->status = i386_dr_low.get_status ();
+ 
+   ALL_DEBUG_REGISTERS(i)
+     {
+-      if (I386_DR_WATCH_HIT (i)
++      if (i386_dr_watch_hit (dr_mirror, i)
+ 	  /* This second condition makes sure DRi is set up for a data
+ 	     watchpoint, not a hardware breakpoint.  The reason is
+ 	     that GDB doesn't call the target_stopped_data_address
+ 	     method except for data watchpoints.  In other words, I'm
+ 	     being paranoiac.  */
+-	  && I386_DR_GET_RW_LEN (i) != 0
++	  && i386_dr_get_rw_len (dr_mirror, i) != 0
+ 	  /* This third condition makes sure DRi is not vacant, this
+ 	     avoids false positives in windows-nat.c.  */
+-	  && !I386_DR_VACANT (i))
++	  && !i386_dr_vacant (dr_mirror, i))
+ 	{
+-	  addr = dr_mirror[i];
++	  addr = dr_mirror->addr[i];
+ 	  rc = 1;
+ 	  if (maint_show_dr)
+ 	    i386_show_dr ("watchpoint_hit", addr, -1, hw_write);
+@@ -687,6 +762,10 @@ i386_use_watchpoints (struct target_ops *t)
    t->to_remove_watchpoint = i386_remove_watchpoint;
-+  t->to_detach_watchpoints = i386_detach_watchpoints;
    t->to_insert_hw_breakpoint = i386_insert_hw_breakpoint;
    t->to_remove_hw_breakpoint = i386_remove_hw_breakpoint;
++
++  if (i386_inferior_data == NULL)
++    i386_inferior_data
++      = register_inferior_data_with_cleanup (i386_inferior_data_cleanup);
  }
+ 
+ void
 diff --git a/gdb/i386-nat.h b/gdb/i386-nat.h
-index 7317e7d..ea914a5 100644
+index 7317e7d..65cd326 100644
 --- a/gdb/i386-nat.h
 +++ b/gdb/i386-nat.h
-@@ -62,6 +62,10 @@ extern void i386_use_watchpoints (struct target_ops *);
-       unset_status             -- unset the specified bits of the debug
- 				  status (DR6) register for all LWPs
+@@ -78,6 +78,28 @@ struct i386_dr_low_type
  
-+      detach                   -- clear all debug registers of only the
-+				  INFERIOR_PTID task without affecting any
-+				  register caches.
+ extern struct i386_dr_low_type i386_dr_low;
+ 
++/* The number of debug address registers.  */
++#define DR_NADDR	4
 +
-    Additionally, the native file should set the debug_register_length
-    field to 4 or 8 depending on the number of bytes used for
-    deubg registers.  */
-@@ -73,6 +77,7 @@ struct i386_dr_low_type
-     void (*reset_addr) (int);
-     unsigned long (*get_status) (void);
-     void (*unset_status) (unsigned long);
-+    void (*detach) (void);
-     int debug_register_length;
-   };
- 
++/* Copy of hardware debug registers for performance reasons.  */
++
++struct i386_dr_mirror
++  {
++    /* Mirror the inferior's DRi registers.  We keep the status and
++       control registers separated because they don't hold addresses.  */
++    CORE_ADDR addr[DR_NADDR];
++
++    /* All the ADDR hardware registers have been written at least once.  */
++    unsigned addr_preset : 1;
++
++    /* Reference counts for each debug register.  */
++    int ref_count[DR_NADDR];
++
++    unsigned long status, control;
++  };
++
++extern struct i386_dr_mirror *i386_dr_mirror_get (void);
++
+ /* Use this function to set i386_dr_low debug_register_length field
+    rather than setting it directly to check that the length is only
+    set once.  It also enables the 'maint set/show show-debug-regs' 
 diff --git a/gdb/infcall.c b/gdb/infcall.c
-index 7f60e56..b7acfc6 100644
+index 6eb1bbf..7323c4b 100644
 --- a/gdb/infcall.c
 +++ b/gdb/infcall.c
 @@ -225,6 +225,56 @@ value_arg_coerce (struct gdbarch *gdbarch, struct value *arg,
@@ -4445,98 +5132,91 @@ index 7f60e56..b7acfc6 100644
      {
        /* Handle the case of functions lacking debugging info.
           Their values are characters since their addresses are char */
-diff --git a/gdb/infrun.c b/gdb/infrun.c
-index f6b00da..56e558b 100644
---- a/gdb/infrun.c
-+++ b/gdb/infrun.c
-@@ -3267,6 +3267,10 @@ handle_inferior_event (struct execution_control_state *ecs)
- 
-       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
- 
-+      /* Clear WATCHPOINT_TRIGGERED values from previous stop which could
-+	 confuse bpstat_stop_status and bpstat_explains_signal.  */
-+      watchpoints_triggered (&ecs->ws);
-+
-       ecs->event_thread->stop_bpstat
- 	= bpstat_stop_status (get_regcache_aspace (get_current_regcache ()),
- 			      stop_pc, ecs->ptid);
-@@ -3354,6 +3358,10 @@ handle_inferior_event (struct execution_control_state *ecs)
- 
-       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
- 
-+      /* Clear WATCHPOINT_TRIGGERED values from previous stop which could
-+	 confuse bpstat_stop_status and bpstat_explains_signal.  */
-+      watchpoints_triggered (&ecs->ws);
-+
-       /* Do whatever is necessary to the parent branch of the vfork.  */
-       handle_vfork_child_exec_or_exit (1);
- 
 diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
-index 0e18034..96895db 100644
+index 56490cc..c4d1c28 100644
 --- a/gdb/linux-nat.c
 +++ b/gdb/linux-nat.c
-@@ -2607,6 +2607,39 @@ linux_nat_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
-   return lp->stopped_data_address_p;
+@@ -1243,6 +1243,64 @@ iterate_over_lwps (ptid_t filter,
+   return NULL;
  }
  
-+/* In `set follow-fork-mode child' with multithreaded parent we need to detach
-+   watchpoints from all the LWPs.  In such case INFERIOR_PTID will be the
-+   non-threaded new child while LWP_LIST will still contain all the threads of
-+   the parent being detached.  */
++/* Helper for linux_nat_iterate_watchpoint_lwps.  */
++
++struct iterate_watchpoint_lwps_data
++  {
++    linux_nat_iterate_watchpoint_lwps_ftype callback;
++    void *callback_data;
++  };
 +
 +static int
-+linux_nat_detach_watchpoints (void)
++iterate_watchpoint_lwps_callback (struct lwp_info *lp, void *datap_voidp)
 +{
-+  struct lwp_info *lp;
-+  int found = 0, retval = 0;
-+  ptid_t filter = pid_to_ptid (ptid_get_pid (inferior_ptid));
-+  struct cleanup *old_chain = save_inferior_ptid ();
++  struct iterate_watchpoint_lwps_data *datap = datap_voidp;
++  int tid;
 +
-+  for (lp = lwp_list; lp; lp = lp->next)
-+    if (ptid_match (lp->ptid, filter))
-+      {
-+	inferior_ptid = lp->ptid;
-+	retval |= linux_ops->to_detach_watchpoints ();
-+	found = 1;
-+      }
++  tid = TIDGET (lp->ptid);
++  if (tid == 0)
++    tid = PIDGET (lp->ptid);
 +
-+  do_cleanups (old_chain);
++  datap->callback (tid, datap->callback_data);
 +
-+  if (!found)
-+    {
-+      gdb_assert (!is_lwp (inferior_ptid));
-+
-+      retval |= linux_ops->to_detach_watchpoints ();
-+    }
-+
-+  return retval;
++  /* Continue the traversal.  */
++  return 0;
 +}
 +
- /* Commonly any breakpoint / watchpoint generate only SIGTRAP.  */
++/* Iterate like iterate_over_lwps does except when forking-off a child call
++   CALLBACK with CALLBACK_DATA specifically only for that new child PID.
++
++   During `set follow-fork-mode child' the call is also made for the new child
++   PID; parent watchpoints get detached elsewhere (during target_detach).  */
++
++void
++linux_nat_iterate_watchpoint_lwps
++  (linux_nat_iterate_watchpoint_lwps_ftype callback, void *callback_data)
++{
++  struct iterate_watchpoint_lwps_data data;
++  int inferior_pid = ptid_get_pid (inferior_ptid);
++  struct inferior *inf = current_inferior ();
++
++  data.callback = callback;
++  data.callback_data = callback_data;
++
++  if (inf->pid == inferior_pid)
++    {
++      /* Standard mode.  Iterate all the threads of the current inferior.
++	 Without specifying INFERIOR_PID it would iterate all the threads of
++	 all the inferiors, which is inappropriate for watchpoints.  */
++
++      iterate_over_lwps (pid_to_ptid (inferior_pid),
++			 iterate_watchpoint_lwps_callback, &data);
++    }
++  else
++    {
++      /* Detaching a new child PID temporarily present in INFERIOR_PID.  */
++
++      callback (inferior_pid, callback_data);
++    }
++}
++
+ /* Update our internal state when changing from one checkpoint to
+    another indicated by NEW_PTID.  We can only switch single-threaded
+    applications, so we only create one new LWP, and the previous list
+diff --git a/gdb/linux-nat.h b/gdb/linux-nat.h
+index 64393fd..a053cbd 100644
+--- a/gdb/linux-nat.h
++++ b/gdb/linux-nat.h
+@@ -139,6 +139,11 @@ struct lwp_info *iterate_over_lwps (ptid_t filter,
+ 						     void *), 
+ 				    void *data);
  
- static int
-@@ -5660,6 +5693,8 @@ linux_nat_add_target (struct target_ops *t)
-   t->to_thread_address_space = linux_nat_thread_address_space;
-   t->to_stopped_by_watchpoint = linux_nat_stopped_by_watchpoint;
-   t->to_stopped_data_address = linux_nat_stopped_data_address;
-+  if (linux_ops->to_detach_watchpoints)
-+    t->to_detach_watchpoints = linux_nat_detach_watchpoints;
- 
-   t->to_can_async_p = linux_nat_can_async_p;
-   t->to_is_async_p = linux_nat_is_async_p;
-diff --git a/gdb/linux-tdep.c b/gdb/linux-tdep.c
-index c51ede9..ef8cbda 100644
---- a/gdb/linux-tdep.c
-+++ b/gdb/linux-tdep.c
-@@ -24,6 +24,8 @@
- #include "target.h"
- #include "elf/common.h"
- #include "inferior.h"
-+#include "value.h"
-+#include "infcall.h"
- 
- static struct gdbarch_data *linux_gdbarch_data_handle;
- 
++typedef void (*linux_nat_iterate_watchpoint_lwps_ftype) (int tid, void *data);
++
++extern void linux_nat_iterate_watchpoint_lwps
++  (linux_nat_iterate_watchpoint_lwps_ftype callback, void *callback_data);
++
+ /* Create a prototype generic GNU/Linux target.  The client can
+    override it with local methods.  */
+ struct target_ops * linux_target (void);
 diff --git a/gdb/mi/mi-cmd-var.c b/gdb/mi/mi-cmd-var.c
 index 310ade9..d8710a1 100644
 --- a/gdb/mi/mi-cmd-var.c
@@ -4601,7 +5281,7 @@ index 0a57e77..6be74df 100644
  		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
  	  return SYMBOL_VALUE_ADDRESS (msymbol);
 diff --git a/gdb/p-valprint.c b/gdb/p-valprint.c
-index 44a2d72..e3aead4 100644
+index 47663bd..d9fb878 100644
 --- a/gdb/p-valprint.c
 +++ b/gdb/p-valprint.c
 @@ -38,6 +38,7 @@
@@ -4860,42 +5540,146 @@ index 1625575..d072f86 100644
 +
  #endif /* PARSER_DEFS_H */
 diff --git a/gdb/ppc-linux-nat.c b/gdb/ppc-linux-nat.c
-index 18ddee7..652b02a 100644
+index 18ddee7..ebb0022 100644
 --- a/gdb/ppc-linux-nat.c
 +++ b/gdb/ppc-linux-nat.c
-@@ -2010,6 +2010,24 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
-   return ret;
+@@ -1620,12 +1620,18 @@ booke_remove_point (struct ppc_hw_breakpoint *b, int tid)
+   hw_breaks[i].hw_break = NULL;
  }
  
-+/* See target_detach_watchpoints.  Do not use wrapper
-+   ppc_linux_remove_watchpoint as it would modify the register cache
-+   (saved_dabr_value).  */
-+
-+static int
-+ppc_linux_detach_watchpoints (void)
++static void
++booke_insert_point_callback (int tid, void *pp_voidp)
 +{
-+  pid_t tid;
++  struct ppc_hw_breakpoint *pp = pp_voidp;
 +
-+  tid = TIDGET (inferior_ptid);
-+  if (tid == 0)
-+    tid = PIDGET (inferior_ptid);
-+
-+  if (ptrace (PTRACE_SET_DEBUGREG, tid, NULL, NULL) < 0)
-+    return -1;
-+  return 0;
++  booke_insert_point (pp, tid);
 +}
 +
- static void
- ppc_linux_new_thread (ptid_t ptid)
+ static int
+ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
+ 				  struct bp_target_info *bp_tgt)
  {
-@@ -2349,6 +2367,7 @@ _initialize_ppc_linux_nat (void)
-   t->to_region_ok_for_hw_watchpoint = ppc_linux_region_ok_for_hw_watchpoint;
-   t->to_insert_watchpoint = ppc_linux_insert_watchpoint;
-   t->to_remove_watchpoint = ppc_linux_remove_watchpoint;
-+  t->to_detach_watchpoints = ppc_linux_detach_watchpoints;
-   t->to_stopped_by_watchpoint = ppc_linux_stopped_by_watchpoint;
-   t->to_stopped_data_address = ppc_linux_stopped_data_address;
-   t->to_watchpoint_addr_within_range = ppc_linux_watchpoint_addr_within_range;
+-  ptid_t ptid;
+-  struct lwp_info *lp;
+   struct ppc_hw_breakpoint p;
+ 
+   if (!have_ptrace_booke_interface ())
+@@ -1639,18 +1645,23 @@ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
+   p.addr2           = 0;
+   p.condition_value = 0;
+ 
+-  ALL_LWPS (lp, ptid)
+-    booke_insert_point (&p, TIDGET (ptid));
++  linux_nat_iterate_watchpoint_lwps (booke_insert_point_callback, &p);
+ 
+   return 0;
+ }
+ 
++static void
++booke_remove_point_callback (int tid, void *pp_voidp)
++{
++  struct ppc_hw_breakpoint *pp = pp_voidp;
++
++  booke_remove_point (pp, tid);
++}
++
+ static int
+ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
+ 				  struct bp_target_info *bp_tgt)
+ {
+-  ptid_t ptid;
+-  struct lwp_info *lp;
+   struct ppc_hw_breakpoint p;
+ 
+   if (!have_ptrace_booke_interface ())
+@@ -1664,8 +1675,7 @@ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
+   p.addr2           = 0;
+   p.condition_value = 0;
+ 
+-  ALL_LWPS (lp, ptid)
+-    booke_remove_point (&p, TIDGET (ptid));
++  linux_nat_iterate_watchpoint_lwps (booke_remove_point_callback, &p);
+ 
+   return 0;
+ }
+@@ -1878,12 +1888,19 @@ ppc_linux_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
+ 	  && check_condition (addr, cond, &data_value));
+ }
+ 
++static void
++set_saved_dabr_value_callback (int tid, void *retp_voidp)
++{
++  int *retp = retp_voidp;
++
++  if (ptrace (PTRACE_SET_DEBUGREG, tid, 0, saved_dabr_value) < 0)
++    *retp = -1;
++}
++
+ static int
+ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+ 			     struct expression *cond)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
+   int ret = -1;
+ 
+   if (have_ptrace_booke_interface ())
+@@ -1907,8 +1924,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+       p.addr            = (uint64_t) addr;
+       p.addr2           = 0;
+ 
+-      ALL_LWPS (lp, ptid)
+-	booke_insert_point (&p, TIDGET (ptid));
++      linux_nat_iterate_watchpoint_lwps (booke_insert_point_callback, &p);
+ 
+       ret = 0;
+     }
+@@ -1951,12 +1967,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+ 
+       saved_dabr_value = dabr_value;
+ 
+-      ALL_LWPS (lp, ptid)
+-	if (ptrace (PTRACE_SET_DEBUGREG, TIDGET (ptid), 0,
+-		    saved_dabr_value) < 0)
+-	  return -1;
+-
+       ret = 0;
++      linux_nat_iterate_watchpoint_lwps (set_saved_dabr_value_callback, &ret);
+     }
+ 
+   return ret;
+@@ -1966,8 +1978,6 @@ static int
+ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
+ 			     struct expression *cond)
+ {
+-  struct lwp_info *lp;
+-  ptid_t ptid;
+   int ret = -1;
+ 
+   if (have_ptrace_booke_interface ())
+@@ -1991,20 +2001,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
+       p.addr            = (uint64_t) addr;
+       p.addr2           = 0;
+ 
+-      ALL_LWPS (lp, ptid)
+-	booke_remove_point (&p, TIDGET (ptid));
++      linux_nat_iterate_watchpoint_lwps (booke_remove_point_callback, &p);
+ 
+       ret = 0;
+     }
+   else
+     {
+       saved_dabr_value = 0;
+-      ALL_LWPS (lp, ptid)
+-	if (ptrace (PTRACE_SET_DEBUGREG, TIDGET (ptid), 0,
+-		    saved_dabr_value) < 0)
+-	  return -1;
+ 
+       ret = 0;
++      linux_nat_iterate_watchpoint_lwps (set_saved_dabr_value_callback, &ret);
+     }
+ 
+   return ret;
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
 index 5586767..144e851 100644
 --- a/gdb/printcmd.c
@@ -5129,7 +5913,7 @@ index 8232436..e9fc8aa 100644
  
  
 diff --git a/gdb/python/py-value.c b/gdb/python/py-value.c
-index 4445655..8b06fd8 100644
+index 3ade512..70e00e9 100644
 --- a/gdb/python/py-value.c
 +++ b/gdb/python/py-value.c
 @@ -28,6 +28,7 @@
@@ -5168,7 +5952,7 @@ index 4445655..8b06fd8 100644
  
  
 diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
-index db21360..1897d10 100644
+index 60efc4a..824a076 100644
 --- a/gdb/solib-svr4.c
 +++ b/gdb/solib-svr4.c
 @@ -1276,7 +1276,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR pc)
@@ -5181,6 +5965,32 @@ index db21360..1897d10 100644
  }
  
  /* Given an executable's ABFD and target, compute the entry-point
+diff --git a/gdb/stack.c b/gdb/stack.c
+index 1e0c2e6..23f7f56 100644
+--- a/gdb/stack.c
++++ b/gdb/stack.c
+@@ -366,6 +366,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
+ 	        {
+                   const struct language_defn *language;
+ 		  struct value_print_options opts;
++		  struct cleanup *old_chain;
+ 
+                   /* Use the appropriate language to display our symbol,
+                      unless the user forced the language to a specific
+@@ -378,7 +379,13 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
+ 		  get_raw_print_options (&opts);
+ 		  opts.deref_ref = 0;
+ 		  opts.summary = summary;
++
++		  /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
++		  old_chain = make_cleanup_restore_selected_frame ();
++		  select_frame (frame);
+ 		  common_val_print (val, stb->stream, 2, &opts, language);
++		  do_cleanups (old_chain);
++
+ 		  ui_out_field_stream (uiout, "value", stb);
+ 	        }
+ 	      else
 diff --git a/gdb/symmisc.c b/gdb/symmisc.c
 index ef63216..1cc9082 100644
 --- a/gdb/symmisc.c
@@ -5259,93 +6069,6 @@ index a4032f8..944dd33 100644
  extern struct minimal_symbol *
      lookup_minimal_symbol_and_objfile (const char *,
  				       struct objfile **);
-diff --git a/gdb/target.c b/gdb/target.c
-index 5984125..06589d4 100644
---- a/gdb/target.c
-+++ b/gdb/target.c
-@@ -123,6 +123,8 @@ static int debug_to_insert_watchpoint (CORE_ADDR, int, int,
- static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
- 				       struct expression *);
- 
-+static int debug_to_detach_watchpoints (void);
-+
- static int debug_to_stopped_by_watchpoint (void);
- 
- static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
-@@ -606,6 +608,7 @@ update_current_target (void)
-       INHERIT (to_remove_hw_breakpoint, t);
-       INHERIT (to_insert_watchpoint, t);
-       INHERIT (to_remove_watchpoint, t);
-+      INHERIT (to_detach_watchpoints, t);
-       INHERIT (to_stopped_data_address, t);
-       INHERIT (to_have_steppable_watchpoint, t);
-       INHERIT (to_have_continuable_watchpoint, t);
-@@ -739,6 +742,9 @@ update_current_target (void)
-   de_fault (to_remove_watchpoint,
- 	    (int (*) (CORE_ADDR, int, int, struct expression *))
- 	    return_minus_one);
-+  de_fault (to_detach_watchpoints,
-+	    (int (*) (void))
-+	    return_zero);
-   de_fault (to_stopped_by_watchpoint,
- 	    (int (*) (void))
- 	    return_zero);
-@@ -3570,6 +3576,19 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
-   return retval;
- }
- 
-+static int
-+debug_to_detach_watchpoints (void)
-+{
-+  int retval;
-+
-+  retval = debug_target.to_detach_watchpoints ();
-+
-+  fprintf_unfiltered (gdb_stdlog,
-+		      "target_detach_watchpoints () = %ld\n",
-+		      (unsigned long) retval);
-+  return retval;
-+}
-+
- static void
- debug_to_terminal_init (void)
- {
-@@ -3817,6 +3836,7 @@ setup_target_debug (void)
-   current_target.to_remove_hw_breakpoint = debug_to_remove_hw_breakpoint;
-   current_target.to_insert_watchpoint = debug_to_insert_watchpoint;
-   current_target.to_remove_watchpoint = debug_to_remove_watchpoint;
-+  current_target.to_detach_watchpoints = debug_to_detach_watchpoints;
-   current_target.to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
-   current_target.to_stopped_data_address = debug_to_stopped_data_address;
-   current_target.to_watchpoint_addr_within_range = debug_to_watchpoint_addr_within_range;
-diff --git a/gdb/target.h b/gdb/target.h
-index 7290d90..c026d76 100644
---- a/gdb/target.h
-+++ b/gdb/target.h
-@@ -445,6 +445,7 @@ struct target_ops
-        provided with the corresponding target_* macros.  */
-     int (*to_remove_watchpoint) (CORE_ADDR, int, int, struct expression *);
-     int (*to_insert_watchpoint) (CORE_ADDR, int, int, struct expression *);
-+    int (*to_detach_watchpoints) (void);
- 
-     int (*to_stopped_by_watchpoint) (void);
-     int to_have_steppable_watchpoint;
-@@ -1324,6 +1325,15 @@ extern char *normal_pid_to_str (ptid_t ptid);
- #define	target_remove_watchpoint(addr, len, type, cond) \
-      (*current_target.to_remove_watchpoint) (addr, len, type, cond)
- 
-+/* Clear all debug registers without affecting any register caches.  Function
-+   acts on INFERIOR_PTID which should be the forked-off process, either the
-+   non-threaded child one or the threaded parent one, depending on `set
-+   follow-fork-mode'.  Both watchpoints and hardware breakpoints get removed.
-+   Return 0 on success, -1 on failure.  */
-+
-+#define	target_detach_watchpoints()	\
-+     (*current_target.to_detach_watchpoints) ()
-+
- #define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
-      (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt)
- 
 diff --git a/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S b/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S
 new file mode 100644
 index 0000000..83faaf6
@@ -7823,6 +8546,121 @@ index 0000000..e492b3a
 +  print *, c40pt  ! break-here
 +
 +end program repro
+diff --git a/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90 b/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
+new file mode 100644
+index 0000000..261ce17
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
+@@ -0,0 +1,24 @@
++! Copyright 2010 Free Software Foundation, Inc.
++!
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 2 of the License, or
++! (at your option) any later version.
++!
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++!
++! You should have received a copy of the GNU General Public License
++! along with this program; if not, write to the Free Software
++! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++!
++! Ihis file is the Fortran source file for dynamic.exp.
++! Original file written by Jakub Jelinek <jakub@redhat.com>.
++! Modified for the GDB testcase by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++subroutine bar
++  real :: dummy
++  dummy = 1
++end subroutine bar
+diff --git a/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp b/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
+new file mode 100644
+index 0000000..4fdd5ee
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
+@@ -0,0 +1,37 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++# 
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++# 
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
++
++set testfile "dynamic-other-frame"
++set srcfile1 ${testfile}.f90
++set srcfile2 ${testfile}-stub.f90
++set objfile2 ${objdir}/${subdir}/${testfile}-stub.o
++set executable ${testfile}
++set binfile ${objdir}/${subdir}/${executable}
++
++if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f77}] != ""
++     || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f77}] != "" } {
++    untested "Couldn't compile ${srcfile1} or ${srcfile2}"
++    return -1
++}
++
++clean_restart ${executable}
++
++if ![runto bar_] then {
++    perror "couldn't run to bar_"
++    continue
++}
++
++gdb_test "bt" {foo \(string='hello'.*}
+diff --git a/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90 b/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
+new file mode 100644
+index 0000000..2bc637d
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
+@@ -0,0 +1,36 @@
++! Copyright 2010 Free Software Foundation, Inc.
++!
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 2 of the License, or
++! (at your option) any later version.
++!
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++!
++! You should have received a copy of the GNU General Public License
++! along with this program; if not, write to the Free Software
++! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++!
++! Ihis file is the Fortran source file for dynamic.exp.
++! Original file written by Jakub Jelinek <jakub@redhat.com>.
++! Modified for the GDB testcase by Jan Kratochvil <jan.kratochvil@redhat.com>.
++
++subroutine foo (string)
++  interface
++    subroutine bar
++    end subroutine
++  end interface
++  character string*(*)
++  call bar                                ! stop-here
++end subroutine foo
++program test
++  interface
++    subroutine foo (string)
++    character string*(*)
++    end subroutine
++  end interface
++  call foo ('hello')
++end
 diff --git a/gdb/testsuite/gdb.fortran/dynamic.exp b/gdb/testsuite/gdb.fortran/dynamic.exp
 new file mode 100644
 index 0000000..0ccebe0
@@ -8186,6 +9024,190 @@ index 0000000..226dc5d
 +  h = 'h'
 +  call foo (g, h)
 +end
+diff --git a/gdb/testsuite/gdb.multi/watchpoint-multi.c b/gdb/testsuite/gdb.multi/watchpoint-multi.c
+new file mode 100644
+index 0000000..153c18b
+--- /dev/null
++++ b/gdb/testsuite/gdb.multi/watchpoint-multi.c
+@@ -0,0 +1,59 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2010 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <pthread.h>
++#include <assert.h>
++
++static volatile int a, b, c;
++
++static void
++marker_exit1 (void)
++{
++  a = 1;
++}
++
++/* Workaround PR breakpoints/12272 by two different breakpoint locations.  */
++static void
++marker_exit2 (void)
++{
++  a = 1;
++}
++
++static void *
++start (void *arg)
++{
++  b = 2;
++  c = 3;
++
++  return NULL;
++}
++
++int
++main (void)
++{
++  pthread_t thread;
++  int i;
++
++  i = pthread_create (&thread, NULL, start, NULL);
++  assert (i == 0);
++  i = pthread_join (thread, NULL);
++  assert (i == 0);
++
++  marker_exit1 ();
++  marker_exit2 ();
++  return 0;
++}
+diff --git a/gdb/testsuite/gdb.multi/watchpoint-multi.exp b/gdb/testsuite/gdb.multi/watchpoint-multi.exp
+new file mode 100644
+index 0000000..3b5d040
+--- /dev/null
++++ b/gdb/testsuite/gdb.multi/watchpoint-multi.exp
+@@ -0,0 +1,113 @@
++# Copyright 2010 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if { [is_remote target] || ![isnative] } then {
++    continue
++}
++
++set testfile "watchpoint-multi"
++
++set executable ${testfile}
++set srcfile ${testfile}.c
++set binfile ${objdir}/${subdir}/${executable}
++
++if { [gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
++    untested ${testfile}.exp
++    return -1
++}
++
++clean_restart $executable
++
++if ![runto_main] {
++    return
++}
++# Never keep/use any non-hw breakpoints to workaround a multi-inferior bug.
++delete_breakpoints
++
++gdb_test "add-inferior" "Added inferior 2"
++gdb_test "inferior 2" "witching to inferior 2 .*"
++gdb_load $binfile
++
++if ![runto_main] {
++    return
++}
++delete_breakpoints
++
++# Simulate non-stop+target-async which also uses breakpoint always-inserted.
++gdb_test_no_output "set breakpoint always-inserted on"
++# displaced-stepping is also needed as other GDB sometimes still removes the
++# breakpoints, even with always-inserted on.
++gdb_test_no_output "set displaced-stepping on"
++
++# Debugging of this testcase:
++#gdb_test_no_output "maintenance set show-debug-regs on"
++#gdb_test_no_output "set debug infrun 1"
++
++# Do not use simple hardware watchpoint ("watch") as its false hit may be
++# unnoticed by GDB if it reads it still has the same value.
++gdb_test "awatch c" "Hardware access \\(read/write\\) watchpoint \[0-9\]+: c"
++# Never keep/use any non-hw breakpoints to workaround a multi-inferior bug.
++# Use `*' to workaround a multi-inferior bug.
++set test "hbreak *marker_exit2"
++gdb_test_multiple $test $test {
++    -re "Hardware assisted breakpoint \[0-9\]+ at .*\r\n$gdb_prompt $" {
++	pass $test
++    }
++    -re "(No hardware breakpoint support in the target\\.|Hardware breakpoints used exceeds limit\\.)\r\n$gdb_prompt $" {
++	pass $test
++	untested ${testfile}.exp
++	return
++    }
++}
++
++gdb_test "inferior 1" "witching to inferior 1 .*"
++
++gdb_test "awatch b" "Hardware access \\(read/write\\) watchpoint \[0-9\]+: b"
++gdb_test "hbreak *marker_exit1" {Hardware assisted breakpoint [0-9]+ at .*}
++
++gdb_test "inferior 2" "witching to inferior 2 .*"
++
++# FAIL would be a hit on watchpoint for `b' - that one is for the other
++# inferior.
++gdb_test "continue" "Hardware access \\(read/write\\) watchpoint \[0-9\]+: c\r\n\r\nOld value = 0\r\nNew value = 3\r\n.*" "catch c"
++
++set test "catch marker_exit2"
++gdb_test_multiple "continue" $test {
++    -re "Breakpoint \[0-9\]+, marker_exit2 .*\r\n$gdb_prompt $" {
++	setup_kfail breakpoints/12312 *-*-*
++	pass $test
++    }
++    -re "Hardware access \\(read/write\\) watchpoint \[0-9\]+: c\r\n\r\nValue = 3\r\n.* in __nptl_death_event .*\r\n$gdb_prompt $" {
++	setup_kfail breakpoints/12312 *-*-*
++	fail $test
++    }
++}
++
++gdb_test "inferior 1" "witching to inferior 1 .*"
++
++gdb_test "continue" "Hardware access \\(read/write\\) watchpoint \[0-9\]+: b\r\n\r\nOld value = 0\r\nNew value = 2\r\n.*" "catch b"
++
++set test "catch marker_exit1"
++gdb_test_multiple "continue" $test {
++    -re "Breakpoint \[0-9\]+, marker_exit1 .*\r\n$gdb_prompt $" {
++	setup_kfail breakpoints/12312 *-*-*
++	pass $test
++    }
++    -re "Hardware access \\(read/write\\) watchpoint \[0-9\]+: b\r\n\r\nValue = 2\r\n.* in __nptl_death_event .*\r\n$gdb_prompt $" {
++	setup_kfail breakpoints/12312 *-*-*
++	fail $test
++    }
++}
++
 diff --git a/gdb/testsuite/gdb.opt/array-from-register-func.c b/gdb/testsuite/gdb.opt/array-from-register-func.c
 new file mode 100644
 index 0000000..729f457
@@ -8564,15 +9586,15 @@ index 0000000..295602d
 +  s := 'test'#0'string';
 +  writeln(s); { set breakpoint 2 here }
 +end.
-diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c b/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-child.c b/gdb/testsuite/gdb.threads/watchpoint-fork-child.c
 new file mode 100644
-index 0000000..4dc308b
+index 0000000..a2ad29a
 --- /dev/null
-+++ b/gdb/testsuite/gdb.threads/watchpoint-fork-forkoff.c
-@@ -0,0 +1,175 @@
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork-child.c
+@@ -0,0 +1,127 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
-+   Copyright 2008, 2009 Free Software Foundation, Inc.
++   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
 +
 +   This file is part of GDB.
 +
@@ -8593,61 +9615,12 @@ index 0000000..4dc308b
 +
 +#include <string.h>
 +#include <errno.h>
++#include <unistd.h>
++#include <assert.h>
++#include <signal.h>
++#include <stdio.h>
 +
-+static void
-+delay (void)
-+{
-+  int i = usleep (1000000 / 100);
-+  assert (i == 0 || errno == EINTR);
-+}
-+
-+#if defined FOLLOW_PARENT
-+
-+static void
-+forkoff (int nr)
-+{
-+  pid_t child, pid_got;
-+  int exit_code = 42 + nr;
-+  int status, i;
-+
-+  child = fork ();
-+  switch (child)
-+    {
-+    case -1:
-+      assert (0);
-+    case 0:
-+      printf ("child%d: %d\n", nr, (int) getpid ());
-+      /* Delay to get both the "child%d" and "parent%d" message printed without
-+	 a race breaking expect by its endless wait on `$gdb_prompt$':
-+	 Breakpoint 3, breakpoint () at ../../../gdb/testsuite/gdb.threads/watchpoint-fork.c:33
-+	 33      }
-+	 (gdb) parent2: 14223  */
-+      i = sleep (1);
-+      assert (i == 0);
-+
-+      /* We must not get caught here (against a forgotten breakpoint).  */
-+      var++;
-+      breakpoint ();
-+
-+      _exit (exit_code);
-+    default:
-+      printf ("parent%d: %d\n", nr, (int) child);
-+      /* Delay to get both the "child%d" and "parent%d" message printed, see
-+	 above.  */
-+      i = sleep (1);
-+      assert (i == 0);
-+
-+      pid_got = wait (&status);
-+      assert (pid_got == child);
-+      assert (WIFEXITED (status));
-+      assert (WEXITSTATUS (status) == exit_code);
-+
-+      /* We must get caught here (against a false watchpoint removal).  */
-+      breakpoint ();
-+    }
-+}
-+
-+#elif defined FOLLOW_CHILD
++#include "watchpoint-fork.h"
 +
 +static volatile int usr1_got;
 +
@@ -8657,11 +9630,11 @@ index 0000000..4dc308b
 +  usr1_got++;
 +}
 +
-+static void
++void
 +forkoff (int nr)
 +{
-+  pid_t child;
-+  int i, loop;
++  pid_t child, save_parent = getpid ();
++  int i;
 +  struct sigaction act, oldact;
 +#ifdef THREAD
 +  void *thread_result;
@@ -8692,7 +9665,7 @@ index 0000000..4dc308b
 +      /* We must not get caught here (against a forgotten breakpoint).  */
 +
 +      var++;
-+      breakpoint ();
++      marker ();
 +
 +#ifdef THREAD
 +      /* And neither got caught our thread.  */
@@ -8720,40 +9693,41 @@ index 0000000..4dc308b
 +
 +      /* Let the parent signal us about its success.  Be careful of races.  */
 +
-+      for (loop = 0; loop < 1000; loop++)
++      for (;;)
 +	{
 +	  /* Parent either died (and USR1_GOT is zero) or it succeeded.  */
++	  if (getppid () != save_parent)
++	    break;
 +	  if (kill (getppid (), 0) != 0)
 +	    break;
 +	  /* Parent succeeded?  */
 +	  if (usr1_got)
 +	    break;
 +
-+	  delay ();
++#ifdef THREAD
++	  i = pthread_yield ();
++	  assert (i == 0);
++#endif
 +	}
 +      assert (usr1_got);
 +
 +      /* We must get caught here (against a false watchpoint removal).  */
 +
-+      breakpoint ();
++      marker ();
 +    }
 +
 +  i = sigaction (SIGUSR1, &oldact, NULL);
 +  assert (i == 0);
 +}
-+
-+#else
-+# error "!FOLLOW_PARENT && !FOLLOW_CHILD"
-+#endif
 diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c b/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
 new file mode 100644
-index 0000000..edacfc0
+index 0000000..08a5aff
 --- /dev/null
 +++ b/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,174 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
-+   Copyright 2008, 2009 Free Software Foundation, Inc.
++   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
 +
 +   This file is part of GDB.
 +
@@ -8783,49 +9757,56 @@ index 0000000..edacfc0
 +#include <unistd.h>
 +#define gettid() syscall (__NR_gettid)
 +
++#include "watchpoint-fork.h"
++
 +/* Non-atomic `var++' should not hurt as we synchronize the threads by the STEP
 +   variable.  Hit-comments need to be duplicite there to catch both at-stops
 +   and behind-stops, depending on the target.  */
 +
-+static volatile int var;
++volatile int var;
 +
-+static void
-+dummy (void)
++void
++marker (void)
 +{
 +}
 +
 +static void
-+breakpoint (void)
++empty (void)
 +{
 +}
 +
-+/* Include here the functions:
-+   static void forkoff (int nr);
-+   static void delay (void);  */
++static void
++mark_exit (void)
++{
++}
 +
-+static pthread_t thread;
-+static volatile int step;
-+#define THREAD
-+
-+#include "watchpoint-fork-forkoff.c"
++pthread_t thread;
++volatile int step;
 +
 +static void *
 +start (void *arg)
 +{
++  int i;
++
 +  if (step >= 3)
 +    goto step_3;
 +
 +  while (step != 1)
-+    delay ();
++    {
++      i = pthread_yield ();
++      assert (i == 0);
++    }
 +
 +  var++;	/* validity-thread-B */
-+  dummy ();	/* validity-thread-B */
++  empty ();	/* validity-thread-B */
 +  step = 2;
 +  while (step != 3)
 +    {
 +      if (step == 99)
 +	goto step_99;
-+      delay ();
++
++      i = pthread_yield ();
++      assert (i == 0);
 +    }
 +
 +step_3:
@@ -8833,24 +9814,26 @@ index 0000000..edacfc0
 +    goto step_5;
 +
 +  var++;	/* after-fork1-B */
-+  dummy ();	/* after-fork1-B */
++  empty ();	/* after-fork1-B */
 +  step = 4;
 +  while (step != 5)
 +    {
 +      if (step == 99)
 +	goto step_99;
-+      delay ();
++
++      i = pthread_yield ();
++      assert (i == 0);
 +    }
 +
 +step_5:
 +  var++;	/* after-fork2-B */
-+  dummy ();	/* after-fork2-B */
++  empty ();	/* after-fork2-B */
 +  return (void *) 5UL;
 +
 +step_99:
 +  /* We must not get caught here (against a forgotten breakpoint).  */
 +  var++;
-+  breakpoint ();
++  marker ();
 +  return (void *) 99UL;
 +}
 +
@@ -8863,24 +9846,28 @@ index 0000000..edacfc0
 +  setbuf (stdout, NULL);
 +  printf ("main: %d\n", (int) gettid ());
 +
-+  /* General watchpoints validity.  */
++  /* General hardware breakpoints and watchpoints validity.  */
++  marker ();
 +  var++;	/* validity-first */
-+  dummy ();	/* validity-first */
++  empty ();	/* validity-first */
 +
 +  i = pthread_create (&thread, NULL, start, NULL);
 +  assert (i == 0);
 +
 +  var++;	/* validity-thread-A */
-+  dummy ();	/* validity-thread-A */
++  empty ();	/* validity-thread-A */
 +  step = 1;
 +  while (step != 2)
-+    delay ();
++    {
++      i = pthread_yield ();
++      assert (i == 0);
++    }
 +
 +  /* Hardware watchpoints got disarmed here.  */
 +  forkoff (1);
 +
 +  var++;	/* after-fork1-A */
-+  dummy ();	/* after-fork1-A */
++  empty ();	/* after-fork1-A */
 +  step = 3;
 +#ifdef FOLLOW_CHILD
 +  /* Spawn new thread as it was deleted in the child of FORK.  */
@@ -8888,13 +9875,16 @@ index 0000000..edacfc0
 +  assert (i == 0);
 +#endif
 +  while (step != 4)
-+    delay ();
++    {
++      i = pthread_yield ();
++      assert (i == 0);
++    }
 +
 +  /* A sanity check for double hardware watchpoints removal.  */
 +  forkoff (2);
 +
 +  var++;	/* after-fork2-A */
-+  dummy ();	/* after-fork2-A */
++  empty ();	/* after-fork2-A */
 +  step = 5;
 +#ifdef FOLLOW_CHILD
 +  /* Spawn new thread as it was deleted in the child of FORK.  */
@@ -8906,17 +9896,98 @@ index 0000000..edacfc0
 +  assert (i == 0);
 +  assert (thread_result == (void *) 5UL);
 +
++  mark_exit ();
 +  return 0;
 +}
-diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork.c b/gdb/testsuite/gdb.threads/watchpoint-fork.c
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c b/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c
 new file mode 100644
-index 0000000..5f62e7f
+index 0000000..82d1182
 --- /dev/null
-+++ b/gdb/testsuite/gdb.threads/watchpoint-fork.c
-@@ -0,0 +1,57 @@
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c
+@@ -0,0 +1,74 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
-+   Copyright 2008, 2009 Free Software Foundation, Inc.
++   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <string.h>
++#include <errno.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include <assert.h>
++#include <stdio.h>
++#include <sys/wait.h>
++
++#include "watchpoint-fork.h"
++
++void
++forkoff (int nr)
++{
++  pid_t child, pid_got;
++  int exit_code = 42 + nr;
++  int status, i;
++
++  child = fork ();
++  switch (child)
++    {
++    case -1:
++      assert (0);
++    case 0:
++      printf ("child%d: %d\n", nr, (int) getpid ());
++      /* Delay to get both the "child%d" and "parent%d" message printed without
++	 a race breaking expect by its endless wait on `$gdb_prompt$':
++	 Breakpoint 3, marker () at ../../../gdb/testsuite/gdb.threads/watchpoint-fork.c:33
++	 33      }
++	 (gdb) parent2: 14223  */
++      i = sleep (1);
++      assert (i == 0);
++
++      /* We must not get caught here (against a forgotten breakpoint).  */
++      var++;
++      marker ();
++
++      _exit (exit_code);
++    default:
++      printf ("parent%d: %d\n", nr, (int) child);
++      /* Delay to get both the "child%d" and "parent%d" message printed, see
++	 above.  */
++      i = sleep (1);
++      assert (i == 0);
++
++      pid_got = wait (&status);
++      assert (pid_got == child);
++      assert (WIFEXITED (status));
++      assert (WEXITSTATUS (status) == exit_code);
++
++      /* We must get caught here (against a false watchpoint removal).  */
++      marker ();
++    }
++}
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork-st.c b/gdb/testsuite/gdb.threads/watchpoint-fork-st.c
+new file mode 100644
+index 0000000..a7eeedd
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork-st.c
+@@ -0,0 +1,61 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
 +
 +   This file is part of GDB.
 +
@@ -8941,17 +10012,19 @@ index 0000000..5f62e7f
 +#include <stdio.h>
 +#include <stdlib.h>
 +
-+static volatile int var;
++#include "watchpoint-fork.h"
 +
-+static void
-+breakpoint (void)
++volatile int var;
++
++void
++marker (void)
 +{
 +}
 +
-+/* Include here the function:
-+   static void forkoff (int nr);  */
-+
-+#include "watchpoint-fork-forkoff.c"
++static void
++mark_exit (void)
++{
++}
 +
 +int
 +main (void)
@@ -8959,7 +10032,8 @@ index 0000000..5f62e7f
 +  setbuf (stdout, NULL);
 +  printf ("main: %d\n", (int) getpid ());
 +
-+  /* General watchpoints validity.  */
++  /* General hardware breakpoints and watchpoints validity.  */
++  marker ();
 +  var++;
 +  /* Hardware watchpoints got disarmed here.  */
 +  forkoff (1);
@@ -8969,15 +10043,16 @@ index 0000000..5f62e7f
 +  forkoff (2);
 +  var++;
 +
++  mark_exit ();
 +  return 0;
 +}
 diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork.exp b/gdb/testsuite/gdb.threads/watchpoint-fork.exp
 new file mode 100644
-index 0000000..1dc93ab
+index 0000000..117700b
 --- /dev/null
 +++ b/gdb/testsuite/gdb.threads/watchpoint-fork.exp
-@@ -0,0 +1,130 @@
-+# Copyright 2008, 2009 Free Software Foundation, Inc.
+@@ -0,0 +1,149 @@
++# Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -8995,56 +10070,72 @@ index 0000000..1dc93ab
 +# Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
 +proc test {type symbol} {
-+    global objdir subdir srcdir
++    global objdir subdir srcdir gdb_prompt
 +
-+    set test watchpoint-fork
++    set testfile watchpoint-fork
 +
 +    global pf_prefix
 +    set prefix_test $pf_prefix
 +    lappend pf_prefix "$type:"
 +    set prefix_mt $pf_prefix
 +
++    set srcfile_type ${srcdir}/${subdir}/${testfile}-${type}.c
++
++
 +    # no threads
 +
 +    set pf_prefix $prefix_mt
 +    lappend pf_prefix "singlethreaded:"
 +
-+    set executable ${test}-${type}
-+    if { [gdb_compile ${srcdir}/${subdir}/${test}.c ${objdir}/${subdir}/${executable} executable [list debug additional_flags=-D$symbol]] != "" } {
-+	untested ${test}.exp
-+	return -1
++    set executable ${testfile}-${type}-st
++    set srcfile_main ${srcdir}/${subdir}/${testfile}-st.c
++    if { [gdb_compile "${srcfile_main} ${srcfile_type}" ${objdir}/${subdir}/${executable} executable [list debug additional_flags=-D$symbol]] != "" } {
++	untested ${testfile}.exp
++	return
 +    }
 +    clean_restart $executable
 +
-+    gdb_test "show detach-on-fork" "Whether gdb will detach the child of a fork is on."
-+    gdb_test "set follow-fork-mode $type"
-+    gdb_test "show follow-fork-mode" "Debugger response to a program call of fork or vfork is \"$type\"."
++    gdb_test "show detach-on-fork" "Whether gdb will detach the child of a fork is on\\."
++    gdb_test_no_output "set follow-fork-mode $type"
++    gdb_test "show follow-fork-mode" "Debugger response to a program call of fork or vfork is \"$type\"\\."
 +    # Testcase uses it for the `follow-fork-mode child' type.
-+    gdb_test "handle SIGUSR1 nostop noprint pass"
++    gdb_test "handle SIGUSR1 nostop noprint pass" "No\[ \t\]+No\[ \t\]+Yes.*"
 +
-+    if { ![runto_main] } then {
-+	gdb_suppress_tests
++    if ![runto_main] {
 +	return
 +    }
 +
-+    # Install the watchpoint only after getting into MAIN - workaround some PPC
-+    # problem.
-+    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++    gdb_test "watch var" "atchpoint \[0-9\]+: var" "Set the watchpoint"
 +
 +    # It is never hit but it should not be left over in the fork()ed-off child.
-+    gdb_breakpoint "breakpoint"
++    set hbreak "hbreak"
++    set test "hbreak marker"
++    gdb_test_multiple $test $test {
++	-re "Hardware assisted breakpoint \[0-9\]+ at .*\r\n$gdb_prompt $" {
++	    pass $test
++	}
++	-re "(No hardware breakpoint support in the target\\.|Hardware breakpoints used exceeds limit\\.)\r\n$gdb_prompt $" {
++	    pass $test
++	    set hbreak "break"
++	    gdb_test "break marker"
++	}
++    }
++
++    gdb_breakpoint "mark_exit"
 +
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 0.*New value = 1.*forkoff *\\(1\\).*" "watchpoints work"
++	     "reakpoint \[0-9\]+, marker.*" "hardware breakpoints work"
 +    gdb_test "continue" \
-+	     "reakpoint 3, breakpoint.*" "breakpoint after the first fork"
++	     "atchpoint \[0-9\]+: var.*Old value = 0.*New value = 1.*forkoff *\\(1\\).*" "watchpoints work"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 1.*New value = 2.*forkoff *\\(2\\).*" "watchpoint after the first fork"
++	     "reakpoint \[0-9\]+, marker.*" "breakpoint after the first fork"
 +    gdb_test "continue" \
-+	     "reakpoint 3, breakpoint.*" "breakpoint after the second fork"
++	     "atchpoint \[0-9\]+: var.*Old value = 1.*New value = 2.*forkoff *\\(2\\).*" "watchpoint after the first fork"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 2.*New value = 3.*return *0;" "watchpoint after the second fork"
-+    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++	     "reakpoint \[0-9\]+, marker.*" "breakpoint after the second fork"
++    gdb_test "continue" \
++	     "atchpoint \[0-9\]+: var.*Old value = 2.*New value = 3.*mark_exit \\(\\);" "watchpoint after the second fork"
++    gdb_test "continue" "Continuing\\..*\r\nBreakpoint \[0-9\]+, mark_exit .*" "finish"
 +
 +
 +    # threads
@@ -9052,61 +10143,102 @@ index 0000000..1dc93ab
 +    set pf_prefix $prefix_mt
 +    lappend pf_prefix "multithreaded:"
 +
-+    set executable ${test}-mt-${type}
-+    if { [gdb_compile_pthreads ${srcdir}/${subdir}/${test}-mt.c ${objdir}/${subdir}/${executable} executable [list debug additional_flags=-D$symbol]] != "" } {
-+	untested ${test}.exp
-+	return -1
++    set executable ${testfile}-${type}-mt
++    set srcfile_main ${srcdir}/${subdir}/${testfile}-mt.c
++    if { [gdb_compile_pthreads "${srcfile_main} ${srcfile_type}" ${objdir}/${subdir}/${executable} executable [list debug "additional_flags=-D$symbol -DTHREAD"]] != "" } {
++	untested ${testfile}.exp
++	return
 +    }
 +    clean_restart $executable
 +
-+    gdb_test "set follow-fork-mode $type"
++    gdb_test_no_output "set follow-fork-mode $type"
 +    # Testcase uses it for the `follow-fork-mode child' type.
-+    gdb_test "handle SIGUSR1 nostop noprint pass"
++    gdb_test "handle SIGUSR1 nostop noprint pass" "No\[ \t\]+No\[ \t\]+Yes.*"
 +
-+    if { ![runto_main] } then {
-+	gdb_suppress_tests
++    if ![runto_main] {
 +	return
 +    }
 +
-+    # Install the watchpoint only after getting into MAIN - workaround some PPC
-+    # problem.
-+    gdb_test "watch var" "atchpoint 2: var" "Set the watchpoint"
++    gdb_test "watch var" "atchpoint \[0-9\]+: var" "Set the watchpoint"
 +
-+    # It is never hit but it should not be left over in the fork()ed-off child.
-+    gdb_breakpoint "breakpoint"
++    # It should not be left over in the fork()ed-off child.
++    gdb_test "$hbreak marker" {reakpoint [0-9]+.*}
++
++    gdb_breakpoint "mark_exit"
 +
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 0.*New value = 1.*validity-first.*" "singlethread watchpoints work"
++	     "reakpoint \[0-9\]+, marker.*" "hardware breakpoints work"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 1.*New value = 2.*validity-thread-A.*" "multithreaded watchpoints work at A"
++	     "atchpoint \[0-9\]+: var.*Old value = 0.*New value = 1.*validity-first.*" "singlethread watchpoints work"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 2.*New value = 3.*validity-thread-B.*" "multithreaded watchpoints work at B"
++	     "atchpoint \[0-9\]+: var.*Old value = 1.*New value = 2.*validity-thread-A.*" "multithreaded watchpoints work at A"
 +    gdb_test "continue" \
-+	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the first fork"
++	     "atchpoint \[0-9\]+: var.*Old value = 2.*New value = 3.*validity-thread-B.*" "multithreaded watchpoints work at B"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 3.*New value = 4.*after-fork1-A.*" "watchpoint A after the first fork"
++	     "reakpoint \[0-9\]+, marker.*" "breakpoint (A) after the first fork"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 4.*New value = 5.*after-fork1-B.*" "watchpoint B after the first fork"
++	     "atchpoint \[0-9\]+: var.*Old value = 3.*New value = 4.*after-fork1-A.*" "watchpoint A after the first fork"
 +    gdb_test "continue" \
-+	     "reakpoint 3, breakpoint.*" "breakpoint (A) after the second fork"
++	     "atchpoint \[0-9\]+: var.*Old value = 4.*New value = 5.*after-fork1-B.*" "watchpoint B after the first fork"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 5.*New value = 6.*after-fork2-A.*" "watchpoint A after the second fork"
++	     "reakpoint \[0-9\]+, marker.*" "breakpoint (A) after the second fork"
 +    gdb_test "continue" \
-+	     "atchpoint 2: var.*Old value = 6.*New value = 7.*after-fork2-B.*" "watchpoint B after the second fork"
-+    gdb_test "continue" "Continuing..*Program exited normally." "finish"
++	     "atchpoint \[0-9\]+: var.*Old value = 5.*New value = 6.*after-fork2-A.*" "watchpoint A after the second fork"
++    gdb_test "continue" \
++	     "atchpoint \[0-9\]+: var.*Old value = 6.*New value = 7.*after-fork2-B.*" "watchpoint B after the second fork"
++    gdb_test "continue" "Continuing\\..*\r\nBreakpoint \[0-9\]+, mark_exit .*" "finish"
 +
 +
 +    # cleanup
-+
 +    set pf_prefix $prefix_test
 +}
 +
 +test parent FOLLOW_PARENT
 +
 +# Only GNU/Linux is known to support `set follow-fork-mode child'.
-+if {[istarget "*-*-linux*"]} {
++if {[istarget "*-*-linux*"] && ![is_remote target]} {
 +    test child FOLLOW_CHILD
++} else {
++    untested "child"
 +}
+diff --git a/gdb/testsuite/gdb.threads/watchpoint-fork.h b/gdb/testsuite/gdb.threads/watchpoint-fork.h
+new file mode 100644
+index 0000000..31f7656
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/watchpoint-fork.h
+@@ -0,0 +1,32 @@
++/* Test case for forgotten hw-watchpoints after fork()-off of a process.
++
++   Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
++
++   This file is part of GDB.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 2 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#ifdef THREAD
++#include <pthread.h>
++
++extern volatile int step;
++extern pthread_t thread;
++#endif /* THREAD */
++
++extern volatile int var;
++
++extern void marker (void);
++extern void forkoff (int nr);
 diff --git a/gdb/testsuite/lib/pascal.exp b/gdb/testsuite/lib/pascal.exp
 index af0b00d..e1a8dc4 100644
 --- a/gdb/testsuite/lib/pascal.exp
@@ -9143,17 +10275,17 @@ index af0b00d..e1a8dc4 100644
      set pascal_init_done 1
  }   
 diff --git a/gdb/top.c b/gdb/top.c
-index 6680c38..38d1cc2 100644
+index 45c9259..8856322 100644
 --- a/gdb/top.c
 +++ b/gdb/top.c
-@@ -338,6 +338,7 @@ void
+@@ -343,6 +343,7 @@ void
  prepare_execute_command (void)
  {
    free_all_values ();
 +  free_all_types ();
  
-   /* With multiple threads running while the one we're examining is stopped,
-      the dcache can get stale without us being able to detect it.
+   /* With multiple threads running while the one we're examining is
+      stopped, the dcache can get stale without us being able to detect
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 index ce9f551..5f9d739 100644
 --- a/gdb/typeprint.c
@@ -9211,11 +10343,52 @@ index ce9f551..5f9d739 100644
  }
  
  static void
+diff --git a/gdb/utils.c b/gdb/utils.c
+index 02c7a37..894be69 100644
+--- a/gdb/utils.c
++++ b/gdb/utils.c
+@@ -2198,6 +2198,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
+   return back_to;
+ }
+ 
++/* Helper for make_cleanup_restore_page_info.  */
++
++static void
++do_restore_selected_frame_cleanup (void *arg)
++{
++  struct frame_id *frame_idp = arg;
++
++  select_frame (frame_find_by_id (*frame_idp));
++
++  xfree (frame_idp);
++}
++
++/* Provide cleanup for restoring currently selected frame.  Use frame_id for
++   the case the current frame becomes stale in the meantime.  */
++
++struct cleanup *
++make_cleanup_restore_selected_frame (void)
++{
++  struct frame_id *frame_idp;
++
++  /* get_selected_frame->get_current_frame would error otherwise.  */
++  if (!has_stack_frames ())
++    return make_cleanup (null_cleanup, NULL);
++
++  frame_idp = xmalloc (sizeof (*frame_idp));
++  *frame_idp = get_frame_id (get_selected_frame (NULL));
++
++  return make_cleanup (do_restore_selected_frame_cleanup, frame_idp);
++}
++
+ /* Set the screen size based on LINES_PER_PAGE and CHARS_PER_LINE.  */
+ 
+ static void
 diff --git a/gdb/valarith.c b/gdb/valarith.c
-index 7c553d1..80be82f 100644
+index 6b212b2..c6b4843 100644
 --- a/gdb/valarith.c
 +++ b/gdb/valarith.c
-@@ -161,12 +161,26 @@ value_subscript (struct value *array, LONGEST index)
+@@ -165,12 +165,26 @@ value_subscript (struct value *array, LONGEST index)
  
        get_discrete_bounds (range_type, &lowerbound, &upperbound);
        if (VALUE_LVAL (array) != lval_memory)
@@ -9244,7 +10417,7 @@ index 7c553d1..80be82f 100644
  	  /* Emit warning unless we have an array of unknown size.
  	     An array of unknown size has lowerbound 0 and upperbound -1.  */
  	  if (upperbound > -1)
-@@ -185,34 +199,37 @@ value_subscript (struct value *array, LONGEST index)
+@@ -189,34 +203,37 @@ value_subscript (struct value *array, LONGEST index)
      error (_("not an array or string"));
  }
  
@@ -9294,7 +10467,7 @@ index 7c553d1..80be82f 100644
    return v;
  }
  
-@@ -292,6 +309,10 @@ int
+@@ -296,6 +313,10 @@ int
  binop_user_defined_p (enum exp_opcode op,
  		      struct value *arg1, struct value *arg2)
  {
@@ -9306,7 +10479,7 @@ index 7c553d1..80be82f 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 932e311..5ce565f 100644
+index 7ea6315..ad3dacf 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -38,6 +38,7 @@
@@ -9317,7 +10490,7 @@ index 932e311..5ce565f 100644
  
  #include <errno.h>
  #include "gdb_string.h"
-@@ -897,6 +898,65 @@ value_one (struct type *type, enum lval_type lv)
+@@ -901,6 +902,65 @@ value_one (struct type *type, enum lval_type lv)
    return val;
  }
  
@@ -9383,7 +10556,7 @@ index 932e311..5ce565f 100644
  /* Helper function for value_at, value_at_lazy, and value_at_lazy_stack.  */
  
  static struct value *
-@@ -995,15 +1055,21 @@ value_fetch_lazy (struct value *val)
+@@ -999,15 +1059,21 @@ value_fetch_lazy (struct value *val)
      }
    else if (VALUE_LVAL (val) == lval_memory)
      {
@@ -9412,7 +10585,7 @@ index 932e311..5ce565f 100644
  	}
      }
    else if (VALUE_LVAL (val) == lval_register)
-@@ -1407,7 +1473,18 @@ address_of_variable (struct symbol *var, struct block *b)
+@@ -1418,7 +1484,18 @@ address_of_variable (struct symbol *var, struct block *b)
    if ((VALUE_LVAL (val) == lval_memory && value_lazy (val))
        || TYPE_CODE (type) == TYPE_CODE_FUNC)
      {
@@ -9432,7 +10605,7 @@ index 932e311..5ce565f 100644
  
        return value_from_pointer (lookup_pointer_type (type), addr);
      }
-@@ -1515,6 +1592,7 @@ struct value *
+@@ -1526,6 +1603,7 @@ struct value *
  value_coerce_array (struct value *arg1)
  {
    struct type *type = check_typedef (value_type (arg1));
@@ -9440,7 +10613,7 @@ index 932e311..5ce565f 100644
  
    /* If the user tries to do something requiring a pointer with an
       array that has not yet been pushed to the target, then this would
-@@ -1524,8 +1602,12 @@ value_coerce_array (struct value *arg1)
+@@ -1535,8 +1613,12 @@ value_coerce_array (struct value *arg1)
    if (VALUE_LVAL (arg1) != lval_memory)
      error (_("Attempt to take address of value not located in memory."));
  
@@ -9455,7 +10628,7 @@ index 932e311..5ce565f 100644
  
  /* Given a value which is a function, return a value which is a pointer
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index ddb16e4..c4c2969 100644
+index 5cba023..4ef5e5a 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
 @@ -36,6 +36,7 @@
@@ -9474,7 +10647,7 @@ index ddb16e4..c4c2969 100644
      case TYPE_CODE_BITSTRING:
        return 0;
      default:
-@@ -1104,6 +1104,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1111,6 +1111,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
  {
    unsigned int things_printed = 0;
    unsigned len;
@@ -9482,7 +10655,7 @@ index ddb16e4..c4c2969 100644
    struct type *elttype, *index_type;
    unsigned eltlen;
    /* Position of the array element we are examining to see
-@@ -1112,9 +1113,33 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1119,9 +1120,33 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
    /* Number of repetitions we have detected so far.  */
    unsigned int reps;
    LONGEST low_bound, high_bound;
@@ -9518,7 +10691,7 @@ index ddb16e4..c4c2969 100644
    index_type = TYPE_INDEX_TYPE (type);
  
    if (get_array_bounds (type, &low_bound, &high_bound))
-@@ -1189,6 +1214,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1196,6 +1221,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
      {
        fprintf_filtered (stream, "...");
      }
@@ -9528,7 +10701,7 @@ index ddb16e4..c4c2969 100644
  
  /* Read LEN bytes of target memory at address MEMADDR, placing the
 diff --git a/gdb/value.c b/gdb/value.c
-index 85cb62a..013a9fc 100644
+index c7de323..645fef2 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -39,6 +39,7 @@
@@ -9539,7 +10712,7 @@ index 85cb62a..013a9fc 100644
  
  #include "python/python.h"
  
-@@ -850,12 +851,15 @@ void
+@@ -864,12 +865,15 @@ void
  set_value_component_location (struct value *component,
  			      const struct value *whole)
  {
@@ -9555,7 +10728,7 @@ index 85cb62a..013a9fc 100644
    if (whole->lval == lval_computed)
      {
        struct lval_funcs *funcs = whole->location.computed.funcs;
-@@ -863,6 +867,12 @@ set_value_component_location (struct value *component,
+@@ -877,6 +881,12 @@ set_value_component_location (struct value *component,
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
@@ -9568,7 +10741,7 @@ index 85cb62a..013a9fc 100644
  }
  
  
-@@ -995,6 +1005,29 @@ show_values (char *num_exp, int from_tty)
+@@ -1009,6 +1019,29 @@ show_values (char *num_exp, int from_tty)
        num_exp[1] = '\0';
      }
  }
@@ -9598,7 +10771,7 @@ index 85cb62a..013a9fc 100644
  
  /* Internal variables.  These are variables within the debugger
     that hold values assigned by debugger commands.
-@@ -1473,6 +1506,40 @@ call_internal_function (struct gdbarch *gdbarch,
+@@ -1503,6 +1536,40 @@ call_internal_function (struct gdbarch *gdbarch,
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -9639,7 +10812,7 @@ index 85cb62a..013a9fc 100644
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -1520,11 +1587,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
+@@ -1550,11 +1617,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
  		    htab_t copied_types)
  {
    if (TYPE_OBJFILE (value->type) == objfile)
@@ -9653,7 +10826,7 @@ index 85cb62a..013a9fc 100644
  						 copied_types);
  }
  
-@@ -1539,13 +1605,13 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
+@@ -1569,13 +1635,13 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
      case INTERNALVAR_INTEGER:
        if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
  	var->u.integer.type
@@ -9669,7 +10842,7 @@ index 85cb62a..013a9fc 100644
        break;
  
      case INTERNALVAR_VALUE:
-@@ -2399,7 +2465,24 @@ value_from_decfloat (struct type *type, const gdb_byte *dec)
+@@ -2438,7 +2504,24 @@ value_from_decfloat (struct type *type, const gdb_byte *dec)
  struct value *
  coerce_ref (struct value *arg)
  {
@@ -9695,7 +10868,7 @@ index 85cb62a..013a9fc 100644
  
    if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
      arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
-@@ -2497,4 +2580,8 @@ VARIABLE is already initialized."));
+@@ -2536,4 +2619,8 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);
@@ -9705,10 +10878,10 @@ index 85cb62a..013a9fc 100644
 +  observer_attach_mark_used (value_types_mark_used);
  }
 diff --git a/gdb/value.h b/gdb/value.h
-index ef2cb4f..ac99a4b 100644
+index cf089be..0fb89f1 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
-@@ -373,6 +373,10 @@ extern struct value *value_from_double (struct type *type, DOUBLEST num);
+@@ -389,6 +389,10 @@ extern struct value *value_from_double (struct type *type, DOUBLEST num);
  extern struct value *value_from_decfloat (struct type *type,
  					  const gdb_byte *decbytes);
  
@@ -9719,7 +10892,7 @@ index ef2cb4f..ac99a4b 100644
  extern struct value *value_at (struct type *type, CORE_ADDR addr);
  extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
  
-@@ -733,7 +737,7 @@ extern struct value *value_allocate_space_in_inferior (int);
+@@ -749,7 +753,7 @@ extern struct value *value_allocate_space_in_inferior (int);
  extern struct value *value_of_local (const char *name, int complain);
  
  extern struct value *value_subscripted_rvalue (struct value *array,
@@ -9729,7 +10902,7 @@ index ef2cb4f..ac99a4b 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index 25518d4..cb5d8a2 100644
+index e87d399..0ea54f5 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
 @@ -26,6 +26,8 @@

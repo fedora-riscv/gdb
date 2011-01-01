@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20101117
+Version: 7.2.50.20101231
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{dist}
+Release: 5%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -203,11 +203,6 @@ Patch169: gdb-6.3-ia64-sigill-20051115.patch
 #=push+work: There was some mail thread about it, this patch may be a hack.
 Patch188: gdb-6.5-bz203661-emit-relocs.patch
 
-# Security patch: avoid stack overflows in dwarf expression computation.
-# CVE-2006-4146
-#=push
-Patch190: gdb-6.5-dwarf-stack-overflow.patch
-
 # Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
 #=push+work: It should be replaced by existing uncommitted Roland's glibc patch for TLS without libpthreads.
 Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
@@ -272,10 +267,6 @@ Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
 #=push+work: Upstream should have backward compat. API: libc-alpha: <20070127104539.GA9444@.*>
 Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 
-# Fix debugging GDB itself - the compiled in source files paths (BZ 225783).
-#=push
-Patch241: gdb-6.6-bz225783-gdb-debuginfo-paths.patch
-
 # Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
 #=fedoratest
 Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
@@ -291,10 +282,6 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
 #=fedoratest
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
-
-# Link with libreadline provided by the operating system.
-#=push
-Patch261: gdb-6.6-readline-system.patch
 
 # Test kernel VDSO decoding while attaching to an i386 process.
 #=fedoratest
@@ -516,14 +503,6 @@ Patch510: gdb-bz592031-siginfo-lost-4of5.patch
 #=push
 Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 
-# Fix crash on CTRL-C while reading an ELF symbol file (BZ 642879).
-#=push
-Patch520: gdb-bz642879-elfread-sigint-stale.patch
-
-# Fix next/finish/etc -vs- exceptions (Tom Tromey).
-#=push
-Patch525: gdb-next-over-throw.patch
-
 # Verify GDB Python built-in function gdb.solib_address exists (BZ # 634108).
 Patch526: gdb-bz634108-solib_address.patch
 
@@ -689,7 +668,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch164 -p1
 %patch169 -p1
 %patch188 -p1
-%patch190 -p1
 %patch194 -p1
 %patch196 -p1
 %patch199 -p1
@@ -705,13 +683,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch231 -p1
 %patch234 -p1
 %patch235 -p1
-%patch241 -p1
 %patch245 -p1
 %patch247 -p1
 %patch254 -p1
 %patch258 -p1
 %patch260 -p1
-%patch261 -p1
 %patch263 -p1
 %patch265 -p1
 %patch266 -p1
@@ -768,8 +744,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch504 -p1
 %patch510 -p1
 %patch511 -p1
-%patch520 -p1
-%patch525 -p1
 %patch526 -p1
 
 %patch393 -p1
@@ -1147,6 +1121,16 @@ fi
 %endif
 
 %changelog
+* Sat Jan  1 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101231-5.fc15
+- Rebase to FSF GDB 7.2.50.20101231 (which is a 7.3 pre-release).
+- Remove gdb-6.3-bt-past-zero-20051201.patch, gdb-archer-ada.patch and
+  gdb-6.3-framepczero-20040927.patch already removed from .spec before.
+- Remove gdb-6.5-dwarf-stack-overflow.patch, upstreamed (Tom Tromey).
+- Remove gdb-6.6-bz225783-gdb-debuginfo-paths.patch, upstreamed (Tom Tromey).
+- Remove gdb-6.6-readline-system.patch, reimplemented upstream (Tom Tromey).
+- Remove gdb-bz642879-elfread-sigint-stale.patch, upstreamed (Jan Kratochvil).
+- Remove gdb-next-over-throw.patch, upstreamed (Tom Tromey).
+
 * Mon Dec 27 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101117-4.fc15
 - Provide stub %%{_sysconfdir}/gdbinit (BZ 651232).
 
