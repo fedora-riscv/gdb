@@ -27,7 +27,7 @@ Version: 7.2.50.20101231
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{dist}
+Release: 6%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -506,6 +506,10 @@ Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 # Verify GDB Python built-in function gdb.solib_address exists (BZ # 634108).
 Patch526: gdb-bz634108-solib_address.patch
 
+# Fix --with-system-readline doc build upstream regression.
+Patch531: gdb-doc-system-readline.patch
+Patch532: gdb-doc-system-readline2.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -745,6 +749,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch510 -p1
 %patch511 -p1
 %patch526 -p1
+%patch531 -p1
+%patch532 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1121,6 +1127,9 @@ fi
 %endif
 
 %changelog
+* Sat Jan  1 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101231-6.fc15
+- Fix --with-system-readline doc build upstream regression.
+
 * Sat Jan  1 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20101231-5.fc15
 - Rebase to FSF GDB 7.2.50.20101231 (which is a 7.3 pre-release).
 - Remove gdb-6.3-bt-past-zero-20051201.patch, gdb-archer-ada.patch and

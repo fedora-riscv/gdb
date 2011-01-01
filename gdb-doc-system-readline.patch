@@ -1,0 +1,52 @@
+http://sourceware.org/ml/gdb-patches/2011-01/msg00001.html
+Subject: [patch] make info regression on --with-system-readline
+
+Hi,
+
+since:
+	[2/2] RFA: --with-system-readline -vs- gdb.texinfo
+	http://sourceware.org/ml/gdb-patches/2010-11/msg00270.html
+
+$ rm -rf gdb-7.2.50.20101231; tar xjf gdb-7.2.50.20101231.tar.bz2; cd gdb-7.2.50.20101231; CFLAGS= ./configure --with-system-readline; make; rm gdb/doc/gdb.info; make -C gdb/doc gdb.info
+->
+[...]
+makeinfo  -I ./../mi -I . \
+	-o gdb.info ./gdb.texinfo
+./gdb.texinfo:30521: @include `rluser.texi': No such file or directory.
+./gdb.texinfo:30521: @include `inc-hist.texinfo': No such file or directory.
+[...]
+Fedora 14 x86_64
+
+It is because GDBvn.texi has started to depend on the configure options.
+
+I will check it in in the case of no comments.
+
+Another issue is that GDBvn.texi and gdb-cfg.texi should not be distributed.
+But that bug is a different one on top of this bug.  That bug of a needless
+files distribution is dependent on magic GDB `make dist' I do not know and
+also that dist bug is not serious enough.
+
+This is a regression.
+
+
+Thanks,
+Jan
+
+
+doc/
+2011-01-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (GDBvn.texi): Add dependency on Makefile.
+
+--- a/gdb/doc/Makefile.in
++++ b/gdb/doc/Makefile.in
+@@ -298,7 +298,7 @@ refcard.pdf : refcard.tex $(REFEDITS)
+ 	rm -f sedref.log sedref.tex tmp.sed
+ 
+ # File to record current GDB version number (copied from main dir version.in)
+-GDBvn.texi : ${gdbdir}/version.in
++GDBvn.texi : ${gdbdir}/version.in Makefile
+ 	echo "@set GDBVN `sed q $(srcdir)/../version.in`" > ./GDBvn.new
+ 	if [ -n "$(PKGVERSION)" ]; then \
+ 	  echo "@set VERSION_PACKAGE $(PKGVERSION)" >> ./GDBvn.new; \
+
