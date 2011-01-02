@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?_with_upstream:.upstream}%{dist}
+Release: 28%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -634,6 +634,34 @@ Patch520: gdb-bz642879-elfread-sigint-stale.patch
 #=drop
 Patch527: gdb-bz653644-gdbindex-double-free.patch
 
+# Backport gdb.base/break-interp.exp test (+prelink fix) on PPC (BZ 663449).
+#=drop
+Patch533: gdb-ppc-test-break-interp-1of6.patch
+#=drop
+Patch534: gdb-ppc-test-break-interp-2of6.patch
+#=drop
+Patch535: gdb-ppc-test-break-interp-3of6.patch
+#=drop
+Patch536: gdb-ppc-test-break-interp-4of6.patch
+#=drop
+Patch537: gdb-ppc-test-break-interp-5of6.patch
+#=drop
+Patch538: gdb-ppc-test-break-interp-6of6.patch
+
+# Backport gdb.cp/infcall-dlopen.exp test (BZ 639645).
+#=drop
+Patch539: gdb-test-infcall-dlopen-1of2.patch
+#=drop
+Patch540: gdb-test-infcall-dlopen-2of2.patch
+
+# New testcase py-prettyprint.exp:print hint_error (for BZ 611569, BZ 629236).
+#=fedoratest
+Patch541: gdb-test-pp-hint-error.patch
+
+# New test gdb.arch/x86_64-pid0-core.exp for kernel PID 0 cores (BZ 611435).
+#=fedoratest
+Patch542: gdb-test-pid0-core.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -908,6 +936,16 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch518 -p1
 %patch520 -p1
 %patch527 -p1
+%patch533 -p1
+%patch534 -p1
+%patch535 -p1
+%patch536 -p1
+%patch537 -p1
+%patch538 -p1
+%patch539 -p1
+%patch540 -p1
+%patch541 -p1
+%patch542 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1278,6 +1316,12 @@ fi
 %endif
 
 %changelog
+* Sat Jan  2 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-28.fc14
+- Backport gdb.base/break-interp.exp test (+prelink fix) on PPC (BZ 663449).
+- Backport gdb.cp/infcall-dlopen.exp test (BZ 639645).
+- New testcase py-prettyprint.exp:print hint_error (for BZ 611569, BZ 629236).
+- New test gdb.arch/x86_64-pid0-core.exp for kernel PID 0 cores (BZ 611435).
+
 * Sat Jan  1 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-27.fc14
 - Fix ppc* compilation of PRPSINFO in the core files (BZ 662995, for BZ 254229).
 - Fix (disable) non-x86* compilation of libinproctrace.so (for BZ 662995).
