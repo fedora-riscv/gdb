@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{dist}
+Release: 29%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -662,6 +662,18 @@ Patch541: gdb-test-pp-hint-error.patch
 #=fedoratest
 Patch542: gdb-test-pid0-core.patch
 
+# Backport support of template parameters (Tom Tromey, BZ 562758).
+#=drop
+Patch543: gdb-template-arguments-1of3.patch
+#=drop
+Patch544: gdb-template-arguments-2of3.patch
+#=drop
+Patch545: gdb-template-arguments-3of3.patch
+
+# New test gdb.base/gnu-ifunc.exp:"static gnu_ifunc" (BZ 632259).
+# =drop
+Patch546: gdb-test-ifunc-static-start.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -946,6 +958,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch540 -p1
 %patch541 -p1
 %patch542 -p1
+%patch543 -p1
+%patch544 -p1
+%patch545 -p1
+%patch546 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1316,7 +1332,11 @@ fi
 %endif
 
 %changelog
-* Sat Jan  2 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-28.fc14
+* Mon Jan  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-29.fc14
+- Backport support of template parameters (Tom Tromey, BZ 562758).
+- New test gdb.base/gnu-ifunc.exp:"static gnu_ifunc" (BZ 632259).
+
+* Sun Jan  2 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-28.fc14
 - Backport gdb.base/break-interp.exp test (+prelink fix) on PPC (BZ 663449).
 - Backport gdb.cp/infcall-dlopen.exp test (BZ 639645).
 - New testcase py-prettyprint.exp:print hint_error (for BZ 611569, BZ 629236).
