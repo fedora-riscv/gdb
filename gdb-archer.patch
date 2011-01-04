@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 18d3d5d564eac7ad10bc972c957e6159a4276d3f
+commit 2be613ebefe3f3c2a5bb329c207d435024af7a2b
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
@@ -44,7 +44,7 @@ index 3efff2e..99097bf 100644
      return 1;
  
 diff --git a/gdb/amd64-linux-nat.c b/gdb/amd64-linux-nat.c
-index 16e97a2..784a476 100644
+index 877072c..2154b73 100644
 --- a/gdb/amd64-linux-nat.c
 +++ b/gdb/amd64-linux-nat.c
 @@ -265,18 +265,11 @@ amd64_linux_store_inferior_registers (struct target_ops *ops,
@@ -266,10 +266,10 @@ index 16e97a2..784a476 100644
  
  
 diff --git a/gdb/block.c b/gdb/block.c
-index f932d41..6e2cd88 100644
+index 776ae53..3544cf2 100644
 --- a/gdb/block.c
 +++ b/gdb/block.c
-@@ -321,3 +321,21 @@ allocate_block (struct obstack *obstack)
+@@ -322,3 +322,21 @@ allocate_block (struct obstack *obstack)
  
    return bl;
  }
@@ -292,10 +292,10 @@ index f932d41..6e2cd88 100644
 +  return SYMBOL_SYMTAB (func)->objfile;
 +}
 diff --git a/gdb/block.h b/gdb/block.h
-index 7eedb6c..a517e80 100644
+index 07d5bc7..fad89b1 100644
 --- a/gdb/block.h
 +++ b/gdb/block.h
-@@ -166,4 +166,6 @@ extern const struct block *block_global_block (const struct block *block);
+@@ -167,4 +167,6 @@ extern const struct block *block_global_block (const struct block *block);
  
  extern struct block *allocate_block (struct obstack *obstack);
  
@@ -303,7 +303,7 @@ index 7eedb6c..a517e80 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/blockframe.c b/gdb/blockframe.c
-index 366bedd..97f418a 100644
+index 4cfc6e6..dc64d51 100644
 --- a/gdb/blockframe.c
 +++ b/gdb/blockframe.c
 @@ -160,6 +160,7 @@ static CORE_ADDR cache_pc_function_low = 0;
@@ -365,7 +365,7 @@ index 366bedd..97f418a 100644
  
  /* Return the innermost stack frame executing inside of BLOCK, or NULL
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 809eb53..8f92c4e 100644
+index 785155c..63d736f 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -62,6 +62,7 @@
@@ -1026,10 +1026,10 @@ index 809eb53..8f92c4e 100644
 +  observer_attach_mark_used (breakpoint_types_mark_used);
  }
 diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
-index bfae8d9..a058e46 100644
+index 2d815c2..66b3ece 100644
 --- a/gdb/breakpoint.h
 +++ b/gdb/breakpoint.h
-@@ -147,6 +147,9 @@ enum bptype
+@@ -148,6 +148,9 @@ enum bptype
  
      /* Event for JIT compiled code generation or deletion.  */
      bp_jit_event,
@@ -1038,16 +1038,18 @@ index bfae8d9..a058e46 100644
 +    bp_gnu_ifunc_resolver_return,
    };
  
- /* States of enablement of breakpoint. */
+ /* States of enablement of breakpoint.  */
 diff --git a/gdb/c-typeprint.c b/gdb/c-typeprint.c
-index 04f8127..2e29eb2 100644
+index feee86d..363c62b 100644
 --- a/gdb/c-typeprint.c
 +++ b/gdb/c-typeprint.c
-@@ -579,7 +579,13 @@ c_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
+@@ -609,9 +609,14 @@ c_type_print_varspec_suffix (struct type *type,
  	  fprintf_filtered (stream, ")");
  
  	fprintf_filtered (stream, "[");
 -	if (get_array_bounds (type, &low_bound, &high_bound))
+-	  fprintf_filtered (stream, "%d", 
+-			    (int) (high_bound - low_bound + 1));
 +	if (TYPE_RANGE_DATA (TYPE_INDEX_TYPE (type))->high.kind
 +	    != RANGE_BOUND_KIND_CONSTANT)
 +	  {
@@ -1055,11 +1057,12 @@ index 04f8127..2e29eb2 100644
 +	    fprintf_filtered (stream, "variable");
 +	  }
 +	else if (get_array_bounds (type, &low_bound, &high_bound))
- 	  fprintf_filtered (stream, "%d", (int) (high_bound - low_bound + 1));
++	  fprintf_filtered (stream, "%d", (int) (high_bound - low_bound + 1));
  	fprintf_filtered (stream, "]");
  
+ 	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,
 diff --git a/gdb/defs.h b/gdb/defs.h
-index 489de74..335d3f5 100644
+index 9d8f6fc..229378a 100644
 --- a/gdb/defs.h
 +++ b/gdb/defs.h
 @@ -398,6 +398,8 @@ extern struct cleanup *make_cleanup_restore_page_info (void);
@@ -1217,7 +1220,7 @@ index e19b8ed..343e160 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dwarf2expr.c b/gdb/dwarf2expr.c
-index 29bfcf4..c339378 100644
+index 4ef6d55..1a3580a 100644
 --- a/gdb/dwarf2expr.c
 +++ b/gdb/dwarf2expr.c
 @@ -900,6 +900,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
@@ -1235,7 +1238,7 @@ index 29bfcf4..c339378 100644
  	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
  	}
 diff --git a/gdb/dwarf2expr.h b/gdb/dwarf2expr.h
-index 68cc667..5b5f29c 100644
+index 3858dc8..a172585 100644
 --- a/gdb/dwarf2expr.h
 +++ b/gdb/dwarf2expr.h
 @@ -114,9 +114,15 @@ struct dwarf_expr_context
@@ -1256,7 +1259,7 @@ index 68cc667..5b5f29c 100644
    /* The current depth of dwarf expression recursion, via DW_OP_call*,
       DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index f0e08c7..d5c0c36 100644
+index 12e4dac..943b37d 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
 @@ -133,6 +133,9 @@ struct dwarf_expr_baton
@@ -1582,7 +1585,7 @@ index f0e08c7..d5c0c36 100644
 +  missing_tracepoint_var_ref
 +};
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index e94346c..55beec2 100644
+index ee52506..6a77c3f 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
 @@ -105,5 +105,14 @@ struct dwarf2_loclist_baton
@@ -1601,7 +1604,7 @@ index e94346c..55beec2 100644
  
  #endif /* dwarf2loc.h */
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 80770f8..9908495 100644
+index 82a2f0b..327164c 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1206,6 +1206,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
@@ -2262,7 +2265,7 @@ index 80770f8..9908495 100644
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
 diff --git a/gdb/elfread.c b/gdb/elfread.c
-index d607b87..2aa7dd9 100644
+index 5944eb0..9b283e1 100644
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
 @@ -37,6 +37,7 @@
@@ -2556,7 +2559,7 @@ index d607b87..2aa7dd9 100644
  
    /* Add synthetic symbols - for instance, names for any PLT entries.  */
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 16e98ae..4fa4d5f 100644
+index fbd3698..56d51c8 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -44,6 +44,7 @@
@@ -2784,7 +2787,7 @@ index 16e98ae..4fa4d5f 100644
      default:
        val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
 diff --git a/gdb/f-lang.h b/gdb/f-lang.h
-index f5bb82d..29cf5ba 100644
+index 5c2692d..b52ae74 100644
 --- a/gdb/f-lang.h
 +++ b/gdb/f-lang.h
 @@ -28,6 +28,10 @@ extern void f_error (char *);	/* Defined in f-exp.y */
@@ -2799,7 +2802,7 @@ index f5bb82d..29cf5ba 100644
  			struct ui_file *, int,
  			const struct value *,
 diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
-index d35a255..dec81d5 100644
+index 6618188..968de7a 100644
 --- a/gdb/f-typeprint.c
 +++ b/gdb/f-typeprint.c
 @@ -32,7 +32,7 @@
@@ -2867,7 +2870,7 @@ index d35a255..dec81d5 100644
      {
      case TYPE_CODE_ARRAY:
 diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
-index e27f79e..93322a2 100644
+index 5db2ed7..e104e21 100644
 --- a/gdb/f-valprint.c
 +++ b/gdb/f-valprint.c
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
@@ -3005,7 +3008,7 @@ index e27f79e..93322a2 100644
    switch (TYPE_CODE (type))
      {
 diff --git a/gdb/findvar.c b/gdb/findvar.c
-index e0ca12c..de6311a 100644
+index 5f97422..2c2670e 100644
 --- a/gdb/findvar.c
 +++ b/gdb/findvar.c
 @@ -35,6 +35,7 @@
@@ -3216,7 +3219,7 @@ index e0ca12c..de6311a 100644
    else
      {
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index b651098..70269d6 100644
+index fac1e98..cbc3aeb 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -39,6 +39,9 @@
@@ -4146,7 +4149,7 @@ index b651098..70269d6 100644
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug, _("\
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 1ce2d91..133f583 100644
+index 9898991..652994c 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -170,6 +170,7 @@ enum type_flag_value
@@ -4423,7 +4426,7 @@ index 1ce2d91..133f583 100644
 +
  #endif /* GDBTYPES_H */
 diff --git a/gdb/i386-linux-nat.c b/gdb/i386-linux-nat.c
-index 4fce1ac..7b6961e 100644
+index ed555ef..6b5c458 100644
 --- a/gdb/i386-linux-nat.c
 +++ b/gdb/i386-linux-nat.c
 @@ -633,22 +633,13 @@ i386_linux_store_inferior_registers (struct target_ops *ops,
@@ -4631,7 +4634,7 @@ index 4fce1ac..7b6961e 100644
  
  
 diff --git a/gdb/i386-nat.c b/gdb/i386-nat.c
-index eaa3644..7f32bd2 100644
+index 900fb40..f28c45b 100644
 --- a/gdb/i386-nat.c
 +++ b/gdb/i386-nat.c
 @@ -25,6 +25,7 @@
@@ -4986,7 +4989,7 @@ index eaa3644..7f32bd2 100644
  
  void
 diff --git a/gdb/i386-nat.h b/gdb/i386-nat.h
-index 7317e7d..65cd326 100644
+index 10fdc3b..ed6de56 100644
 --- a/gdb/i386-nat.h
 +++ b/gdb/i386-nat.h
 @@ -78,6 +78,28 @@ struct i386_dr_low_type
@@ -5019,7 +5022,7 @@ index 7317e7d..65cd326 100644
     rather than setting it directly to check that the length is only
     set once.  It also enables the 'maint set/show show-debug-regs' 
 diff --git a/gdb/infcall.c b/gdb/infcall.c
-index 6eb1bbf..7323c4b 100644
+index 85b814a..f0cb929 100644
 --- a/gdb/infcall.c
 +++ b/gdb/infcall.c
 @@ -225,6 +225,56 @@ value_arg_coerce (struct gdbarch *gdbarch, struct value *arg,
@@ -5133,7 +5136,7 @@ index 6eb1bbf..7323c4b 100644
        /* Handle the case of functions lacking debugging info.
           Their values are characters since their addresses are char */
 diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
-index 56490cc..c4d1c28 100644
+index 146bb8c..9e08eee 100644
 --- a/gdb/linux-nat.c
 +++ b/gdb/linux-nat.c
 @@ -1243,6 +1243,64 @@ iterate_over_lwps (ptid_t filter,
@@ -5202,7 +5205,7 @@ index 56490cc..c4d1c28 100644
     another indicated by NEW_PTID.  We can only switch single-threaded
     applications, so we only create one new LWP, and the previous list
 diff --git a/gdb/linux-nat.h b/gdb/linux-nat.h
-index 64393fd..a053cbd 100644
+index 2987fab..0e5f353 100644
 --- a/gdb/linux-nat.h
 +++ b/gdb/linux-nat.h
 @@ -139,6 +139,11 @@ struct lwp_info *iterate_over_lwps (ptid_t filter,
@@ -5218,7 +5221,7 @@ index 64393fd..a053cbd 100644
     override it with local methods.  */
  struct target_ops * linux_target (void);
 diff --git a/gdb/mi/mi-cmd-var.c b/gdb/mi/mi-cmd-var.c
-index 310ade9..d8710a1 100644
+index 1478cb0..c4492a7 100644
 --- a/gdb/mi/mi-cmd-var.c
 +++ b/gdb/mi/mi-cmd-var.c
 @@ -702,7 +702,6 @@ mi_cmd_var_update (char *command, char **argv, int argc)
@@ -5230,10 +5233,10 @@ index 310ade9..d8710a1 100644
  
        varobj_update_one (var, print_values, 1 /* explicit */);
 diff --git a/gdb/minsyms.c b/gdb/minsyms.c
-index 0a57e77..6be74df 100644
+index e870954..0436b57 100644
 --- a/gdb/minsyms.c
 +++ b/gdb/minsyms.c
-@@ -337,8 +337,9 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
+@@ -338,8 +338,9 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
  	       msymbol = msymbol->hash_next)
  	    {
  	      if (strcmp (SYMBOL_LINKAGE_NAME (msymbol), name) == 0 &&
@@ -5245,7 +5248,7 @@ index 0a57e77..6be74df 100644
  		{
  		  switch (MSYMBOL_TYPE (msymbol))
  		    {
-@@ -700,6 +701,16 @@ lookup_minimal_symbol_by_pc (CORE_ADDR pc)
+@@ -701,6 +702,16 @@ lookup_minimal_symbol_by_pc (CORE_ADDR pc)
    return lookup_minimal_symbol_by_pc_section (pc, NULL);
  }
  
@@ -5262,7 +5265,7 @@ index 0a57e77..6be74df 100644
  /* Find the minimal symbol named NAME, and return both the minsym
     struct and its objfile.  This only checks the linkage name.  Sets
     *OBJFILE_P and returns the minimal symbol, if it is found.  If it
-@@ -769,6 +780,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
+@@ -770,6 +781,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
    switch (ms_type)
      {
      case mst_text:
@@ -5270,7 +5273,7 @@ index 0a57e77..6be74df 100644
      case mst_file_text:
      case mst_solib_trampoline:
        section = SECT_OFF_TEXT (objfile);
-@@ -1234,7 +1246,8 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
+@@ -1235,7 +1247,8 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
      {
        ALL_MSYMBOLS (objfile, msymbol)
        {
@@ -5281,7 +5284,7 @@ index 0a57e77..6be74df 100644
  		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
  	  return SYMBOL_VALUE_ADDRESS (msymbol);
 diff --git a/gdb/p-valprint.c b/gdb/p-valprint.c
-index 47663bd..d9fb878 100644
+index bd01fea..77b1033 100644
 --- a/gdb/p-valprint.c
 +++ b/gdb/p-valprint.c
 @@ -38,6 +38,7 @@
@@ -5358,7 +5361,7 @@ index 47663bd..d9fb878 100644
  }
  
 diff --git a/gdb/parse.c b/gdb/parse.c
-index 18038ed..1438ae0 100644
+index daee633..1f9a0d1 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
 @@ -487,9 +487,21 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
@@ -5510,7 +5513,7 @@ index 18038ed..1438ae0 100644
  
  void
 diff --git a/gdb/parser-defs.h b/gdb/parser-defs.h
-index 1625575..d072f86 100644
+index 95dd799..42266df 100644
 --- a/gdb/parser-defs.h
 +++ b/gdb/parser-defs.h
 @@ -194,6 +194,8 @@ extern void operator_length_standard (const struct expression *, int, int *,
@@ -5540,10 +5543,10 @@ index 1625575..d072f86 100644
 +
  #endif /* PARSER_DEFS_H */
 diff --git a/gdb/ppc-linux-nat.c b/gdb/ppc-linux-nat.c
-index 18ddee7..ebb0022 100644
+index ca7312b..58696d3 100644
 --- a/gdb/ppc-linux-nat.c
 +++ b/gdb/ppc-linux-nat.c
-@@ -1620,12 +1620,18 @@ booke_remove_point (struct ppc_hw_breakpoint *b, int tid)
+@@ -1621,12 +1621,18 @@ booke_remove_point (struct ppc_hw_breakpoint *b, int tid)
    hw_breaks[i].hw_break = NULL;
  }
  
@@ -5564,7 +5567,7 @@ index 18ddee7..ebb0022 100644
    struct ppc_hw_breakpoint p;
  
    if (!have_ptrace_booke_interface ())
-@@ -1639,18 +1645,23 @@ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
+@@ -1640,18 +1646,23 @@ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
    p.addr2           = 0;
    p.condition_value = 0;
  
@@ -5592,7 +5595,7 @@ index 18ddee7..ebb0022 100644
    struct ppc_hw_breakpoint p;
  
    if (!have_ptrace_booke_interface ())
-@@ -1664,8 +1675,7 @@ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
+@@ -1665,8 +1676,7 @@ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
    p.addr2           = 0;
    p.condition_value = 0;
  
@@ -5602,7 +5605,7 @@ index 18ddee7..ebb0022 100644
  
    return 0;
  }
-@@ -1878,12 +1888,19 @@ ppc_linux_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
+@@ -1879,12 +1889,19 @@ ppc_linux_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
  	  && check_condition (addr, cond, &data_value));
  }
  
@@ -5624,7 +5627,7 @@ index 18ddee7..ebb0022 100644
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -1907,8 +1924,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -1908,8 +1925,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
        p.addr            = (uint64_t) addr;
        p.addr2           = 0;
  
@@ -5634,7 +5637,7 @@ index 18ddee7..ebb0022 100644
  
        ret = 0;
      }
-@@ -1951,12 +1967,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -1952,12 +1968,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
  
        saved_dabr_value = dabr_value;
  
@@ -5648,7 +5651,7 @@ index 18ddee7..ebb0022 100644
      }
  
    return ret;
-@@ -1966,8 +1978,6 @@ static int
+@@ -1967,8 +1979,6 @@ static int
  ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
  			     struct expression *cond)
  {
@@ -5657,7 +5660,7 @@ index 18ddee7..ebb0022 100644
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -1991,20 +2001,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -1992,20 +2002,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
        p.addr            = (uint64_t) addr;
        p.addr2           = 0;
  
@@ -5681,7 +5684,7 @@ index 18ddee7..ebb0022 100644
  
    return ret;
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
-index 5586767..144e851 100644
+index eb3c3f9..ed8d67a 100644
 --- a/gdb/printcmd.c
 +++ b/gdb/printcmd.c
 @@ -971,6 +971,11 @@ print_command_1 (char *exp, int inspect, int voidprint)
@@ -5727,7 +5730,7 @@ index 5586767..144e851 100644
 +  observer_attach_mark_used (print_types_mark_used);
  }
 diff --git a/gdb/python/py-type.c b/gdb/python/py-type.c
-index 8232436..e9fc8aa 100644
+index 9a6b077..656d3a1 100644
 --- a/gdb/python/py-type.c
 +++ b/gdb/python/py-type.c
 @@ -29,6 +29,8 @@
@@ -5913,7 +5916,7 @@ index 8232436..e9fc8aa 100644
  
  
 diff --git a/gdb/python/py-value.c b/gdb/python/py-value.c
-index 3ade512..70e00e9 100644
+index adb7658..1e1f7e9 100644
 --- a/gdb/python/py-value.c
 +++ b/gdb/python/py-value.c
 @@ -28,6 +28,7 @@
@@ -5952,7 +5955,7 @@ index 3ade512..70e00e9 100644
  
  
 diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
-index 60efc4a..824a076 100644
+index ef04dd7..512b6e4 100644
 --- a/gdb/solib-svr4.c
 +++ b/gdb/solib-svr4.c
 @@ -1276,7 +1276,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR pc)
@@ -5966,7 +5969,7 @@ index 60efc4a..824a076 100644
  
  /* Given an executable's ABFD and target, compute the entry-point
 diff --git a/gdb/stack.c b/gdb/stack.c
-index 1e0c2e6..23f7f56 100644
+index 1d23806..c20df41 100644
 --- a/gdb/stack.c
 +++ b/gdb/stack.c
 @@ -366,6 +366,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
@@ -5992,7 +5995,7 @@ index 1e0c2e6..23f7f56 100644
  	        }
  	      else
 diff --git a/gdb/symmisc.c b/gdb/symmisc.c
-index ef63216..1cc9082 100644
+index b292c3b..4db6629 100644
 --- a/gdb/symmisc.c
 +++ b/gdb/symmisc.c
 @@ -264,6 +264,9 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
@@ -6006,7 +6009,7 @@ index ef63216..1cc9082 100644
  	  ms_type = 'S';
  	  break;
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index a6023b9..9d577b0 100644
+index 4e68f1b..e6e91ba 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -2988,7 +2988,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
@@ -6019,7 +6022,7 @@ index a6023b9..9d577b0 100644
    enum minimal_symbol_type ourtype2;
    enum minimal_symbol_type ourtype3;
 diff --git a/gdb/symtab.h b/gdb/symtab.h
-index a4032f8..944dd33 100644
+index e85b432..6d97d6e 100644
 --- a/gdb/symtab.h
 +++ b/gdb/symtab.h
 @@ -290,6 +290,9 @@ enum minimal_symbol_type
@@ -7234,7 +7237,7 @@ index 0000000..b05411e
 +
 +gdb_test "ptype array" "type = char \\\[78\\\]" "second: ptype array"
 diff --git a/gdb/testsuite/gdb.base/arrayidx.c b/gdb/testsuite/gdb.base/arrayidx.c
-index ecc3289..f79ad40 100644
+index 6c158bf..739ce34 100644
 --- a/gdb/testsuite/gdb.base/arrayidx.c
 +++ b/gdb/testsuite/gdb.base/arrayidx.c
 @@ -17,6 +17,13 @@
@@ -7252,7 +7255,7 @@ index ecc3289..f79ad40 100644
  main (void)
  {
 diff --git a/gdb/testsuite/gdb.base/arrayidx.exp b/gdb/testsuite/gdb.base/arrayidx.exp
-index 3a33618..f2e11dd 100644
+index d8ee5c0..de4ba75 100644
 --- a/gdb/testsuite/gdb.base/arrayidx.exp
 +++ b/gdb/testsuite/gdb.base/arrayidx.exp
 @@ -57,4 +57,12 @@ gdb_test "print array" \
@@ -7377,10 +7380,10 @@ index 0000000..106271f
 +}
 diff --git a/gdb/testsuite/gdb.base/gnu-ifunc.exp b/gdb/testsuite/gdb.base/gnu-ifunc.exp
 new file mode 100644
-index 0000000..8ecf558
+index 0000000..de59785
 --- /dev/null
 +++ b/gdb/testsuite/gdb.base/gnu-ifunc.exp
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,130 @@
 +# Copyright (C) 2009, 2010 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -7401,12 +7404,17 @@ index 0000000..8ecf558
 +}
 +
 +set testfile "gnu-ifunc"
++set executable ${testfile}
 +set srcfile ${testfile}.c
-+set binfile ${objdir}/${subdir}/${testfile}
++set binfile ${objdir}/${subdir}/${executable}
++set staticexecutable ${executable}-static
++set staticbinfile ${objdir}/${subdir}/${staticexecutable}
 +
 +set libfile "${testfile}-lib"
 +set libsrc ${libfile}.c
 +set lib_so ${objdir}/${subdir}/${libfile}.so
++# $lib_o must not have {debug}, it would override the gnu-ifunc ELF markers.
++set lib_o ${objdir}/${subdir}/${libfile}.o
 +
 +# We need DWARF for the "final" function as we "step" into the function and GDB
 +# would step-over the "final" function if there would be no line number debug
@@ -7430,14 +7438,16 @@ index 0000000..8ecf558
 +}
 +
 +if { [gdb_compile_shlib ${srcdir}/${subdir}/$libsrc $lib_so $lib_opts] != ""
-+     || [gdb_compile ${srcdir}/${subdir}/$srcfile $binfile executable $exec_opts] != ""} {
++     || [gdb_compile ${srcdir}/${subdir}/$srcfile $binfile executable $exec_opts] != ""
++     || [gdb_compile ${srcdir}/${subdir}/$libsrc $lib_o object {}] != ""
++     || [gdb_compile "${srcdir}/${subdir}/$srcfile $lib_o" $staticbinfile executable {debug}] != ""} {
 +    untested "Could not compile either $libsrc or $srcfile."
 +    return -1
 +}
 +
 +# Start with a fresh gdb.
 +
-+clean_restart $testfile
++clean_restart $executable
 +gdb_load_shlibs ${lib_so}
 +
 +if ![runto_main] then {
@@ -7491,6 +7501,19 @@ index 0000000..8ecf558
 +    }
 +}
 +gdb_test "info sym $expect_out(1,string)" "gnu_ifunc in section .*" "info sym <gnu_ifunc-address>"
++
++
++# Test statically linked ifunc resolving during inferior start.
++# https://bugzilla.redhat.com/show_bug.cgi?id=624967
++
++if ![target_info exists gdb_stub] {
++    clean_restart $staticexecutable
++
++    gdb_breakpoint "gnu_ifunc"
++    gdb_breakpoint "main"
++    gdb_run_cmd
++    gdb_test "" "Breakpoint \[0-9\]*, main .*" "static gnu_ifunc"
++}
 diff --git a/gdb/testsuite/gdb.base/internal-var-field-address.c b/gdb/testsuite/gdb.base/internal-var-field-address.c
 new file mode 100644
 index 0000000..eeb7b85
@@ -10240,7 +10263,7 @@ index 0000000..31f7656
 +extern void marker (void);
 +extern void forkoff (int nr);
 diff --git a/gdb/testsuite/lib/pascal.exp b/gdb/testsuite/lib/pascal.exp
-index af0b00d..e1a8dc4 100644
+index 891da37..236c5ca 100644
 --- a/gdb/testsuite/lib/pascal.exp
 +++ b/gdb/testsuite/lib/pascal.exp
 @@ -37,6 +37,9 @@ proc pascal_init {} {
@@ -10275,7 +10298,7 @@ index af0b00d..e1a8dc4 100644
      set pascal_init_done 1
  }   
 diff --git a/gdb/top.c b/gdb/top.c
-index 45c9259..8856322 100644
+index 702e05b..a41cdc6 100644
 --- a/gdb/top.c
 +++ b/gdb/top.c
 @@ -343,6 +343,7 @@ void
@@ -10287,7 +10310,7 @@ index 45c9259..8856322 100644
    /* With multiple threads running while the one we're examining is
       stopped, the dcache can get stale without us being able to detect
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
-index ce9f551..5f9d739 100644
+index a1c44f2..036d939 100644
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
 @@ -36,6 +36,7 @@
@@ -10344,7 +10367,7 @@ index ce9f551..5f9d739 100644
  
  static void
 diff --git a/gdb/utils.c b/gdb/utils.c
-index 02c7a37..894be69 100644
+index 2b55449..6b481cd 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
 @@ -2198,6 +2198,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
@@ -10385,7 +10408,7 @@ index 02c7a37..894be69 100644
  
  static void
 diff --git a/gdb/valarith.c b/gdb/valarith.c
-index 6b212b2..c6b4843 100644
+index f200b2c..4921b54 100644
 --- a/gdb/valarith.c
 +++ b/gdb/valarith.c
 @@ -165,12 +165,26 @@ value_subscript (struct value *array, LONGEST index)
@@ -10479,7 +10502,7 @@ index 6b212b2..c6b4843 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 7ea6315..ad3dacf 100644
+index c66c41e..8d76259 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -38,6 +38,7 @@
@@ -10628,7 +10651,7 @@ index 7ea6315..ad3dacf 100644
  
  /* Given a value which is a function, return a value which is a pointer
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index 5cba023..4ef5e5a 100644
+index 1b16f1f..eef7d61 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
 @@ -36,6 +36,7 @@
@@ -10701,7 +10724,7 @@ index 5cba023..4ef5e5a 100644
  
  /* Read LEN bytes of target memory at address MEMADDR, placing the
 diff --git a/gdb/value.c b/gdb/value.c
-index c7de323..645fef2 100644
+index 58067e8..82efef0 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -39,6 +39,7 @@
@@ -10878,7 +10901,7 @@ index c7de323..645fef2 100644
 +  observer_attach_mark_used (value_types_mark_used);
  }
 diff --git a/gdb/value.h b/gdb/value.h
-index cf089be..0fb89f1 100644
+index e637842..5f36aef 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -389,6 +389,10 @@ extern struct value *value_from_double (struct type *type, DOUBLEST num);
@@ -10902,7 +10925,7 @@ index cf089be..0fb89f1 100644
  /* User function handler.  */
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index e87d399..0ea54f5 100644
+index d020fff..303ecdf 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
 @@ -26,6 +26,8 @@
