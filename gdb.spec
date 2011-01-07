@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110104
+Version: 7.2.50.20110107
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{dist}
+Release: 8%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1132,6 +1132,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan  7 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110107-8.fc15
+- Rebase to FSF GDB 7.2.50.20110107 (which is a 7.3 pre-release).
+- Import archer-tromey-python (BZ 666177, branch update by Phil Muldoon).
+
 * Tue Jan  4 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110104-7.fc15
 - Rebase to FSF GDB 7.2.50.20110104 (which is a 7.3 pre-release).
 - New testcase py-prettyprint.exp:print hint_error (for BZ 611569, BZ 629236).
