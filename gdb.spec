@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?_with_upstream:.upstream}%{dist}
+Release: 30%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -634,6 +634,10 @@ Patch520: gdb-bz642879-elfread-sigint-stale.patch
 #=drop
 Patch527: gdb-bz653644-gdbindex-double-free.patch
 
+# Fix crash on stale bpstat (BZ 661773).
+Patch529: gdb-stale-bpstat-2of3.patch
+Patch530: gdb-stale-bpstat-3of3.patch
+
 # Backport gdb.base/break-interp.exp test (+prelink fix) on PPC (BZ 663449).
 #=drop
 Patch533: gdb-ppc-test-break-interp-1of6.patch
@@ -956,6 +960,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch538 -p1
 %patch539 -p1
 %patch540 -p1
+%patch529 -p1
+%patch530 -p1
 %patch541 -p1
 %patch542 -p1
 %patch543 -p1
@@ -1332,6 +1338,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 13 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-30.fc14
+- Fix crash on stale bpstat (BZ 661773).
+
 * Mon Jan  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-29.fc14
 - Backport support of template parameters (Tom Tromey, BZ 562758).
 - New test gdb.base/gnu-ifunc.exp:"static gnu_ifunc" (BZ 632259).
