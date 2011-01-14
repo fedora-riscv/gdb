@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?_with_upstream:.upstream}%{dist}
+Release: 32%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -554,6 +554,10 @@ Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 #=drop: Upstreamed.
 Patch489: gdb-bz614659-prelink-dynbss.patch
 
+# [delayed-symfile] Test a backtrace regression on CFIs without DIE (BZ 614604).
+#=fedoratest
+Patch490: gdb-test-bt-cfi-without-die.patch
+
 # Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
 #=drop: Re-check against the upstream version.
 Patch491: gdb-gdb-add-index-script.patch
@@ -683,6 +687,14 @@ Patch545: gdb-template-arguments-3of3.patch
 # New test gdb.base/gnu-ifunc.exp:"static gnu_ifunc" (BZ 632259).
 # =drop
 Patch546: gdb-test-ifunc-static-start.patch
+
+# [archer-tromey-delayed-symfile] New test gdb.dwarf2/dw2-aranges.exp.
+# =fedoratest
+Patch547: gdb-test-dw2-aranges.patch
+
+# [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
+# =fedoratest
+Patch548: gdb-test-expr-cumulative-archer.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -938,6 +950,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch415 -p1
 %patch519 -p1
 %patch489 -p1
+%patch490 -p1
 %patch491 -p1
 %patch493 -p1
 %patch496 -p1
@@ -979,6 +992,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch544 -p1
 %patch545 -p1
 %patch546 -p1
+%patch547 -p1
+%patch548 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1370,6 +1385,11 @@ fi
 %endif
 
 %changelog
+* Fri Jan 14 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-32.fc14
+- [delayed-symfile] Test a backtrace regression on CFIs without DIE (BZ 614604).
+- [archer-tromey-delayed-symfile] New test gdb.dwarf2/dw2-aranges.exp.
+- [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
+
 * Fri Jan 14 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-31.fc14
 - Provide %{_bindir}gdb-add-index even on RHEL-5.
 - Provide again libstdc++ pretty printers for any RHEL.
