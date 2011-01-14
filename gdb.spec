@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?_with_upstream:.upstream}%{dist}
+Release: 31%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -85,6 +85,12 @@ Source2: gdb-orphanripper.c
 # Man page for gstack(1).
 #=push
 Source3: gdb-gstack.man
+
+%if 0%{?rhel:1}
+# libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
+%define libstdcxxpython libstdc++-v3-python-r155978
+Source4: %{libstdcxxpython}.tar.bz2
+%endif # 0%{?rhel:1}
 
 # Work around out-of-date dejagnu that does not have KFAIL
 #=drop: That dejagnu is too old to be supported.
@@ -697,6 +703,12 @@ Requires: python-libs%{?_isa}
 Requires: python-libs-%{_arch} >= 2.4.3-32.el5
 %endif
 BuildRequires: python-devel%{?_isa}
+%if 0%{?rhel:1}
+# Temporarily before python files get moved to libstdc++.rpm
+# libstdc++%{bits_other} is not present in Koji, the .spec script generating
+# gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
+BuildRequires: libstdc++%{?_isa}
+%endif # 0%{?rhel:1}
 %endif # 0%{!?_without_python:1}
 
 %if 0%{?_with_testsuite:1}
@@ -797,9 +809,10 @@ machine than the one which is running the program being debugged.
 
 %setup -q -n %{gdb_src}
 
+%if 0%{?rhel:1}
 # libstdc++ pretty printers.
-# Disabled now for F-14 before rebase.
-#tar xjf %{SOURCE4}
+tar xjf %{SOURCE4}
+%endif # 0%{?rhel:1}
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
@@ -922,8 +935,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch470 -p1
 %patch475 -p1
 %patch486 -p1
-# This patch should be applied to gcc-4.5+.src.rpm:
-#patch487 -p1
 %patch415 -p1
 %patch519 -p1
 %patch489 -p1
@@ -975,6 +986,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch393 -p1 -R
 %patch335 -p1 -R
 %endif
+%if 0%{?rhel:1}
+%patch487 -p1
+%endif # 0%{?rhel:1}
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1244,6 +1258,24 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
+%if 0%{?rhel:1}
+%if 0%{!?_without_python:1}
+# Temporarily now:
+for LIB in lib lib64;do
+  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
+  mkdir -p $LIBPATH
+  # basename is being run only for the native (non-biarch) file.
+  sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
+      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
+      < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
+      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+done
+test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
+cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
+      $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
+%endif # 0%{!?_without_python:1}
+%endif # 0%{?rhel:1}
+
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
 # These are part of binutils
@@ -1311,9 +1343,9 @@ fi
 %if 0%{!?_with_upstream:1}
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
+%{_bindir}/gdb-add-index
 %if 0%{!?el5:1}
 %{_bindir}/pstack
-%{_bindir}/gdb-add-index
 %{_mandir}/*/pstack.1*
 %endif # 0%{!?el5:1}
 %endif # 0%{!?_with_upstream:1}
@@ -1338,6 +1370,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan 14 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-31.fc14
+- Provide %{_bindir}gdb-add-index even on RHEL-5.
+- Provide again libstdc++ pretty printers for any RHEL.
+
 * Thu Jan 13 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-30.fc14
 - Fix crash on stale bpstat (BZ 661773).
 
