@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{dist}
+Release: 34%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -696,6 +696,11 @@ Patch547: gdb-test-dw2-aranges.patch
 # =fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
+# [vla] Support Fortran vector slices and subsets (BZ 609782).
+# =drop
+Patch549: gdb-archer-vla-misc.patch
+Patch550: gdb-archer-vla-subarray.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -994,6 +999,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch546 -p1
 %patch547 -p1
 %patch548 -p1
+%patch549 -p1
+%patch550 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1385,6 +1392,9 @@ fi
 %endif
 
 %changelog
+* Sat Jan 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-34.fc14
+- [vla] Support Fortran vector slices and subsets (BZ 609782).
+
 * Sat Jan 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-33.fc14
 - testsuite: Fix gdb-test-expr-cumulative-archer.patch compatibility.
 
