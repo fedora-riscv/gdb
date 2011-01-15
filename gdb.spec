@@ -27,7 +27,7 @@ Version: 7.2.50.20110107
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{dist}
+Release: 10%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -487,6 +487,10 @@ Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
 #=push+work: There are some outstanding issues, check the mails.
 Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
 
+# [delayed-symfile] Test a backtrace regression on CFIs without DIE (BZ 614604).
+#=fedoratest
+Patch490: gdb-test-bt-cfi-without-die.patch
+
 # Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
 #=drop: Re-check against the upstream version.
 Patch491: gdb-gdb-add-index-script.patch
@@ -520,6 +524,14 @@ Patch541: gdb-test-pp-hint-error.patch
 # New test gdb.arch/x86_64-pid0-core.exp for kernel PID 0 cores (BZ 611435).
 #=fedoratest
 Patch542: gdb-test-pid0-core.patch
+
+# [archer-tromey-delayed-symfile] New test gdb.dwarf2/dw2-aranges.exp.
+# =fedoratest
+Patch547: gdb-test-dw2-aranges.patch
+
+# [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
+# =fedoratest
+Patch548: gdb-test-expr-cumulative-archer.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -758,6 +770,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch486 -p1
 %patch415 -p1
 %patch519 -p1
+%patch490 -p1
 %patch491 -p1
 %patch496 -p1
 %patch497 -p1
@@ -767,6 +780,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch526 -p1
 %patch541 -p1
 %patch542 -p1
+%patch547 -p1
+%patch548 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1163,6 +1178,12 @@ fi
 %endif
 
 %changelog
+* Sat Jan 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110107-10.fc15
+- [delayed-symfile] Test a backtrace regression on CFIs without DIE (BZ 614604).
+- [archer-tromey-delayed-symfile] New test gdb.dwarf2/dw2-aranges.exp.
+- [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
+  - testsuite: Fix gdb-test-expr-cumulative-archer.patch compatibility.
+
 * Fri Jan  7 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110107-9.fc15
 - Remove --with-pythondir as no longer valid.
 - Provide %{_bindir}gdb-add-index even on RHEL-5.
