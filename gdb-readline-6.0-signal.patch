@@ -67,8 +67,8 @@ gdb/testsuite/
 
 Index: gdb-7.2/gdb/config.in
 ===================================================================
---- gdb-7.2.orig/gdb/config.in	2011-01-16 18:26:11.000000000 +0100
-+++ gdb-7.2/gdb/config.in	2011-01-16 18:26:50.000000000 +0100
+--- gdb-7.2.orig/gdb/config.in	2011-01-16 19:04:55.000000000 +0100
++++ gdb-7.2/gdb/config.in	2011-01-16 19:05:01.000000000 +0100
 @@ -463,6 +463,9 @@
  /* Define to 1 if wcwidth is declared even after undefining macros. */
  #undef HAVE_RAW_DECL_WCWIDTH
@@ -81,8 +81,8 @@ Index: gdb-7.2/gdb/config.in
  
 Index: gdb-7.2/gdb/configure.ac
 ===================================================================
---- gdb-7.2.orig/gdb/configure.ac	2011-01-16 18:26:11.000000000 +0100
-+++ gdb-7.2/gdb/configure.ac	2011-01-16 18:26:26.000000000 +0100
+--- gdb-7.2.orig/gdb/configure.ac	2011-01-16 19:04:57.000000000 +0100
++++ gdb-7.2/gdb/configure.ac	2011-01-16 19:05:01.000000000 +0100
 @@ -779,17 +779,25 @@ if test "$with_system_readline" = yes; t
    # readline-6.0 started to use the name `_rl_echoing_p'.
    # `$(READLINE_DIR)/' of bundled readline would not resolve in configure.
@@ -114,7 +114,7 @@ Index: gdb-7.2/gdb/configure.ac
 Index: gdb-7.2/gdb/event-loop.c
 ===================================================================
 --- gdb-7.2.orig/gdb/event-loop.c	2010-05-25 17:48:43.000000000 +0200
-+++ gdb-7.2/gdb/event-loop.c	2011-01-16 18:27:14.000000000 +0100
++++ gdb-7.2/gdb/event-loop.c	2011-01-16 19:13:31.000000000 +0100
 @@ -37,6 +37,7 @@
  #include "exceptions.h"
  #include "gdb_assert.h"
@@ -133,7 +133,7 @@ Index: gdb-7.2/gdb/event-loop.c
  
    /* Any events already waiting in the queue?  */
    if (process_event ())
-@@ -460,6 +464,16 @@ gdb_do_one_event (void *data)
+@@ -460,6 +464,29 @@ gdb_do_one_event (void *data)
    if (gdb_wait_for_event (1) < 0)
      return -1;
  
@@ -141,9 +141,22 @@ Index: gdb-7.2/gdb/event-loop.c
 +  if (async_command_editing_p && RL_ISSTATE (RL_STATE_CALLBACK)
 +      && _rl_caught_signal)
 +    {
++      char *prompt;
++
++      if (rl_prompt == NULL)
++	{
++	  /* Should not happen, defensive only.  */
++	  prompt = "";
++	}
++      else
++	{
++	  prompt = alloca (strlen (rl_prompt) + 1);
++	  strcpy (prompt, rl_prompt);
++	}
++
 +      /* Call RL_CHECK_SIGNALS this way.  */
 +      rl_callback_handler_remove ();
-+      rl_callback_handler_install (NULL, input_handler);
++      rl_callback_handler_install (prompt, input_handler);
 +    }
 +#endif
 +
@@ -152,8 +165,8 @@ Index: gdb-7.2/gdb/event-loop.c
      return 1;
 Index: gdb-7.2/gdb/testsuite/gdb.gdb/selftest.exp
 ===================================================================
---- gdb-7.2.orig/gdb/testsuite/gdb.gdb/selftest.exp	2011-01-16 18:26:08.000000000 +0100
-+++ gdb-7.2/gdb/testsuite/gdb.gdb/selftest.exp	2011-01-16 18:30:41.000000000 +0100
+--- gdb-7.2.orig/gdb/testsuite/gdb.gdb/selftest.exp	2011-01-16 19:04:55.000000000 +0100
++++ gdb-7.2/gdb/testsuite/gdb.gdb/selftest.exp	2011-01-16 19:05:01.000000000 +0100
 @@ -433,6 +433,28 @@ proc test_with_self { executable } {
  	}
      }
@@ -199,8 +212,8 @@ Index: gdb-7.2/gdb/testsuite/gdb.gdb/selftest.exp
  	-re ".*$gdb_prompt $" {
 Index: gdb-7.2/gdb/configure
 ===================================================================
---- gdb-7.2.orig/gdb/configure	2011-01-16 18:26:11.000000000 +0100
-+++ gdb-7.2/gdb/configure	2011-01-16 18:26:51.000000000 +0100
+--- gdb-7.2.orig/gdb/configure	2011-01-16 19:04:57.000000000 +0100
++++ gdb-7.2/gdb/configure	2011-01-16 19:05:01.000000000 +0100
 @@ -10305,10 +10305,10 @@ if test "$with_system_readline" = yes; t
    # readline-6.0 started to use the name `_rl_echoing_p'.
    # `$(READLINE_DIR)/' of bundled readline would not resolve in configure.
