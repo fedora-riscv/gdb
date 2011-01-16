@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?_with_upstream:.upstream}%{dist}
+Release: 35%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -470,6 +470,9 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
 #=push+work: It should be in glibc: libc-alpha: <20091004161706.GA27450@.*>
 Patch382: gdb-core-open-vdso-warning.patch
+
+# Fix callback-mode readline-6.0 regression for CTRL-C (for RHEL-6.0).
+Patch390: gdb-readline-6.0-signal.patch
 
 # Fix syscall restarts for amd64->i386 biarch.
 #=push
@@ -1002,8 +1005,14 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch549 -p1
 %patch550 -p1
 
+%patch390 -p1
 %patch393 -p1
 %patch335 -p1
+readline="$(readlink -f %{_libdir}/libreadline.so)"
+if [ "$readline" = "${readline%/libreadline.so.6.0}" ]
+then
+%patch390 -p1 -R
+fi
 %if 0%{!?el5:1}
 %patch393 -p1 -R
 %patch335 -p1 -R
@@ -1392,6 +1401,9 @@ fi
 %endif
 
 %changelog
+* Sun Jan 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-35.fc14
+- Fix callback-mode readline-6.0 regression for CTRL-C (for RHEL-6.0).
+
 * Sat Jan 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-34.fc14
 - [vla] Support Fortran vector slices and subsets (BZ 609782).
 
