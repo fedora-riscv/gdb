@@ -13,7 +13,7 @@
 %define el5 1
 %endif
 # RHEL-5 Brew does not set %{el5}.
-%if "%{dist}" == ".el5"
+%if "%{?dist}" == ".el5"
 %define el5 1
 %endif
 
@@ -27,7 +27,7 @@ Version: 7.2.50.20110117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1187,6 +1187,9 @@ fi
 %endif
 
 %changelog
+* Mon Jan 17 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110117-12.fc15
+- Use %%{?dist} for sanity checking tools compliance (suggested by Petr Muller).
+
 * Mon Jan 17 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110117-11.fc15
 - Rebase to FSF GDB 7.2.50.20110117 (which is a 7.3 pre-release).
 - Fix callback-mode readline-6.0 regression for CTRL-C (for RHEL-6.0).
