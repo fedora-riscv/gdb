@@ -27,7 +27,7 @@ Version: 7.2.50.20110117
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -884,7 +884,11 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?el5:1}
 	--without-rpm						\
 %else
+%if 0%{?el6:1}
 	--with-rpm=librpm.so.1					\
+%else
+	--with-rpm=librpm.so.2					\
+%endif
 %endif
 %ifarch ia64
 	--with-libunwind					\
@@ -1187,6 +1191,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110117-13.fc15
+- Use librpm.so.2 for rpm-4.9.0 in Fedora 15.
+
 * Mon Jan 17 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110117-12.fc15
 - Use %%{?dist} for sanity checking tools compliance (suggested by Petr Muller).
 
