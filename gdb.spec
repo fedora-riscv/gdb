@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?_with_upstream:.upstream}%{dist}
+Release: 37%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -702,7 +702,16 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 # [vla] Support Fortran vector slices and subsets (BZ 609782).
 # =drop
 Patch549: gdb-archer-vla-misc.patch
+# =drop
 Patch550: gdb-archer-vla-subarray.patch
+
+# Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
+# =drop
+Patch551: gdb-gdbindex-v4-1of3.patch
+# =drop
+Patch552: gdb-gdbindex-v4-2of3.patch
+# =drop
+Patch553: gdb-gdbindex-v4-3of3.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -1004,6 +1013,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch548 -p1
 %patch549 -p1
 %patch550 -p1
+%patch551 -p1
+%patch552 -p1
+%patch553 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1401,6 +1413,9 @@ fi
 %endif
 
 %changelog
+* Tue Jan 25 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-37.fc14
+- Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
+
 * Sun Jan 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-36.fc14
 - Fix occasional NULL dereference of the readline-6.0 workaround (BZ 575516).
 
