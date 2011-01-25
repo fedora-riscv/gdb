@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit ce88fe365322b0f7479c43eede6d3a0d337eb786
+commit b3fa51e30637989ca4a8ee4763ba921322a1bd0d
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
@@ -14,7 +14,7 @@ archer-tromey-python
 
 
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
-index 226faf6..03aaa2c 100644
+index 36cc734..977fe0c 100644
 --- a/gdb/Makefile.in
 +++ b/gdb/Makefile.in
 @@ -783,7 +783,8 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
@@ -1123,7 +1123,7 @@ index 9409dde..f0fa4c7 100644
  extern char *xfullpath (const char *);
  
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index d48d95c..4cac1ba 100644
+index cc2391b..161ac1f 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -1177,6 +1177,16 @@ for remote debugging.
@@ -1143,7 +1143,7 @@ index d48d95c..4cac1ba 100644
  @c resolve the situation of these eventually
  @item -tui
  @cindex @code{--tui}
-@@ -20630,8 +20640,6 @@ containing @code{end}.  For example:
+@@ -20652,8 +20662,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -1152,7 +1152,7 @@ index d48d95c..4cac1ba 100644
  >print 23
  >end
  23
-@@ -20644,6 +20652,14 @@ in a Python script.  This can be controlled using @code{maint set
+@@ -20666,6 +20674,14 @@ in a Python script.  This can be controlled using @code{maint set
  python print-stack}: if @code{on}, the default, then Python stack
  printing is enabled; if @code{off}, then Python stack printing is
  disabled.
@@ -1167,7 +1167,7 @@ index d48d95c..4cac1ba 100644
  @end table
  
  It is also possible to execute a Python script from the @value{GDBN}
-@@ -20665,6 +20681,14 @@ and thus is always available.
+@@ -20687,6 +20703,14 @@ and thus is always available.
  @cindex python api
  @cindex programming in python
  
@@ -3254,7 +3254,7 @@ index ad988d2..985fef6 100644
      {
      case TYPE_CODE_ARRAY:
 diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
-index 4d26ade..206a62b 100644
+index 94a70a1..7bb04e7 100644
 --- a/gdb/f-valprint.c
 +++ b/gdb/f-valprint.c
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
@@ -3337,7 +3337,7 @@ index 4d26ade..206a62b 100644
      }
  }
  
-@@ -173,36 +183,34 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
+@@ -174,37 +184,35 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
  
    if (nss != ndimensions)
      {
@@ -3348,10 +3348,10 @@ index 4d26ade..206a62b 100644
  	{
  	  fprintf_filtered (stream, "( ");
  	  f77_print_array_1 (nss + 1, ndimensions, TYPE_TARGET_TYPE (type),
--			     valaddr + i * F77_DIM_OFFSET (nss),
--			     address + i * F77_DIM_OFFSET (nss),
-+			     valaddr + i * F77_DIM_BYTE_STRIDE (nss),
-+			     address + i * F77_DIM_BYTE_STRIDE (nss),
+ 			     valaddr,
+-			     embedded_offset + i * F77_DIM_OFFSET (nss),
++			     embedded_offset + i * F77_DIM_BYTE_STRIDE (nss),
+ 			     address,
  			     stream, recurse, val, options, elts);
  	  fprintf_filtered (stream, ") ");
  	}
@@ -3366,12 +3366,11 @@ index 4d26ade..206a62b 100644
  	   i++, (*elts)++)
  	{
  	  val_print (TYPE_TARGET_TYPE (type),
--		     valaddr + i * F77_DIM_OFFSET (ndimensions),
-+		     valaddr + i * F77_DIM_BYTE_STRIDE (ndimensions),
- 		     0,
--		     address + i * F77_DIM_OFFSET (ndimensions),
-+		     address + i * F77_DIM_BYTE_STRIDE (ndimensions),
- 		     stream, recurse, val, options, current_language);
+ 		     valaddr,
+-		     embedded_offset + i * F77_DIM_OFFSET (ndimensions),
++		     embedded_offset + i * F77_DIM_BYTE_STRIDE (ndimensions),
+ 		     address, stream, recurse,
+ 		     val, options, current_language);
  
 -	  if (i != (F77_DIM_SIZE (nss) - 1))
 +	  if (i != (F77_DIM_COUNT (nss) - 1))
@@ -3383,7 +3382,7 @@ index 4d26ade..206a62b 100644
  	    fprintf_filtered (stream, "...");
  	}
      }
-@@ -260,6 +268,9 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
+@@ -263,6 +271,9 @@ f_val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
    CORE_ADDR addr;
    int index;
  
@@ -5486,7 +5485,7 @@ index 75de56c..2a64a0e 100644
        /* Handle the case of functions lacking debugging info.
           Their values are characters since their addresses are char.  */
 diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
-index 62a4538..8d14fcd 100644
+index a855219..1668f95 100644
 --- a/gdb/linux-nat.c
 +++ b/gdb/linux-nat.c
 @@ -1254,6 +1254,64 @@ iterate_over_lwps (ptid_t filter,
@@ -5785,7 +5784,7 @@ index 8497991..4635853 100644
  		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
  	  return SYMBOL_VALUE_ADDRESS (msymbol);
 diff --git a/gdb/p-valprint.c b/gdb/p-valprint.c
-index e993c05..affbe45 100644
+index 34decb9..0399e0a 100644
 --- a/gdb/p-valprint.c
 +++ b/gdb/p-valprint.c
 @@ -38,6 +38,7 @@
@@ -5796,7 +5795,7 @@ index e993c05..affbe45 100644
  
  
  
-@@ -68,8 +69,27 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
+@@ -68,8 +69,31 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
    struct type *char_type;
    LONGEST val;
    CORE_ADDR addr;
@@ -5805,6 +5804,7 @@ index e993c05..affbe45 100644
 +  CORE_ADDR saved_address = address;
 +  
 +  back_to = make_cleanup (null_cleanup, 0);
++  address += embedded_offset;
 +  type = object_address_get_data (type, &address);
 +  if (type == NULL)
 +    {
@@ -5813,7 +5813,7 @@ index e993c05..affbe45 100644
 +      do_cleanups (back_to);
 +      return 0;
 +    }
-+  if (address != saved_address)
++  if (address != saved_address + embedded_offset)
 +    {
 +      size_t length = TYPE_LENGTH (type);
  
@@ -5821,22 +5821,25 @@ index e993c05..affbe45 100644
 +      valaddr = xmalloc (length);
 +      make_cleanup (xfree, (gdb_byte *) valaddr);
 +      read_memory (address, (gdb_byte *) valaddr, length);
++      embedded_offset = 0;
 +    }
++  else
++    address -= embedded_offset;
    switch (TYPE_CODE (type))
      {
      case TYPE_CODE_ARRAY:
-@@ -125,8 +145,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
+@@ -125,8 +149,8 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
  		{
  		  i = 0;
  		}
--	      val_print_array_elements (type, valaddr + embedded_offset,
+-	      val_print_array_elements (type, valaddr, embedded_offset,
 -					address, stream, recurse,
-+	      val_print_array_elements (saved_type, valaddr + embedded_offset,
++	      val_print_array_elements (saved_type, valaddr, embedded_offset,
 +					saved_address, stream, recurse,
  					original_value, options, i);
  	      fprintf_filtered (stream, "}");
  	    }
-@@ -165,6 +185,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
+@@ -165,6 +189,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
  	  /* Try to print what function it points to.  */
  	  print_address_demangle (gdbarch, addr, stream, demangle);
  	  /* Return value is irrelevant except for string pointers.  */
@@ -5844,7 +5847,7 @@ index e993c05..affbe45 100644
  	  return (0);
  	}
  
-@@ -256,6 +277,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
+@@ -256,6 +281,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
        /* Return number of characters printed, including the terminating
  	 '\0' if we reached the end.  val_print_string takes care including
  	 the terminating '\0' if necessary.  */
@@ -5852,7 +5855,7 @@ index e993c05..affbe45 100644
        return i;
  
        break;
-@@ -572,6 +594,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
+@@ -572,6 +598,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
  	     TYPE_CODE (type));
      }
    gdb_flush (stream);
@@ -6504,7 +6507,7 @@ index 0000000..96b6618
 +AliasCommand()
 diff --git a/gdb/python/lib/gdb/command/backtrace.py b/gdb/python/lib/gdb/command/backtrace.py
 new file mode 100644
-index 0000000..2aa5b90
+index 0000000..eeea909
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/backtrace.py
 @@ -0,0 +1,106 @@
@@ -6590,7 +6593,7 @@ index 0000000..2aa5b90
 +
 +        # FIXME: provide option to start at selected frame
 +        # However, should still number as if starting from newest
-+        newest_frame = gdb.selected_thread ().newest_frame ()
++        newest_frame = gdb.newest_frame()
 +        iter = itertools.imap (FrameWrapper,
 +                               FrameIterator (newest_frame))
 +        if filter:
@@ -9360,10 +9363,10 @@ index 0000000..45bc650
 +gdb_test_no_output {delete $bpnum}
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
 new file mode 100644
-index 0000000..7fb00ea
+index 0000000..aac3baa
 --- /dev/null
 +++ b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
-@@ -0,0 +1,212 @@
+@@ -0,0 +1,246 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
 +   Copyright 2010 Free Software Foundation, Inc.
@@ -9428,6 +9431,19 @@ index 0000000..7fb00ea
 +	.4byte		.Llenb_var-.Lcu1_begin	/* DW_AT_upper_bound */
 +	.byte		0			/* End of children of die */
 +
++	/* DW_AT_upper_bound is referencing register.  */
++.Larrayreg_type:
++	.uleb128	2			/* Abbrev: DW_TAG_array_type */
++	.4byte		.Lchar_type-.Lcu1_begin	/* DW_AT_type */
++
++	.uleb128	8			/* Abbrev: DW_TAG_subrange_type with block */
++	.4byte		.Luint_type-.Lcu1_begin	/* DW_AT_type */
++	.byte		0			/* DW_AT_lower_bound */
++	.byte		2f - 1f			/* DW_AT_upper_bound */
++1:	.byte		0x50			/* DW_OP_reg0 */
++2:
++	.byte		0			/* End of children of die */
++
 +.Luint_type:
 +	.uleb128	4			/* Abbrev: DW_TAG_base_type */
 +	.4byte		.Luint_str		/* DW_AT_name */
@@ -9464,6 +9480,15 @@ index 0000000..7fb00ea
 +	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
 +	.string		"b_string"		/* DW_AT_name */
 +	.4byte		.Larrayb_type-.Lcu1_begin /* DW_AT_type */
++	.byte		2f - 1f			/* DW_AT_location */
++1:	.byte		3			/*   DW_OP_addr */
++	.4byte		vardata			/*   <addr> */
++2:
++
++	/* DW_AT_upper_bound is referencing register.  */
++	.uleb128	6			/* Abbrev: DW_TAG_variable DW_FORM_string */
++	.string		"reg_string"		/* DW_AT_name */
++	.4byte		.Larrayreg_type-.Lcu1_begin /* DW_AT_type */
 +	.byte		2f - 1f			/* DW_AT_location */
 +1:	.byte		3			/*   DW_OP_addr */
 +	.4byte		vardata			/*   <addr> */
@@ -9566,6 +9591,18 @@ index 0000000..7fb00ea
 +	.byte		0x0			/* Terminator */
 +	.byte		0x0			/* Terminator */
 +
++	.uleb128	8			/* Abbrev code */
++	.uleb128	0x21			/* DW_TAG_subrange_type with block */
++	.byte		0x0			/* no children */
++	.uleb128	0x49			/* DW_AT_type */
++	.uleb128	0x13			/* DW_FORM_ref4 */
++	.uleb128	0x22			/* DW_AT_lower_bound */
++	.uleb128	0xb			/* DW_FORM_data1 */
++	.uleb128	0x2f			/* DW_AT_upper_bound */
++	.uleb128	0xa			/* DW_FORM_block1 */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
 +	.byte		0x0			/* Terminator */
 +
 +/* String table */
@@ -9578,10 +9615,10 @@ index 0000000..7fb00ea
 +	.string		"unsigned int"
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
 new file mode 100644
-index 0000000..5dbed3f
+index 0000000..815ed93
 --- /dev/null
 +++ b/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -9633,6 +9670,9 @@ index 0000000..5dbed3f
 +
 +gdb_test "p b_string" { = (0x[0-9a-f]+ )?"seennotseen"}
 +gdb_test "ptype b_string" {type = char \[\]}
++
++# The register contains unpredictable value - the array size.
++gdb_test "ptype reg_string" {type = char \[-?[0-9]+\]}
 diff --git a/gdb/testsuite/gdb.dwarf2/dw2-stripped.c b/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
 new file mode 100644
 index 0000000..1f02d90
@@ -10856,85 +10896,6 @@ index 0000000..f2de718
 +# Seen regression:
 +# Address requested for identifier "arr" which is in register $rdi
 +gdb_test "p arr\[0\]" "\\$\[0-9\]+ = 42"
-diff --git a/gdb/testsuite/gdb.opt/fortran-string.exp b/gdb/testsuite/gdb.opt/fortran-string.exp
-new file mode 100644
-index 0000000..c108ea5
---- /dev/null
-+++ b/gdb/testsuite/gdb.opt/fortran-string.exp
-@@ -0,0 +1,39 @@
-+# Copyright 2009 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 2 of the License, or
-+# (at your option) any later version.
-+# 
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+# 
-+# You should have received a copy of the GNU General Public License
-+# along with this program; if not, write to the Free Software
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
-+
-+# This file was written by Jan Kratochvil <jan.kratochvil@redhat.com>.
-+
-+# Test GDB can cope with Fortran strings having their length present in a CPU
-+# register.  With -O0 the string length is passed on the stack.  To make this
-+# test meaningful the follow assertion should pass.  It is not being checked
-+# here as the "_s" symbol is compiler dependent:
-+#   (gdb) info address _s
-+#   Symbol "_s" is a variable in register XX.
-+
-+set test fortran-string
-+set srcfile ${test}.f90
-+if { [prepare_for_testing ${test}.exp ${test} ${srcfile} {debug f77 additional_flags=-O2}] } {
-+    return -1
-+}
-+
-+if ![runto $srcfile:[gdb_get_line_number "s = s"]] then {
-+    perror "couldn't run to breakpoint MAIN__"
-+    continue
-+}
-+
-+gdb_test "frame" ".*s='foo'.*"
-+gdb_test "ptype s" "type = character\\*3"
-+gdb_test "p s" "\\$\[0-9\]* = 'foo'"
-diff --git a/gdb/testsuite/gdb.opt/fortran-string.f90 b/gdb/testsuite/gdb.opt/fortran-string.f90
-new file mode 100644
-index 0000000..e48d520
---- /dev/null
-+++ b/gdb/testsuite/gdb.opt/fortran-string.f90
-@@ -0,0 +1,28 @@
-+! Copyright 2009 Free Software Foundation, Inc.
-+!
-+! This program is free software; you can redistribute it and/or modify
-+! it under the terms of the GNU General Public License as published by
-+! the Free Software Foundation; either version 2 of the License, or
-+! (at your option) any later version.
-+!
-+! This program is distributed in the hope that it will be useful,
-+! but WITHOUT ANY WARRANTY; without even the implied warranty of
-+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+! GNU General Public License for more details.
-+!
-+! You should have received a copy of the GNU General Public License
-+! along with this program; if not, write to the Free Software
-+! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-+!
-+! Ihis file is the Fortran source file for dynamic.exp.
-+! Original file written by Jakub Jelinek <jakub@redhat.com>.
-+! Modified for the GDB testcase by Jan Kratochvil <jan.kratochvil@redhat.com>.
-+
-+  subroutine f(s)
-+  character*(*) s
-+  s = s
-+  end
-+
-+  program main
-+  call f ('foo')
-+  end
 diff --git a/gdb/testsuite/gdb.pascal/arrays.exp b/gdb/testsuite/gdb.pascal/arrays.exp
 new file mode 100644
 index 0000000..ccc6e1e
@@ -11885,7 +11846,7 @@ index 891da37..236c5ca 100644
      set pascal_init_done 1
  }   
 diff --git a/gdb/top.c b/gdb/top.c
-index bba1a2d..5582f30 100644
+index d14f308..7605f85 100644
 --- a/gdb/top.c
 +++ b/gdb/top.c
 @@ -343,6 +343,7 @@ void
@@ -11954,10 +11915,10 @@ index 03e6332..ce6d1e0 100644
  
  static void
 diff --git a/gdb/utils.c b/gdb/utils.c
-index c23c4d4..60d55b7 100644
+index 82e3adb..a5b9146 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
-@@ -2206,6 +2206,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
+@@ -2238,6 +2238,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
    return back_to;
  }
  
@@ -12180,7 +12141,7 @@ index 19d5238..c9d721a 100644
      {
        int i;
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index f65fe27..dd1aaee 100644
+index c98e315..de9de10 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
 @@ -36,6 +36,7 @@
@@ -12199,7 +12160,7 @@ index f65fe27..dd1aaee 100644
      case TYPE_CODE_BITSTRING:
        return 0;
      default:
-@@ -1117,6 +1117,7 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1118,6 +1118,7 @@ val_print_array_elements (struct type *type,
  {
    unsigned int things_printed = 0;
    unsigned len;
@@ -12207,7 +12168,7 @@ index f65fe27..dd1aaee 100644
    struct type *elttype, *index_type;
    unsigned eltlen;
    /* Position of the array element we are examining to see
-@@ -1125,9 +1126,33 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1126,9 +1127,33 @@ val_print_array_elements (struct type *type,
    /* Number of repetitions we have detected so far.  */
    unsigned int reps;
    LONGEST low_bound, high_bound;
@@ -12243,7 +12204,7 @@ index f65fe27..dd1aaee 100644
    index_type = TYPE_INDEX_TYPE (type);
  
    if (get_array_bounds (type, &low_bound, &high_bound))
-@@ -1202,6 +1227,8 @@ val_print_array_elements (struct type *type, const gdb_byte *valaddr,
+@@ -1207,6 +1232,8 @@ val_print_array_elements (struct type *type,
      {
        fprintf_filtered (stream, "...");
      }

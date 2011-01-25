@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110117
+Version: 7.2.50.20110125
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{?dist}
+Release: 14%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -536,6 +536,13 @@ Patch547: gdb-test-dw2-aranges.patch
 # =fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
+# Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
+# =push
+Patch552: gdb-gdbindex-v4-2of3.patch
+
+# Fix DWARF-3+ DW_AT_accessibility default assumption for F15 gcc-4.6.
+Patch554: gdb-dwarf3-accessibility.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -785,6 +792,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
+%patch552 -p1
+%patch554 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1191,6 +1200,11 @@ fi
 %endif
 
 %changelog
+* Thu Jan 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110125-14.fc15
+- Rebase to FSF GDB 7.2.50.20110125 (which is a 7.3 pre-release).
+- Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
+- Fix DWARF-3+ DW_AT_accessibility default assumption for F15 gcc-4.6.
+
 * Thu Jan 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110117-13.fc15
 - Use librpm.so.2 for rpm-4.9.0 in Fedora 15.
 
