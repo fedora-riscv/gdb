@@ -1,0 +1,154 @@
+http://sourceware.org/ml/archer/2011-q1/msg00024.html
+Subject: [patch] Fix RH BZ 672235
+
+
+Bug:
+
+http://bugzilla.redhat.com/show_bug.cgi?id=672235
+
+The latter half of this bug was caused by removing the value function
+from gdb.Symbol.  This happened quite some time ago, so I am a little
+surprised it took this long to surface.
+
+The old Symbol.value function never returned anything except a gdb.Block
+if the symbol happened to represent a function a block.  Anything else
+raised an error.  Way back when, I removed this function as it was an
+obvious stub, and it was superseded by frame.read_var() which is a more
+accurate method of determining the value of a symbol.
+
+Wind forward to today, and it turns out one of the unported
+archer-tromey-python scripts we ship in Fedora relies on this (symbol ->
+block) API.  I thought about ways of trying to fix this. I thought about
+just changing FrameWrapper to just take a block instead of a symbol
+representing a function.  But FrameWrapper has an API that we shipped.
+I tried to find the block through the existing API, but that did not
+work too well.  The gdb.Block method block_for_pc can return a block
+from a pc but this just turned out to be expensive and convoluted.  I
+eventually just elected to add a block() function to gdb.Symbol which,
+if the symbol represented a method or a function, would return the block.
+Yet I am still not entirely satisfied.  It seems weird to ask the user
+to retrieve symbol value from frame.read_var for most symbols, but in
+the case of a function or method, use block().  I tried to use read_var
+for this, but it returns a gdb.Value, and I could not figure out a way to
+transform a gdb.Value to a gdb.Block.
+
+Before I submit this for upstream review I'd like to see if anyone has
+any comments.
+
+Cheers
+
+Phil
+
+--
+
+diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
+index 161ac1f..55eca2a 100644
+--- a/gdb/doc/gdb.texinfo
++++ b/gdb/doc/gdb.texinfo
+@@ -22718,6 +22718,13 @@ domain constant defined in the @code{gdb} module and described later
+ in this chapter.
+ @end defun
+ 
++A @code{gdb.Symbol} object has the following methods:
++
++@defmethod Symbol block
++Returns a @code{gdb.Block} object if the symbol is a function or a
++method.  @xref{Blocks In Python}.
++@end defmethod
++
+ A @code{gdb.Symbol} object has the following attributes:
+ 
+ @table @code
+diff --git a/gdb/python/lib/gdb/FrameWrapper.py b/gdb/python/lib/gdb/FrameWrapper.py
+index b790a54..5d98b0f 100644
+--- a/gdb/python/lib/gdb/FrameWrapper.py
++++ b/gdb/python/lib/gdb/FrameWrapper.py
+@@ -46,7 +46,7 @@ class FrameWrapper:
+             return
+ 
+         first = True
+-        block = func.value
++        block = func.block ()
+ 
+         for sym in block:
+             if sym.is_argument:
+@@ -60,7 +60,7 @@ class FrameWrapper:
+             return
+ 
+         first = True
+-        block = func.value
++        block = func.block ()
+ 
+         for sym in block:
+             if not sym.is_argument:
+diff --git a/gdb/python/py-symbol.c b/gdb/python/py-symbol.c
+index e072dc8..1dfe394 100644
+--- a/gdb/python/py-symbol.c
++++ b/gdb/python/py-symbol.c
+@@ -167,6 +167,27 @@ sympy_is_variable (PyObject *self, void *closure)
+ 			      || class == LOC_OPTIMIZED_OUT));
+ }
+ 
++static PyObject *
++sympy_get_block (PyObject *self, PyObject *args)
++{
++  struct symbol *symbol = NULL;
++
++  SYMPY_REQUIRE_VALID (self, symbol);
++
++  if (SYMBOL_CLASS (symbol) == LOC_BLOCK)
++    {
++      struct symtab *symt = SYMBOL_SYMTAB (symbol);
++
++      return block_to_block_object (SYMBOL_BLOCK_VALUE (symbol),
++				    symt->objfile);
++    }
++  else
++    PyErr_SetString (PyExc_RuntimeError,
++		     _("Symbol is not a block class."));
++
++  return NULL;
++}
++
+ /* Given a symbol, and a symbol_object that has previously been
+    allocated and initialized, populate the symbol_object with the
+    struct symbol data.  Also, register the symbol_object life-cycle
+@@ -362,6 +383,13 @@ gdbpy_initialize_symbols (void)
+ 
+ 
+ 
++static PyMethodDef symbol_object_methods[] = {
++  { "block", sympy_get_block, METH_NOARGS,
++    "block () -> gdb.Block.\n\
++Return the block of this symbol, if the symbol represents a function." },
++  {NULL}  /* Sentinel */
++};
++
+ static PyGetSetDef symbol_object_getset[] = {
+   { "symtab", sympy_get_symtab, NULL,
+     "Symbol table in which the symbol appears.", NULL },
+@@ -415,7 +443,7 @@ PyTypeObject symbol_object_type = {
+   0,				  /*tp_weaklistoffset */
+   0,				  /*tp_iter */
+   0,				  /*tp_iternext */
+-  0,				  /*tp_methods */
++  symbol_object_methods,	  /*tp_methods */
+   0,				  /*tp_members */
+   symbol_object_getset		  /*tp_getset */
+ };
+diff --git a/gdb/testsuite/gdb.python/py-symbol.exp b/gdb/testsuite/gdb.python/py-symbol.exp
+index 8e3aec1..6d43566 100644
+--- a/gdb/testsuite/gdb.python/py-symbol.exp
++++ b/gdb/testsuite/gdb.python/py-symbol.exp
+@@ -69,6 +69,10 @@ gdb_test "python print func.print_name" "func" "Test func.print_name"
+ gdb_test "python print func.linkage_name" "func" "Test func.linkage_name"
+ gdb_test "python print func.addr_class == gdb.SYMBOL_LOC_BLOCK" "True" "Test func.addr_class"
+ 
++# Test block() method
++gdb_py_test_silent_cmd "python func = frame.block().function" "Get block" 0
++gdb_test "python print func.block().function.name" "func" "Test block method"
++
+ gdb_breakpoint [gdb_get_line_number "Break at end."]
+ gdb_continue_to_breakpoint "Break at end."
+ gdb_py_test_silent_cmd "python frame = gdb.selected_frame()" "Get Frame" 0
+

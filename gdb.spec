@@ -27,7 +27,7 @@ Version: 7.2.50.20110125
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{?dist}
+Release: 16%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -541,13 +541,20 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 Patch552: gdb-gdbindex-v4-2of3.patch
 
 # Fix DWARF-3+ DW_AT_accessibility default assumption for F15 gcc-4.6.
+# =push
 Patch554: gdb-dwarf3-accessibility.patch
 
 # Temporary fix of F15 gcc-4.6 child DIEs of DW_TAG_typedef (BZ 672230).
+# =push
 Patch555: gdb-gcc46-typedef.patch
 
 # Workaround gcc-4.6 stdarg false prologue end (GDB PR 12435 + GCC PR 47471).
+# =push
 Patch556: gdb-gcc46-stdarg-prologue.patch
+
+# Fix Python new-backtrace command (BZ 672235, Phil Muldoon).
+# =push
+Patch557: gdb-python-newbacktrace.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -802,6 +809,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch554 -p1
 %patch555 -p1
 %patch556 -p1
+%patch557 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1208,6 +1216,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 27 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110125-16.fc15
+- Fix Python new-backtrace command (BZ 672235, Phil Muldoon).
+
 * Wed Jan 26 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110125-15.fc15
 - Temporary fix of F15 gcc-4.6 child DIEs of DW_TAG_typedef (BZ 672230).
 - Workaround gcc-4.6 stdarg false prologue end (GDB PR 12435 + GCC PR 47471).
