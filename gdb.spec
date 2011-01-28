@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?_with_upstream:.upstream}%{dist}
+Release: 38%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -713,6 +713,9 @@ Patch552: gdb-gdbindex-v4-2of3.patch
 # =drop
 Patch553: gdb-gdbindex-v4-3of3.patch
 
+# [ifunc] Fix possible crash on deleting breakpoints (BZ 673483).
+Patch558: gdb-ifunc-unchain.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1016,6 +1019,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch551 -p1
 %patch552 -p1
 %patch553 -p1
+%patch558 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1413,6 +1417,9 @@ fi
 %endif
 
 %changelog
+* Fri Jan 28 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-38.fc14
+- [ifunc] Fix possible crash on deleting breakpoints (BZ 673483).
+
 * Tue Jan 25 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-37.fc14
 - Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
 
