@@ -1,0 +1,81 @@
+http://sourceware.org/ml/gdb-patches/2011-01/msg00566.html
+Subject: [patch] testcase: PR 8210 corefiles threads
+
+Hi,
+
+PR 8210 did not provide a new testcase, here it is.  I have limited the check
+only to *-*-linux* as other targets seem to identify the thread differently
+(untested outside of GNU/Linux).
+
+I will check it in after a while, it seems safe to me.
+
+Tested on x86_64-fedora14-linux-gnu.
+
+
+Thanks,
+Jan
+
+
+gdb/testsuite/
+2011-01-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test PR corefiles/8210.
+	* gdb.threads/gcore-thread.exp (pthread_self): New.
+	New variables main_self, thread1_self, thread2_self.
+	(main pthread_self found, thread1 pthread_self found)
+	(thread2 pthread_self found): New tests.
+
+--- ./gdb/testsuite/gdb.threads/gcore-thread.exp	2010-06-02 21:58:21.000000000 +0200
++++ ./gdb/testsuite/gdb.threads/gcore-thread.exp	2011-01-30 20:02:53.000000000 +0100
+@@ -53,6 +53,19 @@ set horiz "\[^\n\r\]*"
+ # regexp for newline
+ set nl "\[\r\n\]+"
+ 
++proc pthread_self {name} {
++    global gdb_prompt
++
++    set test "print pthread_t of $name"
++    gdb_test_multiple "p/x (*(pthread_t (*)(void)) pthread_self) ()" $test {
++	-re " = (0x\[0-9a-f\]+)\r\n$gdb_prompt $" {
++	    pass $test
++	    return $expect_out(1,string)
++	}
++    }
++    return ""
++}
++
+ set prev_timeout $timeout
+ set timeout 30
+ 
+@@ -82,15 +95,19 @@ gdb_test_multiple "info threads" "thread
+     }
+ }
+ 
++set main_self [pthread_self main]
++
+ # Make sure thread 1 is running
+ delete_breakpoints
+ gdb_breakpoint "thread1"
+ gdb_test "continue" "Continuing.*Breakpoint.* thread1 .*" "thread 1 is running"
++set thread1_self [pthread_self thread1]
+ 
+ # Make sure thread 2 is running
+ delete_breakpoints
+ gdb_breakpoint "thread2"
+ gdb_test "continue" "Continuing.*Breakpoint.* thread2 .*" "thread 2 is running"
++set thread2_self [pthread_self thread2]
+ 
+ set escapedfilename [string_to_regexp ${objdir}/${subdir}/gcore.test]
+ # Drop corefile
+@@ -159,4 +176,10 @@ gdb_test "info threads" ".* thread2 .*" 
+ gdb_test "info threads" ".*${nl}\\* ${horiz} thread2 .*" \
+ 	"thread2 is current thread in corefile"
+ 
++if [istarget "*-*-linux*"] then {
++    gdb_test "info threads" "Thread $main_self .*" "main pthread_self found"
++    gdb_test "info threads" "Thread $thread1_self .*" "thread1 pthread_self found"
++    gdb_test "info threads" "Thread $thread2_self .*" "thread2 pthread_self found"
++}
++
+ set timeout $prev_timeout
+
