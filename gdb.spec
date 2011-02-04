@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?_with_upstream:.upstream}%{dist}
+Release: 41%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -726,6 +726,11 @@ Patch563: gdb-core-threads-5of5.patch
 # Fix crash on static method with no parameters.
 Patch564: gdb-crash-noparam.patch
 
+# Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
+Patch565: gdb-physname-pr11734-1of2.patch
+Patch566: gdb-physname-pr11734-2of2.patch
+Patch567: gdb-physname-pr12273.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1036,6 +1041,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch562 -p1
 %patch563 -p1
 %patch564 -p1
+%patch565 -p1
+%patch566 -p1
+%patch567 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1433,6 +1441,9 @@ fi
 %endif
 
 %changelog
+* Fri Feb  4 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-41.fc14
+- Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
+
 * Sun Jan 30 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-40.fc14
 - Fix crash on static method with no parameters.
 
