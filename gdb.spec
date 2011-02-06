@@ -27,7 +27,7 @@ Version: 7.2.50.20110206
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?_with_upstream:.upstream}%{?dist}
+Release: 18%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -552,6 +552,11 @@ Patch556: gdb-gcc46-stdarg-prologue.patch
 # =push
 Patch557: gdb-python-newbacktrace.patch
 
+# Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
+Patch565: gdb-physname-pr11734-1of2.patch
+Patch566: gdb-physname-pr11734-2of2.patch
+Patch567: gdb-physname-pr12273.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -805,6 +810,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch555 -p1
 %patch556 -p1
 %patch557 -p1
+%patch565 -p1
+%patch566 -p1
+%patch567 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1211,7 +1219,10 @@ fi
 %endif
 
 %changelog
-* Thu Jan 27 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110206-17.fc15
+* Sun Feb  6 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110206-18.fc15
+- Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
+
+* Sun Feb  6 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110206-17.fc15
 - Rebase to FSF GDB 7.2.50.20110206 (which is a 7.3 pre-release).
 
 * Thu Jan 27 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110125-16.fc15
