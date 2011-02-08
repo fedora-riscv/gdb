@@ -27,7 +27,7 @@ Version: 7.2.50.20110206
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?_with_upstream:.upstream}%{?dist}
+Release: 19%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1219,6 +1219,9 @@ fi
 %endif
 
 %changelog
+* Tue Feb 08 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.2.50.20110206-19
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
+
 * Sun Feb  6 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110206-18.fc15
 - Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
 
