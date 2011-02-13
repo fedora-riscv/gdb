@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?_with_upstream:.upstream}%{dist}
+Release: 42%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1441,6 +1441,10 @@ fi
 %endif
 
 %changelog
+* Sun Feb 13 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-42.fc14
+- Fix occasionall unfound source lines (affecting at least glibc debugging).
+- Fix const/volatile qualifiers of C++ types (PR c++/12328).
+
 * Fri Feb  4 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-41.fc14
 - Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
 
