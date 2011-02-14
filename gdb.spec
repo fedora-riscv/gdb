@@ -27,7 +27,7 @@ Version: 7.2.50.20110213
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?_with_upstream:.upstream}%{?dist}
+Release: 21%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -42,6 +42,7 @@ URL: http://gnu.org/software/gdb/
 # For our convenience
 %define gdb_src gdb-%{version}
 %define gdb_build build-%{_target_platform}
+%define gdb_docdir %{_docdir}/%{name}-doc-%{version}
 
 %if 0%{?_with_debug:1}
 # Define this if you want to skip the strip step and preserve debug info.
@@ -679,6 +680,17 @@ This package provides a program that allows you to run GDB on a different
 machine than the one which is running the program being debugged.
 %endif # 0%{!?el5:1}
 
+%package doc
+Summary: Documentation for GDB (the GNU source-level debugger)
+Group: Development/Debuggers
+
+%description doc
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+Java, and other languages, by executing them in a controlled fashion
+and printing their data.
+
+This package provides INFO and HTML user manual for GDB.
+
 %prep
 
 # This allows the tarball name to be different from our
@@ -887,6 +899,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--sysconfdir=%{_sysconfdir}				\
 	--mandir=%{_mandir}					\
 	--infodir=%{_infodir}					\
+	--htmldir=%{gdb_docdir}					\
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
@@ -988,7 +1001,7 @@ done	# fprofile
 
 cd %{gdb_build}
 
-make %{?_smp_mflags} info
+make %{?_smp_mflags} -C gdb/doc gdb.info annotate.info gdb/index.html annotate/index.html MAKEHTMLFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1137,6 +1150,8 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/bfd*
 rm -f $RPM_BUILD_ROOT%{_infodir}/standard*
 rm -f $RPM_BUILD_ROOT%{_infodir}/mmalloc*
 rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
+rm -f $RPM_BUILD_ROOT%{_infodir}/gdbint*
+rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 rm -rf $RPM_BUILD_ROOT%{_includedir}
 rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
@@ -1167,8 +1182,6 @@ if [ -e %{_infodir}/gdb.info.gz ]
 then
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
-  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
 fi
 
 %preun
@@ -1179,8 +1192,6 @@ then
   then
     /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
     /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdbint.info.gz || :
-    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/stabs.info.gz || :
   fi
 fi
 
@@ -1204,10 +1215,6 @@ fi
 %endif # 0%{!?el5:1}
 %endif # 0%{!?_with_upstream:1}
 %{_datadir}/gdb
-%{_infodir}/annotate.info*
-%{_infodir}/gdb.info*
-%{_infodir}/gdbint.info*
-%{_infodir}/stabs.info*
 
 # don't include the files in include, they are part of binutils
 
@@ -1223,7 +1230,18 @@ fi
 %endif
 %endif
 
+%files doc
+%doc %{gdb_build}/gdb/doc/annotate.html %{gdb_build}/gdb/doc/gdb.html
+%defattr(-,root,root)
+%{_infodir}/annotate.info*
+%{_infodir}/gdb.info*
+
 %changelog
+* Tue Feb 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110213-21.fc15
+- Drop non-user (gdbint) and obsolete (stabs) documentation.
+- Install also HTML files besides the INFO file.
+- Create new subpackage gdb-doc for both INFO and HTML files.
+
 * Sun Feb 13 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110213-20.fc15
 - Rebase to FSF GDB 7.2.50.20110213 (which is a 7.3 pre-release).
 - Fix occasionall unfound source lines (affecting at least glibc debugging).
