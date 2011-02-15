@@ -27,9 +27,9 @@ Version: 7.2.50.20110213
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?_with_upstream:.upstream}%{?dist}
+Release: 23%{?_with_upstream:.upstream}%{?dist}
 
-License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
+License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
@@ -682,6 +682,7 @@ machine than the one which is running the program being debugged.
 
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
+License: GFDL
 Group: Documentation
 BuildArch: noarch
 
@@ -1238,6 +1239,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Feb 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110213-23.fc15
+- Move the GFDL License to gdb-doc.
+
 * Tue Feb 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110213-22.fc15
 - Fix gdb-doc Group to be Documentation, also provide it as noarch.
 
