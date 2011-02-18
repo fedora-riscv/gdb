@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?_with_upstream:.upstream}%{dist}
+Release: 43%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -704,6 +704,10 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 Patch549: gdb-archer-vla-misc.patch
 # =drop
 Patch550: gdb-archer-vla-subarray.patch
+# =drop
+Patch569: gdb-archer-vla-subarray-alloc-1of2.patch
+# =drop
+Patch570: gdb-archer-vla-subarray-alloc-2of2.patch
 
 # Fix discontiguous address ranges in .gdb_index - v3->v4 (BZ 672281).
 # =drop
@@ -1031,6 +1035,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch548 -p1
 %patch549 -p1
 %patch550 -p1
+%patch569 -p1
+%patch570 -p1
 %patch551 -p1
 %patch552 -p1
 %patch553 -p1
@@ -1441,6 +1447,9 @@ fi
 %endif
 
 %changelog
+* Fri Feb 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-43.fc14
+- [vla] Fox Fortran vector slices for allocated arrays (for BZ 609782).
+
 * Sun Feb 13 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-42.fc14
 - Fix occasionall unfound source lines (affecting at least glibc debugging).
 - Fix const/volatile qualifiers of C++ types (PR c++/12328).
