@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110213
+Version: 7.2.50.20110218
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?_with_upstream:.upstream}%{?dist}
+Release: 24%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -264,7 +264,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -558,10 +558,6 @@ Patch565: gdb-physname-pr11734-1of2.patch
 Patch566: gdb-physname-pr11734-2of2.patch
 Patch567: gdb-physname-pr12273.patch
 
-# Temporary HEAD compilation fix.
-# =drop
-Patch568: gdb-compile-doc-info.patch
-
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -716,7 +712,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -831,7 +827,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch565 -p1
 %patch566 -p1
 %patch567 -p1
-%patch568 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1239,6 +1234,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110218-24.fc15
+- Rebase to FSF GDB 7.2.50.20110218 (which is a 7.3 pre-release).
+- [vla] Fox Fortran vector slices for allocated arrays (for BZ 609782).
+
 * Tue Feb 15 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110213-23.fc15
 - Move the GFDL License to gdb-doc.
 
