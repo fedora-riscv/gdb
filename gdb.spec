@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 43%{?_with_upstream:.upstream}%{dist}
+Release: 44%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1447,6 +1447,9 @@ fi
 %endif
 
 %changelog
+* Mon Feb 21 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-44.fc14
+- Fix C++ operators resolving through typedefs (STL from gcc-4.5, BZ 678454).
+
 * Fri Feb 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-43.fc14
 - [vla] Fox Fortran vector slices for allocated arrays (for BZ 609782).
 
