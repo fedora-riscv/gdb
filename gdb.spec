@@ -27,7 +27,7 @@ Version: 7.2.50.20110218
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?_with_upstream:.upstream}%{?dist}
+Release: 25%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1167,6 +1167,23 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 %endif # 0%{!?el5:1}
 %endif # 0%{!?_with_upstream:1}
 
+# Packaged GDB is not a cross-target one.
+(cd $RPM_BUILD_ROOT%{_datadir}/gdb/syscalls
+ rm -f mips*.xml
+%ifnarch sparc sparcv9 sparc64
+ rm -f sparc*.xml
+%endif
+%ifnarch x86_64
+ rm -f amd64-linux.xml
+%endif
+%ifnarch %{ix86} x86_64
+ rm -f i386-linux.xml
+%endif
+%ifnarch ppc ppc64
+ rm -f ppc{,64}-linux.xml
+%endif
+)
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -1234,6 +1251,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon Feb 21 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110218-25.fc15
+- Drop %%{_datadir}/gdb/syscalls/* for unsupported arches.
+
 * Fri Feb 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110218-24.fc15
 - Rebase to FSF GDB 7.2.50.20110218 (which is a 7.3 pre-release).
 - [vla] Fox Fortran vector slices for allocated arrays (for BZ 609782).
