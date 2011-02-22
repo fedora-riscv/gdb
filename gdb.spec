@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110218
+Version: 7.2.50.20110222
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?_with_upstream:.upstream}%{?dist}
+Release: 26%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -558,6 +558,9 @@ Patch565: gdb-physname-pr11734-1of2.patch
 Patch566: gdb-physname-pr11734-2of2.patch
 Patch567: gdb-physname-pr12273.patch
 
+# Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
+Patch571: gdb-prelink-rela.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -827,6 +830,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch565 -p1
 %patch566 -p1
 %patch567 -p1
+%patch571 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1251,6 +1255,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Feb 23 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110222-26.fc15
+- Rebase to FSF GDB 7.2.50.20110222 (which is a 7.3 pre-release).
+- Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
+
 * Mon Feb 21 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110218-25.fc15
 - Drop %%{_datadir}/gdb/syscalls/* for unsupported arches.
 
