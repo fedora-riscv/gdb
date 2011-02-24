@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?_with_upstream:.upstream}%{dist}
+Release: 45%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -735,6 +735,14 @@ Patch565: gdb-physname-pr11734-1of2.patch
 Patch566: gdb-physname-pr11734-2of2.patch
 Patch567: gdb-physname-pr12273.patch
 
+# Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
+Patch571: gdb-prelink-rela.patch
+
+# Fix threading internal error on corrupted memory (BZ 677654).
+Patch572: gdb-core-thread-internalerr-1of3.patch
+Patch573: gdb-core-thread-internalerr-2of3.patch
+Patch574: gdb-core-thread-internalerr-3of3.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1050,6 +1058,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch565 -p1
 %patch566 -p1
 %patch567 -p1
+%patch571 -p1
+%patch572 -p1
+%patch573 -p1
+%patch574 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1447,6 +1459,10 @@ fi
 %endif
 
 %changelog
+* Thu Feb 24 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-45.fc14
+- Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
+- Fix threading internal error on corrupted memory (BZ 677654).
+
 * Mon Feb 21 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-44.fc14
 - Fix C++ operators resolving through typedefs (STL from gcc-4.5, BZ 678454).
 
