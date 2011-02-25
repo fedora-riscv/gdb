@@ -27,7 +27,7 @@ Version: 7.2.50.20110222
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?_with_upstream:.upstream}%{?dist}
+Release: 27%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -587,6 +587,8 @@ BuildRequires: python-devel%{?_isa}
 BuildRequires: libstdc++%{?_isa}
 %endif # 0%{?rhel:1}
 %endif # 0%{!?_without_python:1}
+# gdb-doc in PDF:
+BuildRequires: texinfo-tex
 
 %if 0%{?_with_testsuite:1}
 
@@ -690,7 +692,7 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
-This package provides INFO and HTML user manual for GDB.
+This package provides INFO, HTML and PDF user manual for GDB.
 
 %prep
 
@@ -901,6 +903,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--mandir=%{_mandir}					\
 	--infodir=%{_infodir}					\
 	--htmldir=%{gdb_docdir}					\
+	--pdfdir=%{gdb_docdir}					\
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
@@ -1002,7 +1005,7 @@ done	# fprofile
 
 cd %{gdb_build}
 
-make %{?_smp_mflags} -C gdb/doc gdb.info annotate.info gdb/index.html annotate/index.html MAKEHTMLFLAGS=--no-split
+make %{?_smp_mflags} -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1249,12 +1252,15 @@ fi
 %endif
 
 %files doc
-%doc %{gdb_build}/gdb/doc/annotate.html %{gdb_build}/gdb/doc/gdb.html
+%doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
 %defattr(-,root,root)
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 25 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110222-27.fc15
+- Include doc also in the PDF form; new BuildRequires: texinfo-tex.
+
 * Wed Feb 23 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110222-26.fc15
 - Rebase to FSF GDB 7.2.50.20110222 (which is a 7.3 pre-release).
 - Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
