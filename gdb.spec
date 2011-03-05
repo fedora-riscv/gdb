@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 45%{?_with_upstream:.upstream}%{dist}
+Release: 46%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -743,6 +743,9 @@ Patch572: gdb-core-thread-internalerr-1of3.patch
 Patch573: gdb-core-thread-internalerr-2of3.patch
 Patch574: gdb-core-thread-internalerr-3of3.patch
 
+# [vla] Disable the unfinished types garbage collector (BZ 682286).
+Patch575: gdb-vla-gc-disable.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1062,6 +1065,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch572 -p1
 %patch573 -p1
 %patch574 -p1
+%patch575 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1459,6 +1463,9 @@ fi
 %endif
 
 %changelog
+* Sat Mar  5 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-46.fc14
+- [vla] Disable the unfinished types garbage collector (BZ 682286).
+
 * Thu Feb 24 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-45.fc14
 - Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
 - Fix threading internal error on corrupted memory (BZ 677654).
