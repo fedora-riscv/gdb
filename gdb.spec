@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?_with_upstream:.upstream}%{dist}
+Release: 47%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -744,6 +744,7 @@ Patch573: gdb-core-thread-internalerr-2of3.patch
 Patch574: gdb-core-thread-internalerr-3of3.patch
 
 # [vla] Disable the unfinished types garbage collector (BZ 682286).
+# [vla] New testcase for the unfinished types garbage collector (for BZ 682286).
 Patch575: gdb-vla-gc-disable.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
@@ -1463,6 +1464,9 @@ fi
 %endif
 
 %changelog
+* Tue Mar  8 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-47.fc14
+- [vla] New testcase for the unfinished types garbage collector (for BZ 682286).
+
 * Sat Mar  5 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-46.fc14
 - [vla] Disable the unfinished types garbage collector (BZ 682286).
 
