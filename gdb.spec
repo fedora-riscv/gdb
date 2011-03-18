@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 47%{?_with_upstream:.upstream}%{dist}
+Release: 48%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1464,6 +1464,9 @@ fi
 %endif
 
 %changelog
+* Fri Mar 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-48.fc14
+- Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
+
 * Tue Mar  8 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-47.fc14
 - [vla] New testcase for the unfinished types garbage collector (for BZ 682286).
 
