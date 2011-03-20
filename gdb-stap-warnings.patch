@@ -1,0 +1,59 @@
+http://sourceware.org/ml/archer/2011-q1/msg00136.html
+Subject: archer-sergiodj-stap -O2 -Wall warnings=errors
+
+Hi Sergio,
+
+with -O2 (+some -Wall or so options possibly - what applies for Fedora builds)
+one gets:
+
+gcc-4.6.0-0.14.fc15.x86_64
+stap-probe.c: In function ‘stap_fetch_reg_value’:
+stap-probe.c:923:12: error: ‘aop’ may be used uninitialized in this function [-Werror=uninitialized]
+stap-probe.c:919:10: error: ‘ret’ may be used uninitialized in this function [-Werror=uninitialized]
+stap-probe.c: In function ‘stap_evaluate_conditionally’:
+stap-probe.c:1184:3: error: ‘res’ may be used uninitialized in this function [-Werror=uninitialized]
+
+The attached patch needs a review, I have only briefly checked it is not
+completely bogus.
+
+
+Thanks,
+Jan
+
+
+--- a/gdb/stap-probe.c
++++ b/gdb/stap-probe.c
+@@ -780,7 +780,9 @@ stap_fetch_reg_value (struct stap_evaluation_info *eval_info,
+ #define REG_NAME_MAX_SIZE 20
+   char regname[REG_NAME_MAX_SIZE + 1];
+   int len, regnum, indirect_p = 0;
+-  struct value *ret;
++  /* GCC false warning: ‘ret’ may be used uninitialized in this function
++     */
++  struct value *ret = NULL;
+   
+   /* The function which called us did not check if the expression
+      buffer was empty.  */
+@@ -851,7 +853,9 @@ stap_fetch_reg_value (struct stap_evaluation_info *eval_info,
+   if (indirect_p)
+     {
+       struct type *t = NULL;
+-      enum agent_op aop;
++      /* GCC false warning: ‘aop’ may be used uninitialized in this function.
++         */
++      enum agent_op aop = 0;
+ 
+       /* If the user has specified that the register must be indirected,
+ 	 we should know what's the correct type to cast it before making
+@@ -949,7 +953,9 @@ stap_evaluate_single_operand (struct stap_evaluation_info *eval_info)
+   struct gdbarch *gdbarch = eval_info->gdbarch;
+   struct frame_info *frame = eval_info->frame;
+   enum stap_arg_bitness bitness = eval_info->bitness;
+-  struct value *res;
++  /* GCC false warning: ‘res’ may be used uninitialized in this function
++     */
++  struct value *res = NULL;
+ 
+   switch (*eval_info->exp_buf)
+     {
+

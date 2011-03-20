@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110305
+Version: 7.2.50.20110320
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?_with_upstream:.upstream}%{?dist}
+Release: 29%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -264,7 +264,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -549,17 +549,14 @@ Patch555: gdb-gcc46-typedef.patch
 # =push
 Patch556: gdb-gcc46-stdarg-prologue.patch
 
-# Fix Python new-backtrace command (BZ 672235, Phil Muldoon).
-# =push
-Patch557: gdb-python-newbacktrace.patch
-
-# Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
-Patch565: gdb-physname-pr11734-1of2.patch
-Patch566: gdb-physname-pr11734-2of2.patch
-Patch567: gdb-physname-pr12273.patch
-
 # Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
 Patch571: gdb-prelink-rela.patch
+
+# [stap] Fix -O2 warnings.
+Patch576: gdb-stap-warnings.patch
+
+# Fix Ada support crash on uninitialized gdbarch.
+Patch577: gdb-ada-gdbarch-crash.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
@@ -717,7 +714,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -828,11 +825,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch554 -p1
 %patch555 -p1
 %patch556 -p1
-%patch557 -p1
-%patch565 -p1
-%patch566 -p1
-%patch567 -p1
 %patch571 -p1
+%patch576 -p1
+%patch577 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1258,6 +1253,12 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sun Mar 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110320-29.fc15
+- Rebase to FSF GDB 7.2.50.20110320 (which is a 7.3 pre-release).
+- Merge archer-sergiodj-stap, the SystemTap probes breakpoints feature.
+  - [stap] Fix -O2 warnings.
+- Fix Ada support crash on uninitialized gdbarch.
+
 * Sat Mar  5 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110305-28.fc15
 - Rebase to FSF GDB 7.2.50.20110305 (which is a 7.3 pre-release).
 
