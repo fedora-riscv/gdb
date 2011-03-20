@@ -27,7 +27,7 @@ Version: 7.2.50.20110320
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?_with_upstream:.upstream}%{?dist}
+Release: 30%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -466,6 +466,7 @@ Patch408: gdb-ppc-power7-test.patch
 Patch412: gdb-unused-revert.patch
 
 # Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
+# Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
 #=push+work: It should be fixed properly instead.
 Patch417: gdb-bz541866-rwatch-before-run.patch
 
@@ -551,6 +552,11 @@ Patch556: gdb-gcc46-stdarg-prologue.patch
 
 # Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
 Patch571: gdb-prelink-rela.patch
+
+# Fix threading internal error on corrupted memory (BZ 677654).
+Patch572: gdb-core-thread-internalerr-1of3.patch
+Patch573: gdb-core-thread-internalerr-2of3.patch
+Patch574: gdb-core-thread-internalerr-3of3.patch
 
 # [stap] Fix -O2 warnings.
 Patch576: gdb-stap-warnings.patch
@@ -826,6 +832,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch555 -p1
 %patch556 -p1
 %patch571 -p1
+%patch572 -p1
+%patch573 -p1
+%patch574 -p1
 %patch576 -p1
 %patch577 -p1
 
@@ -1253,6 +1262,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sun Mar 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110320-30.fc15
+- Fix threading internal error on corrupted memory (BZ 677654).
+- Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
+
 * Sun Mar 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110320-29.fc15
 - Rebase to FSF GDB 7.2.50.20110320 (which is a 7.3 pre-release).
 - Merge archer-sergiodj-stap, the SystemTap probes breakpoints feature.
