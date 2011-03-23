@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?_with_upstream:.upstream}%{dist}
+Release: 49%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -747,6 +747,9 @@ Patch574: gdb-core-thread-internalerr-3of3.patch
 # [vla] New testcase for the unfinished types garbage collector (for BZ 682286).
 Patch575: gdb-vla-gc-disable.patch
 
+# [ifunc] Fix ppc64 function descriptors compatibility.
+Patch578: gdb-ifunc-ppc64.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1067,6 +1070,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch573 -p1
 %patch574 -p1
 %patch575 -p1
+%patch578 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1464,6 +1468,9 @@ fi
 %endif
 
 %changelog
+* Wed Mar 23 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-49.fc14
+- [ifunc] Fix ppc64 function descriptors compatibility.
+
 * Fri Mar 18 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-48.fc14
 - Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
 
