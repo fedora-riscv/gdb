@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110320
+Version: 7.2.50.20110328
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?_with_upstream:.upstream}%{?dist}
+Release: 31%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -92,11 +92,9 @@ Source3: gdb-gstack.man
 #=fedora
 Source4: gdbinit
 
-%if 0%{?rhel:1}
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
 %define libstdcxxpython libstdc++-v3-python-r155978
-Source4: %{libstdcxxpython}.tar.bz2
-%endif # 0%{?rhel:1}
+Source5: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
 #=drop: That dejagnu is too old to be supported.
@@ -558,12 +556,6 @@ Patch572: gdb-core-thread-internalerr-1of3.patch
 Patch573: gdb-core-thread-internalerr-2of3.patch
 Patch574: gdb-core-thread-internalerr-3of3.patch
 
-# [stap] Fix -O2 warnings.
-Patch576: gdb-stap-warnings.patch
-
-# Fix Ada support crash on uninitialized gdbarch.
-Patch577: gdb-ada-gdbarch-crash.patch
-
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -706,7 +698,7 @@ This package provides INFO, HTML and PDF user manual for GDB.
 
 %if 0%{?rhel:1}
 # libstdc++ pretty printers.
-tar xjf %{SOURCE4}
+tar xjf %{SOURCE5}
 %endif # 0%{?rhel:1}
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
@@ -835,8 +827,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch572 -p1
 %patch573 -p1
 %patch574 -p1
-%patch576 -p1
-%patch577 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1262,6 +1252,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon Mar 28 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110328-31.fc15
+- Rebase to FSF GDB 7.2.50.20110328 (which is a 7.3 pre-release).
+- Bundle %%{libstdcxxpython}.tar.bz2 unconditionally - for rebulds on RHELs.
+
 * Sun Mar 20 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110320-30.fc15
 - Fix threading internal error on corrupted memory (BZ 677654).
 - Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
