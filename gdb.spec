@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 50%{?_with_upstream:.upstream}%{dist}
+Release: 51%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -1468,6 +1468,9 @@ fi
 %endif
 
 %changelog
+* Tue Mar 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-51.fc14
+- Fix occasional crash on `print errno' with no -pthread and no -g3 (BZ 690908).
+
 * Wed Mar 23 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-50.fc14
 - detach-as-stopped kernel workaround is now always active, not just on RHEL-5.
 
