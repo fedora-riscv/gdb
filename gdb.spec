@@ -27,7 +27,7 @@ Version: 7.2.50.20110328
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?_with_upstream:.upstream}%{?dist}
+Release: 32%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1252,6 +1252,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Mar 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110328-32.fc15
+- Fix occasional crash on `print errno' with no -pthread and no -g3 (BZ 690908).
+
 * Mon Mar 28 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110328-31.fc15
 - Rebase to FSF GDB 7.2.50.20110328 (which is a 7.3 pre-release).
 - Bundle %%{libstdcxxpython}.tar.bz2 unconditionally - for rebulds on RHELs.
