@@ -27,7 +27,7 @@ Version: 7.2.50.20110328
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?_with_upstream:.upstream}%{?dist}
+Release: 33%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -556,6 +556,19 @@ Patch572: gdb-core-thread-internalerr-1of3.patch
 Patch573: gdb-core-thread-internalerr-2of3.patch
 Patch574: gdb-core-thread-internalerr-3of3.patch
 
+# Toolchain on sparc is slightly broken and debuginfo files are generated
+# with non 64bit aligned tables/offsets.
+# See for example readelf -S ../Xvnc.debug.
+#
+# As a consenquence calculation of sectp->filepos as used in
+# dwarf2_read_section (gdb/dwarf2read.c:1525) will return a non aligned buffer
+# that cannot be used directly as done with MMAP.
+# Usage will result in a BusError.
+#
+# While we figure out what's wrong in the toolchain and do a full archive
+# rebuild to fix it, we need to be able to use gdb :)
+Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -610,7 +623,7 @@ BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
 # Copied from prelink-0.4.2-3.fc13.
 %ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
 # Prelink is broken on sparcv9/sparc64.
-%ifnarch sparcv9 sparc64
+%ifnarch sparc sparcv9 sparc64
 BuildRequires: prelink
 %endif
 %endif
@@ -844,6 +857,8 @@ fi
 %patch487 -p1
 %endif # 0%{?rhel:1}
 
+%patch579 -p1
+
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
 
@@ -901,7 +916,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
-%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparcv9 sparc64
+%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparc sparcv9 sparc64
 	--disable-werror					\
 %else
 %if 0%{?_with_upstream:1}
@@ -939,11 +954,14 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %else
 	--without-libunwind					\
 %endif
+%ifarch sparc sparcv9 sparc64
+	--without-mmap						\
+%endif
 	--enable-64-bit-bfd					\
 %if 0%{?_with_debug:1}
 	--enable-static --disable-shared --enable-debug		\
 %endif
-%ifarch sparcv9
+%ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
 	%{_target_platform}
@@ -1233,7 +1251,7 @@ fi
 
 # don't include the files in include, they are part of binutils
 
-%ifnarch sparcv9
+%ifnarch sparc sparcv9
 %if 0%{!?el5:1}
 %files gdbserver
 %defattr(-,root,root)
@@ -1252,6 +1270,14 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Mar 30 2011 Fabio M. Di Nitto <fdinitto@redhat.com> - 7.2.50.20110328-33.fc15
+- Cleanup spec file to add sparc|sparcv9|sparc64.
+- Add sparc specific workarounds to toolchain badness:
+  - disable mmap in bdf/ via --without-mmap configure option.
+  - add patch to not build mmap support on sparc for gdb/.
+  - gdb code is NOT at fault, but we need a working gdb while we sort out
+    the toolchain and rebuild all packages. this workaround is NOT for upstream.
+
 * Tue Mar 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110328-32.fc15
 - Fix occasional crash on `print errno' with no -pthread and no -g3 (BZ 690908).
 
