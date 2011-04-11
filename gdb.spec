@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.50.20110328
+Version: 7.2.90.20110411
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?_with_upstream:.upstream}%{?dist}
+Release: 34%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -468,10 +468,6 @@ Patch412: gdb-unused-revert.patch
 #=push+work: It should be fixed properly instead.
 Patch417: gdb-bz541866-rwatch-before-run.patch
 
-# Fix crash when using GNU IFUNC call from breakpoint condition.
-#=drop: After archer-jankratochvil-ifunc gets in this one gets obsoleted.
-Patch454: gdb-bz539590-gnu-ifunc-fix-cond.patch
-
 # Workaround non-stop moribund locations exploited by kernel utrace (BZ 590623).
 #=push+work: Currently it is still not fully safe.
 Patch459: gdb-moribund-utrace-workaround.patch
@@ -502,10 +498,6 @@ Patch491: gdb-gdb-add-index-script.patch
 #=drop+work: Inferior objects should be read in parts, then this patch gets obsoleted.
 Patch496: gdb-bz568248-oom-is-error.patch
 
-# Workaround false GCC warning(s).
-#=push
-Patch497: gdb-false-gcc-warning.patch
-
 # Fix gcore writer for -Wl,-z,relro (PR corefiles/11804).
 #=push: There is different patch on gdb-patches, waiting now for resolution in kernel.
 Patch504: gdb-bz623749-gcore-relro.patch
@@ -535,10 +527,6 @@ Patch547: gdb-test-dw2-aranges.patch
 # [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
 # =fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
-
-# Fix DWARF-3+ DW_AT_accessibility default assumption for F15 gcc-4.6.
-# =push
-Patch554: gdb-dwarf3-accessibility.patch
 
 # Temporary fix of F15 gcc-4.6 child DIEs of DW_TAG_typedef (BZ 672230).
 # =push
@@ -814,7 +802,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch408 -p1
 %patch412 -p1
 %patch417 -p1
-%patch454 -p1
 %patch459 -p1
 %patch470 -p1
 %patch475 -p1
@@ -824,7 +811,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch490 -p1
 %patch491 -p1
 %patch496 -p1
-%patch497 -p1
 %patch504 -p1
 %patch510 -p1
 %patch511 -p1
@@ -833,13 +819,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
-%patch554 -p1
 %patch555 -p1
 %patch556 -p1
 %patch571 -p1
 %patch572 -p1
 %patch573 -p1
 %patch574 -p1
+%patch579 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -856,8 +842,6 @@ fi
 %if 0%{?rhel:1}
 %patch487 -p1
 %endif # 0%{?rhel:1}
-
-%patch579 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1270,6 +1254,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon Apr 11 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110411-34.fc15
+- Rebase to FSF GDB 7.2.90.20110411 (which is a 7.3 pre-release).
+- Include the proper fix for anonymous struct typedefs (Tom Tromey, BZ 672230).
+
 * Wed Mar 30 2011 Fabio M. Di Nitto <fdinitto@redhat.com> - 7.2.50.20110328-33.fc15
 - Cleanup spec file to add sparc|sparcv9|sparc64.
 - Add sparc specific workarounds to toolchain badness:

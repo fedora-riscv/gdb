@@ -2,24 +2,25 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 16f35a2c55556970ed111419202305782a0f79ec
+commit 42fbc89fd3a797da9880ecbc467c32f282acf31f
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
 archer-jankratochvil-watchpoint3
-archer-jankratochvil-ifunc
 archer-tromey-python
-archer-sergiodj-stap
+archer-sergiodj-stap-fedora15jk
 
 
 diff --git a/bfd/elf-bfd.h b/bfd/elf-bfd.h
-index 21ec38f..50c1272 100644
+index 21ec38f..d50823a 100644
 --- a/bfd/elf-bfd.h
 +++ b/bfd/elf-bfd.h
-@@ -1476,6 +1476,13 @@ enum
+@@ -1476,6 +1476,15 @@ enum
    Tag_compatibility = 32
  };
  
++/* The following struct stores information about every SystemTap section
++   found in the object file.  */
 +struct sdt_note
 +{
 +  struct sdt_note *next;
@@ -30,10 +31,13 @@ index 21ec38f..50c1272 100644
  /* Some private data is stashed away for future use using the tdata pointer
     in the bfd structure.  */
  
-@@ -1633,6 +1640,8 @@ struct elf_obj_tdata
+@@ -1633,6 +1642,11 @@ struct elf_obj_tdata
    bfd_size_type build_id_size;
    bfd_byte *build_id;
  
++  /* Linked-list containing information about every Systemtap section
++     found in the object file.  Each section corresponds to one entry
++     in the list.  */
 +  struct sdt_note *sdt_note_head;
 +
    /* True if the bfd contains symbols that have the STT_GNU_IFUNC
@@ -95,10 +99,10 @@ index f69abf2..3c038eb 100644
  	}
  
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
-index 489b1e9..c332b1b 100644
+index 6abd87a..93d8dae 100644
 --- a/gdb/Makefile.in
 +++ b/gdb/Makefile.in
-@@ -716,8 +716,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
+@@ -721,8 +721,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
  	sentinel-frame.c \
  	serial.c ser-base.c ser-unix.c \
  	solib.c solib-target.c source.c \
@@ -109,17 +113,16 @@ index 489b1e9..c332b1b 100644
  	target.c target-descriptions.c target-memory.c \
  	thread.c top.c tracepoint.c \
  	trad-frame.c \
-@@ -801,7 +801,8 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
- remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
- sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
- gdb_usleep.h jit.h xml-syscall.h microblaze-tdep.h \
--psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h
-+psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h \
-+python/python.h python/python-internal.h
+@@ -814,7 +814,7 @@ osdata.h procfs.h python/py-event.h python/py-events.h python/py-stopevent.h \
+ python/python-internal.h python/python.h ravenscar-thread.h record.h \
+ solib-darwin.h solib-ia64-hpux.h solib-spu.h windows-nat.h xcoffread.h \
+ gnulib/extra/arg-nonnull.h gnulib/extra/c++defs.h gnulib/extra/warn-on-use.h \
+-gnulib/stddef.in.h inline-frame.h
++gnulib/stddef.in.h inline-frame.h stap-probe.h
  
  # Header files that already have srcdir in them, or which are in objdir.
  
-@@ -886,7 +887,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
+@@ -899,7 +899,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
  	prologue-value.o memory-map.o memrange.o xml-support.o xml-syscall.o \
  	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
  	inferior.o osdata.o gdb_usleep.o record.o gcore.o \
@@ -128,7 +131,7 @@ index 489b1e9..c332b1b 100644
  
  TSOBS = inflow.o
  
-@@ -1307,6 +1308,12 @@ stamp-h: $(srcdir)/config.in config.status
+@@ -1320,6 +1320,12 @@ stamp-h: $(srcdir)/config.in config.status
  	  CONFIG_LINKS= \
  	  $(SHELL) config.status
  
@@ -142,7 +145,7 @@ index 489b1e9..c332b1b 100644
  	$(SHELL) config.status --recheck
  
 diff --git a/gdb/NEWS b/gdb/NEWS
-index 2288497..6df9868 100644
+index 8692e2f..c22bf0d 100644
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
 @@ -36,6 +36,10 @@
@@ -157,10 +160,10 @@ index 2288497..6df9868 100644
  
    ** The function gdb.Write now accepts an optional keyword 'stream'.
 diff --git a/gdb/ada-lang.c b/gdb/ada-lang.c
-index 5728ac8..744d2fa 100644
+index 0a0b09f..4546e93 100644
 --- a/gdb/ada-lang.c
 +++ b/gdb/ada-lang.c
-@@ -11391,6 +11391,7 @@ ada_operator_length (const struct expression *exp, int pc, int *oplenp,
+@@ -11422,6 +11422,7 @@ ada_operator_length (const struct expression *exp, int pc, int *oplenp,
  
  static int
  ada_operator_check (struct expression *exp, int pos,
@@ -168,7 +171,7 @@ index 5728ac8..744d2fa 100644
  		    int (*objfile_func) (struct objfile *objfile, void *data),
  		    void *data)
  {
-@@ -11405,12 +11406,15 @@ ada_operator_check (struct expression *exp, int pos,
+@@ -11436,12 +11437,15 @@ ada_operator_check (struct expression *exp, int pos,
  	break;
  
        default:
@@ -468,102 +471,8 @@ index 07d5bc7..fad89b1 100644
 +extern struct objfile *block_objfile (const struct block *block);
 +
  #endif /* BLOCK_H */
-diff --git a/gdb/blockframe.c b/gdb/blockframe.c
-index 5bc5930..3b546a7 100644
---- a/gdb/blockframe.c
-+++ b/gdb/blockframe.c
-@@ -163,6 +163,7 @@ static CORE_ADDR cache_pc_function_low = 0;
- static CORE_ADDR cache_pc_function_high = 0;
- static char *cache_pc_function_name = 0;
- static struct obj_section *cache_pc_function_section = NULL;
-+static int cache_pc_function_is_gnu_ifunc = 0;
- 
- /* Clear cache, e.g. when symbol table is discarded.  */
- 
-@@ -173,6 +174,7 @@ clear_pc_function_cache (void)
-   cache_pc_function_high = 0;
-   cache_pc_function_name = (char *) 0;
-   cache_pc_function_section = NULL;
-+  cache_pc_function_is_gnu_ifunc = 0;
- }
- 
- /* Finds the "function" (text symbol) that is smaller than PC but
-@@ -180,17 +182,19 @@ clear_pc_function_cache (void)
-    *NAME and/or *ADDRESS conditionally if that pointer is non-null.
-    If ENDADDR is non-null, then set *ENDADDR to be the end of the
-    function (exclusive), but passing ENDADDR as non-null means that
--   the function might cause symbols to be read.  This function either
--   succeeds or fails (not halfway succeeds).  If it succeeds, it sets
--   *NAME, *ADDRESS, and *ENDADDR to real information and returns 1.
--   If it fails, it sets *NAME, *ADDRESS, and *ENDADDR to zero and
--   returns 0.  */
-+   the function might cause symbols to be read.  If IS_GNU_IFUNC_P is provided
-+   *IS_GNU_IFUNC_P is set to 1 on return if the function is STT_GNU_IFUNC.
-+   This function either succeeds or fails (not halfway succeeds).  If it
-+   succeeds, it sets *NAME, *ADDRESS, and *ENDADDR to real information and
-+   returns 1.  If it fails, it sets *NAME, *ADDRESS, *ENDADDR and
-+   *IS_GNU_IFUNC_P to zero and returns 0.  */
- 
- /* Backward compatibility, no section argument.  */
- 
- int
--find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
--			  CORE_ADDR *endaddr)
-+find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, char **name,
-+				    CORE_ADDR *address, CORE_ADDR *endaddr,
-+				    int *is_gnu_ifunc_p)
- {
-   struct obj_section *section;
-   struct symbol *f;
-@@ -240,6 +244,7 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
- 	  cache_pc_function_high = BLOCK_END (SYMBOL_BLOCK_VALUE (f));
- 	  cache_pc_function_name = SYMBOL_LINKAGE_NAME (f);
- 	  cache_pc_function_section = section;
-+	  cache_pc_function_is_gnu_ifunc = TYPE_GNU_IFUNC (SYMBOL_TYPE (f));
- 	  goto return_cached_value;
- 	}
-     }
-@@ -262,12 +267,15 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
- 	*address = 0;
-       if (endaddr != NULL)
- 	*endaddr = 0;
-+      if (is_gnu_ifunc_p != NULL)
-+	*is_gnu_ifunc_p = 0;
-       return 0;
-     }
- 
-   cache_pc_function_low = SYMBOL_VALUE_ADDRESS (msymbol);
-   cache_pc_function_name = SYMBOL_LINKAGE_NAME (msymbol);
-   cache_pc_function_section = section;
-+  cache_pc_function_is_gnu_ifunc = MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc;
- 
-   /* If the minimal symbol has a size, use it for the cache.
-      Otherwise use the lesser of the next minimal symbol in the same
-@@ -330,9 +338,22 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
- 	*endaddr = cache_pc_function_high;
-     }
- 
-+  if (is_gnu_ifunc_p)
-+    *is_gnu_ifunc_p = cache_pc_function_is_gnu_ifunc;
-+
-   return 1;
- }
- 
-+/* See find_pc_partial_function_gnu_ifunc, only the IS_GNU_IFUNC_P parameter
-+   is omitted here for backward API compatibility.  */
-+
-+int
-+find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
-+			  CORE_ADDR *endaddr)
-+{
-+  return find_pc_partial_function_gnu_ifunc (pc, name, address, endaddr, NULL);
-+}
-+
- /* Return the innermost stack frame executing inside of BLOCK, or NULL
-    if there is no such frame.  If BLOCK is NULL, just return NULL.  */
- 
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index dbd9588..d551ddd 100644
+index 2a25c8d..e8c771c 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
 @@ -63,6 +63,8 @@
@@ -585,41 +494,7 @@ index dbd9588..d551ddd 100644
  /* This function is used in gdbtk sources and thus can not be made
     static.  */
  struct breakpoint *set_raw_breakpoint (struct gdbarch *gdbarch,
-@@ -1159,6 +1164,25 @@ watchpoint_in_thread_scope (struct breakpoint *b)
- 	      && !is_executing (inferior_ptid)));
- }
- 
-+/* Set watchpoint B to disp_del_at_next_stop, even including its possible
-+   associated bp_watchpoint_scope breakpoint.  */
-+
-+static void
-+watchpoint_del_at_next_stop (struct breakpoint *b)
-+{
-+  gdb_assert (is_watchpoint (b));
-+
-+  if (b->related_breakpoint != b)
-+    {
-+      gdb_assert (b->related_breakpoint->type == bp_watchpoint_scope);
-+      gdb_assert (b->related_breakpoint->related_breakpoint == b);
-+      b->related_breakpoint->disposition = disp_del_at_next_stop;
-+      b->related_breakpoint->related_breakpoint = b->related_breakpoint;
-+      b->related_breakpoint = b;
-+    }
-+  b->disposition = disp_del_at_next_stop;
-+}
-+
- /* Assuming that B is a watchpoint:
-    - Reparse watchpoint expression, if REPARSE is non-zero
-    - Evaluate expression and store the result in B->val
-@@ -1218,12 +1242,17 @@ update_watchpoint (struct breakpoint *b, int reparse)
-   struct frame_id saved_frame_id;
-   int frame_saved;
- 
-+  gdb_assert (is_watchpoint (b));
-+
-   /* If this is a local watchpoint, we only want to check if the
-      watchpoint frame is in scope if the current thread is the thread
-      that was used to create the watchpoint.  */
+@@ -1249,6 +1254,9 @@ update_watchpoint (struct breakpoint *b, int reparse)
    if (!watchpoint_in_thread_scope (b))
      return;
  
@@ -629,22 +504,7 @@ index dbd9588..d551ddd 100644
    if (b->disposition == disp_del_at_next_stop)
      return;
   
-@@ -1453,13 +1482,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
- Watchpoint %d deleted because the program has left the block\n\
- in which its expression is valid.\n"),
- 		       b->number);
--      if (b->related_breakpoint)
--	{
--	  b->related_breakpoint->disposition = disp_del_at_next_stop;
--	  b->related_breakpoint->related_breakpoint = NULL;
--	  b->related_breakpoint= NULL;
--	}
--      b->disposition = disp_del_at_next_stop;
-+      watchpoint_del_at_next_stop (b);
-     }
- 
-   /* Restore the selected frame.  */
-@@ -1501,6 +1524,40 @@ should_be_inserted (struct bp_location *bl)
+@@ -1520,6 +1528,40 @@ should_be_inserted (struct bp_location *bl)
    return 1;
  }
  
@@ -685,7 +545,7 @@ index dbd9588..d551ddd 100644
  /* Insert a low-level "breakpoint" of some type.  BL is the breakpoint
     location.  Any error messages are printed to TMP_ERROR_STREAM; and
     DISABLED_BREAKS, and HW_BREAKPOINT_ERROR are used to report problems.
-@@ -1596,6 +1653,8 @@ insert_bp_location (struct bp_location *bl,
+@@ -1616,6 +1658,8 @@ insert_bp_location (struct bp_location *bl,
  	  else
  	    val = target_insert_breakpoint (bl->gdbarch,
  					    &bl->target_info);
@@ -694,7 +554,7 @@ index dbd9588..d551ddd 100644
  	}
        else
  	{
-@@ -1850,6 +1909,7 @@ insert_breakpoint_locations (void)
+@@ -1870,6 +1914,7 @@ insert_breakpoint_locations (void)
    int val = 0;
    int disabled_breaks = 0;
    int hw_breakpoint_error = 0;
@@ -702,7 +562,7 @@ index dbd9588..d551ddd 100644
  
    struct ui_file *tmp_error_stream = mem_fileopen ();
    struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
-@@ -1877,9 +1937,13 @@ insert_breakpoint_locations (void)
+@@ -1897,9 +1942,13 @@ insert_breakpoint_locations (void)
        /* For targets that support global breakpoints, there's no need
  	 to select an inferior to insert breakpoint to.  In fact, even
  	 if we aren't attached to any process yet, we should still
@@ -718,7 +578,7 @@ index dbd9588..d551ddd 100644
  	continue;
  
        val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-@@ -1903,13 +1967,19 @@ insert_breakpoint_locations (void)
+@@ -1923,13 +1972,19 @@ insert_breakpoint_locations (void)
  
        if (bpt->disposition == disp_del_at_next_stop)
  	continue;
@@ -744,7 +604,7 @@ index dbd9588..d551ddd 100644
        if (some_failed)
  	{
  	  for (loc = bpt->loc; loc; loc = loc->next)
-@@ -2091,15 +2161,24 @@ struct breakpoint_objfile_data
+@@ -2111,15 +2166,24 @@ struct breakpoint_objfile_data
    /* Minimal symbol(s) for "longjmp", "siglongjmp", etc. (if any).  */
    struct minimal_symbol *longjmp_msym[NUM_LONGJMP_NAMES];
  
@@ -769,7 +629,7 @@ index dbd9588..d551ddd 100644
  /* Minimal symbol not found sentinel.  */
  static struct minimal_symbol msym_not_found;
  
-@@ -2207,6 +2286,29 @@ create_longjmp_master_breakpoint (void)
+@@ -2227,6 +2291,29 @@ create_longjmp_master_breakpoint (void)
  
        bp_objfile_data = get_breakpoint_objfile_data (objfile);
  
@@ -799,7 +659,7 @@ index dbd9588..d551ddd 100644
        for (i = 0; i < NUM_LONGJMP_NAMES; i++)
  	{
  	  struct breakpoint *b;
-@@ -2315,6 +2417,31 @@ create_exception_master_breakpoint (void)
+@@ -2335,6 +2422,31 @@ create_exception_master_breakpoint (void)
  
        bp_objfile_data = get_breakpoint_objfile_data (objfile);
  
@@ -831,7 +691,7 @@ index dbd9588..d551ddd 100644
        if (msym_not_found_p (bp_objfile_data->exception_msym))
  	continue;
  
-@@ -2533,6 +2660,8 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
+@@ -2553,6 +2665,8 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
  	    val = target_remove_hw_breakpoint (bl->gdbarch, &bl->target_info);
  	  else
  	    val = target_remove_breakpoint (bl->gdbarch, &bl->target_info);
@@ -840,231 +700,7 @@ index dbd9588..d551ddd 100644
  	}
        else
  	{
-@@ -3489,6 +3618,8 @@ print_it_typical (bpstat bs)
-     case bp_tracepoint:
-     case bp_fast_tracepoint:
-     case bp_jit_event:
-+    case bp_gnu_ifunc_resolver:
-+    case bp_gnu_ifunc_resolver_return:
-     default:
-       result = PRINT_UNKNOWN;
-       break;
-@@ -3714,6 +3845,8 @@ watchpoint_check (void *p)
-   gdb_assert (bs->breakpoint_at != NULL);
-   b = bs->breakpoint_at;
- 
-+  gdb_assert (is_watchpoint (b));
-+
-   /* If this is a local watchpoint, we only want to check if the
-      watchpoint frame is in scope if the current thread is the thread
-      that was used to create the watchpoint.  */
-@@ -3823,13 +3956,7 @@ watchpoint_check (void *p)
- 		   " deleted because the program has left the block in\n\
- which its expression is valid.\n");     
- 
--      if (b->related_breakpoint)
--	{
--	  b->related_breakpoint->disposition = disp_del_at_next_stop;
--	  b->related_breakpoint->related_breakpoint = NULL;
--	  b->related_breakpoint = NULL;
--	}
--      b->disposition = disp_del_at_next_stop;
-+      watchpoint_del_at_next_stop (b);
- 
-       return WP_DELETED;
-     }
-@@ -4034,9 +4161,7 @@ bpstat_check_watchpoint (bpstat bs)
- 	    case 0:
- 	      /* Error from catch_errors.  */
- 	      printf_filtered (_("Watchpoint %d deleted.\n"), b->number);
--	      if (b->related_breakpoint)
--		b->related_breakpoint->disposition = disp_del_at_next_stop;
--	      b->disposition = disp_del_at_next_stop;
-+	      watchpoint_del_at_next_stop (b);
- 	      /* We've already printed what needs to be printed.  */
- 	      bs->print_it = print_it_done;
- 	      break;
-@@ -4247,7 +4372,7 @@ bpstat_stop_status (struct address_space *aspace,
- 	     watchpoint as triggered so that we will handle the
- 	     out-of-scope event.  We'll get to the watchpoint next
- 	     iteration.  */
--	  if (b->type == bp_watchpoint_scope)
-+	  if (b->type == bp_watchpoint_scope && b->related_breakpoint != b)
- 	    b->related_breakpoint->watchpoint_triggered = watch_triggered_yes;
- 	}
-     }
-@@ -4369,7 +4494,7 @@ handle_jit_event (void)
- /* Decide what infrun needs to do with this bpstat.  */
- 
- struct bpstat_what
--bpstat_what (bpstat bs)
-+bpstat_what (bpstat bs_head)
- {
-   struct bpstat_what retval;
-   /* We need to defer calling `solib_add', as adding new symbols
-@@ -4377,12 +4502,13 @@ bpstat_what (bpstat bs)
-      and hence may clear unprocessed entries in the BS chain.  */
-   int shlib_event = 0;
-   int jit_event = 0;
-+  bpstat bs;
- 
-   retval.main_action = BPSTAT_WHAT_KEEP_CHECKING;
-   retval.call_dummy = STOP_NONE;
-   retval.is_longjmp = 0;
- 
--  for (; bs != NULL; bs = bs->next)
-+  for (bs = bs_head; bs != NULL; bs = bs->next)
-     {
-       /* Extract this BS's action.  After processing each BS, we check
- 	 if its action overrides all we've seem so far.  */
-@@ -4512,6 +4638,16 @@ bpstat_what (bpstat bs)
- 	     out already.  */
- 	  internal_error (__FILE__, __LINE__,
- 			  _("bpstat_what: tracepoint encountered"));
-+	  break;
-+	case bp_gnu_ifunc_resolver:
-+	  /* Step over it (and insert bp_gnu_ifunc_resolver_return).  */
-+	  this_action = BPSTAT_WHAT_SINGLE;
-+	  break;
-+	case bp_gnu_ifunc_resolver_return:
-+	  /* The breakpoint will be removed, execution will restart from the
-+	     PC of the former breakpoint.  */
-+	  this_action = BPSTAT_WHAT_KEEP_CHECKING;
-+	  break;
- 	default:
- 	  internal_error (__FILE__, __LINE__,
- 			  _("bpstat_what: unhandled bptype %d"), (int) bptype);
-@@ -4520,6 +4656,9 @@ bpstat_what (bpstat bs)
-       retval.main_action = max (retval.main_action, this_action);
-     }
- 
-+  /* These operations may affect the bs->breakpoint_at state so they are
-+     delayed after MAIN_ACTION is decided above.  */
-+
-   if (shlib_event)
-     {
-       if (debug_infrun)
-@@ -4549,6 +4688,23 @@ bpstat_what (bpstat bs)
-       handle_jit_event ();
-     }
- 
-+  for (bs = bs_head; bs != NULL; bs = bs->next)
-+    {
-+      struct breakpoint *b = bs->breakpoint_at;
-+
-+      if (b == NULL)
-+	continue;
-+      switch (b->type)
-+	{
-+	case bp_gnu_ifunc_resolver:
-+	  gnu_ifunc_resolver_stop (b);
-+	  break;
-+	case bp_gnu_ifunc_resolver_return:
-+	  gnu_ifunc_resolver_return_stop (b);
-+	  break;
-+	}
-+    }
-+
-   return retval;
- }
- 
-@@ -4706,6 +4862,8 @@ bptype_string (enum bptype type)
-     {bp_fast_tracepoint, "fast tracepoint"},
-     {bp_static_tracepoint, "static tracepoint"},
-     {bp_jit_event, "jit events"},
-+    {bp_gnu_ifunc_resolver, "STT_GNU_IFUNC resolver"},
-+    {bp_gnu_ifunc_resolver_return, "STT_GNU_IFUNC resolver return"},
-   };
- 
-   if (((int) type >= (sizeof (bptypes) / sizeof (bptypes[0])))
-@@ -4840,6 +4998,8 @@ print_one_breakpoint_location (struct breakpoint *b,
-       case bp_fast_tracepoint:
-       case bp_static_tracepoint:
-       case bp_jit_event:
-+      case bp_gnu_ifunc_resolver:
-+      case bp_gnu_ifunc_resolver_return:
- 	if (opts.addressprint)
- 	  {
- 	    annotate_field (4);
-@@ -5115,7 +5275,8 @@ user_settable_breakpoint (const struct breakpoint *b)
- 	  || b->type == bp_catchpoint
- 	  || b->type == bp_hardware_breakpoint
- 	  || is_tracepoint (b)
--	  || is_watchpoint (b));
-+	  || is_watchpoint (b)
-+	  || b->type == bp_gnu_ifunc_resolver);
- }
- 
- /* Return true if this breakpoint was set by the user, false if it is
-@@ -5611,6 +5772,8 @@ allocate_bp_location (struct breakpoint *bpt)
-     case bp_longjmp_master:
-     case bp_std_terminate_master:
-     case bp_exception_master:
-+    case bp_gnu_ifunc_resolver:
-+    case bp_gnu_ifunc_resolver_return:
-       loc->loc_type = bp_loc_software_breakpoint;
-       break;
-     case bp_hardware_breakpoint:
-@@ -5700,6 +5863,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
-   b->ops = NULL;
-   b->condition_not_parsed = 0;
-   b->py_bp_object = NULL;
-+  b->related_breakpoint = b;
- 
-   /* Add this breakpoint to the end of the chain so that a list of
-      breakpoints will come out in order of increasing numbers.  */
-@@ -5716,9 +5880,12 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
-   return b;
- }
- 
--/* Initialize loc->function_name.  */
-+/* Initialize loc->function_name.  EXPLICIT_LOC says no indirect function
-+   resolutions should be made as the user specified the location explicitly
-+   enough.  */
-+
- static void
--set_breakpoint_location_function (struct bp_location *loc)
-+set_breakpoint_location_function (struct bp_location *loc, int explicit_loc)
- {
-   gdb_assert (loc->owner != NULL);
- 
-@@ -5726,8 +5893,33 @@ set_breakpoint_location_function (struct bp_location *loc)
-       || loc->owner->type == bp_hardware_breakpoint
-       || is_tracepoint (loc->owner))
-     {
--      find_pc_partial_function (loc->address, &(loc->function_name), 
--				NULL, NULL);
-+      int is_gnu_ifunc;
-+
-+      find_pc_partial_function_gnu_ifunc (loc->address, &loc->function_name,
-+					  NULL, NULL, &is_gnu_ifunc);
-+
-+      if (is_gnu_ifunc && !explicit_loc)
-+	{
-+	  struct breakpoint *b = loc->owner;
-+
-+	  gdb_assert (loc->pspace == current_program_space);
-+	  if (gnu_ifunc_resolve_name (loc->function_name,
-+				      &loc->requested_address))
-+	    {
-+	      /* Recalculate ADDRESS based on new REQUESTED_ADDRESS.  */
-+	      loc->address = adjust_breakpoint_address (loc->gdbarch,
-+							loc->requested_address,
-+							b->type);
-+	    }
-+	  else if (b->type == bp_breakpoint && b->loc == loc
-+	           && loc->next == NULL && b->related_breakpoint == b)
-+	    {
-+	      /* Create only the whole new breakpoint of this type but do not
-+		 mess more complicated breakpoints with multiple locations.  */
-+	      b->type = bp_gnu_ifunc_resolver;
-+	    }
-+	}
-+
-       if (loc->function_name)
- 	loc->function_name = xstrdup (loc->function_name);
-     }
-@@ -5790,6 +5982,7 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
+@@ -5902,6 +6016,7 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
    b->loc->requested_address = sal.pc;
    b->loc->address = adjusted_address;
    b->loc->pspace = sal.pspace;
@@ -1072,25 +708,7 @@ index dbd9588..d551ddd 100644
  
    /* Store the program space that was used to set the breakpoint, for
       breakpoint resetting.  */
-@@ -5802,7 +5995,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
-   b->loc->section = sal.section;
-   b->line_number = sal.line;
- 
--  set_breakpoint_location_function (b->loc);
-+  set_breakpoint_location_function (b->loc,
-+				    sal.explicit_pc || sal.explicit_line);
- 
-   breakpoints_changed ();
- 
-@@ -6919,13 +7113,14 @@ clone_momentary_breakpoint (struct breakpoint *orig)
- 
-   copy = set_raw_breakpoint_without_location (orig->gdbarch, orig->type);
-   copy->loc = allocate_bp_location (copy);
--  set_breakpoint_location_function (copy->loc);
-+  set_breakpoint_location_function (copy->loc, 1);
- 
-   copy->loc->gdbarch = orig->loc->gdbarch;
-   copy->loc->requested_address = orig->loc->requested_address;
+@@ -7057,6 +7172,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
    copy->loc->address = orig->loc->address;
    copy->loc->section = orig->loc->section;
    copy->loc->pspace = orig->loc->pspace;
@@ -1098,32 +716,7 @@ index dbd9588..d551ddd 100644
  
    if (orig->source_file == NULL)
      copy->source_file = NULL;
-@@ -7019,6 +7214,7 @@ mention (struct breakpoint *b)
- 	do_cleanups (ui_out_chain);
- 	break;
-       case bp_breakpoint:
-+      case bp_gnu_ifunc_resolver:
- 	if (ui_out_is_mi_like_p (uiout))
- 	  {
- 	    say_where = 0;
-@@ -7029,6 +7225,8 @@ mention (struct breakpoint *b)
- 	else
- 	  printf_filtered (_("Breakpoint"));
- 	printf_filtered (_(" %d"), b->number);
-+	if (b->type == bp_gnu_ifunc_resolver)
-+	  printf_filtered (_(" at gnu-indirect-function resolver"));
- 	say_where = 1;
- 	break;
-       case bp_hardware_breakpoint:
-@@ -7088,6 +7286,7 @@ mention (struct breakpoint *b)
-       case bp_longjmp_master:
-       case bp_std_terminate_master:
-       case bp_exception_master:
-+      case bp_gnu_ifunc_resolver_return:
- 	break;
-       }
- 
-@@ -7145,10 +7344,12 @@ add_location_to_breakpoint (struct breakpoint *b,
+@@ -7280,6 +7396,7 @@ add_location_to_breakpoint (struct breakpoint *b,
    loc->address = adjust_breakpoint_address (loc->gdbarch,
  					    loc->requested_address, b->type);
    loc->pspace = sal->pspace;
@@ -1131,13 +724,7 @@ index dbd9588..d551ddd 100644
    gdb_assert (loc->pspace != NULL);
    loc->section = sal->section;
  
--  set_breakpoint_location_function (loc);
-+  set_breakpoint_location_function (loc,
-+				    sal->explicit_pc || sal->explicit_line);
-   return loc;
- }
- 
-@@ -7493,6 +7694,16 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
+@@ -7629,6 +7746,16 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
  {
    int i;
  
@@ -1154,7 +741,7 @@ index dbd9588..d551ddd 100644
    for (i = 0; i < sals.nelts; ++i)
      {
        struct symtabs_and_lines expanded = 
-@@ -8018,7 +8229,7 @@ create_breakpoint (struct gdbarch *gdbarch,
+@@ -8154,7 +8281,7 @@ create_breakpoint (struct gdbarch *gdbarch,
          mention (b);
      }
    
@@ -1163,7 +750,7 @@ index dbd9588..d551ddd 100644
      {
        warning (_("Multiple breakpoints were set.\nUse the "
  		 "\"delete\" command to delete unwanted breakpoints."));
-@@ -8586,6 +8797,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
+@@ -9026,6 +9153,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
    b = set_raw_breakpoint_without_location (NULL, bp_type);
    set_breakpoint_number (internal, b);
    b->thread = thread;
@@ -1171,7 +758,7 @@ index dbd9588..d551ddd 100644
    b->disposition = disp_donttouch;
    b->exp = exp;
    b->exp_valid_block = exp_valid_block;
-@@ -9747,6 +9959,9 @@ update_global_location_list (int should_insert)
+@@ -10188,6 +10316,9 @@ update_global_location_list (int should_insert)
        int keep_in_target = 0;
        int removed = 0;
  
@@ -1181,145 +768,93 @@ index dbd9588..d551ddd 100644
        /* Skip LOCP entries which will definitely never be needed.
  	 Stop either at or being the one matching OLD_LOC.  */
        while (locp < bp_location + bp_location_count
-@@ -10063,12 +10278,20 @@ delete_breakpoint (struct breakpoint *bpt)
+@@ -10952,12 +11083,14 @@ update_breakpoint_locations (struct breakpoint *b,
+    On return, FOUND will be 1 if any SaL was found, zero otherwise.  */
  
-   /* At least avoid this stale reference until the reference counting
-      of breakpoints gets resolved.  */
--  if (bpt->related_breakpoint != NULL)
-+  if (bpt->related_breakpoint != bpt)
-     {
--      gdb_assert (bpt->related_breakpoint->related_breakpoint == bpt);
--      bpt->related_breakpoint->disposition = disp_del_at_next_stop;
--      bpt->related_breakpoint->related_breakpoint = NULL;
--      bpt->related_breakpoint = NULL;
-+      struct breakpoint *related;
-+
-+      if (bpt->type == bp_watchpoint_scope)
-+	watchpoint_del_at_next_stop (bpt->related_breakpoint);
-+      else if (bpt->related_breakpoint->type == bp_watchpoint_scope)
-+	watchpoint_del_at_next_stop (bpt);
-+
-+      /* Unlink bpt from the bpt->related_breakpoint ring.  */
-+      for (related = bpt; related->related_breakpoint != bpt;
-+	   related = related->related_breakpoint);
-+      related->related_breakpoint = bpt->related_breakpoint;
-+      bpt->related_breakpoint = bpt;
-     }
- 
-   observer_notify_breakpoint_deleted (bpt->number);
-@@ -10381,7 +10604,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
-   return sal;
- }
- 
--static void
-+void
- update_breakpoint_locations (struct breakpoint *b,
- 			     struct symtabs_and_lines sals)
+ static struct symtabs_and_lines
+-addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
++addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found,
++		     int *pre_expanded)
  {
-@@ -10501,6 +10724,7 @@ breakpoint_re_set_one (void *bint)
+   char *s;
+   int marker_spec, not_found;
+   struct symtabs_and_lines sals = {0};
    struct gdb_exception e;
++  int my_pre_expanded = 0;
+ 
+   s = addr_string;
+   marker_spec = b->type == bp_static_tracepoint && is_marker_spec (s);
+@@ -10976,8 +11109,27 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
+ 	    error (_("marker %s not found"), b->static_trace_marker_id);
+ 	}
+       else
+-	sals = decode_line_1 (&s, 1, (struct symtab *) NULL, 0,
+-			      NULL, &not_found);
++	{
++	  struct linespec_result canonical;
++
++	  init_linespec_result (&canonical);
++	  sals = decode_line_1 (&s, 1, (struct symtab *) NULL, 0,
++				&canonical, &not_found);
++
++	  /* We don't need the contents.  */
++	  if (canonical.canonical)
++	    {
++	      int i;
++
++	      for (i = 0; i < sals.nelts; ++i)
++		xfree (canonical.canonical[i]);
++	      xfree (canonical.canonical);
++	    }
++
++	  my_pre_expanded = canonical.pre_expanded;
++	  if (pre_expanded)
++	    *pre_expanded = my_pre_expanded;
++	}
+     }
+   if (e.reason < 0)
+     {
+@@ -11010,7 +11162,7 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
+ 
+   if (!not_found)
+     {
+-      gdb_assert (sals.nelts == 1);
++      gdb_assert (my_pre_expanded || sals.nelts == 1);
+ 
+       resolve_sal_pc (&sals.sals[0]);
+       if (b->condition_not_parsed && s && s[0])
+@@ -11049,22 +11201,27 @@ re_set_breakpoint (struct breakpoint *b)
+   struct symtabs_and_lines expanded = {0};
+   struct symtabs_and_lines expanded_end = {0};
    struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
-   int marker_spec = 0;
 +  int pre_expanded = 0;
  
-   switch (b->type)
+   input_radix = b->input_radix;
+   save_current_space_and_thread ();
+   switch_to_program_space_and_thread (b->pspace);
+   set_language (b->language);
+ 
+-  sals = addr_string_to_sals (b, b->addr_string, &found);
++  sals = addr_string_to_sals (b, b->addr_string, &found, &pre_expanded);
+   if (found)
      {
-@@ -10513,6 +10737,7 @@ breakpoint_re_set_one (void *bint)
-     case bp_tracepoint:
-     case bp_fast_tracepoint:
-     case bp_static_tracepoint:
-+    case bp_gnu_ifunc_resolver:
-       /* Do not attempt to re-set breakpoints disabled during startup.  */
-       if (b->enable_state == bp_startup_disabled)
- 	return 0;
-@@ -10547,8 +10772,25 @@ breakpoint_re_set_one (void *bint)
- 		error (_("marker %s not found"), b->static_trace_marker_id);
- 	    }
- 	  else
--	    sals = decode_line_1 (&s, 1, (struct symtab *) NULL, 0,
--				  NULL, not_found_ptr);
-+	    {
-+	      struct linespec_result canonical;
-+
-+	      init_linespec_result (&canonical);
-+	      sals = decode_line_1 (&s, 1, (struct symtab *) NULL, 0,
-+				    &canonical, not_found_ptr);
-+
-+	      /* We don't need the contents.  */
-+	      if (canonical.canonical)
-+		{
-+		  int i;
-+
-+		  for (i = 0; i < sals.nelts; ++i)
-+		    xfree (canonical.canonical[i]);
-+		  xfree (canonical.canonical);
-+		}
-+
-+	      pre_expanded = canonical.pre_expanded;
-+	    }
- 	}
-       if (e.reason < 0)
- 	{
-@@ -10581,7 +10823,7 @@ breakpoint_re_set_one (void *bint)
- 
-       if (!not_found)
- 	{
--	  gdb_assert (sals.nelts == 1);
-+	  gdb_assert (pre_expanded || sals.nelts == 1);
- 
- 	  resolve_sal_pc (&sals.sals[0]);
- 	  if (b->condition_not_parsed && s && s[0])
-@@ -10602,7 +10844,10 @@ breakpoint_re_set_one (void *bint)
- 	  if (b->type == bp_static_tracepoint && !marker_spec)
- 	    sals.sals[0] = update_static_tracepoint (b, sals.sals[0]);
- 
--	  expanded = expand_line_sal_maybe (sals.sals[0]);
-+	  if (pre_expanded)
-+	    expanded = sals;
-+	  else
-+	    expanded = expand_line_sal_maybe (sals.sals[0]);
- 	}
- 
        make_cleanup (xfree, sals.sals);
-@@ -10683,6 +10928,7 @@ breakpoint_re_set_one (void *bint)
-     case bp_exception:
-     case bp_exception_resume:
-     case bp_jit_event:
-+    case bp_gnu_ifunc_resolver_return:
-       break;
+-      expanded = expand_line_sal_maybe (sals.sals[0]);
++      if (pre_expanded)
++	expanded = sals;
++      else
++	expanded = expand_line_sal_maybe (sals.sals[0]);
      }
  
-@@ -10849,11 +11095,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
- 	  ALL_BREAKPOINTS_SAFE (b, tmp)
- 	    if (b->number == num)
- 	      {
--		struct breakpoint *related_breakpoint = b->related_breakpoint;
-+		struct breakpoint *related_breakpoint;
-+
- 		match = 1;
--		function (b, data);
--		if (related_breakpoint)
--		  function (related_breakpoint, data);
-+		related_breakpoint = b;
-+		do
-+		  {
-+		    struct breakpoint *next_related_b;
-+
-+		    /* FUNCTION can be also delete_breakpoint.  */
-+		    next_related_b = related_breakpoint->related_breakpoint;
-+		    function (related_breakpoint, data);
-+
-+		    /* For delete_breakpoint of the last entry of the ring we
-+		       were traversing we would never get back to B.  */
-+		    if (next_related_b == related_breakpoint)
-+		      break;
-+		    related_breakpoint = next_related_b;
-+		  }
-+		while (related_breakpoint != b);
- 		break;
- 	      }
- 	  if (match == 0)
-@@ -11984,6 +12244,24 @@ all_tracepoints (void)
+   if (b->addr_string_range_end)
+     {
+-      sals_end = addr_string_to_sals (b, b->addr_string_range_end, &found);
++      sals_end = addr_string_to_sals (b, b->addr_string_range_end, &found,
++				      NULL);
+       if (found)
+ 	{
+ 	  make_cleanup (xfree, sals_end.sals);
+@@ -12501,6 +12658,24 @@ all_tracepoints (void)
    return tp_vec;
  }
  
@@ -1344,7 +879,7 @@ index dbd9588..d551ddd 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak
     commands.  It is defined as a macro to prevent duplication.
-@@ -12603,4 +12881,7 @@ inferior in all-stop mode, gdb behaves as if always-inserted mode is off."),
+@@ -13136,4 +13311,7 @@ range (including START-LOCATION and END-LOCATION)."));
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
@@ -1353,30 +888,10 @@ index dbd9588..d551ddd 100644
 +#endif
  }
 diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
-index d5af928..c8a3161 100644
+index 7a9c2d4..8a91019 100644
 --- a/gdb/breakpoint.h
 +++ b/gdb/breakpoint.h
-@@ -149,6 +149,19 @@ enum bptype
- 
-     /* Event for JIT compiled code generation or deletion.  */
-     bp_jit_event,
-+
-+    /* Breakpoint is placed at the STT_GNU_IFUNC resolver.  When hit GDB
-+       inserts new bp_gnu_ifunc_resolver_return at the caller.
-+       bp_gnu_ifunc_resolver is still being kept here as a different thread
-+       may still hit it before bp_gnu_ifunc_resolver_return is hit by the
-+       original thread.  */
-+    bp_gnu_ifunc_resolver,
-+
-+    /* On its hit GDB now know the resolved address of the target
-+       STT_GNU_IFUNC function.  Associated bp_gnu_ifunc_resolver can be
-+       deleted now and the breakpoint moved to the target function entry
-+       point.  */
-+    bp_gnu_ifunc_resolver_return,
-   };
- 
- /* States of enablement of breakpoint.  */
-@@ -345,6 +358,11 @@ struct bp_location
+@@ -363,6 +363,11 @@ struct bp_location
       processor's architectual constraints.  */
    CORE_ADDR requested_address;
  
@@ -1388,17 +903,7 @@ index d5af928..c8a3161 100644
    char *function_name;
  
    /* Details of the placed breakpoint, when inserted.  */
-@@ -890,6 +908,9 @@ extern int breakpoint_thread_match (struct address_space *,
- 
- extern void until_break_command (char *, int, int);
- 
-+extern void update_breakpoint_locations (struct breakpoint *b,
-+					 struct symtabs_and_lines sals);
-+
- extern void breakpoint_re_set (void);
- 
- extern void breakpoint_re_set_thread (struct breakpoint *);
-@@ -1191,4 +1212,11 @@ extern struct breakpoint *iterate_over_breakpoints (int (*) (struct breakpoint *
+@@ -1237,4 +1242,11 @@ extern struct breakpoint *iterate_over_breakpoints (int (*) (struct breakpoint *
  
  extern int user_breakpoint_p (struct breakpoint *);
  
@@ -1432,6 +937,59 @@ index 2e23dd7..aefc807 100644
  	fprintf_filtered (stream, "]");
  
  	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,
+diff --git a/gdb/cli/cli-utils.c b/gdb/cli/cli-utils.c
+index 62a2f12..dd2824f 100644
+--- a/gdb/cli/cli-utils.c
++++ b/gdb/cli/cli-utils.c
+@@ -245,3 +245,32 @@ remove_trailing_whitespace (const char *start, char *s)
+ 
+   return s;
+ }
++
++/* See documentation in cli-utils.h.  */
++
++char *
++extract_arg (char **arg)
++{
++  char *result, *copy;
++
++  if (!*arg)
++    return NULL;
++
++  /* Find the start of the argument.  */
++  *arg = skip_spaces (*arg);
++  if (! **arg)
++    return NULL;
++  result = *arg;
++
++  /* Find the end of the argument.  */
++  *arg = skip_to_space (*arg + 1);
++
++  if (result == *arg)
++    return NULL;
++
++  copy = xmalloc (*arg - result + 1);
++  memcpy (copy, result, *arg - result);
++  copy[*arg - result] = '\0';
++
++  return copy;
++}
+diff --git a/gdb/cli/cli-utils.h b/gdb/cli/cli-utils.h
+index 8a6e5b3..ed1a63e 100644
+--- a/gdb/cli/cli-utils.h
++++ b/gdb/cli/cli-utils.h
+@@ -103,4 +103,11 @@ extern char *skip_to_space (char *inp);
+    START.  */
+ 
+ extern char *remove_trailing_whitespace (const char *start, char *s);
++
++/* A helper function to extract an argument from *ARG.  An argument is
++   delimited by whitespace.  The return value is either NULL if no
++   argument was found, or an xmalloc'd string.  */
++
++extern char *extract_arg (char **arg);
++
+ #endif /* CLI_UTILS_H */
 diff --git a/gdb/coffread.c b/gdb/coffread.c
 index b11dd73..0868a79 100644
 --- a/gdb/coffread.c
@@ -1496,7 +1054,7 @@ index 51ddd9d..a59ae10 100644
  };
  
 diff --git a/gdb/defs.h b/gdb/defs.h
-index 9409dde..f0fa4c7 100644
+index 9531c5a..b994645 100644
 --- a/gdb/defs.h
 +++ b/gdb/defs.h
 @@ -398,6 +398,8 @@ extern struct cleanup *make_cleanup_restore_page_info (void);
@@ -1509,7 +1067,7 @@ index 9409dde..f0fa4c7 100644
  extern char *xfullpath (const char *);
  
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index e023058..bf54e9a 100644
+index c71d664..b66e426 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -1177,6 +1177,16 @@ for remote debugging.
@@ -1547,7 +1105,7 @@ index e023058..bf54e9a 100644
 +@cindex SystemTap static probe point
 +@cindex sdt-probe
 +The @sc{gnu}/Linux tool @code{SystemTap} provides a way for
-+applications to embed static probes, using @file{sdt.h}.  @value{GDBN}
++applications to embed static probes, using @file{sys/sdt.h}.  @value{GDBN}
 +can list the available probes, and you can put breakpoints at the
 +probe points (@pxref{Specify Location}).
 +
@@ -1629,7 +1187,24 @@ index e023058..bf54e9a 100644
  @item $_sdata
  @vindex $_sdata@r{, inspect, convenience variable}
  The variable @code{$_sdata} contains extra collected static tracepoint
-@@ -20692,8 +20774,6 @@ containing @code{end}.  For example:
+@@ -10219,6 +10301,16 @@ Collect all function arguments.
+ @item $locals
+ Collect all local variables.
+ 
++@item $_probe_argc
++Collects the number of arguments from the @code{SystemTap} probe at
++which the tracepoint is located.
++@xref{Static Probe Points,,Static Probe Points}
++
++@item $_probe_arg@var{N}
++Where @var{N} varies from 0 to 9.  Collects the @var{N}th argument
++from the @code{SystemTap} probe at which the tracepoint is located.
++@xref{Static Probe Points,,Static Probe Points}
++
+ @item $_sdata
+ @vindex $_sdata@r{, collect}
+ Collect static tracepoint marker specific data.  Only available for
+@@ -20710,8 +20802,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -1638,7 +1213,7 @@ index e023058..bf54e9a 100644
  >print 23
  >end
  23
-@@ -20706,6 +20786,14 @@ in a Python script.  This can be controlled using @code{maint set
+@@ -20724,6 +20814,14 @@ in a Python script.  This can be controlled using @code{maint set
  python print-stack}: if @code{on}, the default, then Python stack
  printing is enabled; if @code{off}, then Python stack printing is
  disabled.
@@ -1653,7 +1228,7 @@ index e023058..bf54e9a 100644
  @end table
  
  It is also possible to execute a Python script from the @value{GDBN}
-@@ -20727,6 +20815,14 @@ and thus is always available.
+@@ -20745,6 +20843,14 @@ and thus is always available.
  @cindex python api
  @cindex programming in python
  
@@ -2230,7 +1805,7 @@ index 96a490e..b0ebb06 100644
  /* Compile a DWARF location expression to an agent expression.
     
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 0cc5ca0..b7feb09 100644
+index ca6c98b..d176624 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -1211,6 +1211,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
@@ -2263,7 +1838,7 @@ index 0cc5ca0..b7feb09 100644
  static void dwarf2_release_queue (void *dummy);
  
  static void queue_comp_unit (struct dwarf2_per_cu_data *per_cu,
-@@ -7315,6 +7324,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7342,6 +7351,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -2293,7 +1868,7 @@ index 0cc5ca0..b7feb09 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -7328,7 +7360,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7355,7 +7387,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -2302,7 +1877,7 @@ index 0cc5ca0..b7feb09 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -7381,17 +7413,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7408,17 +7440,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -2333,7 +1908,7 @@ index 0cc5ca0..b7feb09 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -7884,29 +7918,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -7911,29 +7945,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -2462,7 +2037,7 @@ index 0cc5ca0..b7feb09 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -8191,8 +8310,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8218,8 +8337,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -2472,7 +2047,7 @@ index 0cc5ca0..b7feb09 100644
    char *name;
    LONGEST negative_mask;
  
-@@ -8205,53 +8323,126 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8232,53 +8350,126 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    if (range_type)
      return range_type;
  
@@ -2634,7 +2209,7 @@ index 0cc5ca0..b7feb09 100644
      }
  
    /* Dwarf-2 specifications explicitly allows to create subrange types
-@@ -8292,24 +8483,41 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -8319,24 +8510,41 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  	}
      }
  
@@ -2692,7 +2267,7 @@ index 0cc5ca0..b7feb09 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -10835,10 +11043,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -10881,10 +11089,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -2707,7 +2282,7 @@ index 0cc5ca0..b7feb09 100644
  }
  
  /* Given a pointer to a DWARF information entry, figure out if we need
-@@ -10876,6 +11086,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
+@@ -10922,6 +11132,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
        else
  	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
        OBJSTAT (objfile, n_syms++);
@@ -2716,7 +2291,7 @@ index 0cc5ca0..b7feb09 100644
  
        /* Cache this symbol's name and the name's demangled form (if any).  */
        SYMBOL_SET_LANGUAGE (sym, cu->language);
-@@ -11648,6 +11860,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11694,6 +11906,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -2726,7 +2301,7 @@ index 0cc5ca0..b7feb09 100644
    return this_type;
  }
  
-@@ -14468,61 +14683,99 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
+@@ -14548,61 +14763,99 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
    baton->base_address = cu->base_address;
  }
  
@@ -2869,7 +2444,7 @@ index 0cc5ca0..b7feb09 100644
      }
  }
  
-@@ -14868,6 +15121,25 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -14951,6 +15204,25 @@ offset_and_type_eq (const void *item_lhs, const void *item_rhs)
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -2895,7 +2470,7 @@ index 0cc5ca0..b7feb09 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.
  
-@@ -14893,6 +15165,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -14976,6 +15248,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    struct objfile *objfile = cu->objfile;
    htab_t *type_hash_ptr;
  
@@ -2905,32 +2480,31 @@ index 0cc5ca0..b7feb09 100644
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
 diff --git a/gdb/elfread.c b/gdb/elfread.c
-index dacc6f0..f796851 100644
+index b9cfa13..fed63f5 100644
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
-@@ -38,6 +38,13 @@
- #include "demangle.h"
- #include "psympriv.h"
- #include "filenames.h"
-+#include "gdbtypes.h"
+@@ -43,6 +43,12 @@
+ #include "infcall.h"
+ #include "gdbthread.h"
+ #include "regcache.h"
++#include "stap-probe.h"
++#include "arch-utils.h"
 +#include "value.h"
 +#include "infcall.h"
 +#include "gdbthread.h"
 +#include "regcache.h"
-+#include "stap-probe.h"
-+#include "arch-utils.h"
  
  extern void _initialize_elfread (void);
  
-@@ -56,8 +63,30 @@ struct elfinfo
+@@ -61,6 +67,21 @@ struct elfinfo
      asection *mdebugsect;	/* Section pointer for .mdebug section */
    };
  
-+/* Per-objfile data for Systemtap probe info.  */
++/* Per-objfile data for SystemTap probe info.  */
 +
 +static const struct objfile_data *stap_probe_key = NULL;
 +
-+/* Per-objfile data about Systemtap probes.  */
++/* Per-objfile data about SystemTap probes.  */
 +
 +struct stap_probe_per_objfile
 +  {
@@ -2943,522 +2517,14 @@ index dacc6f0..f796851 100644
 +
  static void free_elfinfo (void *);
  
-+/* Minimal symbols located at the GOT entries for .plt - that is the real
-+   pointer where the given entry will jump to.  It gets updated by the real
-+   function address during lazy ld.so resolving in the inferior.  These
-+   minimal symbols are indexed for <tab>-completion.  */
-+
-+#define SYMBOL_GOT_PLT_SUFFIX "@got.plt"
-+
- /* Locate the segments in ABFD.  */
- 
- static struct symfile_segment_data *
-@@ -185,7 +214,8 @@ record_minimal_symbol (const char *name, int name_len, int copy_name,
- {
-   struct gdbarch *gdbarch = get_objfile_arch (objfile);
- 
--  if (ms_type == mst_text || ms_type == mst_file_text)
-+  if (ms_type == mst_text || ms_type == mst_file_text
-+      || ms_type == mst_text_gnu_ifunc)
-     address = gdbarch_smash_text_address (gdbarch, address);
- 
-   return prim_record_minimal_symbol_full (name, name_len, copy_name, address,
-@@ -394,7 +424,10 @@ elf_symtab_read (struct objfile *objfile, int type,
- 	    {
- 	      if (sym->flags & (BSF_GLOBAL | BSF_WEAK))
- 		{
--		  ms_type = mst_text;
-+		  if (sym->flags & BSF_GNU_INDIRECT_FUNCTION)
-+		    ms_type = mst_text_gnu_ifunc;
-+		  else
-+		    ms_type = mst_text;
- 		}
- 	      else if ((sym->name[0] == '.' && sym->name[1] == 'L')
- 		       || ((sym->flags & BSF_LOCAL)
-@@ -578,6 +611,467 @@ elf_symtab_read (struct objfile *objfile, int type,
-   do_cleanups (back_to);
- }
- 
-+/* Build minimal symbols named `function@got.plt' (see SYMBOL_GOT_PLT_SUFFIX)
-+   for later look ups of which function to call when user requests
-+   a STT_GNU_IFUNC function.  As the STT_GNU_IFUNC type is found at the target
-+   library defining `function' we cannot yet know while reading OBJFILE which
-+   of the SYMBOL_GOT_PLT_SUFFIX entries will be needed and later
-+   DYN_SYMBOL_TABLE is no longer easily available for OBJFILE.  */
-+
-+static void
-+elf_rel_plt_read (struct objfile *objfile, asymbol **dyn_symbol_table)
-+{
-+  bfd *obfd = objfile->obfd;
-+  const struct elf_backend_data *bed = get_elf_backend_data (obfd);
-+  asection *plt, *relplt, *got_plt;
-+  unsigned u;
-+  int plt_elf_idx;
-+  bfd_size_type reloc_count, reloc;
-+  char *string_buffer = NULL;
-+  size_t string_buffer_size = 0;
-+  struct cleanup *back_to;
-+  struct gdbarch *gdbarch = objfile->gdbarch;
-+  struct type *ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
-+  size_t ptr_size = TYPE_LENGTH (ptr_type);
-+
-+  if (objfile->separate_debug_objfile_backlink)
-+    return;
-+
-+  plt = bfd_get_section_by_name (obfd, ".plt");
-+  if (plt == NULL)
-+    return;
-+  plt_elf_idx = elf_section_data (plt)->this_idx;
-+
-+  got_plt = bfd_get_section_by_name (obfd, ".got.plt");
-+  if (got_plt == NULL)
-+    return;
-+
-+  /* This search algorithm is from _bfd_elf_canonicalize_dynamic_reloc.  */
-+  for (relplt = obfd->sections; relplt != NULL; relplt = relplt->next)
-+    if (elf_section_data (relplt)->this_hdr.sh_info == plt_elf_idx
-+	&& (elf_section_data (relplt)->this_hdr.sh_type == SHT_REL
-+	    || elf_section_data (relplt)->this_hdr.sh_type == SHT_RELA))
-+      break;
-+  if (relplt == NULL)
-+    return;
-+
-+  if (! bed->s->slurp_reloc_table (obfd, relplt, dyn_symbol_table, TRUE))
-+    return;
-+
-+  back_to = make_cleanup (free_current_contents, &string_buffer);
-+
-+  reloc_count = relplt->size / elf_section_data (relplt)->this_hdr.sh_entsize;
-+  for (reloc = 0; reloc < reloc_count; reloc++)
-+    {
-+      const char *name, *name_got_plt;
-+      struct minimal_symbol *msym;
-+      CORE_ADDR address;
-+      const size_t got_suffix_len = strlen (SYMBOL_GOT_PLT_SUFFIX);
-+      size_t name_len;
-+
-+      name = bfd_asymbol_name (*relplt->relocation[reloc].sym_ptr_ptr);
-+      name_len = strlen (name);
-+      address = relplt->relocation[reloc].address;
-+
-+      /* Does the pointer reside in the .got.plt section?  */
-+      if (!(bfd_get_section_vma (obfd, got_plt) <= address
-+            && address < bfd_get_section_vma (obfd, got_plt)
-+			 + bfd_get_section_size (got_plt)))
-+	continue;
-+
-+      /* We cannot check if NAME is a reference to mst_text_gnu_ifunc as in
-+	 OBJFILE the symbol is undefined and the objfile having NAME defined
-+	 may not yet have been loaded.  */
-+
-+      if (string_buffer_size < name_len + got_suffix_len)
-+	{
-+	  string_buffer_size = 2 * (name_len + got_suffix_len);
-+	  string_buffer = xrealloc (string_buffer, string_buffer_size);
-+	}
-+      memcpy (string_buffer, name, name_len);
-+      memcpy (&string_buffer[name_len], SYMBOL_GOT_PLT_SUFFIX,
-+	      got_suffix_len);
-+
-+      msym = record_minimal_symbol (string_buffer, name_len + got_suffix_len,
-+                                    1, address, mst_slot_got_plt, got_plt,
-+				    objfile);
-+      if (msym)
-+	MSYMBOL_SIZE (msym) = ptr_size;
-+    }
-+
-+  do_cleanups (back_to);
-+}
-+
-+/* The data pointer is htab_t for gnu_ifunc_record_cache_unchecked.  */
-+
-+static const struct objfile_data *elf_objfile_gnu_ifunc_cache_data;
-+
-+/* Map function names to CORE_ADDR in elf_objfile_gnu_ifunc_cache_data.  */
-+
-+struct elf_gnu_ifunc_cache
-+{
-+  /* This is always a function entry address, not a function descriptor.  */
-+  CORE_ADDR addr;
-+
-+  char name[1];
-+};
-+
-+/* htab_hash for elf_objfile_gnu_ifunc_cache_data.  */
-+
-+static hashval_t
-+elf_gnu_ifunc_cache_hash (const void *a_voidp)
-+{
-+  const struct elf_gnu_ifunc_cache *a = a_voidp;
-+
-+  return htab_hash_string (a->name);
-+}
-+
-+/* htab_eq for elf_objfile_gnu_ifunc_cache_data.  */
-+
-+static int
-+elf_gnu_ifunc_cache_eq (const void *a_voidp, const void *b_voidp)
-+{
-+  const struct elf_gnu_ifunc_cache *a = a_voidp;
-+  const struct elf_gnu_ifunc_cache *b = b_voidp;
-+
-+  return strcmp (a->name, b->name) == 0;
-+}
-+
-+/* Record the target function address of a STT_GNU_IFUNC function NAME is the
-+   function entry address ADDR.  Return 1 if NAME and ADDR are considered as
-+   valid and therefore they were successfully recorded, return 0 otherwise.
-+
-+   Function does not expect a duplicate entry.  Use
-+   elf_gnu_ifunc_resolve_by_cache first to check if the entry for NAME already
-+   exists.  */
-+
-+static int
-+elf_gnu_ifunc_record_cache (const char *name, CORE_ADDR addr)
-+{
-+  struct minimal_symbol *msym;
-+  asection *sect;
-+  struct objfile *objfile;
-+  htab_t htab;
-+  struct elf_gnu_ifunc_cache entry_local, *entry_p;
-+  void **slot;
-+
-+  msym = lookup_minimal_symbol_by_pc (addr);
-+  if (msym == NULL)
-+    return 0;
-+  if (SYMBOL_VALUE_ADDRESS (msym) != addr)
-+    return 0;
-+  /* minimal symbols have always SYMBOL_OBJ_SECTION non-NULL.  */
-+  sect = SYMBOL_OBJ_SECTION (msym)->the_bfd_section;
-+  objfile = SYMBOL_OBJ_SECTION (msym)->objfile;
-+
-+  /* If .plt jumps back to .plt the symbol is still deferred for later
-+     resolution and it has no use for GDB.  Besides ".text" this symbol can
-+     reside also in ".opd" for ppc64 function descriptor.  */
-+  if (strcmp (bfd_get_section_name (objfile->obfd, sect), ".plt") == 0)
-+    return 0;
-+
-+  htab = objfile_data (objfile, elf_objfile_gnu_ifunc_cache_data);
-+  if (htab == NULL)
-+    {
-+      htab = htab_create_alloc_ex (1, elf_gnu_ifunc_cache_hash,
-+				   elf_gnu_ifunc_cache_eq,
-+				   NULL, &objfile->objfile_obstack,
-+				   hashtab_obstack_allocate,
-+				   dummy_obstack_deallocate);
-+      set_objfile_data (objfile, elf_objfile_gnu_ifunc_cache_data, htab);
-+    }
-+
-+  entry_local.addr = addr;
-+  obstack_grow (&objfile->objfile_obstack, &entry_local,
-+		offsetof (struct elf_gnu_ifunc_cache, name));
-+  obstack_grow_str0 (&objfile->objfile_obstack, name);
-+  entry_p = obstack_finish (&objfile->objfile_obstack);
-+
-+  slot = htab_find_slot (htab, entry_p, INSERT);
-+  if (*slot != NULL)
-+    {
-+      struct elf_gnu_ifunc_cache *entry_found_p = *slot;
-+      struct gdbarch *gdbarch = objfile->gdbarch;
-+
-+      if (entry_found_p->addr != addr)
-+	{
-+	  /* This case indicates buggy inferior program, the resolved address
-+	     should never change.  */
-+
-+	    warning (_("gnu-indirect-function \"%s\" has changed its resolved "
-+		       "function_address from %s to %s"),
-+		     name, paddress (gdbarch, entry_found_p->addr),
-+		     paddress (gdbarch, addr));
-+	}
-+
-+      /* New ENTRY_P is here leaked/duplicate in the OBJFILE obstack.  */
-+    }
-+  *slot = entry_p;
-+
-+  return 1;
-+}
-+
-+/* Try to find the target resolved function entry address of a STT_GNU_IFUNC
-+   function NAME.  If the address is found it is stored to *ADDR_P (if ADDR_P
-+   is not NULL) and the function returns 1.  It returns 0 otherwise.
-+
-+   Only the elf_objfile_gnu_ifunc_cache_data hash table is searched by this
-+   function.  */
-+
-+static int
-+elf_gnu_ifunc_resolve_by_cache (const char *name, CORE_ADDR *addr_p)
-+{
-+  struct objfile *objfile;
-+
-+  ALL_PSPACE_OBJFILES (current_program_space, objfile)
-+    {
-+      htab_t htab;
-+      struct elf_gnu_ifunc_cache *entry_p;
-+      void **slot;
-+
-+      htab = objfile_data (objfile, elf_objfile_gnu_ifunc_cache_data);
-+      if (htab == NULL)
-+	continue;
-+
-+      entry_p = alloca (sizeof (*entry_p) + strlen (name));
-+      strcpy (entry_p->name, name);
-+
-+      slot = htab_find_slot (htab, entry_p, NO_INSERT);
-+      if (slot == NULL)
-+	continue;
-+      entry_p = *slot;
-+      gdb_assert (entry_p != NULL);
-+
-+      if (addr_p)
-+	*addr_p = entry_p->addr;
-+      return 1;
-+    }
-+
-+  return 0;
-+}
-+
-+/* Try to find the target resolved function entry address of a STT_GNU_IFUNC
-+   function NAME.  If the address is found it is stored to *ADDR_P (if ADDR_P
-+   is not NULL) and the function returns 1.  It returns 0 otherwise.
-+
-+   Only the SYMBOL_GOT_PLT_SUFFIX locations are searched by this function.
-+   elf_gnu_ifunc_resolve_by_cache must have been already called for NAME to
-+   prevent cache entries duplicates.  */
-+
-+static int
-+elf_gnu_ifunc_resolve_by_got (const char *name, CORE_ADDR *addr_p)
-+{
-+  char *name_got_plt;
-+  struct objfile *objfile;
-+  const size_t got_suffix_len = strlen (SYMBOL_GOT_PLT_SUFFIX);
-+
-+  name_got_plt = alloca (strlen (name) + got_suffix_len + 1);
-+  sprintf (name_got_plt, "%s" SYMBOL_GOT_PLT_SUFFIX, name);
-+
-+  ALL_PSPACE_OBJFILES (current_program_space, objfile)
-+    {
-+      bfd *obfd = objfile->obfd;
-+      struct gdbarch *gdbarch = objfile->gdbarch;
-+      struct type *ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
-+      size_t ptr_size = TYPE_LENGTH (ptr_type);
-+      CORE_ADDR pointer_address, addr;
-+      asection *plt;
-+      gdb_byte *buf = alloca (ptr_size);
-+      struct minimal_symbol *msym;
-+
-+      msym = lookup_minimal_symbol (name_got_plt, NULL, objfile);
-+      if (msym == NULL)
-+	continue;
-+      if (MSYMBOL_TYPE (msym) != mst_slot_got_plt)
-+	continue;
-+      pointer_address = SYMBOL_VALUE_ADDRESS (msym);
-+
-+      plt = bfd_get_section_by_name (obfd, ".plt");
-+      if (plt == NULL)
-+	continue;
-+
-+      if (MSYMBOL_SIZE (msym) != ptr_size)
-+	continue;
-+      if (target_read_memory (pointer_address, buf, ptr_size) != 0)
-+	continue;
-+      addr = extract_typed_address (buf, ptr_type);
-+      addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr,
-+						 &current_target);
-+
-+      if (addr_p)
-+	*addr_p = addr;
-+      if (elf_gnu_ifunc_record_cache (name, addr))
-+	return 1;
-+    }
-+
-+  return 0;
-+}
-+
-+/* Try to find the target resolved function entry address of a STT_GNU_IFUNC
-+   function NAME.  If the address is found it is stored to *ADDR_P (if ADDR_P
-+   is not NULL) and the function returns 1.  It returns 0 otherwise.
-+
-+   Both the elf_objfile_gnu_ifunc_cache_data hash table and
-+   SYMBOL_GOT_PLT_SUFFIX locations are searched by this function.  */
-+
-+static int
-+elf_gnu_ifunc_resolve_name (const char *name, CORE_ADDR *addr_p)
-+{
-+  if (elf_gnu_ifunc_resolve_by_cache (name, addr_p))
-+    return 1;
-+  
-+  if (elf_gnu_ifunc_resolve_by_got (name, addr_p))
-+    return 1;
-+
-+  return 0;
-+}
-+
-+/* Call STT_GNU_IFUNC - a function returning addresss of a real function to
-+   call.  PC is theSTT_GNU_IFUNC resolving function entry.  The value returned
-+   is the entry point of the resolved STT_GNU_IFUNC target function to call.
-+   */
-+
-+static CORE_ADDR
-+elf_gnu_ifunc_resolve_addr (struct gdbarch *gdbarch, CORE_ADDR pc)
-+{
-+  char *name_at_pc;
-+  CORE_ADDR start_at_pc, address;
-+  struct type *func_func_type = builtin_type (gdbarch)->builtin_func_func;
-+  struct value *function, *address_val;
-+
-+  /* Try first any non-intrusive methods without an inferior call.  */
-+
-+  if (find_pc_partial_function (pc, &name_at_pc, &start_at_pc, NULL)
-+      && start_at_pc == pc)
-+    {
-+      if (elf_gnu_ifunc_resolve_name (name_at_pc, &address))
-+	return address;
-+    }
-+  else
-+    name_at_pc = NULL;
-+
-+  function = allocate_value (func_func_type);
-+  set_value_address (function, pc);
-+
-+  /* STT_GNU_IFUNC resolver functions have no parameters.  FUNCTION is the
-+     function entry address.  ADDRESS may be a function descriptor.  */
-+
-+  address_val = call_function_by_hand (function, 0, NULL);
-+  address = value_as_address (address_val);
-+  address = gdbarch_convert_from_func_ptr_addr (gdbarch, address,
-+						&current_target);
-+
-+  if (name_at_pc)
-+    elf_gnu_ifunc_record_cache (name_at_pc, address);
-+
-+  return address;
-+}
-+
-+/* Handle inferior hit of bp_gnu_ifunc_resolver, see its definition.  */
-+
-+static void
-+elf_gnu_ifunc_resolver_stop (struct breakpoint *b)
-+{
-+  struct breakpoint *b_return;
-+  struct frame_info *prev_frame = get_prev_frame (get_current_frame ());
-+  struct frame_id prev_frame_id = get_stack_frame_id (prev_frame);
-+  CORE_ADDR prev_pc = get_frame_pc (prev_frame);
-+  int thread_id = pid_to_thread_id (inferior_ptid);
-+
-+  gdb_assert (b->type == bp_gnu_ifunc_resolver);
-+
-+  for (b_return = b->related_breakpoint; b_return != b;
-+       b_return = b_return->related_breakpoint)
-+    {
-+      gdb_assert (b_return->type == bp_gnu_ifunc_resolver_return);
-+      gdb_assert (b_return->loc != NULL && b_return->loc->next == NULL);
-+      gdb_assert (frame_id_p (b_return->frame_id));
-+
-+      if (b_return->thread == thread_id
-+	  && b_return->loc->requested_address == prev_pc
-+	  && frame_id_eq (b_return->frame_id, prev_frame_id))
-+	break;
-+    }
-+
-+  if (b_return == b)
-+    {
-+      struct symtab_and_line sal;
-+
-+      /* No need to call find_pc_line for symbols resolving as this is only
-+	 a helper breakpointer never shown to the user.  */
-+
-+      init_sal (&sal);
-+      sal.pspace = current_inferior ()->pspace;
-+      sal.pc = prev_pc;
-+      sal.section = find_pc_overlay (sal.pc);
-+      sal.explicit_pc = 1;
-+      b_return = set_momentary_breakpoint (get_frame_arch (prev_frame), sal,
-+					   prev_frame_id,
-+					   bp_gnu_ifunc_resolver_return);
-+
-+      /* Add new b_return to the ring list b->related_breakpoint.  */
-+      gdb_assert (b_return->related_breakpoint == b_return);
-+      b_return->related_breakpoint = b->related_breakpoint;
-+      b->related_breakpoint = b_return;
-+    }
-+}
-+
-+/* Handle inferior hit of bp_gnu_ifunc_resolver_return, see its definition.  */
-+
-+static void
-+elf_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
-+{
-+  struct gdbarch *gdbarch = get_frame_arch (get_current_frame ());
-+  struct type *func_func_type = builtin_type (gdbarch)->builtin_func_func;
-+  struct type *value_type = TYPE_TARGET_TYPE (func_func_type);
-+  struct regcache *regcache = get_thread_regcache (inferior_ptid);
-+  struct value *value;
-+  CORE_ADDR resolved_address, resolved_pc;
-+  struct symtab_and_line sal;
-+  struct symtabs_and_lines sals;
-+
-+  gdb_assert (b->type == bp_gnu_ifunc_resolver_return);
-+
-+  value = allocate_value (value_type);
-+  gdbarch_return_value (gdbarch, func_func_type, value_type, regcache,
-+			value_contents_raw (value), NULL);
-+  resolved_address = value_as_address (value);
-+  resolved_pc = gdbarch_convert_from_func_ptr_addr (gdbarch,
-+						    resolved_address,
-+						    &current_target);
-+
-+  while (b->related_breakpoint != b)
-+    {
-+      struct breakpoint *b_next = b->related_breakpoint;
-+
-+      switch (b->type)
-+	{
-+	case bp_gnu_ifunc_resolver:
-+	  break;
-+	case bp_gnu_ifunc_resolver_return:
-+	  delete_breakpoint (b);
-+	  break;
-+	default:
-+	  internal_error (__FILE__, __LINE__,
-+			  _("handle_inferior_event: Invalid "
-+			    "gnu-indirect-function breakpoint type %d"),
-+			  (int) b->type);
-+	}
-+      b = b_next;
-+    }
-+  gdb_assert (b->type == bp_gnu_ifunc_resolver);
-+
-+  gdb_assert (current_program_space == b->pspace);
-+  elf_gnu_ifunc_record_cache (b->addr_string, resolved_pc);
-+
-+  sal = find_pc_line (resolved_pc, 0);
-+  sals.nelts = 1;
-+  sals.sals = &sal;
-+
-+  b->type = bp_breakpoint;
-+  update_breakpoint_locations (b, sals);
-+}
-+
- struct build_id
-   {
-     size_t size;
-@@ -819,6 +1313,8 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
- 	       bfd_errmsg (bfd_get_error ()));
- 
-       elf_symtab_read (objfile, ST_DYNAMIC, dynsymcount, dyn_symbol_table, 0);
-+
-+      elf_rel_plt_read (objfile, dyn_symbol_table);
-     }
- 
-   /* Add synthetic symbols - for instance, names for any PLT entries.  */
-@@ -1071,7 +1567,238 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
+ /* Minimal symbols located at the GOT entries for .plt - that is the real
+@@ -1551,7 +1572,266 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
      complaint (&symfile_complaints,
  	       _("elf/stab section information missing for %s"), filename);
  }
 +
 +/* Helper function that parses the information contained in a
-+   Systemtap's probe.  Basically, the information consists in:
++   SystemTap's probe.  Basically, the information consists in:
 +
 +   - Probe's PC address;
 +   - Link-time section address of `.stapsdt.base' section;
@@ -3527,7 +2593,13 @@ index dacc6f0..f796851 100644
 +    ret->args = NULL;
 +}
 +
++/* The name of the SystemTap section where we will find information about
++   the probes.  */
++
 +#define STAP_BASE_SECTION_NAME ".stapsdt.base"
++
++/* Helper function which tries to find the base address of the SystemTap
++   base section named STAP_BASE_SECTION_NAME.  */
 +
 +static void
 +get_base_address_1 (bfd *abfd, asection *sect, void *obj)
@@ -3540,6 +2612,10 @@ index dacc6f0..f796851 100644
 +    *base = sect->vma;
 +}
 +
++/* Helper function which iterates over every section in the BFD file,
++   trying to find the base address of the SystemTap base section.
++   Returns the section address if found, or -1 otherwise.  */
++
 +static bfd_vma
 +get_base_address (bfd *obfd)
 +{
@@ -3549,6 +2625,8 @@ index dacc6f0..f796851 100644
 +
 +  return base;
 +}
++
++/* Implementation of `sym_get_probes', as documented in symfile.h.  */
 +
 +static const struct stap_probe *
 +elf_get_probes (struct objfile *objfile, int *num_probes)
@@ -3612,6 +2690,9 @@ index dacc6f0..f796851 100644
 +  return ret;
 +}
 +
++/* Implementation of `sym_get_probe_argument_count', as documented in
++   symfile.h.  */
++
 +static int
 +elf_get_probe_argument_count (struct objfile *objfile,
 +			      const struct stap_probe *probe)
@@ -3625,6 +2706,9 @@ index dacc6f0..f796851 100644
 +  return stap_get_probe_argument_count (probe);
 +}
 +
++/* Implementation of `sym_evaluate_probe_argument', as documented in
++   symfile.h.  */
++
 +static struct value *
 +elf_evaluate_probe_argument (struct objfile *objfile,
 +			     const struct stap_probe *probe,
@@ -3633,6 +2717,8 @@ index dacc6f0..f796851 100644
 +{
 +  return stap_evaluate_probe_argument (objfile, probe, frame, n);
 +}
++
++/* Implementation of `sym_compile_to_ax', as documented in symfile.h.  */
 +
 +static void
 +elf_compile_to_ax (struct objfile *objfile,
@@ -3643,6 +2729,8 @@ index dacc6f0..f796851 100644
 +{
 +  stap_compile_to_ax (objfile, probe, expr, value, n);
 +}
++
++/* Implementation of `sym_relocate_probe', as documented in symfile.h.  */
 +
 +static void
 +elf_symfile_relocate_probe (struct objfile *objfile,
@@ -3666,6 +2754,9 @@ index dacc6f0..f796851 100644
 +    }
 +}
 +
++/* Helper function used to free the space allocated for storing SystemTap
++   probe information.  */
++
 +static void
 +stap_probe_key_free (struct objfile *objfile, void *d)
 +{
@@ -3679,6 +2770,9 @@ index dacc6f0..f796851 100644
 +}
 +
  
++
++/* Implementation `sym_probe_fns', as documented in symfile.h.  */
++
 +static const struct sym_probe_fns elf_probe_fns =
 +{
 +  elf_get_probes,		/* sym_get_probes */
@@ -3691,7 +2785,7 @@ index dacc6f0..f796851 100644
  /* Register that we are able to handle ELF object file formats.  */
  
  static const struct sym_fns elf_sym_fns =
-@@ -1086,6 +1813,7 @@ static const struct sym_fns elf_sym_fns =
+@@ -1566,6 +1846,7 @@ static const struct sym_fns elf_sym_fns =
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -3699,7 +2793,7 @@ index dacc6f0..f796851 100644
    &psym_functions
  };
  
-@@ -1104,6 +1832,7 @@ static const struct sym_fns elf_sym_fns_lazy_psyms =
+@@ -1584,6 +1865,7 @@ static const struct sym_fns elf_sym_fns_lazy_psyms =
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -3707,7 +2801,7 @@ index dacc6f0..f796851 100644
    &psym_functions
  };
  
-@@ -1121,11 +1850,27 @@ static const struct sym_fns elf_sym_fns_gdb_index =
+@@ -1601,6 +1883,7 @@ static const struct sym_fns elf_sym_fns_gdb_index =
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -3715,28 +2809,17 @@ index dacc6f0..f796851 100644
    &dwarf2_gdb_index_functions
  };
  
-+/* STT_GNU_IFUNC resolver vector to be installed to gnu_ifunc_fns_p.  */
-+
-+static const struct gnu_ifunc_fns elf_gnu_ifunc_fns =
-+{
-+  elf_gnu_ifunc_resolve_addr,
-+  elf_gnu_ifunc_resolve_name,
-+  elf_gnu_ifunc_resolver_stop,
-+  elf_gnu_ifunc_resolver_return_stop
-+};
-+
+@@ -1617,6 +1900,8 @@ static const struct gnu_ifunc_fns elf_gnu_ifunc_fns =
  void
  _initialize_elfread (void)
  {
 +  stap_probe_key
 +    = register_objfile_data_with_cleanup (NULL, stap_probe_key_free);
    add_symtab_fns (&elf_sym_fns);
-+
-+  elf_objfile_gnu_ifunc_cache_data = register_objfile_data ();
-+  gnu_ifunc_fns_p = &elf_gnu_ifunc_fns;
- }
+ 
+   elf_objfile_gnu_ifunc_cache_data = register_objfile_data ();
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 09b41a0..7c0a8f9 100644
+index bbc7b8a..7c0a8f9 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -44,6 +44,7 @@
@@ -3989,16 +3072,7 @@ index 09b41a0..7c0a8f9 100644
  
    pc = (*pos)++;
    op = exp->elts[pc].opcode;
-@@ -1832,6 +2024,8 @@ evaluate_subexp_standard (struct type *expect_type,
- 	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
- 				 not_lval);
- 	    }
-+	  else if (TYPE_GNU_IFUNC (ftype))
-+	    return allocate_value (TYPE_TARGET_TYPE (TYPE_TARGET_TYPE (ftype)));
- 	  else if (TYPE_TARGET_TYPE (ftype))
- 	    return allocate_value (TYPE_TARGET_TYPE (ftype));
- 	  else
-@@ -1860,6 +2054,8 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -1862,6 +2054,8 @@ evaluate_subexp_standard (struct type *expect_type,
  
        /* First determine the type code we are dealing with.  */
        arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
@@ -4007,7 +3081,7 @@ index 09b41a0..7c0a8f9 100644
        type = check_typedef (value_type (arg1));
        code = TYPE_CODE (type);
  
-@@ -1880,23 +2076,13 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -1882,23 +2076,13 @@ evaluate_subexp_standard (struct type *expect_type,
  	      code = TYPE_CODE (type);
  	    }
  	} 
@@ -4033,7 +3107,7 @@ index 09b41a0..7c0a8f9 100644
  
  	case TYPE_CODE_PTR:
  	case TYPE_CODE_FUNC:
-@@ -2335,49 +2521,6 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -2337,49 +2521,6 @@ evaluate_subexp_standard (struct type *expect_type,
  	}
        return (arg1);
  
@@ -4083,7 +3157,7 @@ index 09b41a0..7c0a8f9 100644
      case BINOP_LOGICAL_AND:
        arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
        if (noside == EVAL_SKIP)
-@@ -2609,15 +2752,23 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -2611,15 +2752,23 @@ evaluate_subexp_standard (struct type *expect_type,
        if (expect_type && TYPE_CODE (expect_type) == TYPE_CODE_PTR)
  	expect_type = TYPE_TARGET_TYPE (check_typedef (expect_type));
        arg1 = evaluate_subexp (expect_type, exp, pos, noside);
@@ -4109,7 +3183,7 @@ index 09b41a0..7c0a8f9 100644
        else if (noside == EVAL_AVOID_SIDE_EFFECTS)
  	{
  	  type = check_typedef (value_type (arg1));
-@@ -2626,12 +2777,18 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -2628,12 +2777,18 @@ evaluate_subexp_standard (struct type *expect_type,
  	  /* In C you can dereference an array to get the 1st elt.  */
  	      || TYPE_CODE (type) == TYPE_CODE_ARRAY
  	    )
@@ -4133,7 +3207,7 @@ index 09b41a0..7c0a8f9 100644
  	  else
  	    error (_("Attempt to take contents of a non-pointer value."));
  	}
-@@ -2641,9 +2798,14 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -2643,9 +2798,14 @@ evaluate_subexp_standard (struct type *expect_type,
  	 do.  "long long" variables are rare enough that
  	 BUILTIN_TYPE_LONGEST would seem to be a mistake.  */
        if (TYPE_CODE (type) == TYPE_CODE_INT)
@@ -4151,7 +3225,7 @@ index 09b41a0..7c0a8f9 100644
  
      case UNOP_ADDR:
        /* C++: check for and handle pointer to members.  */
-@@ -2989,7 +3151,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
+@@ -2991,7 +3151,7 @@ evaluate_subexp_with_coercion (struct expression *exp,
  {
    enum exp_opcode op;
    int pc;
@@ -4160,7 +3234,7 @@ index 09b41a0..7c0a8f9 100644
    struct symbol *var;
    struct type *type;
  
-@@ -3000,13 +3162,18 @@ evaluate_subexp_with_coercion (struct expression *exp,
+@@ -3002,13 +3162,18 @@ evaluate_subexp_with_coercion (struct expression *exp,
      {
      case OP_VAR_VALUE:
        var = exp->elts[pc + 2].symbol;
@@ -4180,7 +3254,7 @@ index 09b41a0..7c0a8f9 100644
  	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
  			     val);
  	}
-@@ -3058,9 +3225,13 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
+@@ -3060,9 +3225,13 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
  
      case OP_VAR_VALUE:
        (*pos) += 4;
@@ -4197,7 +3271,7 @@ index 09b41a0..7c0a8f9 100644
  
      default:
        val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
-@@ -3091,18 +3262,25 @@ parse_and_eval_type (char *p, int length)
+@@ -3093,18 +3262,25 @@ parse_and_eval_type (char *p, int length)
  int
  calc_f77_array_dims (struct type *array_type)
  {
@@ -4640,7 +3714,7 @@ index ffb7f53..a2e7e94 100644
  
  b internal_error
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 91fafa2..eda2506 100644
+index 3b45931..eda2506 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -39,6 +39,9 @@
@@ -4973,16 +4047,7 @@ index 91fafa2..eda2506 100644
      }
  
    type = make_qualified_type (type, instance_flags, NULL);
-@@ -1902,6 +2042,8 @@ init_type (enum type_code code, int length, int flags,
-     TYPE_STUB_SUPPORTED (type) = 1;
-   if (flags & TYPE_FLAG_FIXED_INSTANCE)
-     TYPE_FIXED_INSTANCE (type) = 1;
-+  if (flags & TYPE_FLAG_GNU_IFUNC)
-+    TYPE_GNU_IFUNC (type) = 1;
- 
-   if (name)
-     TYPE_NAME (type) = obsavestring (name, strlen (name),
-@@ -3264,33 +3406,42 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
+@@ -3266,33 +3406,42 @@ type_pair_eq (const void *item_lhs, const void *item_rhs)
  }
  
  /* Allocate the hash table used by copy_type_recursive to walk
@@ -5040,7 +4105,7 @@ index 91fafa2..eda2506 100644
      return type;
  
    /* This type shouldn't be pointing to any types in other objfiles;
-@@ -3305,9 +3456,10 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3307,9 +3456,10 @@ copy_type_recursive (struct objfile *objfile,
    new_type = alloc_type_arch (get_type_arch (type));
  
    /* We must add the new type to the hash table immediately, in case
@@ -5054,7 +4119,7 @@ index 91fafa2..eda2506 100644
    stored->old = type;
    stored->new = new_type;
    *slot = stored;
-@@ -3318,6 +3470,21 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3320,6 +3470,21 @@ copy_type_recursive (struct objfile *objfile,
    TYPE_OBJFILE_OWNED (new_type) = 0;
    TYPE_OWNER (new_type).gdbarch = get_type_arch (type);
  
@@ -5076,7 +4141,7 @@ index 91fafa2..eda2506 100644
    if (TYPE_NAME (type))
      TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
    if (TYPE_TAG_NAME (type))
-@@ -3326,12 +3493,48 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3328,12 +3493,48 @@ copy_type_recursive (struct objfile *objfile,
    TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
    TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
  
@@ -5125,7 +4190,7 @@ index 91fafa2..eda2506 100644
        TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
        for (i = 0; i < nfields; i++)
  	{
-@@ -3340,8 +3543,8 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3342,8 +3543,8 @@ copy_type_recursive (struct objfile *objfile,
  	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
  	  if (TYPE_FIELD_TYPE (type, i))
  	    TYPE_FIELD_TYPE (new_type, i)
@@ -5136,7 +4201,7 @@ index 91fafa2..eda2506 100644
  	  if (TYPE_FIELD_NAME (type, i))
  	    TYPE_FIELD_NAME (new_type, i) = 
  	      xstrdup (TYPE_FIELD_NAME (type, i));
-@@ -3368,24 +3571,184 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3370,24 +3571,184 @@ copy_type_recursive (struct objfile *objfile,
  	}
      }
  
@@ -5328,7 +4393,7 @@ index 91fafa2..eda2506 100644
    /* Maybe copy the type_specific bits.
  
       NOTE drow/2005-12-09: We do not copy the C++-specific bits like
-@@ -3402,6 +3765,17 @@ copy_type_recursive (struct objfile *objfile,
+@@ -3404,6 +3765,17 @@ copy_type_recursive (struct objfile *objfile,
    return new_type;
  }
  
@@ -5346,7 +4411,7 @@ index 91fafa2..eda2506 100644
  /* Make a copy of the given TYPE, except that the pointer & reference
     types are not preserved.
     
-@@ -3424,6 +3798,201 @@ copy_type (const struct type *type)
+@@ -3426,6 +3798,201 @@ copy_type (const struct type *type)
    return new_type;
  }
  
@@ -5548,35 +4613,7 @@ index 91fafa2..eda2506 100644
  
  /* Helper functions to initialize architecture-specific types.  */
  
-@@ -3772,6 +4341,8 @@ gdbtypes_post_init (struct gdbarch *gdbarch)
-     = lookup_pointer_type (builtin_type->builtin_void);
-   builtin_type->builtin_func_ptr
-     = lookup_pointer_type (lookup_function_type (builtin_type->builtin_void));
-+  builtin_type->builtin_func_func
-+    = lookup_function_type (builtin_type->builtin_func_ptr);
- 
-   /* This type represents a GDB internal function.  */
-   builtin_type->internal_fn
-@@ -3885,6 +4456,18 @@ objfile_type (struct objfile *objfile)
- 		 "<text variable, no debug info>", objfile);
-   TYPE_TARGET_TYPE (objfile_type->nodebug_text_symbol)
-     = objfile_type->builtin_int;
-+  objfile_type->nodebug_text_gnu_ifunc_symbol
-+    = init_type (TYPE_CODE_FUNC, 1, TYPE_FLAG_GNU_IFUNC,
-+		 "<text gnu-indirect-function variable, no debug info>",
-+		 objfile);
-+  TYPE_TARGET_TYPE (objfile_type->nodebug_text_gnu_ifunc_symbol)
-+    = objfile_type->nodebug_text_symbol;
-+  objfile_type->nodebug_got_plt_symbol
-+    = init_type (TYPE_CODE_PTR, gdbarch_addr_bit (gdbarch) / 8, 0,
-+		 "<text from jump slot in .got.plt, no debug info>",
-+		 objfile);
-+  TYPE_TARGET_TYPE (objfile_type->nodebug_got_plt_symbol)
-+    = objfile_type->nodebug_text_symbol;
-   objfile_type->nodebug_data_symbol
-     = init_type (TYPE_CODE_INT,
- 		 gdbarch_int_bit (gdbarch) / HOST_CHAR_BIT, 0,
-@@ -3939,6 +4522,13 @@ void
+@@ -3955,6 +4522,13 @@ void
  _initialize_gdbtypes (void)
  {
    gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
@@ -5591,18 +4628,10 @@ index 91fafa2..eda2506 100644
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug,
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 5f89fec..4b4720a 100644
+index 39ca1b4..4b4720a 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
-@@ -170,6 +170,7 @@ enum type_flag_value
-   TYPE_FLAG_VECTOR = (1 << 15),
-   TYPE_FLAG_FIXED_INSTANCE = (1 << 16),
-   TYPE_FLAG_STUB_SUPPORTED = (1 << 17),
-+  TYPE_FLAG_GNU_IFUNC = (1 << 18),
- 
-   /* Used for error-checking.  */
-   TYPE_FLAG_MIN = TYPE_FLAG_UNSIGNED
-@@ -214,6 +215,11 @@ enum type_instance_flag_value
+@@ -215,6 +215,11 @@ enum type_instance_flag_value
  
  #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
  
@@ -5614,20 +4643,7 @@ index 5f89fec..4b4720a 100644
  /* Static type.  If this is set, the corresponding type had 
     a static modifier.
     Note: This may be unnecessary, since static data members
-@@ -271,6 +277,12 @@ enum type_instance_flag_value
- 
- #define TYPE_NOTTEXT(t)	(TYPE_INSTANCE_FLAGS (t) & TYPE_INSTANCE_FLAG_NOTTEXT)
- 
-+/* Used only for TYPE_CODE_FUNC where it specifies the real function
-+   address is returned by this function call.  TYPE_TARGET_TYPE determines the
-+   final returned function type to be presented to user.  */
-+
-+#define TYPE_GNU_IFUNC(t)	(TYPE_MAIN_TYPE (t)->flag_gnu_ifunc)
-+
- /* Type owner.  If TYPE_OBJFILE_OWNED is true, the type is owned by
-    the objfile retrieved as TYPE_OBJFILE.  Otherweise, the type is
-    owned by an architecture; TYPE_OBJFILE is NULL in this case.  */
-@@ -285,6 +297,50 @@ enum type_instance_flag_value
+@@ -292,6 +297,50 @@ enum type_instance_flag_value
  
  #define TYPE_DECLARED_CLASS(t) (TYPE_MAIN_TYPE (t)->flag_declared_class)
  
@@ -5678,13 +4694,7 @@ index 5f89fec..4b4720a 100644
  /* Constant type.  If this is set, the corresponding type has a
     const modifier.  */
  
-@@ -387,11 +443,21 @@ struct main_type
-   unsigned int flag_varargs : 1;
-   unsigned int flag_vector : 1;
-   unsigned int flag_stub_supported : 1;
-+  unsigned int flag_gnu_ifunc : 1;
-   unsigned int flag_fixed_instance : 1;
-   unsigned int flag_objfile_owned : 1;
+@@ -400,6 +449,15 @@ struct main_type
    /* True if this type was declared with "class" rather than
       "struct".  */
    unsigned int flag_declared_class : 1;
@@ -5700,7 +4710,7 @@ index 5f89fec..4b4720a 100644
  
    /* A discriminant telling us which field of the type_specific union
       is being used for this type, if any.  */
-@@ -465,6 +531,20 @@ struct main_type
+@@ -473,6 +531,20 @@ struct main_type
  
    struct type *target_type;
  
@@ -5721,7 +4731,7 @@ index 5f89fec..4b4720a 100644
    /* For structure and union types, a description of each field.
       For set and pascal array types, there is one "field",
       whose type is the domain type of the set or array.
-@@ -539,13 +619,34 @@ struct main_type
+@@ -547,13 +619,34 @@ struct main_type
  
      struct range_bounds
      {
@@ -5761,7 +4771,7 @@ index 5f89fec..4b4720a 100644
  
        /* Flags indicating whether the values of low and high are
           valid.  When true, the respective range value is
-@@ -918,9 +1019,9 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -926,9 +1019,9 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -5774,7 +4784,7 @@ index 5f89fec..4b4720a 100644
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
-@@ -928,11 +1029,16 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -936,11 +1029,16 @@ extern void allocate_gnat_aux_type (struct type *);
  #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
@@ -5793,7 +4803,7 @@ index 5f89fec..4b4720a 100644
  #define TYPE_LOW_BOUND_UNDEFINED(range_type) \
     TYPE_RANGE_DATA(range_type)->low_undefined
  #define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
-@@ -949,7 +1055,14 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -957,7 +1055,14 @@ extern void allocate_gnat_aux_type (struct type *);
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
  
  #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
@@ -5809,27 +4819,7 @@ index 5f89fec..4b4720a 100644
  
  /* C++ */
  
-@@ -1178,6 +1291,10 @@ struct builtin_type
-      (*) () can server as a generic function pointer.  */
-   struct type *builtin_func_ptr;
- 
-+  /* `function returning pointer to function (returning void)' type.
-+     The final void return type is not significant for it.  */
-+  struct type *builtin_func_func;
-+
- 
-   /* Special-purpose types.  */
- 
-@@ -1218,6 +1335,8 @@ struct objfile_type
- 
-   /* Types used for symbols with no debug information.  */
-   struct type *nodebug_text_symbol;
-+  struct type *nodebug_text_gnu_ifunc_symbol;
-+  struct type *nodebug_got_plt_symbol;
-   struct type *nodebug_data_symbol;
-   struct type *nodebug_unknown_symbol;
-   struct type *nodebug_tls_symbol;
-@@ -1365,6 +1484,18 @@ extern struct type *create_array_type (struct type *, struct type *,
+@@ -1379,6 +1484,18 @@ extern struct type *create_array_type (struct type *, struct type *,
  				       struct type *);
  extern struct type *lookup_array_range_type (struct type *, int, int);
  
@@ -5848,7 +4838,7 @@ index 5f89fec..4b4720a 100644
  extern struct type *create_string_type (struct type *, struct type *,
  					struct type *);
  extern struct type *lookup_string_range_type (struct type *, int, int);
-@@ -1410,6 +1541,10 @@ extern int is_public_ancestor (struct type *, struct type *);
+@@ -1424,6 +1541,10 @@ extern int is_public_ancestor (struct type *, struct type *);
  
  extern int is_unique_ancestor (struct type *, struct value *);
  
@@ -5859,7 +4849,7 @@ index 5f89fec..4b4720a 100644
  /* Overload resolution */
  
  #define LENGTH_MATCH(bv) ((bv)->rank[0])
-@@ -1482,10 +1617,13 @@ extern void maintenance_print_type (char *, int);
+@@ -1496,10 +1617,13 @@ extern void maintenance_print_type (char *, int);
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -6471,87 +5461,8 @@ index 819c6b8..bef8a35 100644
  /* Use this function to set i386_dr_low debug_register_length field
     rather than setting it directly to check that the length is only
     set once.  It also enables the 'maint set/show show-debug-regs' 
-diff --git a/gdb/infcall.c b/gdb/infcall.c
-index d42248e..ca23704 100644
---- a/gdb/infcall.c
-+++ b/gdb/infcall.c
-@@ -228,6 +228,21 @@ value_arg_coerce (struct gdbarch *gdbarch, struct value *arg,
-   return value_cast (type, arg);
- }
- 
-+/* Return the return type of a function with its first instruction exactly at
-+   the PC address.  Return NULL otherwise.  */
-+
-+static struct type *
-+find_function_return_type (CORE_ADDR pc)
-+{
-+  struct symbol *sym = find_pc_function (pc);
-+
-+  if (sym != NULL && BLOCK_START (SYMBOL_BLOCK_VALUE (sym)) == pc
-+      && SYMBOL_TYPE (sym) != NULL)
-+    return TYPE_TARGET_TYPE (SYMBOL_TYPE (sym));
-+
-+  return NULL;
-+}
-+
- /* Determine a function's address and its return type from its value.
-    Calls error() if the function is not valid for calling.  */
- 
-@@ -236,7 +251,6 @@ find_function_addr (struct value *function, struct type **retval_type)
- {
-   struct type *ftype = check_typedef (value_type (function));
-   struct gdbarch *gdbarch = get_type_arch (ftype);
--  enum type_code code = TYPE_CODE (ftype);
-   struct type *value_type = NULL;
-   CORE_ADDR funaddr;
- 
-@@ -244,24 +258,34 @@ find_function_addr (struct value *function, struct type **retval_type)
-      part of it.  */
- 
-   /* Determine address to call.  */
--  if (code == TYPE_CODE_FUNC || code == TYPE_CODE_METHOD)
--    {
--      funaddr = value_address (function);
--      value_type = TYPE_TARGET_TYPE (ftype);
--    }
--  else if (code == TYPE_CODE_PTR)
-+  if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
-+      || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
-+    funaddr = value_address (function);
-+  else if (TYPE_CODE (ftype) == TYPE_CODE_PTR)
-     {
-       funaddr = value_as_address (function);
-       ftype = check_typedef (TYPE_TARGET_TYPE (ftype));
-       if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
- 	  || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
-+	funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
-+						      &current_target);
-+    }
-+  if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
-+      || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
-+    {
-+      value_type = TYPE_TARGET_TYPE (ftype);
-+
-+      if (TYPE_GNU_IFUNC (ftype))
- 	{
--	  funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
--							&current_target);
--	  value_type = TYPE_TARGET_TYPE (ftype);
-+	  funaddr = gnu_ifunc_resolve_addr (gdbarch, funaddr);
-+
-+	  /* Skip querying the function symbol if no RETVAL_TYPE has been
-+	     asked for.  */
-+	  if (retval_type)
-+	    value_type = find_function_return_type (funaddr);
- 	}
-     }
--  else if (code == TYPE_CODE_INT)
-+  else if (TYPE_CODE (ftype) == TYPE_CODE_INT)
-     {
-       /* Handle the case of functions lacking debugging info.
-          Their values are characters since their addresses are char.  */
 diff --git a/gdb/infrun.c b/gdb/infrun.c
-index 7cee7c8..751c9ef 100644
+index 7cee7c8..b94c11a 100644
 --- a/gdb/infrun.c
 +++ b/gdb/infrun.c
 @@ -54,6 +54,8 @@
@@ -6607,7 +5518,7 @@ index 7cee7c8..751c9ef 100644
  	keep_going (ecs);
  	return;
  
-@@ -5263,15 +5268,64 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
+@@ -5263,15 +5268,65 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
      }
  }
  
@@ -6632,8 +5543,9 @@ index 7cee7c8..751c9ef 100644
 +
 +  if (debug_infrun)
 +    fprintf_unfiltered (gdb_stdlog,
-+			"infrun: exception resume at %lx\n",
-+			(unsigned long) handler);
++			"infrun: exception resume at %s\n",
++			paddress (get_objfile_arch (objfile),
++				  handler));
 +
 +  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
 +				       handler, bp_exception_resume);
@@ -6673,7 +5585,7 @@ index 7cee7c8..751c9ef 100644
  
    TRY_CATCH (e, RETURN_MASK_ERROR)
      {
-@@ -6253,7 +6307,8 @@ static struct lval_funcs siginfo_value_funcs =
+@@ -6253,7 +6308,8 @@ static struct lval_funcs siginfo_value_funcs =
     if there's no object available.  */
  
  static struct value *
@@ -6683,10 +5595,12 @@ index 7cee7c8..751c9ef 100644
  {
    if (target_has_stack
        && !ptid_equal (inferior_ptid, null_ptid)
-@@ -6826,6 +6881,13 @@ show_schedule_multiple (struct ui_file *file, int from_tty,
+@@ -6826,6 +6882,15 @@ show_schedule_multiple (struct ui_file *file, int from_tty,
  			    "of all processes is %s.\n"), value);
  }
  
++/* Implementation of `siginfo' variable.  */
++
 +static const struct internalvar_funcs siginfo_funcs =
 +{
 +  siginfo_make_value,
@@ -6697,7 +5611,7 @@ index 7cee7c8..751c9ef 100644
  void
  _initialize_infrun (void)
  {
-@@ -7098,7 +7160,7 @@ Tells gdb whether to detach the child of a fork."),
+@@ -7098,7 +7163,7 @@ Tells gdb whether to detach the child of a fork."),
       value with a void typed value, and when we get here, gdbarch
       isn't initialized yet.  At this point, we're quite sure there
       isn't another convenience variable of the same name.  */
@@ -6707,7 +5621,7 @@ index 7cee7c8..751c9ef 100644
    add_setshow_boolean_cmd ("observer", no_class,
  			   &observer_mode_1, _("\
 diff --git a/gdb/linespec.c b/gdb/linespec.c
-index 70df3ca..af53f97 100644
+index 70df3ca..5338161 100644
 --- a/gdb/linespec.c
 +++ b/gdb/linespec.c
 @@ -43,6 +43,7 @@
@@ -6731,7 +5645,7 @@ index 70df3ca..af53f97 100644
      return decode_indirect (argptr);
  
 +  if (strncmp (*argptr, "probe:", 6) == 0)
-+    return parse_stap_probe (argptr, canonical, not_found_ptr);
++    return parse_stap_probe (argptr, canonical);
 +
    is_quoted = (strchr (get_gdb_completer_quote_characters (),
  		       **argptr) != NULL);
@@ -7011,110 +5925,6 @@ index a401846..26dca8c 100644
        struct varobj *var = varobj_get_handle (name);
  
        varobj_update_one (var, print_values, 1 /* explicit */);
-diff --git a/gdb/minsyms.c b/gdb/minsyms.c
-index 4551b07..b054e3f 100644
---- a/gdb/minsyms.c
-+++ b/gdb/minsyms.c
-@@ -334,8 +334,9 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
- 	       msymbol = msymbol->hash_next)
- 	    {
- 	      if (strcmp (SYMBOL_LINKAGE_NAME (msymbol), name) == 0 &&
--		  (MSYMBOL_TYPE (msymbol) == mst_text ||
--		   MSYMBOL_TYPE (msymbol) == mst_file_text))
-+		  (MSYMBOL_TYPE (msymbol) == mst_text
-+		   || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc
-+		   || MSYMBOL_TYPE (msymbol) == mst_file_text))
- 		{
- 		  switch (MSYMBOL_TYPE (msymbol))
- 		    {
-@@ -697,6 +698,69 @@ lookup_minimal_symbol_by_pc (CORE_ADDR pc)
-   return lookup_minimal_symbol_by_pc_section (pc, NULL);
- }
- 
-+/* Return non-zero iff PC is in an STT_GNU_IFUNC function resolver.  */
-+
-+int
-+in_gnu_ifunc_stub (CORE_ADDR pc)
-+{
-+  struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
-+
-+  return msymbol && MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc;
-+}
-+
-+/* See elf_gnu_ifunc_resolve_addr for its real implementation.  */
-+
-+static CORE_ADDR
-+stub_gnu_ifunc_resolve_addr (struct gdbarch *gdbarch, CORE_ADDR pc)
-+{
-+  error (_("GDB cannot resolve STT_GNU_IFUNC symbol at address %s without "
-+	   "the ELF support compiled in."),
-+	 paddress (gdbarch, pc));
-+}
-+
-+/* See elf_gnu_ifunc_resolve_name for its real implementation.  */
-+
-+static int
-+stub_gnu_ifunc_resolve_name (const char *function_name,
-+			     CORE_ADDR *function_address_p)
-+{
-+  error (_("GDB cannot resolve STT_GNU_IFUNC symbol \"%s\" without "
-+	   "the ELF support compiled in."),
-+	 function_name);
-+}
-+
-+/* See elf_gnu_ifunc_resolver_stop for its real implementation.  */
-+
-+static void
-+stub_gnu_ifunc_resolver_stop (struct breakpoint *b)
-+{
-+  internal_error (__FILE__, __LINE__,
-+		  _("elf_gnu_ifunc_resolver_stop cannot be reached."));
-+}
-+
-+/* See elf_gnu_ifunc_resolver_return_stop for its real implementation.  */
-+
-+static void
-+stub_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
-+{
-+  internal_error (__FILE__, __LINE__,
-+		  _("elf_gnu_ifunc_resolver_return_stop cannot be reached."));
-+}
-+
-+/* See elf_gnu_ifunc_fns for its real implementation.  */
-+
-+static const struct gnu_ifunc_fns stub_gnu_ifunc_fns =
-+{
-+  stub_gnu_ifunc_resolve_addr,
-+  stub_gnu_ifunc_resolve_name,
-+  stub_gnu_ifunc_resolver_stop,
-+  stub_gnu_ifunc_resolver_return_stop,
-+};
-+
-+/* A placeholder for &elf_gnu_ifunc_fns.  */
-+
-+const struct gnu_ifunc_fns *gnu_ifunc_fns_p = &stub_gnu_ifunc_fns;
-+
- /* Find the minimal symbol named NAME, and return both the minsym
-    struct and its objfile.  This only checks the linkage name.  Sets
-    *OBJFILE_P and returns the minimal symbol, if it is found.  If it
-@@ -766,6 +830,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
-   switch (ms_type)
-     {
-     case mst_text:
-+    case mst_text_gnu_ifunc:
-     case mst_file_text:
-     case mst_solib_trampoline:
-       section = SECT_OFF_TEXT (objfile);
-@@ -1231,7 +1296,8 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
-     {
-       ALL_MSYMBOLS (objfile, msymbol)
-       {
--	if (MSYMBOL_TYPE (msymbol) == mst_text
-+	if ((MSYMBOL_TYPE (msymbol) == mst_text
-+	    || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc)
- 	    && strcmp (SYMBOL_LINKAGE_NAME (msymbol),
- 		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
- 	  return SYMBOL_VALUE_ADDRESS (msymbol);
 diff --git a/gdb/mipsread.c b/gdb/mipsread.c
 index 74d795d..7e05317 100644
 --- a/gdb/mipsread.c
@@ -7128,14 +5938,14 @@ index 74d795d..7e05317 100644
  };
  
 diff --git a/gdb/objfiles.c b/gdb/objfiles.c
-index f3259dd..1309cdb 100644
+index f3259dd..4cb3bed 100644
 --- a/gdb/objfiles.c
 +++ b/gdb/objfiles.c
 @@ -846,6 +846,11 @@ objfile_relocate1 (struct objfile *objfile,
  				obj_section_addr (s));
      }
  
-+  /* Relocating Systemtap probes.  */
++  /* Relocating SystemTap probes.  */
 +  if (objfile->sf && objfile->sf->sym_probe_fns)
 +    objfile->sf->sym_probe_fns->sym_relocate_probe (objfile,
 +						    new_offsets, delta);
@@ -7224,57 +6034,10 @@ index d2efa5b..d98b3a4 100644
  }
  
 diff --git a/gdb/parse.c b/gdb/parse.c
-index 02a7d89..81f3f0c 100644
+index 4815854..81f3f0c 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
-@@ -487,9 +487,22 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
-   pc = gdbarch_convert_from_func_ptr_addr (gdbarch, addr, &current_target);
-   if (pc != addr)
-     {
-+      struct minimal_symbol *ifunc_msym = lookup_minimal_symbol_by_pc (pc);
-+
-       /* In this case, assume we have a code symbol instead of
- 	 a data symbol.  */
--      type = mst_text;
-+
-+      if (ifunc_msym != NULL && MSYMBOL_TYPE (ifunc_msym) == mst_text_gnu_ifunc
-+	  && SYMBOL_VALUE_ADDRESS (ifunc_msym) == pc)
-+	{
-+	  /* A function descriptor has been resolved but PC is still in the
-+	     STT_GNU_IFUNC resolver body (such as because inferior does not
-+	     run to be able to call it).  */
-+
-+	  type = mst_text_gnu_ifunc;
-+	}
-+      else
-+	type = mst_text;
-       section = NULL;
-       addr = pc;
-     }
-@@ -521,6 +534,11 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
-       write_exp_elt_type (objfile_type (objfile)->nodebug_text_symbol);
-       break;
- 
-+    case mst_text_gnu_ifunc:
-+      write_exp_elt_type (objfile_type (objfile)
-+					       ->nodebug_text_gnu_ifunc_symbol);
-+      break;
-+
-     case mst_data:
-     case mst_file_data:
-     case mst_bss:
-@@ -528,6 +546,10 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
-       write_exp_elt_type (objfile_type (objfile)->nodebug_data_symbol);
-       break;
- 
-+    case mst_slot_got_plt:
-+      write_exp_elt_type (objfile_type (objfile)->nodebug_got_plt_symbol);
-+      break;
-+
-     default:
-       write_exp_elt_type (objfile_type (objfile)->nodebug_unknown_symbol);
-       break;
-@@ -1480,6 +1502,7 @@ parser_fprintf (FILE *x, const char *y, ...)
+@@ -1502,6 +1502,7 @@ parser_fprintf (FILE *x, const char *y, ...)
  
  int
  operator_check_standard (struct expression *exp, int pos,
@@ -7282,7 +6045,7 @@ index 02a7d89..81f3f0c 100644
  			 int (*objfile_func) (struct objfile *objfile,
  					      void *data),
  			 void *data)
-@@ -1521,7 +1544,7 @@ operator_check_standard (struct expression *exp, int pos,
+@@ -1543,7 +1544,7 @@ operator_check_standard (struct expression *exp, int pos,
  	    struct type *type = elts[pos + 2 + arg].type;
  	    struct objfile *objfile = TYPE_OBJFILE (type);
  
@@ -7291,7 +6054,7 @@ index 02a7d89..81f3f0c 100644
  	      return 1;
  	  }
        }
-@@ -1539,7 +1562,8 @@ operator_check_standard (struct expression *exp, int pos,
+@@ -1561,7 +1562,8 @@ operator_check_standard (struct expression *exp, int pos,
  
  	/* Check objfile where the variable itself is placed.
  	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
@@ -7301,7 +6064,7 @@ index 02a7d89..81f3f0c 100644
  	  return 1;
  
  	/* Check objfile where is placed the code touching the variable.  */
-@@ -1552,24 +1576,27 @@ operator_check_standard (struct expression *exp, int pos,
+@@ -1574,24 +1576,27 @@ operator_check_standard (struct expression *exp, int pos,
  
    /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
  
@@ -7337,7 +6100,7 @@ index 02a7d89..81f3f0c 100644
  	     int (*objfile_func) (struct objfile *objfile, void *data),
  	     void *data)
  {
-@@ -1584,7 +1611,9 @@ exp_iterate (struct expression *exp,
+@@ -1606,7 +1611,9 @@ exp_iterate (struct expression *exp,
  
        pos = endpos - oplen;
        if (exp->language_defn->la_exp_desc->operator_check (exp, pos,
@@ -7348,7 +6111,7 @@ index 02a7d89..81f3f0c 100644
  	return 1;
  
        endpos = pos;
-@@ -1615,8 +1644,29 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
+@@ -1637,8 +1644,29 @@ exp_uses_objfile (struct expression *exp, struct objfile *objfile)
  {
    gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
  
@@ -7412,10 +6175,10 @@ index 3f743d1..3b942c4 100644
 +
  #endif /* PARSER_DEFS_H */
 diff --git a/gdb/ppc-linux-nat.c b/gdb/ppc-linux-nat.c
-index 049cde8..f3d35ec 100644
+index f0c7f61..54cacbb 100644
 --- a/gdb/ppc-linux-nat.c
 +++ b/gdb/ppc-linux-nat.c
-@@ -1637,12 +1637,18 @@ booke_remove_point (struct ppc_hw_breakpoint *b, int tid)
+@@ -1637,6 +1637,14 @@ booke_remove_point (struct ppc_hw_breakpoint *b, int tid)
    hw_breaks[i].hw_break = NULL;
  }
  
@@ -7427,7 +6190,10 @@ index 049cde8..f3d35ec 100644
 +  booke_insert_point (pp, tid);
 +}
 +
+ /* Return the number of registers needed for a ranged breakpoint.  */
+ 
  static int
+@@ -1654,8 +1662,6 @@ static int
  ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
  				  struct bp_target_info *bp_tgt)
  {
@@ -7436,9 +6202,9 @@ index 049cde8..f3d35ec 100644
    struct ppc_hw_breakpoint p;
  
    if (!have_ptrace_booke_interface ())
-@@ -1656,18 +1662,23 @@ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
-   p.addr2 = 0;
-   p.condition_value = 0;
+@@ -1681,18 +1687,23 @@ ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
+       p.addr2 = 0;
+     }
  
 -  ALL_LWPS (lp, ptid)
 -    booke_insert_point (&p, TIDGET (ptid));
@@ -7464,9 +6230,9 @@ index 049cde8..f3d35ec 100644
    struct ppc_hw_breakpoint p;
  
    if (!have_ptrace_booke_interface ())
-@@ -1681,8 +1692,7 @@ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
-   p.addr2 = 0;
-   p.condition_value = 0;
+@@ -1718,8 +1729,7 @@ ppc_linux_remove_hw_breakpoint (struct gdbarch *gdbarch,
+       p.addr2 = 0;
+     }
  
 -  ALL_LWPS (lp, ptid)
 -    booke_remove_point (&p, TIDGET (ptid));
@@ -7474,7 +6240,7 @@ index 049cde8..f3d35ec 100644
  
    return 0;
  }
-@@ -1896,6 +1906,15 @@ ppc_linux_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
+@@ -1933,6 +1943,15 @@ ppc_linux_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
  	  && check_condition (addr, cond, &data_value));
  }
  
@@ -7490,7 +6256,7 @@ index 049cde8..f3d35ec 100644
  /* Set up P with the parameters necessary to request a watchpoint covering
     LEN bytes starting at ADDR and if possible with condition expression COND
     evaluated by hardware.  INSERT tells if we are creating a request for
-@@ -1949,8 +1968,6 @@ static int
+@@ -1986,8 +2005,6 @@ static int
  ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
  			     struct expression *cond)
  {
@@ -7499,7 +6265,7 @@ index 049cde8..f3d35ec 100644
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -1959,8 +1976,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -1996,8 +2013,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
  
        create_watchpoint_request (&p, addr, len, rw, cond, 1);
  
@@ -7509,7 +6275,7 @@ index 049cde8..f3d35ec 100644
  
        ret = 0;
      }
-@@ -2003,12 +2019,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -2040,12 +2056,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
  
        saved_dabr_value = dabr_value;
  
@@ -7523,7 +6289,7 @@ index 049cde8..f3d35ec 100644
      }
  
    return ret;
-@@ -2018,8 +2030,6 @@ static int
+@@ -2055,8 +2067,6 @@ static int
  ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
  			     struct expression *cond)
  {
@@ -7532,7 +6298,7 @@ index 049cde8..f3d35ec 100644
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -2028,20 +2038,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
+@@ -2065,20 +2075,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
  
        create_watchpoint_request (&p, addr, len, rw, cond, 0);
  
@@ -8765,20 +7531,6 @@ index ce0eb35..14572f4 100644
  int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
  			      int embedded_offset, CORE_ADDR address,
  			      struct ui_file *stream, int recurse,
-diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
-index 432da99..78c6b1c 100644
---- a/gdb/solib-svr4.c
-+++ b/gdb/solib-svr4.c
-@@ -1276,7 +1276,8 @@ svr4_in_dynsym_resolve_code (CORE_ADDR pc)
- 	   && pc < info->interp_text_sect_high)
- 	  || (pc >= info->interp_plt_sect_low
- 	      && pc < info->interp_plt_sect_high)
--	  || in_plt_section (pc, NULL));
-+	  || in_plt_section (pc, NULL)
-+	  || in_gnu_ifunc_stub (pc));
- }
- 
- /* Given an executable's ABFD and target, compute the entry-point
 diff --git a/gdb/somread.c b/gdb/somread.c
 index 70831a0..baf68ea 100644
 --- a/gdb/somread.c
@@ -8819,11 +7571,11 @@ index 0888b69..c3efd5b 100644
  	      else
 diff --git a/gdb/stap-probe.c b/gdb/stap-probe.c
 new file mode 100644
-index 0000000..e251bd3
+index 0000000..836d904
 --- /dev/null
 +++ b/gdb/stap-probe.c
-@@ -0,0 +1,2031 @@
-+/* Systemtap probe support for GDB.
+@@ -0,0 +1,2041 @@
++/* SystemTap probe support for GDB.
 +
 +   Copyright (C) 2011 Free Software Foundation, Inc.
 +
@@ -8862,6 +7614,22 @@ index 0000000..e251bd3
 +
 +#include <ctype.h>
 +
++/* This define is used to inform whether we are compiling an agent
++   expression or not.  */
++
++#define STAP_COMPILING_AGENT_EXPR_P(eval_info) \
++  (eval_info->aexpr != NULL)
++
++/* The various possibilities of bitness defined for a probe's argument.
++
++   The relationship is:
++
++   - STAP_ARG_BITNESS_UNDEFINED:  The user hasn't specified the bitness.
++   - STAP_ARG_BITNESS_32BIT_UNSIGNED:  argument string starts with `4@'.
++   - STAP_ARG_BITNESS_32BIT_SIGNED:  argument string starts with `-4@'.
++   - STAP_ARG_BITNESS_64BIT_UNSIGNED:  argument string starts with `8@'.
++   - STAP_ARG_BITNESS_64BIT_SIGNED:  argument string starts with `-8@'.  */
++
 +enum stap_arg_bitness
 +{
 +  STAP_ARG_BITNESS_UNDEFINED,
@@ -8870,6 +7638,8 @@ index 0000000..e251bd3
 +  STAP_ARG_BITNESS_64BIT_UNSIGNED,
 +  STAP_ARG_BITNESS_64BIT_SIGNED,
 +};
++
++/* The following structure represents a single argument for the probe.  */
 +
 +struct stap_probe_arg
 +{
@@ -8880,7 +7650,12 @@ index 0000000..e251bd3
 +  char *arg_str;
 +};
 +
++/* The maximum number of arguments that a probe can have,
++   as defined in <sys/sdt.h>.  */
++
 +#define STAP_MAX_ARGS 10
++
++/* Structure that holds information about all arguments of a probe.  */
 +
 +struct stap_args_info
 +{
@@ -8894,7 +7669,7 @@ index 0000000..e251bd3
 +  struct stap_probe_arg *arg;
 +};
 +
-+/* Struct that contains all the necessary information to evaluate
++/* Structure that contains all the necessary information to evaluate
 +   an expression.  */
 +
 +struct stap_evaluation_info
@@ -8918,9 +7693,6 @@ index 0000000..e251bd3
 +  /* The bitness specified for this argument.  */
 +  enum stap_arg_bitness bitness;
 +
-+  /* Flag to indicate if we are compiling an agent expression.  */
-+  int compiling_p;
-+
 +  /* If the above flag is true (one), this field will contain the
 +     pointer to the agent expression.  */
 +  struct agent_expr *aexpr;
@@ -8936,24 +7708,17 @@ index 0000000..e251bd3
 +static struct stap_args_info dummy_stap_args_info =
 +  { 0, NULL, NULL };
 +
-+/* Evaluation function for probe's argument expressions.  LHS represents
-+   the left side of the expression, and PREC is the precedence of the
-+   last operator identified before calling the function.  */
-+
 +static struct value *stap_evaluate_probe_argument_2
 +  (struct stap_evaluation_info *eval_info,
 +   struct value *lhs, int prec);
 +
-+/* This function is responsible for checking the necessary type of evaluation
-+   depending on what is the next "thing" in the buffer.  Valid values are:
-+
-+   - Unary operators;
-+   - Integer constants;
-+   - Register displacement, indirection, and direct access;
-+   - Parenthesized operand.  */
-+
 +static struct value *stap_evaluate_conditionally
 +  (struct stap_evaluation_info *eval_info);
++
++/* Helper function which decides to skip whitespaces or not in a probe's
++   argument string.  Basically, if we are inside a parenthesis expression
++   (i.e., inside a subexpression), we can skip whitespaces; otherwise we
++   cannot.  */
 +
 +static void
 +stap_skip_whitespace_cond (char **s, int inside_paren)
@@ -8961,6 +7726,10 @@ index 0000000..e251bd3
 +  if (inside_paren)
 +    *s = skip_spaces (*s);
 +}
++
++/* Helper function which parses a single argument in a probe's argument
++   string, based on various rules (which can be learned from the `gas'
++   manual).  It returns 1 on success, or 0 otherwise.  */
 +
 +static int
 +stap_parse_arg (const char **p)
@@ -9153,28 +7922,48 @@ index 0000000..e251bd3
 +  return 1;
 +}
 +
++/* Helper function which is responsible for freeing the space allocated to
++   hold information about a probe's arguments.  */
++
 +static void
 +stap_free_args_info (void *args_info_ptr)
 +{
 +  struct stap_args_info *a = (struct stap_args_info *) args_info_ptr;
 +  int i;
 +
-+  for (i = 0; i < STAP_MAX_ARGS; i++)
++  for (i = 0; i < a->n_args; i++)
 +    {
-+      xfree (a->arg->arg_str);
++      xfree (a->arg[i].arg_str);
 +    }
 +
 +  xfree (a->arg);
 +  xfree (a);
 +}
 +
-+void
++/* Function which parses an argument string from PROBE, correctly splitting
++   the arguments and storing their information in properly ways.  This function
++   only separates the arguments, but does not evaluate them.
++
++   Consider the following argument string:
++
++   `4@%eax 4@$10'
++
++   We have two arguments, `%eax' and `$10', both with 32-bit unsigned bitness.
++   This function basically handles them, properly filling some structures with
++   this information.  */
++
++static void
 +stap_parse_probe_arguments (struct stap_probe *probe)
 +{
 +  struct stap_args_info *args_info;
 +  struct cleanup *back_to;
 +  const char *cur = probe->args;
 +  int current_arg = -1;
++  /* This is a state-machine parser, which means we will always be
++     in a known state when parsing an argument.  The state could be
++     either `NEW_ARG' if we are parsing a new argument, `BITNESS' if
++     we are parsing the bitness-definition part (i.e., `4@'), or
++     `PARSE_ARG' if we are actually parsing the argument part.  */
 +  enum
 +    {
 +      NEW_ARG,
@@ -9311,6 +8100,8 @@ index 0000000..e251bd3
 +
 +  discard_cleanups (back_to);
 +}
++
++/* See definition in stap-probe.h.  */
 +
 +int
 +stap_get_probe_argument_count (const struct stap_probe *probe)
@@ -9611,8 +8402,7 @@ index 0000000..e251bd3
 +  struct gdbarch *gdbarch = eval_info->gdbarch;
 +  struct frame_info *frame = eval_info->frame;
 +  enum stap_arg_bitness bitness = eval_info->bitness;
-+#define REG_NAME_MAX_SIZE 20
-+  char regname[REG_NAME_MAX_SIZE + 1];
++  char *regname;
 +  int len, regnum, indirect_p = 0;
 +  struct value *ret = NULL;
 +  
@@ -9620,7 +8410,7 @@ index 0000000..e251bd3
 +     buffer was empty.  */
 +  gdb_assert (s && *s);
 +
-+  if (eval_info->compiling_p)
++  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +    /* If we are compiling, we cannot return NULL because that would
 +       lead to errors in future evaluations.  That's why we just make
 +       this dummy value, representing that the return value of this
@@ -9670,10 +8460,7 @@ index 0000000..e251bd3
 +  if (indirect_p && *s == ')')
 +    ++s;
 +
-+  if (len >= REG_NAME_MAX_SIZE)
-+    error (_("The register name is greater than the supported size "
-+	     "on expression `%s'."), eval_info->saved_expr);
-+
++  regname = alloca (len + 1);
 +  strncpy (regname, start, len);
 +  regname[len] = '\0';
 +
@@ -9684,7 +8471,7 @@ index 0000000..e251bd3
 +    error (_("Invalid register name `%s' on expression `%s'."),
 +	   regname, eval_info->saved_expr);
 +
-+  if (eval_info->compiling_p)
++  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +    ax_reg (eval_info->aexpr, regnum);
 +  else
 +    ret = value_of_register (regnum, frame);
@@ -9703,7 +8490,7 @@ index 0000000..e251bd3
 +      switch (bitness)
 +	{
 +	case STAP_ARG_BITNESS_UNDEFINED:
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    {
 +	      if (gdbarch_addr_bit (gdbarch) == 32)
 +		aop = aop_ref32;
@@ -9722,7 +8509,7 @@ index 0000000..e251bd3
 +	  break;
 +
 +	case STAP_ARG_BITNESS_32BIT_SIGNED:
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    aop = aop_ref32;
 +	  else
 +	    t = lookup_pointer_type
@@ -9730,7 +8517,7 @@ index 0000000..e251bd3
 +	  break;
 +
 +	case STAP_ARG_BITNESS_32BIT_UNSIGNED:
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    aop = aop_ref32;
 +	  else
 +	    t = lookup_pointer_type
@@ -9738,7 +8525,7 @@ index 0000000..e251bd3
 +	  break;
 +
 +	case STAP_ARG_BITNESS_64BIT_SIGNED:
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    aop = aop_ref64;
 +	  else
 +	    t = lookup_pointer_type
@@ -9746,7 +8533,7 @@ index 0000000..e251bd3
 +	  break;
 +
 +	case STAP_ARG_BITNESS_64BIT_UNSIGNED:
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    aop = aop_ref64;
 +	  else
 +	    t = lookup_pointer_type
@@ -9761,7 +8548,7 @@ index 0000000..e251bd3
 +
 +      if (displacement)
 +	{
-+	  if (eval_info->compiling_p)
++	  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	    {
 +	      ax_const_l (eval_info->aexpr, value_as_long (displacement));
 +	      ax_simple (eval_info->aexpr, aop_add);
@@ -9770,7 +8557,7 @@ index 0000000..e251bd3
 +	    ret = value_ptradd (ret, value_as_long (displacement));
 +	}
 +
-+      if (eval_info->compiling_p)
++      if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	{
 +	  if (trace_kludge)
 +	    {
@@ -9809,7 +8596,7 @@ index 0000000..e251bd3
 +  enum stap_arg_bitness bitness = eval_info->bitness;
 +  struct value *res = NULL;
 +
-+  if (eval_info->compiling_p)
++  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +    /* If we are compiling, we cannot return NULL because that would
 +       lead to errors in future evaluations.  That's why we just make
 +       this dummy value, representing that the return value of this
@@ -9854,7 +8641,7 @@ index 0000000..e251bd3
 +
 +	      if (c == '-')
 +		{
-+		  if (eval_info->compiling_p)
++		  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +		    {
 +		      /* We have to add `-1' to the stack, and multiply
 +			 the two values.  */
@@ -9866,7 +8653,7 @@ index 0000000..e251bd3
 +		}
 +	      else
 +		{
-+		  if (eval_info->compiling_p)
++		  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +		    ax_simple (eval_info->aexpr, aop_bit_not);
 +		  else
 +		    res = value_complement (tmp_res);
@@ -9911,26 +8698,25 @@ index 0000000..e251bd3
 +	      number = strtol (eval_info->exp_buf,
 +			       &eval_info->exp_buf, 0);
 +
-+	      if (!eval_info->compiling_p)
++	      if (!STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +		res
 +		  = value_from_longest (builtin_type (gdbarch)->builtin_int,
 +					number);
-+
-+	      if (eval_info->compiling_p)
++	      else
 +		ax_const_l (eval_info->aexpr, number);
 +
 +	      eval_info->exp_buf = skip_spaces (eval_info->exp_buf);
 +
 +	      if (c == '-')
 +		{
-+		  if (eval_info->compiling_p)
++		  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +		    ax_simple (eval_info->aexpr, aop_log_not);
 +		  else
 +		    res = value_neg (res);
 +		}
 +	      else
 +		{
-+		  if (eval_info->compiling_p)
++		  if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +		    ax_simple (eval_info->aexpr, aop_bit_not);
 +		  else
 +		    res = value_complement (res);
@@ -9973,7 +8759,7 @@ index 0000000..e251bd3
 +
 +	number = strtol (eval_info->exp_buf, &eval_info->exp_buf, 0);
 +
-+	if (eval_info->compiling_p)
++	if (STAP_COMPILING_AGENT_EXPR_P (eval_info))
 +	  ax_const_l (eval_info->aexpr, number);
 +	else
 +	  res = value_from_longest (builtin_type (gdbarch)->builtin_int,
@@ -10000,6 +8786,14 @@ index 0000000..e251bd3
 +
 +  return res;
 +}
++
++/* This function is responsible for checking the necessary type of evaluation
++   depending on what is the next "thing" in the buffer.  Valid values are:
++
++   - Unary operators;
++   - Integer constants;
++   - Register displacement, indirection, and direct access;
++   - Parenthesized operand.  */
 +
 +static struct value *
 +stap_evaluate_conditionally (struct stap_evaluation_info *eval_info)
@@ -10039,12 +8833,16 @@ index 0000000..e251bd3
 +  return ret;
 +}
 +
++/* Evaluation function for probe's argument expressions.  LHS represents
++   the left side of the expression, and PREC is the precedence of the
++   last operator identified before calling the function.  */
++
 +static struct value *
 +stap_evaluate_probe_argument_2 (struct stap_evaluation_info *eval_info,
 +				struct value *lhs, int prec)
 +{
 +  struct value *rhs = NULL;
-+  int compiling_p = eval_info->compiling_p;
++  int compiling_p = STAP_COMPILING_AGENT_EXPR_P (eval_info);
 +
 +  /* This is an operator-precedence parser and evaluator.
 +
@@ -10137,7 +8935,6 @@ index 0000000..e251bd3
 +/* This function fills the necessary arguments for the evaluation function
 +   to work.  */
 +
-+#define TEST 0
 +static struct value *
 +stap_evaluate_probe_argument_1 (struct objfile *objfile,
 +				const struct stap_probe *probe,
@@ -10147,13 +8944,6 @@ index 0000000..e251bd3
 +  struct stap_evaluation_info eval_info;
 +  char *s = (char *) probe->parsed_args->arg[n].arg_str;
 +  struct value *res, *vs[4];
-+#if TEST /*TESTING*/
-+  const char *args[4] = { "$2",
-+      "$2 + $3 * $4 + $5",
-+      "-($2 + $3)",
-+      "(~($2) * $3) / ($1 + $1)" };
-+  int i;
-+#endif
 +
 +  /* Filling necessary information for evaluation function.  */
 +  eval_info.saved_expr = s;
@@ -10162,23 +8952,11 @@ index 0000000..e251bd3
 +  eval_info.frame = frame;
 +  eval_info.bitness = probe->parsed_args->arg[n].bitness;
 +  /* We are not compiling to an agent expression.  */
-+  eval_info.compiling_p = 0;
 +  eval_info.aexpr = NULL;
 +  eval_info.avalue = NULL;
 +
 +  res = stap_evaluate_probe_argument_2 (&eval_info,
 +					/*lhs=*/NULL, /*prec=*/0);
-+#if TEST /* TESTING */
-+  for (i = 0; i < 4; i++)
-+    {
-+      eval_info.saved_expr = (const char *) args[i];
-+      eval_info.exp_buf = (char *) args[i];
-+      vs[i] = stap_evaluate_probe_argument_2 (&eval_info,
-+					      /*lhs=*/NULL, /*prec=*/0);
-+
-+      fprintf_unfiltered (gdb_stdout, "%ld\n", value_as_long (vs[i]));
-+    }
-+#endif
 +
 +  if (!res)
 +    error (_("Could not evaluate expression `%s'."),
@@ -10186,6 +8964,8 @@ index 0000000..e251bd3
 +
 +  return res;
 +}
++
++/* See definition in stap-probe.h.  */
 +
 +struct value *
 +stap_evaluate_probe_argument (struct objfile *objfile,
@@ -10202,6 +8982,9 @@ index 0000000..e251bd3
 +
 +  return stap_evaluate_probe_argument_1 (objfile, probe, frame, n);
 +}
++
++/* Helper function which compiles the probe's argument N into an
++   agent expression, suitable for using with tracepoints.  */
 +
 +static void
 +stap_compile_to_ax_1 (struct objfile *objfile,
@@ -10221,7 +9004,6 @@ index 0000000..e251bd3
 +  eval_info.frame = NULL;
 +  eval_info.bitness = probe->parsed_args->arg[n].bitness;
 +  /* We are compiling to an agent expression.  */
-+  eval_info.compiling_p = 1;
 +  eval_info.aexpr = expr;
 +  eval_info.avalue = value;
 +
@@ -10264,6 +9046,8 @@ index 0000000..e251bd3
 +				  /*lhs=*/NULL, /*prec=*/0);
 +}
 +
++/* See definition in stap-probe.h.  */
++
 +void
 +stap_compile_to_ax (struct objfile *objfile,
 +		    const struct stap_probe *probe,
@@ -10280,8 +9064,6 @@ index 0000000..e251bd3
 +
 +  stap_compile_to_ax_1 (objfile, probe, expr, value, n);
 +}
-+
-+/* See documentation in stap-probe.h.  */
 +
 +struct value *
 +stap_safe_evaluate_at_pc (struct frame_info *frame, int n)
@@ -10307,47 +9089,23 @@ index 0000000..e251bd3
 +								  n);
 +}
 +
++/* This function frees the space allocated to hold information about
++   the probe's parsed arguments.  */
++
 +void
 +stap_free_parsed_args (struct stap_args_info *parsed_args)
 +{
++  int i;
++
 +  if (!parsed_args
 +      || parsed_args == &dummy_stap_args_info
 +      || parsed_args->n_args == 0)
 +    return;
 +
-+  xfree (parsed_args->arg);
++  for (i = 0; i < parsed_args->n_args; i++)
++    xfree (parsed_args->arg);
++
 +  xfree (parsed_args);
-+}
-+
-+/* A helper function to extract an argument from *ARG.  An argument is
-+   delimited by whitespace.  The return value is either NULL if no
-+   argument was found, or an xmalloc'd string.  */
-+
-+static char *
-+extract_arg (char **arg)
-+{
-+  char *result, *copy;
-+
-+  if (!*arg)
-+    return NULL;
-+
-+  /* Find the start of the argument.  */
-+  *arg = skip_spaces (*arg);
-+  if (! **arg)
-+    return NULL;
-+  result = *arg;
-+
-+  /* Find the end of the argument.  */
-+  *arg = skip_to_space (*arg + 1);
-+
-+  if (result == *arg)
-+    return NULL;
-+
-+  copy = xmalloc (*arg - result + 1);
-+  memcpy (copy, result, *arg - result);
-+  copy[*arg - result] = '\0';
-+
-+  return copy;
 +}
 +
 +/* A utility structure.  A VEC of these is built when handling "info
@@ -10550,6 +9308,8 @@ index 0000000..e251bd3
 +
 +
 +
++/* See definition in stap-probe.h.  */
++
 +const struct stap_probe *
 +find_probe_in_objfile (struct objfile *objfile,
 +		       const char *provider,
@@ -10576,9 +9336,10 @@ index 0000000..e251bd3
 +  return NULL;
 +}
 +
++/* See definition in stap-probe.h.  */
++
 +struct symtabs_and_lines
-+parse_stap_probe (char **argptr, struct linespec_result *canonical,
-+		  int *not_found_ptr)
++parse_stap_probe (char **argptr, struct linespec_result *canonical)
 +{
 +  char *full_arg = extract_arg (argptr);
 +  char *arg = xstrdup (full_arg);
@@ -10683,8 +9444,6 @@ index 0000000..e251bd3
 +
 +  if (result.nelts == 0)
 +    {
-+      if (not_found_ptr)
-+	*not_found_ptr = 1;
 +      throw_error (NOT_FOUND_ERROR,
 +		   _("No probe matching objfile=`%s', provider=`%s', name=`%s'"),
 +		   objfile_name ? objfile_name : _("<any>"),
@@ -10704,6 +9463,8 @@ index 0000000..e251bd3
 +}
 +
 +
++
++/* See definition in stap-probe.h.  */
 +
 +const struct stap_probe *
 +find_probe_by_pc (CORE_ADDR pc, struct objfile **objfile_out)
@@ -10749,7 +9510,7 @@ index 0000000..e251bd3
 +  int n_probes;
 +
 +  /* SEL==10 means "_probe_argc".  */
-+  gdb_assert (sel >= 0 && sel <= 10);
++  gdb_assert (sel >= 0 && sel <= STAP_MAX_ARGS);
 +
 +  pc_probe = find_probe_by_pc (pc, &objfile);
 +  if (pc_probe == NULL)
@@ -10761,7 +9522,6 @@ index 0000000..e251bd3
 +  if (sel == 10)
 +    return value_from_longest (builtin_type (arch)->builtin_int, n_probes);
 +
-+  gdb_assert (sel >= 0);
 +  if (sel >= n_probes)
 +    error (_("Invalid probe argument %d -- probe has %d arguments available"),
 +	   sel, n_probes);
@@ -10813,6 +9573,8 @@ index 0000000..e251bd3
 +
 +
 +
++/* Implementation of `$_probe_arg*' set of variables.  */
++
 +static const struct internalvar_funcs probe_funcs =
 +{
 +  compute_probe_arg,
@@ -10856,11 +9618,11 @@ index 0000000..e251bd3
 +}
 diff --git a/gdb/stap-probe.h b/gdb/stap-probe.h
 new file mode 100644
-index 0000000..d700b19
+index 0000000..391d96f
 --- /dev/null
 +++ b/gdb/stap-probe.h
-@@ -0,0 +1,113 @@
-+/* Systemtap probe support for GDB.
+@@ -0,0 +1,109 @@
++/* SystemTap probe support for GDB.
 +
 +   Copyright (C) 2011 Free Software Foundation, Inc.
 +
@@ -10885,6 +9647,8 @@ index 0000000..d700b19
 +struct stap_args_info;
 +struct axs_value;
 +struct linespec_result;
++
++/* Main structure which holds information about a SystemTap probe.  */
 +
 +struct stap_probe
 +{
@@ -10917,8 +9681,7 @@ index 0000000..d700b19
 +   error.  */
 +
 +extern struct symtabs_and_lines parse_stap_probe (char **argptr,
-+						  struct linespec_result *canon,
-+						  int *not_found_ptr);
++						  struct linespec_result *canon);
 +
 +/* Search OBJFILE for a probe with the given PROVIDER and NAME.  If a
 +   probe is found, return it.  If no probe is found, return NULL.  */
@@ -10933,11 +9696,6 @@ index 0000000..d700b19
 +
 +extern const struct stap_probe *find_probe_by_pc (CORE_ADDR pc,
 +						  struct objfile **objfile_out);
-+
-+/* Given PROBE, this function will parse its arguments and fill the
-+   `struct stap_args_info' with proper information about them.  */
-+
-+extern void stap_parse_probe_arguments (struct stap_probe *probe);
 +
 +/* Given PROBE, returns the number of arguments present in that probe's
 +   argument string.  */
@@ -11053,22 +9811,8 @@ index a0151ea..752c46a 100644
    /* The "quick" (aka partial) symbol functions for this symbol
       reader.  */
    const struct quick_symbol_functions *qf;
-diff --git a/gdb/symmisc.c b/gdb/symmisc.c
-index 74e4941..66c2f05 100644
---- a/gdb/symmisc.c
-+++ b/gdb/symmisc.c
-@@ -265,6 +265,9 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
- 	case mst_text:
- 	  ms_type = 'T';
- 	  break;
-+	case mst_text_gnu_ifunc:
-+	  ms_type = 'i';
-+	  break;
- 	case mst_solib_trampoline:
- 	  ms_type = 'S';
- 	  break;
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index 3061f3c..0bcbbf7 100644
+index 8aa692d..0bcbbf7 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -770,6 +770,7 @@ init_sal (struct symtab_and_line *sal)
@@ -11079,78 +9823,11 @@ index 3061f3c..0bcbbf7 100644
  }
  
  
-@@ -3006,7 +3007,7 @@ search_symbols (char *regexp, domain_enum kind, int nfiles, char *files[],
-   static const enum minimal_symbol_type types3[]
-     = {mst_file_data, mst_solib_trampoline, mst_abs, mst_unknown};
-   static const enum minimal_symbol_type types4[]
--    = {mst_file_bss, mst_text, mst_abs, mst_unknown};
-+    = {mst_file_bss, mst_text_gnu_ifunc, mst_abs, mst_unknown};
-   enum minimal_symbol_type ourtype;
-   enum minimal_symbol_type ourtype2;
-   enum minimal_symbol_type ourtype3;
 diff --git a/gdb/symtab.h b/gdb/symtab.h
-index e946c65..6239f7f 100644
+index abe5e86..6239f7f 100644
 --- a/gdb/symtab.h
 +++ b/gdb/symtab.h
-@@ -290,6 +290,9 @@ enum minimal_symbol_type
- {
-   mst_unknown = 0,		/* Unknown type, the default */
-   mst_text,			/* Generally executable instructions */
-+  mst_text_gnu_ifunc,		/* Executable code returning address
-+				   of executable code */
-+  mst_slot_got_plt,		/* GOT entries for .plt sections */
-   mst_data,			/* Generally initialized data */
-   mst_bss,			/* Generally uninitialized data */
-   mst_abs,			/* Generally absolute (nonrelocatable) */
-@@ -953,6 +956,11 @@ extern struct symbol *find_pc_function (CORE_ADDR);
- 
- extern struct symbol *find_pc_sect_function (CORE_ADDR, struct obj_section *);
- 
-+extern int find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, char **name,
-+					       CORE_ADDR *address,
-+					       CORE_ADDR *endaddr,
-+					       int *is_gnu_ifunc_p);
-+
- /* lookup function from address, return name, start addr and end addr.  */
- 
- extern int find_pc_partial_function (CORE_ADDR, char **, CORE_ADDR *,
-@@ -1034,6 +1042,35 @@ extern struct minimal_symbol *lookup_minimal_symbol_by_pc_name
- 
- extern struct minimal_symbol *lookup_minimal_symbol_by_pc (CORE_ADDR);
- 
-+extern int in_gnu_ifunc_stub (CORE_ADDR pc);
-+
-+/* Functions for resolving STT_GNU_IFUNC symbols which are implemented only
-+   for ELF symbol files.  */
-+
-+struct gnu_ifunc_fns
-+{
-+  /* See elf_gnu_ifunc_resolve_addr for its real implementation.  */
-+  CORE_ADDR (*gnu_ifunc_resolve_addr) (struct gdbarch *gdbarch, CORE_ADDR pc);
-+
-+  /* See elf_gnu_ifunc_resolve_name for its real implementation.  */
-+  int (*gnu_ifunc_resolve_name) (const char *function_name,
-+				 CORE_ADDR *function_address_p);
-+
-+  /* See elf_gnu_ifunc_resolver_stop for its real implementation.  */
-+  void (*gnu_ifunc_resolver_stop) (struct breakpoint *b);
-+
-+  /* See elf_gnu_ifunc_resolver_return_stop for its real implementation.  */
-+  void (*gnu_ifunc_resolver_return_stop) (struct breakpoint *b);
-+};
-+
-+#define gnu_ifunc_resolve_addr gnu_ifunc_fns_p->gnu_ifunc_resolve_addr
-+#define gnu_ifunc_resolve_name gnu_ifunc_fns_p->gnu_ifunc_resolve_name
-+#define gnu_ifunc_resolver_stop gnu_ifunc_fns_p->gnu_ifunc_resolver_stop
-+#define gnu_ifunc_resolver_return_stop \
-+  gnu_ifunc_fns_p->gnu_ifunc_resolver_return_stop
-+
-+extern const struct gnu_ifunc_fns *gnu_ifunc_fns_p;
-+
- extern struct minimal_symbol *
-     lookup_minimal_symbol_and_objfile (const char *,
- 				       struct objfile **);
-@@ -1072,6 +1109,10 @@ struct symtab_and_line
+@@ -1109,6 +1109,10 @@ struct symtab_and_line
    CORE_ADDR end;
    int explicit_pc;
    int explicit_line;
@@ -12383,264 +11060,6 @@ index d58c519..abb1b05 100644
      }
  
  #test show directories
-diff --git a/gdb/testsuite/gdb.base/gnu-ifunc-lib.c b/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
-new file mode 100644
-index 0000000..dc6710e
---- /dev/null
-+++ b/gdb/testsuite/gdb.base/gnu-ifunc-lib.c
-@@ -0,0 +1,33 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2009, 2010, 2011 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+extern volatile int gnu_ifunc_initialized;
-+extern int init_stub (int arg);
-+extern int final (int arg);
-+
-+typedef int (*final_t) (int arg);
-+
-+asm (".type gnu_ifunc, @gnu_indirect_function");
-+
-+final_t
-+gnu_ifunc (void)
-+{
-+  if (! gnu_ifunc_initialized)
-+    return init_stub;
-+  else
-+    return final;
-+}
-diff --git a/gdb/testsuite/gdb.base/gnu-ifunc.c b/gdb/testsuite/gdb.base/gnu-ifunc.c
-new file mode 100644
-index 0000000..0ee741f
---- /dev/null
-+++ b/gdb/testsuite/gdb.base/gnu-ifunc.c
-@@ -0,0 +1,61 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2009, 2010, 2011 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+#include <assert.h>
-+
-+int
-+init_stub (int arg)
-+{
-+  return 0;
-+}
-+
-+int
-+final (int arg)
-+{
-+  return arg + 1;
-+}
-+
-+/* Make differentiation of how the gnu_ifunc call resolves before and after
-+   calling gnu_ifunc_pre.  This ensures the resolved function address is not
-+   being cached anywhere for the debugging purposes.  */
-+
-+volatile int gnu_ifunc_initialized;
-+
-+static void
-+gnu_ifunc_pre (void)
-+{
-+  assert (!gnu_ifunc_initialized);
-+
-+  gnu_ifunc_initialized = 1;
-+}
-+
-+extern int gnu_ifunc (int arg);
-+
-+int
-+main (void)
-+{
-+  int i;
-+
-+  gnu_ifunc_pre ();
-+  
-+  i = gnu_ifunc (1);	/* break-at-call */
-+  assert (i == 2);
-+
-+  gnu_ifunc (2);	/* break-at-nextcall */
-+
-+  return 0;	/* break-at-exit */
-+}
-diff --git a/gdb/testsuite/gdb.base/gnu-ifunc.exp b/gdb/testsuite/gdb.base/gnu-ifunc.exp
-new file mode 100644
-index 0000000..4fcc3bf
---- /dev/null
-+++ b/gdb/testsuite/gdb.base/gnu-ifunc.exp
-@@ -0,0 +1,146 @@
-+# Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 3 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+if {[skip_shlib_tests]} {
-+    return 0
-+}
-+
-+set testfile "gnu-ifunc"
-+set executable ${testfile}
-+set srcfile ${testfile}.c
-+set binfile ${objdir}/${subdir}/${executable}
-+set staticexecutable ${executable}-static
-+set staticbinfile ${objdir}/${subdir}/${staticexecutable}
-+
-+set libfile "${testfile}-lib"
-+set libsrc ${libfile}.c
-+set lib_so ${objdir}/${subdir}/${libfile}.so
-+# $lib_o must not have {debug}, it would override the STT_GNU_IFUNC ELF markers.
-+set lib_o ${objdir}/${subdir}/${libfile}.o
-+
-+# We need DWARF for the "final" function as we "step" into the function and GDB
-+# would step-over the "final" function if there would be no line number debug
-+# information (DWARF) available.
-+#
-+# We must not have DWARF for the "gnu_ifunc" function as DWARF has no way to
-+# express the STT_GNU_IFUNC type and it would be considered as a regular
-+# function due to DWARF by GDB.  In ELF gnu-ifunc is expressed by the
-+# STT_GNU_IFUNC type.
-+#
-+# Both functions need to be in the same shared library file but
-+# gdb_compile_shlib has no way to specify source-specific compilation options.
-+#
-+# Therefore $libfile contains only the STT_GNU_IFUNC function with no DWARF
-+# referencing all the other parts from the main executable with DWARF.
-+
-+set lib_opts {}
-+set exec_opts [list debug shlib=$lib_so]
-+
-+if [get_compiler_info ${binfile}] {
-+    return -1
-+}
-+
-+if { [gdb_compile_shlib ${srcdir}/${subdir}/$libsrc $lib_so $lib_opts] != ""
-+     || [gdb_compile ${srcdir}/${subdir}/$srcfile $binfile executable $exec_opts] != ""} {
-+    untested "Could not compile dynamic executable $binfile."
-+    return -1
-+}
-+
-+# Start with a fresh gdb.
-+
-+clean_restart $executable
-+gdb_load_shlibs ${lib_so}
-+
-+if ![runto_main] then {
-+    fail "Can't run to main"
-+    return 1;
-+}
-+
-+# The "if" condition is artifical to test regression of a former patch.
-+gdb_breakpoint "[gdb_get_line_number "break-at-nextcall"] if i && gnu_ifunc (i) != 42"
-+
-+gdb_breakpoint [gdb_get_line_number "break-at-call"]
-+gdb_continue_to_breakpoint "break-at-call" ".*break-at-call.*"
-+
-+# Test GDB will automatically indirect the call.
-+
-+gdb_test "p gnu_ifunc (3)" " = 4"
-+
-+# Test GDB will skip the gnu_ifunc resolver on first call.
-+
-+gdb_test "step" "\r\nfinal .*"
-+
-+# Test GDB will not break before the final chosen implementation.
-+
-+# Also test a former patch regression:
-+# Continuing.
-+# Error in testing breakpoint condition:
-+# Attempt to take address of value not located in memory.
-+# 
-+# Breakpoint 2, main () at ./gdb.base/gnu-ifunc.c:33
-+
-+gdb_test "continue" "Continuing.\r\n\r\nBreakpoint .* (at|in) .*break-at-nextcall.*" \
-+	 "continue to break-at-nextcall"
-+
-+gdb_breakpoint "gnu_ifunc"
-+
-+gdb_continue_to_breakpoint "nextcall gnu_ifunc"
-+
-+gdb_test "frame" "#0 +(0x\[0-9a-f\]+ in +)?final \\(.*" "nextcall gnu_ifunc skipped"
-+
-+
-+# Check any commands not doing an inferior call access the address of the
-+# STT_GNU_IFUNC resolver, not the target function.
-+
-+if {[istarget powerpc64-*] && [is_lp64_target]} {
-+    # With only minimal symbols GDB provides the function descriptors.  With
-+    # full debug info the function code would be displayed.
-+    set func_prefix {\.}
-+} else {
-+    set func_prefix {}
-+}
-+
-+gdb_test "p gnu_ifunc" " = {<text gnu-indirect-function variable, no debug info>} 0x\[0-9a-f\]+ <${func_prefix}gnu_ifunc>" "p gnu_ifunc executing"
-+gdb_test "info sym gnu_ifunc" "gnu_ifunc in section .*" "info sym gnu_ifunc executing"
-+
-+set test "info addr gnu_ifunc"
-+gdb_test_multiple $test $test {
-+    -re "Symbol \"gnu_ifunc\" is at (0x\[0-9a-f\]+) in .*$gdb_prompt $" {
-+	pass $test
-+    }
-+}
-+gdb_test "info sym $expect_out(1,string)" "gnu_ifunc in section .*" "info sym <gnu_ifunc-address>"
-+
-+
-+# Test statically linked ifunc resolving during inferior start.
-+# https://bugzilla.redhat.com/show_bug.cgi?id=624967
-+
-+if ![target_info exists gdb_stub] {
-+
-+    # Compile $staticbinfile separately as it may exit on error (ld/12595).
-+
-+    if { [gdb_compile ${srcdir}/${subdir}/$libsrc $lib_o object {}] != ""
-+	 || [gdb_compile "${srcdir}/${subdir}/$srcfile $lib_o" $staticbinfile executable {debug}] != "" } {
-+	untested "Could not compile static executable $staticbinfile."
-+	return -1
-+    }
-+
-+    clean_restart $staticexecutable
-+
-+    gdb_breakpoint "gnu_ifunc"
-+    gdb_breakpoint "main"
-+    gdb_run_cmd
-+    gdb_test "" "Breakpoint \[0-9\]*, main .*" "static gnu_ifunc"
-+}
 diff --git a/gdb/testsuite/gdb.base/internal-var-field-address.c b/gdb/testsuite/gdb.base/internal-var-field-address.c
 new file mode 100644
 index 0000000..eeb7b85
@@ -13132,89 +11551,6 @@ index 0000000..5da7378
 +gdb_test "p temp1" " = '1' <repeats 78 times>" "second: print temp1"
 +gdb_test "p temp2" " = '2' <repeats 78 times>" "second: print temp2"
 +gdb_test "p temp3" " = '3' <repeats 48 times>" "second: print temp3"
-diff --git a/gdb/testsuite/gdb.base/watchpoint-delete.c b/gdb/testsuite/gdb.base/watchpoint-delete.c
-new file mode 100644
-index 0000000..20c9929
---- /dev/null
-+++ b/gdb/testsuite/gdb.base/watchpoint-delete.c
-@@ -0,0 +1,33 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2010, 2011 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+void
-+func (void)
-+{
-+  volatile int x = 0;
-+
-+  x++;	/* break-here */
-+  x++;
-+}
-+
-+int
-+main (void)
-+{
-+  func ();
-+
-+  return 0;
-+}
-diff --git a/gdb/testsuite/gdb.base/watchpoint-delete.exp b/gdb/testsuite/gdb.base/watchpoint-delete.exp
-new file mode 100644
-index 0000000..7aadf4e
---- /dev/null
-+++ b/gdb/testsuite/gdb.base/watchpoint-delete.exp
-@@ -0,0 +1,38 @@
-+# Copyright 2010, 2011 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 3 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+set testfile "watchpoint-delete"
-+set srcfile ${testfile}.c
-+set binfile ${objdir}/${subdir}/${testfile}
-+
-+if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
-+    untested ${testfile}.exp
-+    return -1
-+}
-+
-+# It is more compatible this way.
-+gdb_test_no_output "set can-use-hw-watchpoints 0"
-+
-+if ![runto_main] {
-+    return -1
-+}
-+
-+# Ensure there is a parent frame to create related bp_watchpoint_scope.
-+gdb_breakpoint [gdb_get_line_number "break-here"]
-+gdb_continue_to_breakpoint "break-here" ".* break-here .*"
-+
-+gdb_test "watch x" {Watchpoint [0-9]+: x}
-+
-+gdb_test_no_output {delete $bpnum}
 diff --git a/gdb/testsuite/gdb.cp/nextoverthrow.exp b/gdb/testsuite/gdb.cp/nextoverthrow.exp
 index 89c02d6..a970bb9 100644
 --- a/gdb/testsuite/gdb.cp/nextoverthrow.exp
@@ -16043,7 +14379,7 @@ index 891da37..236c5ca 100644
      set pascal_init_done 1
  }   
 diff --git a/gdb/thread.c b/gdb/thread.c
-index 6ad1807..91fe056 100644
+index 6ad1807..aef9dce 100644
 --- a/gdb/thread.c
 +++ b/gdb/thread.c
 @@ -1438,7 +1438,8 @@ update_thread_list (void)
@@ -16056,10 +14392,12 @@ index 6ad1807..91fe056 100644
  {
    struct thread_info *tp = find_thread_ptid (inferior_ptid);
  
-@@ -1449,6 +1450,13 @@ thread_id_make_value (struct gdbarch *gdbarch, struct internalvar *var)
+@@ -1449,6 +1450,15 @@ thread_id_make_value (struct gdbarch *gdbarch, struct internalvar *var)
  /* Commands with a prefix of `thread'.  */
  struct cmd_list_element *thread_cmd_list = NULL;
  
++/* Implementation of `thread' variable.  */
++
 +static struct internalvar_funcs thread_funcs =
 +{
 +  thread_id_make_value,
@@ -16070,7 +14408,7 @@ index 6ad1807..91fe056 100644
  void
  _initialize_thread (void)
  {
-@@ -1494,5 +1502,5 @@ Show printing of thread events (such as thread start and exit)."), NULL,
+@@ -1494,5 +1504,5 @@ Show printing of thread events (such as thread start and exit)."), NULL,
           show_print_thread_events,
           &setprintlist, &showprintlist);
  
@@ -16092,7 +14430,7 @@ index a25550f..87f0b41 100644
    /* With multiple threads running while the one we're examining is
       stopped, the dcache can get stale without us being able to detect
 diff --git a/gdb/tracepoint.c b/gdb/tracepoint.c
-index 3ae35d0..d3cd593 100644
+index 3ae35d0..1cb39ea 100644
 --- a/gdb/tracepoint.c
 +++ b/gdb/tracepoint.c
 @@ -1600,6 +1600,8 @@ start_tracing (void)
@@ -16153,10 +14491,12 @@ index 3ae35d0..d3cd593 100644
  {
    LONGEST size;
    gdb_byte *buf;
-@@ -4676,6 +4703,13 @@ traceframe_available_memory (VEC(mem_range_s) **result,
+@@ -4676,6 +4703,15 @@ traceframe_available_memory (VEC(mem_range_s) **result,
    return 0;
  }
  
++/* Implementation of `sdata' variable.  */
++
 +static const struct internalvar_funcs sdata_funcs =
 +{
 +  sdata_make_value,
@@ -16167,7 +14507,7 @@ index 3ae35d0..d3cd593 100644
  /* module initialization */
  void
  _initialize_tracepoint (void)
-@@ -4686,7 +4720,7 @@ _initialize_tracepoint (void)
+@@ -4686,7 +4722,7 @@ _initialize_tracepoint (void)
       value with a void typed value, and when we get here, gdbarch
       isn't initialized yet.  At this point, we're quite sure there
       isn't another convenience variable of the same name.  */
@@ -16234,7 +14574,7 @@ index 03e6332..ce6d1e0 100644
  
  static void
 diff --git a/gdb/utils.c b/gdb/utils.c
-index e688d19..f1fc507 100644
+index 51d32b7..5fee809 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
 @@ -2243,6 +2243,36 @@ set_batch_flag_and_make_cleanup_restore_page_info (void)
@@ -16302,7 +14642,7 @@ index 68f649f..aaa4487 100644
  }
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index b9f5508..1b7ed76 100644
+index 99115b7..dc27644 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -47,6 +47,7 @@
@@ -16447,7 +14787,7 @@ index b9f5508..1b7ed76 100644
  }
  
  /* Given a value which is a function, return a value which is a pointer
-@@ -3688,6 +3772,8 @@ value_slice (struct value *array, int lowbound, int length)
+@@ -3695,6 +3779,8 @@ value_slice (struct value *array, int lowbound, int length)
  					TYPE_TARGET_TYPE (range_type),
  					lowbound, 
  					lowbound + length - 1);
@@ -16530,7 +14870,7 @@ index 286ef9e..1fe58b1 100644
  
  /* Read LEN bytes of target memory at address MEMADDR, placing the
 diff --git a/gdb/value.c b/gdb/value.c
-index 2acb1df..cf8dda0 100644
+index 2acb1df..6744b76 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -43,6 +43,7 @@
@@ -16618,7 +14958,7 @@ index 2acb1df..cf8dda0 100644
  
        /* The internal function used with INTERNALVAR_FUNCTION.  */
        struct
-@@ -1629,18 +1671,37 @@ create_internalvar (const char *name)
+@@ -1629,18 +1671,39 @@ create_internalvar (const char *name)
  /* Create an internal variable with name NAME and register FUN as the
     function that value_of_internalvar uses to create a value whenever
     this variable is referenced.  NAME should not normally include a
@@ -16642,6 +14982,8 @@ index 2acb1df..cf8dda0 100644
    return var;
  }
  
++/* See documentation in value.h.  */
++
 +int
 +compile_internalvar_to_ax (struct internalvar *var,
 +			   struct agent_expr *expr,
@@ -16659,7 +15001,7 @@ index 2acb1df..cf8dda0 100644
  /* Look up an internal variable with name NAME.  NAME should not
     normally include a dollar sign.
  
-@@ -1713,7 +1774,8 @@ value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
+@@ -1713,7 +1776,8 @@ value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
        break;
  
      case INTERNALVAR_MAKE_VALUE:
@@ -16669,7 +15011,7 @@ index 2acb1df..cf8dda0 100644
        break;
  
      default:
-@@ -1909,6 +1971,11 @@ clear_internalvar (struct internalvar *var)
+@@ -1909,6 +1973,11 @@ clear_internalvar (struct internalvar *var)
        xfree (var->u.string);
        break;
  
@@ -16681,7 +15023,7 @@ index 2acb1df..cf8dda0 100644
      default:
        break;
      }
-@@ -1963,6 +2030,38 @@ call_internal_function (struct gdbarch *gdbarch,
+@@ -1963,6 +2032,38 @@ call_internal_function (struct gdbarch *gdbarch,
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -16720,7 +15062,7 @@ index 2acb1df..cf8dda0 100644
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -2010,11 +2109,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
+@@ -2010,11 +2111,10 @@ preserve_one_value (struct value *value, struct objfile *objfile,
  		    htab_t copied_types)
  {
    if (TYPE_OBJFILE (value->type) == objfile)
@@ -16734,7 +15076,7 @@ index 2acb1df..cf8dda0 100644
  						 copied_types);
  }
  
-@@ -2029,7 +2127,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
+@@ -2029,7 +2129,7 @@ preserve_one_internalvar (struct internalvar *var, struct objfile *objfile,
      case INTERNALVAR_INTEGER:
        if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
  	var->u.integer.type
@@ -16743,7 +15085,7 @@ index 2acb1df..cf8dda0 100644
        break;
  
      case INTERNALVAR_VALUE:
-@@ -2080,14 +2178,22 @@ show_convenience (char *ignore, int from_tty)
+@@ -2080,14 +2180,22 @@ show_convenience (char *ignore, int from_tty)
    get_user_print_options (&opts);
    for (var = internalvars; var; var = var->next)
      {
@@ -16769,7 +15111,7 @@ index 2acb1df..cf8dda0 100644
      }
    if (!varseen)
      printf_unfiltered (_("No debugger convenience variables now defined.\n"
-@@ -3047,7 +3153,24 @@ value_from_history_ref (char *h, char **endp)
+@@ -3047,7 +3155,24 @@ value_from_history_ref (char *h, char **endp)
  struct value *
  coerce_ref (struct value *arg)
  {
@@ -16795,7 +15137,7 @@ index 2acb1df..cf8dda0 100644
  
    if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
      arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
-@@ -3145,4 +3268,10 @@ VARIABLE is already initialized."));
+@@ -3145,4 +3270,10 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);
@@ -16878,7 +15220,7 @@ index 0889cef..4b51a4a 100644
  extern struct internalvar *lookup_internalvar (const char *name);
  
 diff --git a/gdb/windows-tdep.c b/gdb/windows-tdep.c
-index 31ddd14..b36e4ca 100644
+index 31ddd14..b319250 100644
 --- a/gdb/windows-tdep.c
 +++ b/gdb/windows-tdep.c
 @@ -268,7 +268,7 @@ static struct lval_funcs tlb_value_funcs =
@@ -16890,10 +15232,12 @@ index 31ddd14..b36e4ca 100644
  {
    if (target_has_stack && !ptid_equal (inferior_ptid, null_ptid))
      {
-@@ -425,6 +425,13 @@ init_w32_command_list (void)
+@@ -425,6 +425,15 @@ init_w32_command_list (void)
      }
  }
  
++/* Implementation of `tlb' variable.  */
++
 +static const struct internalvar_funcs tlb_funcs =
 +{
 +  tlb_make_value,
@@ -16904,7 +15248,7 @@ index 31ddd14..b36e4ca 100644
  void
  _initialize_windows_tdep (void)
  {
-@@ -451,5 +458,5 @@ even if their meaning is unknown."),
+@@ -451,5 +460,5 @@ even if their meaning is unknown."),
       value with a void typed value, and when we get here, gdbarch
       isn't initialized yet.  At this point, we're quite sure there
       isn't another convenience variable of the same name.  */
