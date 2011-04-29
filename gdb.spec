@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.90.20110411
+Version: 7.2.90.20110429
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?_with_upstream:.upstream}%{?dist}
+Release: 35%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -262,7 +262,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -557,6 +557,19 @@ Patch574: gdb-core-thread-internalerr-3of3.patch
 # rebuild to fix it, we need to be able to use gdb :)
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
+# Fix case insensitive symbols for Fortran by iFort (BZ 645773).
+Patch580: gdb-bz645773-case-insensitive-1of5.patch
+Patch581: gdb-bz645773-case-insensitive-2of5.patch
+Patch582: gdb-bz645773-case-insensitive-3of5.patch
+Patch583: gdb-bz645773-case-insensitive-4of5.patch
+Patch588: gdb-bz645773-case-insensitive-5of5.patch
+
+# Fix -O2 -g breakpoints internal error + prologue skipping (BZ 612253).
+Patch589: gdb-optim-g-prologue-skip.patch
+
+# Fix physname-related CU expansion issue for C++ (PR 12708).
+Patch590: gdb-physname-expand-completer.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -713,7 +726,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -826,6 +839,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch573 -p1
 %patch574 -p1
 %patch579 -p1
+%patch580 -p1
+%patch581 -p1
+%patch582 -p1
+%patch583 -p1
+%patch588 -p1
+%patch589 -p1
+%patch590 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1254,6 +1274,13 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Apr 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-35.fc15
+- Rebase to FSF GDB 7.2.90.20110429 (which is a 7.3 pre-release).
+- Fix -O2 -g breakpoints internal error + prologue skipping (BZ 612253).
+- Fix case insensitive symbols for Fortran by iFort (BZ 645773).
+- Fix physname-related CU expansion issue for C++ (PR 12708).
+- Fix Python access to inlined frames (BZ 694824).
+
 * Mon Apr 11 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110411-34.fc15
 - Rebase to FSF GDB 7.2.90.20110411 (which is a 7.3 pre-release).
 - Include the proper fix for anonymous struct typedefs (Tom Tromey, BZ 672230).

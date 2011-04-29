@@ -1,0 +1,139 @@
+Fix Python access to inlined frames (BZ 694824).
+http://sourceware.org/ml/gdb-cvs/2011-04/msg00189.html
+
+### src/gdb/ChangeLog	2011/04/27 03:52:20	1.12887.2.14
+### src/gdb/ChangeLog	2011/04/29 07:32:37	1.12887.2.15
+## -1,3 +1,9 @@
++2011-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix Python access to inlined frames.
++	* python/py-frame.c (frapy_read_var): Find BLOCK using get_frame_block.
++	* python/py-symbol.c (gdbpy_lookup_symbol): Likewise.
++
+ 2011-04-26  Michael Walle  <michael@walle.cc>
+ 
+ 	* remote.c (remote_start_remote): Ack packet after sending the
+--- src/gdb/python/py-frame.c	2011/01/26 20:53:45	1.15
++++ src/gdb/python/py-frame.c	2011/04/29 07:32:40	1.15.2.1
+@@ -436,7 +436,7 @@
+ 	  FRAPY_REQUIRE_VALID ((frame_object *) self, frame);
+ 
+ 	  if (!block)
+-	    block = block_for_pc (get_frame_address_in_block (frame));
++	    block = get_frame_block (frame, NULL);
+ 	  var = lookup_symbol (var_name, block, VAR_DOMAIN, NULL);
+ 	}
+       GDB_PY_HANDLE_EXCEPTION (except);
+--- src/gdb/python/py-symbol.c	2011/03/17 09:36:16	1.6
++++ src/gdb/python/py-symbol.c	2011/04/29 07:32:40	1.6.2.1
+@@ -275,8 +275,8 @@
+ 
+       TRY_CATCH (except, RETURN_MASK_ALL)
+ 	{
+-	  selected_frame  = get_selected_frame (_("No frame selected."));
+-	  block = block_for_pc (get_frame_address_in_block (selected_frame));
++	  selected_frame = get_selected_frame (_("No frame selected."));
++	  block = get_frame_block (selected_frame, NULL);
+ 	}
+       GDB_PY_HANDLE_EXCEPTION (except);
+     }
+### src/gdb/testsuite/ChangeLog	2011/04/25 21:25:18	1.2655.2.4
+### src/gdb/testsuite/ChangeLog	2011/04/29 07:32:40	1.2655.2.5
+## -1,3 +1,9 @@
++2011-04-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix Python access to inlined frames.
++	* gdb.python/py-frame-inline.c: New file.
++	* gdb.python/py-frame-inline.exp: New file.
++
+ 2011-04-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* gdb.base/gdbindex-stabs-dwarf.c: New file.
+--- src/gdb/testsuite/gdb.python/py-frame-inline.c
++++ src/gdb/testsuite/gdb.python/py-frame-inline.c	2011-04-29 07:33:45.912552000 +0000
+@@ -0,0 +1,43 @@
++/* This test is part of GDB, the GNU debugger.
++
++   Copyright 2011 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++volatile int v = 42;
++
++__attribute__((__always_inline__)) static int
++f (void)
++{
++  /* Provide first stub line so that GDB understand the PC is already inside
++     the inlined function and does not expect a step into it.  */
++  v++;
++  v++;		/* break-here */
++
++  return v;
++}
++
++__attribute__((__noinline__)) static int
++g (void)
++{
++  volatile int l = v;
++
++  return f ();
++}
++
++int
++main (void)
++{
++  return g ();
++}
+--- src/gdb/testsuite/gdb.python/py-frame-inline.exp
++++ src/gdb/testsuite/gdb.python/py-frame-inline.exp	2011-04-29 07:33:46.649817000 +0000
+@@ -0,0 +1,39 @@
++# Copyright (C) 2011 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++load_lib gdb-python.exp
++
++set testfile "py-frame-inline"
++set srcfile ${testfile}.c
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
++    return -1
++}
++
++# Skip all tests if Python scripting is not enabled.
++if { [skip_python_tests] } { continue }
++
++if ![runto main] then {
++    fail "Can't run to function f"
++    return 0
++}
++
++gdb_breakpoint [gdb_get_line_number "break-here"]
++gdb_continue_to_breakpoint "Block break here."
++
++gdb_test "info frame" "inlined into frame 1\r\n.*"
++
++gdb_test "up" "#1  g .*"
++
++gdb_test "python print gdb.selected_frame().read_var('l')" "\r\n42"

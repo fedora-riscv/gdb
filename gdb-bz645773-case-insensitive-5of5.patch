@@ -1,0 +1,62 @@
+http://sourceware.org/ml/gdb-patches/2011-04/msg00546.html
+Subject: [obv] Fix completer pre-expansion for case insensitive lookups
+
+Hi,
+
+due to the pending patches there happened a semantic collision.  Both pathsets
+were right on their own but together it did not work well.  There could be
+a testcase for it but I do not provide it, it seems obvious enought to me.
+
+The two patches were:
+	Re: [patch 3/3] case insensitive: the fix [rediff]
+	http://sourceware.org/ml/gdb-patches/2011-04/msg00418.html
+	 - see the change in completion_list_add_name
+and
+	[patch][+7.3] Fix physname completion regression
+	http://sourceware.org/ml/gdb-patches/2011-04/msg00140.html
+	 - see expand_partial_symbol_name which just called
+	   completion_list_add_name before but now it has explicit strncmp.
+
+Another problem is this code is still wrong.  That is the subject of:
+	CU expansion problem for parameters
+	http://sourceware.org/bugzilla/show_bug.cgi?id=12708
+
+But I did not want to mix two unrelated fixes into a single patch
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora15-linux-gnu.  Checked it in
+already to not get lost in the inter-patch dependencies again.
+
+
+Sorry,
+Jan
+
+
+http://sourceware.org/ml/gdb-cvs/2011-04/msg00186.html
+
+### src/gdb/ChangeLog	2011/04/28 15:52:53	1.12964
+### src/gdb/ChangeLog	2011/04/28 17:37:02	1.12965
+## -1,3 +1,8 @@
++2011-04-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* symtab.c (expand_partial_symbol_name): New variable NCMP.  Support
++	case insensitive comparison.
++
+ 2011-04-28  Ulrich Weigand  <ulrich.weigand@linaro.org>
+ 
+ 	* infrun.c (proceed): Revert previous change.
+--- src/gdb/symtab.c	2011/04/27 20:03:03	1.269
++++ src/gdb/symtab.c	2011/04/28 17:37:06	1.270
+@@ -3707,8 +3707,11 @@
+ expand_partial_symbol_name (const char *name, void *user_data)
+ {
+   struct add_name_data *datum = (struct add_name_data *) user_data;
++  int (*ncmp) (const char *, const char *, size_t);
+ 
+-  return strncmp (name, datum->sym_text, datum->sym_text_len) == 0;
++  ncmp = (case_sensitivity == case_sensitive_on ? strncmp : strncasecmp);
++
++  return ncmp (name, datum->sym_text, datum->sym_text_len) == 0;
+ }
+ 
+ char **
+
