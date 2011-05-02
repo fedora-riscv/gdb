@@ -27,7 +27,7 @@ Version: 7.2.90.20110429
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?_with_upstream:.upstream}%{?dist}
+Release: 36%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -231,8 +231,6 @@ Patch211: gdb-6.5-last-address-space-byte-test.patch
 Patch208: gdb-6.5-BEA-testsuite.patch
 
 # Fix readline segfault on excessively long hand-typed lines.
-#=drop: After upstream's readline rebase it will be obsolete.
-Patch209: gdb-6.5-readline-long-line-crash.patch
 #=fedoratest
 Patch213: gdb-6.5-readline-long-line-crash-test.patch
 
@@ -417,9 +415,6 @@ Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 #=push+work: It should be in glibc: libc-alpha: <20091004161706.GA27450@.*>
 Patch382: gdb-core-open-vdso-warning.patch
 
-# Fix callback-mode readline-6.0 regression for CTRL-C (for RHEL-6.0).
-Patch390: gdb-readline-6.0-signal.patch
-
 # Fix syscall restarts for amd64->i386 biarch.
 #=push
 Patch391: gdb-x86_64-i386-syscall-restart.patch
@@ -570,9 +565,15 @@ Patch589: gdb-optim-g-prologue-skip.patch
 # Fix physname-related CU expansion issue for C++ (PR 12708).
 Patch590: gdb-physname-expand-completer.patch
 
+# Bundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
+Patch591: gdb-bz701131-readline62-1of3.patch
+Patch592: gdb-bz701131-readline62-2of3.patch
+Patch593: gdb-bz701131-readline62-3of3.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
-Requires: readline%{?_isa}
-BuildRequires: readline-devel%{?_isa}
+# --without-system-readline
+# Requires: readline%{?_isa}
+# BuildRequires: readline-devel%{?_isa}
 %if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs a mandatory dependency.
 #Requires: rpm-libs%{?_isa}
@@ -758,7 +759,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch196 -p1
 %patch199 -p1
 %patch208 -p1
-%patch209 -p1
 %patch211 -p1
 %patch213 -p1
 %patch214 -p1
@@ -846,15 +846,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch588 -p1
 %patch589 -p1
 %patch590 -p1
+%patch591 -p1
+%patch592 -p1
+%patch593 -p1
 
-%patch390 -p1
 %patch393 -p1
 %patch335 -p1
-readline="$(readlink -f %{_libdir}/libreadline.so)"
-if [ "$readline" = "${readline%/libreadline.so.6.0}" ]
-then
-%patch390 -p1 -R
-fi
 %if 0%{!?el5:1}
 %patch393 -p1 -R
 %patch335 -p1 -R
@@ -932,7 +929,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-	--with-system-readline					\
+	--without-system-readline				\
 	--with-expat						\
 $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--without-libexpat-prefix				\
@@ -1274,6 +1271,11 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon May  2 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-36.fc15
+- Bundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
+  - Use --without-system-readline, disable Requires and BuildRequires of readline.
+  - Drop gdb-6.5-readline-long-line-crash.patch and gdb-readline-6.0-signal.patch.
+
 * Fri Apr 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-35.fc15
 - Rebase to FSF GDB 7.2.90.20110429 (which is a 7.3 pre-release).
 - Fix -O2 -g breakpoints internal error + prologue skipping (BZ 612253).
