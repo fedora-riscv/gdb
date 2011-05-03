@@ -27,7 +27,7 @@ Version: 7.2.90.20110429
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?_with_upstream:.upstream}%{?dist}
+Release: 37%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1271,6 +1271,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue May  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-37.fc15
+- Search also for .<seqno> files in /usr/lib/debug/.build-id (BZ 641377).
+
 * Mon May  2 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-36.fc15
 - Bundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
   - Use --without-system-readline, disable Requires and BuildRequires of readline.
