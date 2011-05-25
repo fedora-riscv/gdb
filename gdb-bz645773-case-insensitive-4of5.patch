@@ -58,10 +58,10 @@ gdb/testsuite/
 	* gdb.dwarf2/dw2-case-insensitive.c: New file.
 	* gdb.dwarf2/dw2-case-insensitive.exp: New file.
 
-Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
+Index: gdb-7.2.90.20110525/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/dwarf2read.c	2011-04-29 09:43:34.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/dwarf2read.c	2011-04-29 09:45:58.000000000 +0200
+--- gdb-7.2.90.20110525.orig/gdb/dwarf2read.c	2011-05-25 17:12:51.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/dwarf2read.c	2011-05-25 19:12:33.000000000 +0200
 @@ -152,6 +152,9 @@ DEF_VEC_I (offset_type);
     a comment by the code that writes the index.  */
  struct mapped_index
@@ -72,7 +72,7 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
    /* The total length of the buffer.  */
    off_t total_size;
  
-@@ -1990,17 +1993,23 @@ create_addrmap_from_index (struct objfil
+@@ -1997,17 +2000,23 @@ create_addrmap_from_index (struct objfil
     SYMBOL_HASH_NEXT, but we keep a separate copy to maintain control over the
     implementation.  This is necessary because the hash function is tied to the
     format of the mapped index file.  The hash values do not have to match with
@@ -99,29 +99,34 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
  
    return r;
  }
-@@ -2013,11 +2022,19 @@ static int
- find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
- 			  offset_type **vec_out)
- {
--  offset_type hash = mapped_index_string_hash (name);
-+  /* Index version 4 did not support case insensitive searches.  But the
-+     indexes for case insensitive languages are built in lowercase, therefore
-+     simulate our NAME being searched is also lowercased.  */
-+  offset_type hash = mapped_index_string_hash ((index->version == 4
-+                                    && case_sensitivity == case_sensitive_off
-+				    ? 5 : index->version),
-+				   name);
+@@ -2023,6 +2032,7 @@ find_slot_in_mapped_hash (struct mapped_
+   struct cleanup *back_to = make_cleanup (null_cleanup, 0);
+   offset_type hash;
    offset_type slot, step;
 +  int (*cmp) (const char *, const char *);
  
+   if (current_language->la_language == language_cplus
+       || current_language->la_language == language_java
+@@ -2045,9 +2055,16 @@ find_slot_in_mapped_hash (struct mapped_
+ 	}
+     }
+ 
+-  hash = mapped_index_string_hash (name);
++  /* Index version 4 did not support case insensitive searches.  But the
++     indexes for case insensitive languages are built in lowercase, therefore
++     simulate our NAME being searched is also lowercased.  */
++  hash = mapped_index_string_hash ((index->version == 4
++                                    && case_sensitivity == case_sensitive_off
++				    ? 5 : index->version),
++				   name);
    slot = hash & (index->symbol_table_slots - 1);
    step = ((hash * 17) & (index->symbol_table_slots - 1)) | 1;
 +  cmp = (case_sensitivity == case_sensitive_on ? strcmp : strcasecmp);
  
    for (;;)
      {
-@@ -2028,7 +2045,7 @@ find_slot_in_mapped_hash (struct mapped_
- 	return 0;
+@@ -2061,7 +2078,7 @@ find_slot_in_mapped_hash (struct mapped_
+ 	}
  
        str = index->constant_pool + MAYBE_SWAP (index->symbol_table[i]);
 -      if (!strcmp (name, str))
@@ -129,7 +134,7 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
  	{
  	  *vec_out = (offset_type *) (index->constant_pool
  				      + MAYBE_SWAP (index->symbol_table[i + 1]));
-@@ -2071,15 +2088,17 @@ dwarf2_read_index (struct objfile *objfi
+@@ -2105,15 +2122,17 @@ dwarf2_read_index (struct objfile *objfi
    /* Versions earlier than 3 emitted every copy of a psymbol.  This
       causes the index to behave very poorly for certain requests.  Version 3
       contained incomplete addrmap.  So, it seems better to just ignore such
@@ -149,7 +154,7 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
    map->total_size = dwarf2_per_objfile->gdb_index.size;
  
    metadata = (offset_type *) (addr + sizeof (offset_type));
-@@ -15602,13 +15621,16 @@ struct strtab_entry
+@@ -15692,13 +15711,16 @@ struct strtab_entry
    const char *str;
  };
  
@@ -168,7 +173,7 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
  }
  
  /* Equality function for a strtab_entry.  */
-@@ -15746,12 +15768,15 @@ cleanup_mapped_symtab (void *p)
+@@ -15836,12 +15858,15 @@ cleanup_mapped_symtab (void *p)
  }
  
  /* Find a slot in SYMTAB for the symbol NAME.  Returns a pointer to
@@ -186,7 +191,7 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
  
    index = hash & (symtab->size - 1);
    step = ((hash * 17) & (symtab->size - 1)) | 1;
-@@ -16279,7 +16304,7 @@ write_psymtabs_to_index (struct objfile 
+@@ -16369,7 +16394,7 @@ write_psymtabs_to_index (struct objfile 
    total_len = size_of_contents;
  
    /* The version number.  */
@@ -195,10 +200,10 @@ Index: gdb-7.2.90.20110429/gdb/dwarf2read.c
    obstack_grow (&contents, &val, sizeof (val));
  
    /* The offset of the CU list from the start of the file.  */
-Index: gdb-7.2.90.20110429/gdb/minsyms.c
+Index: gdb-7.2.90.20110525/gdb/minsyms.c
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/minsyms.c	2011-04-29 09:43:34.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/minsyms.c	2011-04-29 09:44:15.000000000 +0200
+--- gdb-7.2.90.20110525.orig/gdb/minsyms.c	2011-05-25 17:12:51.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/minsyms.c	2011-05-25 17:13:13.000000000 +0200
 @@ -239,11 +239,16 @@ lookup_minimal_symbol (const char *name,
  
  		  if (pass == 1)
@@ -218,10 +223,10 @@ Index: gdb-7.2.90.20110429/gdb/minsyms.c
  		      match = SYMBOL_MATCHES_SEARCH_NAME (msymbol,
  							  modified_name);
  		    }
-Index: gdb-7.2.90.20110429/gdb/psymtab.c
+Index: gdb-7.2.90.20110525/gdb/psymtab.c
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/psymtab.c	2011-04-20 22:10:29.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/psymtab.c	2011-04-29 09:44:15.000000000 +0200
+--- gdb-7.2.90.20110525.orig/gdb/psymtab.c	2011-04-20 22:10:29.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/psymtab.c	2011-05-25 17:13:13.000000000 +0200
 @@ -690,8 +690,15 @@ lookup_partial_symbol (struct partial_sy
  	internal_error (__FILE__, __LINE__,
  			_("failed internal consistency check"));
@@ -240,10 +245,10 @@ Index: gdb-7.2.90.20110429/gdb/psymtab.c
  	{
  	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
  				     SYMBOL_DOMAIN (*top), domain))
-Index: gdb-7.2.90.20110429/gdb/symtab.c
+Index: gdb-7.2.90.20110525/gdb/symtab.c
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/symtab.c	2011-04-29 09:43:55.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/symtab.c	2011-04-29 09:44:15.000000000 +0200
+--- gdb-7.2.90.20110525.orig/gdb/symtab.c	2011-05-25 17:12:51.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/symtab.c	2011-05-25 17:13:49.000000000 +0200
 @@ -1062,19 +1062,6 @@ lookup_symbol_in_language (const char *n
  	}
      }
@@ -264,7 +269,7 @@ Index: gdb-7.2.90.20110429/gdb/symtab.c
    returnval = lookup_symbol_aux (modified_name, block, domain, lang,
  				 is_a_field_of_this);
    do_cleanups (cleanup);
-@@ -3082,7 +3069,9 @@ search_symbols (char *regexp, domain_enu
+@@ -3106,7 +3093,9 @@ search_symbols (char *regexp, domain_enu
  	    }
  	}
  
@@ -275,26 +280,24 @@ Index: gdb-7.2.90.20110429/gdb/symtab.c
        if (errcode != 0)
  	{
  	  char *err = get_regcomp_error (errcode, &datum.preg);
-@@ -3529,10 +3518,13 @@ completion_list_add_name (char *symname,
- 			  char *text, char *word)
+@@ -3546,7 +3535,11 @@ rbreak_command (char *regexp, int from_t
+ static int
+ compare_symbol_name (const char *name, const char *sym_text, int sym_text_len)
  {
-   int newsize;
+-  if (strncmp (name, sym_text, sym_text_len) != 0)
 +  int (*ncmp) (const char *, const char *, size_t);
 +
 +  ncmp = (case_sensitivity == case_sensitive_on ? strncmp : strncasecmp);
++
++  if (ncmp (name, sym_text, sym_text_len) != 0)
+     return 0;
  
-   /* Clip symbols that cannot match.  */
- 
--  if (strncmp (symname, sym_text, sym_text_len) != 0)
-+  if (ncmp (symname, sym_text, sym_text_len) != 0)
-     {
-       return;
-     }
-Index: gdb-7.2.90.20110429/gdb/symtab.h
+   if (sym_text[sym_text_len] == '(')
+Index: gdb-7.2.90.20110525/gdb/symtab.h
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/symtab.h	2011-04-29 09:43:34.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/symtab.h	2011-04-29 09:44:15.000000000 +0200
-@@ -1030,7 +1030,8 @@ extern unsigned int msymbol_hash (const 
+--- gdb-7.2.90.20110525.orig/gdb/symtab.h	2011-05-25 17:12:51.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/symtab.h	2011-05-25 17:13:13.000000000 +0200
+@@ -1036,7 +1036,8 @@ extern unsigned int msymbol_hash (const 
     is only a GDB in-memory computed value with no external files compatibility
     requirements.  */
  
@@ -304,10 +307,10 @@ Index: gdb-7.2.90.20110429/gdb/symtab.h
  
  extern struct objfile * msymbol_objfile (struct minimal_symbol *sym);
  
-Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.c
+Index: gdb-7.2.90.20110525/gdb/testsuite/gdb.base/fortran-sym-case.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.c	2011-04-29 09:44:15.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/testsuite/gdb.base/fortran-sym-case.c	2011-05-25 17:13:13.000000000 +0200
 @@ -0,0 +1,22 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -331,10 +334,10 @@ Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.c
 +{
 +  return 0;
 +}
-Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.exp
+Index: gdb-7.2.90.20110525/gdb/testsuite/gdb.base/fortran-sym-case.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.exp	2011-04-29 09:44:15.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/testsuite/gdb.base/fortran-sym-case.exp	2011-05-25 17:13:13.000000000 +0200
 @@ -0,0 +1,27 @@
 +# Copyright (C) 2011 Free Software Foundation, Inc.
 +
@@ -363,10 +366,10 @@ Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.base/fortran-sym-case.exp
 +gdb_test "set language fortran" {Warning: the current language does not match this frame\.}
 +
 +gdb_test "frame" ", aRGv=.*"
-Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S
+Index: gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S	2011-04-29 09:44:15.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S	2011-05-25 17:13:13.000000000 +0200
 @@ -0,0 +1,102 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -470,10 +473,10 @@ Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive-debug.S
 +
 +	.byte		0x0			/* Terminator */
 +	.byte		0x0			/* Terminator */
-Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c
+Index: gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c	2011-04-29 09:44:15.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c	2011-05-25 17:13:13.000000000 +0200
 @@ -0,0 +1,38 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -513,10 +516,10 @@ Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.c
 +  FUNC_symtab ();
 +  return 0;
 +}
-Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp
+Index: gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp	2011-04-29 09:44:15.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp	2011-05-25 17:13:13.000000000 +0200
 @@ -0,0 +1,49 @@
 +# Copyright 2011 Free Software Foundation, Inc.
 +
@@ -567,10 +570,10 @@ Index: gdb-7.2.90.20110429/gdb/testsuite/gdb.dwarf2/dw2-case-insensitive.exp
 +if {[gdb_breakpoint "fuNC_symtab"] == 1} {
 +    pass "setting breakpoint at fuNC_symtab"
 +}
-Index: gdb-7.2.90.20110429/gdb/utils.c
+Index: gdb-7.2.90.20110525/gdb/utils.c
 ===================================================================
---- gdb-7.2.90.20110429.orig/gdb/utils.c	2011-04-29 09:43:34.000000000 +0200
-+++ gdb-7.2.90.20110429/gdb/utils.c	2011-04-29 09:44:15.000000000 +0200
+--- gdb-7.2.90.20110525.orig/gdb/utils.c	2011-05-25 17:12:51.000000000 +0200
++++ gdb-7.2.90.20110525/gdb/utils.c	2011-05-25 17:13:13.000000000 +0200
 @@ -3003,10 +3003,12 @@ strcmp_iw (const char *string1, const ch
  	{
  	  string2++;

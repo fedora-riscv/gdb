@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.90.20110429
+Version: 7.2.90.20110525
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?_with_upstream:.upstream}%{?dist}
+Release: 38%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -260,7 +260,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -557,18 +557,14 @@ Patch580: gdb-bz645773-case-insensitive-1of5.patch
 Patch581: gdb-bz645773-case-insensitive-2of5.patch
 Patch582: gdb-bz645773-case-insensitive-3of5.patch
 Patch583: gdb-bz645773-case-insensitive-4of5.patch
-Patch588: gdb-bz645773-case-insensitive-5of5.patch
-
-# Fix -O2 -g breakpoints internal error + prologue skipping (BZ 612253).
-Patch589: gdb-optim-g-prologue-skip.patch
-
-# Fix physname-related CU expansion issue for C++ (PR 12708).
-Patch590: gdb-physname-expand-completer.patch
 
 # Bundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
 Patch591: gdb-bz701131-readline62-1of3.patch
 Patch592: gdb-bz701131-readline62-2of3.patch
 Patch593: gdb-bz701131-readline62-3of3.patch
+
+# [stap] Fix double free.
+Patch594: gdb-stap-double-free.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
@@ -727,7 +723,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -843,12 +839,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch581 -p1
 %patch582 -p1
 %patch583 -p1
-%patch588 -p1
-%patch589 -p1
-%patch590 -p1
 %patch591 -p1
 %patch592 -p1
 %patch593 -p1
+%patch594 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1271,6 +1265,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed May 25 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110525-38.fc15
+- Rebase to FSF GDB 7.2.90.20110525 (which is a 7.3 pre-release).
+- [stap] Fix double free (Sergio Durigan Junior).
+
 * Tue May  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110429-37.fc15
 - Search also for .<seqno> files in /usr/lib/debug/.build-id (BZ 641377).
 
