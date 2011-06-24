@@ -27,7 +27,7 @@ Version: 7.2.90.20110525
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?_with_upstream:.upstream}%{?dist}
+Release: 39%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -665,9 +665,6 @@ Requires: libunwind >= 0.96-3
 %endif
 %endif
 
-Requires(post): /sbin/install-info
-Requires(preun): /sbin/install-info
-
 %description
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
@@ -699,6 +696,9 @@ Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
 This package provides INFO, HTML and PDF user manual for GDB.
+
+Requires(post): /sbin/install-info
+Requires(preun): /sbin/install-info
 
 %prep
 
@@ -1201,7 +1201,7 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post
+%post doc
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
 
@@ -1212,7 +1212,7 @@ then
   /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
 fi
 
-%preun
+%preun doc
 if [ $1 = 0 ]
 then
   # For --excludedocs:
@@ -1265,6 +1265,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Jun 24 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110525-39.fc15
+- Fix install-info for the gdb-doc subpackage (BZ 715228).
+
 * Wed May 25 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110525-38.fc15
 - Rebase to FSF GDB 7.2.90.20110525 (which is a 7.3 pre-release).
 - [stap] Fix double free (Sergio Durigan Junior).
