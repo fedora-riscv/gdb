@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.90.20110525
+Version: 7.2.90.20110703
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?_with_upstream:.upstream}%{?dist}
+Release: 40%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1265,6 +1265,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sun Jul  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110703-40.fc15
+- Rebase to FSF GDB 7.2.90.20110703 (which is a 7.3 pre-release).
+  - Adjust the `print errno' patch due to the DW_AT_linkage_name following again.
+
 * Fri Jun 24 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110525-39.fc15
 - Fix install-info for the gdb-doc subpackage (BZ 715228).
 
