@@ -23,7 +23,7 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.2.90.20110703
+Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
@@ -290,12 +290,6 @@ Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
 #=fedoratest
 Patch263: gdb-6.3-attach-see-vdso-test.patch
 
-# Do not hang on exit of a thread group leader (BZ 247354).
-#=push
-Patch265: gdb-6.6-bz247354-leader-exit-fix.patch
-#=push
-Patch266: gdb-6.6-bz247354-leader-exit-test.patch
-
 # Test leftover zombie process (BZ 243845).
 #=fedoratest
 Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
@@ -507,10 +501,6 @@ Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 #=fedoratest
 Patch526: gdb-bz634108-solib_address.patch
 
-# New testcase py-prettyprint.exp:print hint_error (for BZ 611569, BZ 629236).
-#=fedoratest
-Patch541: gdb-test-pp-hint-error.patch
-
 # New test gdb.arch/x86_64-pid0-core.exp for kernel PID 0 cores (BZ 611435).
 #=fedoratest
 Patch542: gdb-test-pid0-core.patch
@@ -523,21 +513,9 @@ Patch547: gdb-test-dw2-aranges.patch
 # =fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
-# Temporary fix of F15 gcc-4.6 child DIEs of DW_TAG_typedef (BZ 672230).
-# =push
-Patch555: gdb-gcc46-typedef.patch
-
 # Workaround gcc-4.6 stdarg false prologue end (GDB PR 12435 + GCC PR 47471).
 # =push
 Patch556: gdb-gcc46-stdarg-prologue.patch
-
-# Fix attach/core-load of {,un}prelinked i386 libs (bugreport by Michal Toman).
-Patch571: gdb-prelink-rela.patch
-
-# Fix threading internal error on corrupted memory (BZ 677654).
-Patch572: gdb-core-thread-internalerr-1of3.patch
-Patch573: gdb-core-thread-internalerr-2of3.patch
-Patch574: gdb-core-thread-internalerr-3of3.patch
 
 # Toolchain on sparc is slightly broken and debuginfo files are generated
 # with non 64bit aligned tables/offsets.
@@ -551,20 +529,6 @@ Patch574: gdb-core-thread-internalerr-3of3.patch
 # While we figure out what's wrong in the toolchain and do a full archive
 # rebuild to fix it, we need to be able to use gdb :)
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
-
-# Fix case insensitive symbols for Fortran by iFort (BZ 645773).
-Patch580: gdb-bz645773-case-insensitive-1of5.patch
-Patch581: gdb-bz645773-case-insensitive-2of5.patch
-Patch582: gdb-bz645773-case-insensitive-3of5.patch
-Patch583: gdb-bz645773-case-insensitive-4of5.patch
-
-# Bundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
-Patch591: gdb-bz701131-readline62-1of3.patch
-Patch592: gdb-bz701131-readline62-2of3.patch
-Patch593: gdb-bz701131-readline62-3of3.patch
-
-# [stap] Fix double free.
-Patch594: gdb-stap-double-free.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
@@ -771,8 +735,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch258 -p1
 %patch260 -p1
 %patch263 -p1
-%patch265 -p1
-%patch266 -p1
 %patch271 -p1
 %patch274 -p1
 %patch353 -p1
@@ -824,25 +786,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch510 -p1
 %patch511 -p1
 %patch526 -p1
-%patch541 -p1
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
-%patch555 -p1
 %patch556 -p1
-%patch571 -p1
-%patch572 -p1
-%patch573 -p1
-%patch574 -p1
 %patch579 -p1
-%patch580 -p1
-%patch581 -p1
-%patch582 -p1
-%patch583 -p1
-%patch591 -p1
-%patch592 -p1
-%patch593 -p1
-%patch594 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1265,6 +1213,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Jul 23 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-1.fc16
+- Rebase to FSF GDB 7.3.50.20110722.
+- Improve gcc-4.6 stdarg false prologue end workaround (GDB PR 12435 + GCC PR 47471).
+
 * Sun Jul  3 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.90.20110703-40.fc15
 - Rebase to FSF GDB 7.2.90.20110703 (which is a 7.3 pre-release).
   - Adjust the `print errno' patch due to the DW_AT_linkage_name following again.

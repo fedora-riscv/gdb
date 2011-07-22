@@ -2,107 +2,20 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 42fbc89fd3a797da9880ecbc467c32f282acf31f
+commit ad8e4e822c855645bf938ca82d04b4ed9f83a83b
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
 archer-jankratochvil-watchpoint3
 archer-tromey-python
-archer-sergiodj-stap-fedora15jk
+archer-sergiodj-stap-patch-split
 
 
-Index: gdb-7.2.90.20110703/bfd/elf-bfd.h
+Index: gdb-7.3.50.20110722/gdb/Makefile.in
 ===================================================================
---- gdb-7.2.90.20110703.orig/bfd/elf-bfd.h	2011-03-14 16:54:57.000000000 +0100
-+++ gdb-7.2.90.20110703/bfd/elf-bfd.h	2011-07-03 10:33:11.000000000 +0200
-@@ -1476,6 +1476,15 @@ enum
-   Tag_compatibility = 32
- };
- 
-+/* The following struct stores information about every SystemTap section
-+   found in the object file.  */
-+struct sdt_note
-+{
-+  struct sdt_note *next;
-+  bfd_size_type size;
-+  bfd_byte data[1];
-+};
-+
- /* Some private data is stashed away for future use using the tdata pointer
-    in the bfd structure.  */
- 
-@@ -1633,6 +1642,11 @@ struct elf_obj_tdata
-   bfd_size_type build_id_size;
-   bfd_byte *build_id;
- 
-+  /* Linked-list containing information about every Systemtap section
-+     found in the object file.  Each section corresponds to one entry
-+     in the list.  */
-+  struct sdt_note *sdt_note_head;
-+
-   /* True if the bfd contains symbols that have the STT_GNU_IFUNC
-      symbol type.  Used to set the osabi field in the ELF header
-      structure.  */
-Index: gdb-7.2.90.20110703/bfd/elf.c
-===================================================================
---- gdb-7.2.90.20110703.orig/bfd/elf.c	2011-03-14 16:54:58.000000000 +0100
-+++ gdb-7.2.90.20110703/bfd/elf.c	2011-07-03 10:33:11.000000000 +0200
-@@ -8416,6 +8416,37 @@ elfobj_grok_gnu_note (bfd *abfd, Elf_Int
-     }
- }
- 
-+#define SDT_NOTE_TYPE 3
-+
-+static bfd_boolean
-+elfobj_grok_stapsdt_note_1 (bfd *abfd, Elf_Internal_Note *note)
-+{
-+  struct sdt_note *cur =
-+    (struct sdt_note *) bfd_alloc (abfd, sizeof (struct sdt_note)
-+				   + note->descsz);
-+
-+  cur->next = (struct sdt_note *) (elf_tdata (abfd))->sdt_note_head;
-+  cur->size = (bfd_size_type) note->descsz;
-+  memcpy (cur->data, note->descdata, note->descsz);
-+
-+  elf_tdata (abfd)->sdt_note_head = cur;
-+
-+  return TRUE;
-+}
-+
-+static bfd_boolean
-+elfobj_grok_stapsdt_note (bfd *abfd, Elf_Internal_Note *note)
-+{
-+  switch (note->type)
-+    {
-+    case SDT_NOTE_TYPE:
-+      return elfobj_grok_stapsdt_note_1 (abfd, note);
-+
-+    default:
-+      return TRUE;
-+    }
-+}
-+
- static bfd_boolean
- elfcore_netbsd_get_lwpid (Elf_Internal_Note *note, int *lwpidp)
- {
-@@ -9189,6 +9220,12 @@ elf_parse_notes (bfd *abfd, char *buf, s
- 	      if (! elfobj_grok_gnu_note (abfd, &in))
- 		return FALSE;
- 	    }
-+	  else if (in.namesz == sizeof "stapsdt"
-+		   && strcmp (in.namedata, "stapsdt") == 0)
-+	    {
-+	      if (! elfobj_grok_stapsdt_note (abfd, &in))
-+		return FALSE;
-+	    }
- 	  break;
- 	}
- 
-Index: gdb-7.2.90.20110703/gdb/Makefile.in
-===================================================================
---- gdb-7.2.90.20110703.orig/gdb/Makefile.in	2011-03-30 08:55:39.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/Makefile.in	2011-07-03 10:33:11.000000000 +0200
-@@ -721,8 +721,8 @@ SFILES = ada-exp.y ada-lang.c ada-typepr
+--- gdb-7.3.50.20110722.orig/gdb/Makefile.in	2011-07-22 01:46:08.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/Makefile.in	2011-07-22 20:04:21.000000000 +0200
+@@ -720,8 +720,8 @@ SFILES = ada-exp.y ada-lang.c ada-typepr
  	sentinel-frame.c \
  	serial.c ser-base.c ser-unix.c \
  	solib.c solib-target.c source.c \
@@ -113,25 +26,25 @@ Index: gdb-7.2.90.20110703/gdb/Makefile.in
  	target.c target-descriptions.c target-memory.c \
  	thread.c top.c tracepoint.c \
  	trad-frame.c \
-@@ -814,7 +814,7 @@ osdata.h procfs.h python/py-event.h pyth
+@@ -818,7 +818,7 @@ osdata.h procfs.h python/py-event.h pyth
  python/python-internal.h python/python.h ravenscar-thread.h record.h \
  solib-darwin.h solib-ia64-hpux.h solib-spu.h windows-nat.h xcoffread.h \
  gnulib/extra/arg-nonnull.h gnulib/extra/c++defs.h gnulib/extra/warn-on-use.h \
--gnulib/stddef.in.h inline-frame.h
-+gnulib/stddef.in.h inline-frame.h stap-probe.h
+-gnulib/stddef.in.h inline-frame.h \
++gnulib/stddef.in.h inline-frame.h stap-probe.h \
+ common/common-utils.h common/xml-utils.h common/buffer.h common/ptid.h \
+ common/linux-osdata.h
  
- # Header files that already have srcdir in them, or which are in objdir.
- 
-@@ -899,7 +899,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $
- 	prologue-value.o memory-map.o memrange.o xml-support.o xml-syscall.o \
+@@ -906,7 +906,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $
+ 	xml-support.o xml-syscall.o xml-utils.o \
  	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
  	inferior.o osdata.o gdb_usleep.o record.o gcore.o \
--	jit.o progspace.o
-+	jit.o progspace.o stap-probe.o
+-	jit.o progspace.o \
++	jit.o progspace.o stap-probe.o \
+ 	common-utils.o buffer.o ptid.o
  
  TSOBS = inflow.o
- 
-@@ -1320,6 +1320,12 @@ stamp-h: $(srcdir)/config.in config.stat
+@@ -1328,6 +1328,12 @@ stamp-h: $(srcdir)/config.in config.stat
  	  CONFIG_LINKS= \
  	  $(SHELL) config.status
  
@@ -144,11 +57,11 @@ Index: gdb-7.2.90.20110703/gdb/Makefile.in
  config.status: $(srcdir)/configure configure.tgt configure.host
  	$(SHELL) config.status --recheck
  
-Index: gdb-7.2.90.20110703/gdb/NEWS
+Index: gdb-7.3.50.20110722/gdb/NEWS
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/NEWS	2011-03-31 16:32:48.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/NEWS	2011-07-03 10:33:11.000000000 +0200
-@@ -36,6 +36,10 @@
+--- gdb-7.3.50.20110722.orig/gdb/NEWS	2011-07-21 19:23:55.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/NEWS	2011-07-22 20:04:21.000000000 +0200
+@@ -109,6 +109,10 @@ QTDisable
    Initial support for the OpenCL C language (http://www.khronos.org/opencl)
    has been integrated into GDB.
  
@@ -159,11 +72,11 @@ Index: gdb-7.2.90.20110703/gdb/NEWS
  * Python scripting
  
    ** The function gdb.Write now accepts an optional keyword 'stream'.
-Index: gdb-7.2.90.20110703/gdb/ada-lang.c
+Index: gdb-7.3.50.20110722/gdb/ada-lang.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/ada-lang.c	2011-05-17 23:26:08.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/ada-lang.c	2011-07-03 10:33:11.000000000 +0200
-@@ -11421,6 +11421,7 @@ ada_operator_length (const struct expres
+--- gdb-7.3.50.20110722.orig/gdb/ada-lang.c	2011-07-05 06:34:55.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/ada-lang.c	2011-07-22 20:04:21.000000000 +0200
+@@ -11862,6 +11862,7 @@ ada_operator_length (const struct expres
  
  static int
  ada_operator_check (struct expression *exp, int pos,
@@ -171,7 +84,7 @@ Index: gdb-7.2.90.20110703/gdb/ada-lang.c
  		    int (*objfile_func) (struct objfile *objfile, void *data),
  		    void *data)
  {
-@@ -11435,12 +11436,15 @@ ada_operator_check (struct expression *e
+@@ -11876,12 +11877,15 @@ ada_operator_check (struct expression *e
  	break;
  
        default:
@@ -189,10 +102,10 @@ Index: gdb-7.2.90.20110703/gdb/ada-lang.c
        && (*objfile_func) (TYPE_OBJFILE (type), data))
      return 1;
  
-Index: gdb-7.2.90.20110703/gdb/amd64-linux-nat.c
+Index: gdb-7.3.50.20110722/gdb/amd64-linux-nat.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/amd64-linux-nat.c	2011-01-07 20:36:15.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/amd64-linux-nat.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/amd64-linux-nat.c	2011-01-07 20:36:15.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/amd64-linux-nat.c	2011-07-22 20:04:21.000000000 +0200
 @@ -265,18 +265,11 @@ amd64_linux_store_inferior_registers (st
  
  /* Support for debug registers.  */
@@ -411,10 +324,10 @@ Index: gdb-7.2.90.20110703/gdb/amd64-linux-nat.c
  }
  
  
-Index: gdb-7.2.90.20110703/gdb/ax-gdb.c
+Index: gdb-7.3.50.20110722/gdb/ax-gdb.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/ax-gdb.c	2011-02-24 08:39:47.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/ax-gdb.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/ax-gdb.c	2011-06-17 22:46:47.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/ax-gdb.c	2011-07-22 20:04:21.000000000 +0200
 @@ -2001,7 +2001,8 @@ gen_expr (struct expression *exp, union 
  
      case OP_INTERNALVAR:
@@ -434,10 +347,10 @@ Index: gdb-7.2.90.20110703/gdb/ax-gdb.c
  	  error (_("$%s is not a trace state variable; GDB agent "
  		   "expressions cannot use convenience variables."), name);
        }
-Index: gdb-7.2.90.20110703/gdb/block.c
+Index: gdb-7.3.50.20110722/gdb/block.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/block.c	2011-01-01 16:32:57.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/block.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/block.c	2011-01-01 16:32:57.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/block.c	2011-07-22 20:04:21.000000000 +0200
 @@ -322,3 +322,21 @@ allocate_block (struct obstack *obstack)
  
    return bl;
@@ -460,21 +373,21 @@ Index: gdb-7.2.90.20110703/gdb/block.c
 +
 +  return SYMBOL_SYMTAB (func)->objfile;
 +}
-Index: gdb-7.2.90.20110703/gdb/block.h
+Index: gdb-7.3.50.20110722/gdb/block.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/block.h	2011-01-01 16:32:57.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/block.h	2011-07-03 10:33:11.000000000 +0200
-@@ -167,4 +167,6 @@ extern const struct block *block_global_
+--- gdb-7.3.50.20110722.orig/gdb/block.h	2011-04-04 16:10:12.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/block.h	2011-07-22 20:04:21.000000000 +0200
+@@ -163,4 +163,6 @@ extern const struct block *block_global_
  
  extern struct block *allocate_block (struct obstack *obstack);
  
 +extern struct objfile *block_objfile (const struct block *block);
 +
  #endif /* BLOCK_H */
-Index: gdb-7.2.90.20110703/gdb/breakpoint.c
+Index: gdb-7.3.50.20110722/gdb/breakpoint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/breakpoint.c	2011-07-02 21:33:09.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/breakpoint.c	2011-07-03 10:35:09.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/breakpoint.c	2011-07-05 06:34:55.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/breakpoint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -63,6 +63,8 @@
  #include "jit.h"
  #include "xml-syscall.h"
@@ -482,19 +395,9 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
 +#include "gdb_regex.h"
 +#include "stap-probe.h"
  #include "cli/cli-utils.h"
+ #include "continuations.h"
  
- /* readline include files */
-@@ -107,6 +109,9 @@ static void break_command_1 (char *, int
- 
- static void mention (struct breakpoint *);
- 
-+static struct bp_location *add_location_to_breakpoint (struct breakpoint *b,
-+					     const struct symtab_and_line *sal);
-+
- /* This function is used in gdbtk sources and thus can not be made
-    static.  */
- struct breakpoint *set_raw_breakpoint (struct gdbarch *gdbarch,
-@@ -1249,6 +1254,9 @@ update_watchpoint (struct breakpoint *b,
+@@ -1248,6 +1250,9 @@ update_watchpoint (struct breakpoint *b,
    if (!watchpoint_in_thread_scope (b))
      return;
  
@@ -504,7 +407,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
    if (b->disposition == disp_del_at_next_stop)
      return;
   
-@@ -1520,6 +1528,40 @@ should_be_inserted (struct bp_location *
+@@ -1532,6 +1537,40 @@ should_be_inserted (struct bp_location *
    return 1;
  }
  
@@ -545,7 +448,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  /* Insert a low-level "breakpoint" of some type.  BL is the breakpoint
     location.  Any error messages are printed to TMP_ERROR_STREAM; and
     DISABLED_BREAKS, and HW_BREAKPOINT_ERROR are used to report problems.
-@@ -1616,6 +1658,8 @@ insert_bp_location (struct bp_location *
+@@ -1628,6 +1667,8 @@ insert_bp_location (struct bp_location *
  	  else
  	    val = target_insert_breakpoint (bl->gdbarch,
  					    &bl->target_info);
@@ -554,7 +457,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  	}
        else
  	{
-@@ -1870,6 +1914,7 @@ insert_breakpoint_locations (void)
+@@ -1883,6 +1924,7 @@ insert_breakpoint_locations (void)
    int val = 0;
    int disabled_breaks = 0;
    int hw_breakpoint_error = 0;
@@ -562,7 +465,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
    struct ui_file *tmp_error_stream = mem_fileopen ();
    struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
-@@ -1897,9 +1942,13 @@ insert_breakpoint_locations (void)
+@@ -1910,9 +1952,13 @@ insert_breakpoint_locations (void)
        /* For targets that support global breakpoints, there's no need
  	 to select an inferior to insert breakpoint to.  In fact, even
  	 if we aren't attached to any process yet, we should still
@@ -578,7 +481,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  	continue;
  
        val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-@@ -1923,13 +1972,19 @@ insert_breakpoint_locations (void)
+@@ -1936,13 +1982,19 @@ insert_breakpoint_locations (void)
  
        if (bpt->disposition == disp_del_at_next_stop)
  	continue;
@@ -604,12 +507,15 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
        if (some_failed)
  	{
  	  for (loc = bpt->loc; loc; loc = loc->next)
-@@ -2111,15 +2166,24 @@ struct breakpoint_objfile_data
+@@ -2110,11 +2162,23 @@ struct breakpoint_objfile_data
    /* Minimal symbol(s) for "longjmp", "siglongjmp", etc. (if any).  */
    struct minimal_symbol *longjmp_msym[NUM_LONGJMP_NAMES];
  
-+  /* SystemTap probe point for longjmp (if any).  */
-+  const struct stap_probe *longjmp_probe;
++  /* True if we have looked for longjmp probes.  */
++  int longjmp_searched;
++
++  /* SystemTap probe points for longjmp (if any).  */
++  VEC (stap_probe_p) *longjmp_probes;
 +
    /* Minimal symbol for "std::terminate()" (if any).  */
    struct minimal_symbol *terminate_msym;
@@ -617,73 +523,100 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
    /* Minimal symbol for "_Unwind_DebugHook" (if any).  */
    struct minimal_symbol *exception_msym;
 +
-+  /* SystemTap probe point for unwinding (if any).  */
-+  const struct stap_probe *exception_probe;
++  /* True if we have looked for exception probes.  */
++  int exception_searched;
++
++  /* SystemTap probe points for unwinding (if any).  */
++  VEC (stap_probe_p) *exception_probes;
  };
  
  static const struct objfile_data *breakpoint_objfile_key;
+@@ -2151,6 +2215,15 @@ get_breakpoint_objfile_data (struct objf
+ }
  
-+/* SystemTap probe not found sentinel.  */
-+static const struct stap_probe probe_not_found;
+ static void
++free_breakpoint_probes (struct objfile *obj, void *data)
++{
++  struct breakpoint_objfile_data *bp_objfile_data = data;
 +
- /* Minimal symbol not found sentinel.  */
- static struct minimal_symbol msym_not_found;
- 
-@@ -2227,6 +2291,29 @@ create_longjmp_master_breakpoint (void)
++  VEC_free (stap_probe_p, bp_objfile_data->longjmp_probes);
++  VEC_free (stap_probe_p, bp_objfile_data->exception_probes);
++}
++
++static void
+ create_overlay_event_breakpoint (void)
+ {
+   struct objfile *objfile;
+@@ -2226,6 +2299,36 @@ create_longjmp_master_breakpoint (void)
  
        bp_objfile_data = get_breakpoint_objfile_data (objfile);
  
-+      if (bp_objfile_data->longjmp_probe != &probe_not_found)
++      if (!bp_objfile_data->longjmp_searched)
 +	{
-+	  if (bp_objfile_data->longjmp_probe == NULL)
-+	    bp_objfile_data->longjmp_probe
-+	      = find_probe_in_objfile (objfile, "libc", "longjmp");
++	  bp_objfile_data->longjmp_probes
++	    = find_probes_in_objfile (objfile, "libc", "longjmp");
++	  bp_objfile_data->longjmp_searched = 1;
++	}
 +
-+	  if (bp_objfile_data->longjmp_probe)
++      if (bp_objfile_data->longjmp_probes != NULL)
++	{
++	  int i;
++	  const struct stap_probe *probe;
++	  struct gdbarch *gdbarch = get_objfile_arch (objfile);
++
++	  for (i = 0;
++	       VEC_iterate (stap_probe_p,
++			    bp_objfile_data->longjmp_probes,
++			    i, probe);
++	       ++i)
 +	    {
 +	      struct breakpoint *b;
-+	      struct gdbarch *gdbarch = get_objfile_arch (objfile);
-+
-+	      b = create_internal_breakpoint (gdbarch,
-+					      bp_objfile_data->longjmp_probe->address,
++	       
++	      b = create_internal_breakpoint (gdbarch, probe->address,
 +					      bp_longjmp_master);
 +	      b->addr_string = xstrdup ("probe:libc:longjmp");
 +	      b->enable_state = bp_disabled;
-+
-+	      continue;
 +	    }
-+	  else
-+	    bp_objfile_data->longjmp_probe = &probe_not_found;
++
++	  continue;
 +	}
 +
        for (i = 0; i < NUM_LONGJMP_NAMES; i++)
  	{
  	  struct breakpoint *b;
-@@ -2335,6 +2422,31 @@ create_exception_master_breakpoint (void
+@@ -2334,6 +2437,39 @@ create_exception_master_breakpoint (void
  
        bp_objfile_data = get_breakpoint_objfile_data (objfile);
  
 +      /* We prefer the SystemTap probe point if it exists.  */
-+      if (bp_objfile_data->exception_probe != &probe_not_found)
++      if (!bp_objfile_data->exception_searched)
 +	{
-+	  if (bp_objfile_data->exception_probe == NULL)
-+	    bp_objfile_data->exception_probe
-+	      = find_probe_in_objfile (objfile, "libgcc", "unwind");
++	  bp_objfile_data->exception_probes
++	    = find_probes_in_objfile (objfile, "libgcc", "unwind");
++	  bp_objfile_data->exception_searched = 1;
++	}
 +
-+	  if (bp_objfile_data->exception_probe)
++      if (bp_objfile_data->exception_probes != NULL)
++	{
++	  struct gdbarch *gdbarch = get_objfile_arch (objfile);
++	  int i;
++	  const struct stap_probe *probe;
++
++	  for (i = 0;
++	       VEC_iterate (stap_probe_p,
++			    bp_objfile_data->exception_probes,
++			    i, probe);
++	       ++i)
 +	    {
 +	      struct breakpoint *b;
-+	      struct gdbarch *gdbarch = get_objfile_arch (objfile);
 +
-+	      b = create_internal_breakpoint (gdbarch,
-+					      bp_objfile_data->exception_probe->address,
++	      b = create_internal_breakpoint (gdbarch, probe->address,
 +					      bp_exception_master);
 +	      b->addr_string = xstrdup ("probe:libgcc:unwind");
 +	      b->enable_state = bp_disabled;
-+	      continue;
 +	    }
-+	  else
-+	    bp_objfile_data->exception_probe = &probe_not_found;
++
++	  continue;
 +	}
 +
 +      /* Otherwise, try the hook function.  */
@@ -691,7 +624,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
        if (msym_not_found_p (bp_objfile_data->exception_msym))
  	continue;
  
-@@ -2553,6 +2665,8 @@ remove_breakpoint_1 (struct bp_location 
+@@ -2552,6 +2688,8 @@ remove_breakpoint_1 (struct bp_location 
  	    val = target_remove_hw_breakpoint (bl->gdbarch, &bl->target_info);
  	  else
  	    val = target_remove_breakpoint (bl->gdbarch, &bl->target_info);
@@ -700,7 +633,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  	}
        else
  	{
-@@ -5902,6 +6016,7 @@ set_raw_breakpoint (struct gdbarch *gdba
+@@ -5957,6 +6095,7 @@ init_raw_breakpoint (struct breakpoint *
    b->loc->requested_address = sal.pc;
    b->loc->address = adjusted_address;
    b->loc->pspace = sal.pspace;
@@ -708,7 +641,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
    /* Store the program space that was used to set the breakpoint, for
       breakpoint resetting.  */
-@@ -7056,6 +7171,7 @@ clone_momentary_breakpoint (struct break
+@@ -7226,6 +7365,7 @@ clone_momentary_breakpoint (struct break
    copy->loc->address = orig->loc->address;
    copy->loc->section = orig->loc->section;
    copy->loc->pspace = orig->loc->pspace;
@@ -716,7 +649,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
    if (orig->source_file == NULL)
      copy->source_file = NULL;
-@@ -7279,6 +7395,7 @@ add_location_to_breakpoint (struct break
+@@ -7444,6 +7584,7 @@ add_location_to_breakpoint (struct break
    loc->address = adjust_breakpoint_address (loc->gdbarch,
  					    loc->requested_address, b->type);
    loc->pspace = sal->pspace;
@@ -724,7 +657,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
    gdb_assert (loc->pspace != NULL);
    loc->section = sal->section;
  
-@@ -7628,6 +7745,16 @@ create_breakpoints_sal (struct gdbarch *
+@@ -7792,6 +7933,16 @@ create_breakpoints_sal (struct gdbarch *
  {
    int i;
  
@@ -741,8 +674,8 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
    for (i = 0; i < sals.nelts; ++i)
      {
        struct symtabs_and_lines expanded = 
-@@ -8148,7 +8275,7 @@ create_breakpoint (struct gdbarch *gdbar
-         mention (b);
+@@ -8300,7 +8451,7 @@ create_breakpoint (struct gdbarch *gdbar
+       observer_notify_breakpoint_created (b);
      }
    
 -  if (sals.nelts > 1)
@@ -750,15 +683,15 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
      {
        warning (_("Multiple breakpoints were set.\nUse the "
  		 "\"delete\" command to delete unwanted breakpoints."));
-@@ -9020,6 +9147,7 @@ watch_command_1 (char *arg, int accessfl
+@@ -9394,6 +9545,7 @@ watch_command_1 (char *arg, int accessfl
+   /* Now set up the breakpoint.  */
    b = set_raw_breakpoint_without_location (NULL, bp_type);
-   set_breakpoint_number (internal, b);
    b->thread = thread;
 +  b->pspace = current_program_space;
    b->disposition = disp_donttouch;
    b->exp = exp;
    b->exp_valid_block = exp_valid_block;
-@@ -10182,6 +10310,9 @@ update_global_location_list (int should_
+@@ -10512,6 +10664,9 @@ update_global_location_list (int should_
        int keep_in_target = 0;
        int removed = 0;
  
@@ -768,7 +701,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
        /* Skip LOCP entries which will definitely never be needed.
  	 Stop either at or being the one matching OLD_LOC.  */
        while (locp < bp_location + bp_location_count
-@@ -10946,12 +11077,14 @@ update_breakpoint_locations (struct brea
+@@ -11333,12 +11488,14 @@ update_breakpoint_locations (struct brea
     On return, FOUND will be 1 if any SaL was found, zero otherwise.  */
  
  static struct symtabs_and_lines
@@ -784,7 +717,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
    s = addr_string;
    marker_spec = b->type == bp_static_tracepoint && is_marker_spec (s);
-@@ -10970,7 +11103,27 @@ addr_string_to_sals (struct breakpoint *
+@@ -11357,7 +11514,27 @@ addr_string_to_sals (struct breakpoint *
  	    error (_("marker %s not found"), b->static_trace_marker_id);
  	}
        else
@@ -813,7 +746,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
      }
    if (e.reason < 0)
      {
-@@ -11003,7 +11156,7 @@ addr_string_to_sals (struct breakpoint *
+@@ -11390,7 +11567,7 @@ addr_string_to_sals (struct breakpoint *
  
    if (e.reason == 0 || e.error != NOT_FOUND_ERROR)
      {
@@ -822,16 +755,11 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
        resolve_sal_pc (&sals.sals[0]);
        if (b->condition_not_parsed && s && s[0])
-@@ -11044,22 +11197,27 @@ re_set_breakpoint (struct breakpoint *b)
+@@ -11426,17 +11603,22 @@ breakpoint_re_set_default (struct breakp
+   struct symtabs_and_lines sals, sals_end;
    struct symtabs_and_lines expanded = {0};
    struct symtabs_and_lines expanded_end = {0};
-   struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
 +  int pre_expanded = 0;
- 
-   input_radix = b->input_radix;
-   save_current_space_and_thread ();
-   switch_to_program_space_and_thread (b->pspace);
-   set_language (b->language);
  
 -  sals = addr_string_to_sals (b, b->addr_string, &found);
 +  sals = addr_string_to_sals (b, b->addr_string, &found, &pre_expanded);
@@ -853,7 +781,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
        if (found)
  	{
  	  make_cleanup (xfree, sals_end.sals);
-@@ -12496,6 +12654,24 @@ all_tracepoints (void)
+@@ -12913,6 +13095,24 @@ all_tracepoints (void)
    return tp_vec;
  }
  
@@ -878,7 +806,17 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
  
  /* This help string is used for the break, hbreak, tbreak and thbreak
     commands.  It is defined as a macro to prevent duplication.
-@@ -13131,4 +13307,7 @@ range (including START-LOCATION and END-
+@@ -13005,7 +13205,8 @@ _initialize_breakpoint (void)
+   observer_attach_inferior_exit (clear_syscall_counts);
+   observer_attach_memory_changed (invalidate_bp_value_on_memory_change);
+ 
+-  breakpoint_objfile_key = register_objfile_data ();
++  breakpoint_objfile_key
++    = register_objfile_data_with_cleanup (NULL, free_breakpoint_probes);
+ 
+   breakpoint_chain = 0;
+   /* Don't bother to call set_breakpoint_count.  $bpnum isn't useful
+@@ -13532,4 +13733,7 @@ range (including START-LOCATION and END-
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
@@ -886,11 +824,11 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.c
 +  observer_attach_mark_used (breakpoint_types_mark_used);
 +#endif
  }
-Index: gdb-7.2.90.20110703/gdb/breakpoint.h
+Index: gdb-7.3.50.20110722/gdb/breakpoint.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/breakpoint.h	2011-05-17 23:25:56.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/breakpoint.h	2011-07-03 10:33:11.000000000 +0200
-@@ -363,6 +363,11 @@ struct bp_location
+--- gdb-7.3.50.20110722.orig/gdb/breakpoint.h	2011-06-22 19:53:44.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/breakpoint.h	2011-07-22 20:04:21.000000000 +0200
+@@ -383,6 +383,11 @@ struct bp_location
       processor's architectual constraints.  */
    CORE_ADDR requested_address;
  
@@ -902,7 +840,7 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.h
    char *function_name;
  
    /* Details of the placed breakpoint, when inserted.  */
-@@ -1237,4 +1242,11 @@ extern struct breakpoint *iterate_over_b
+@@ -1316,4 +1321,11 @@ extern struct breakpoint *iterate_over_b
  
  extern int user_breakpoint_p (struct breakpoint *);
  
@@ -914,10 +852,10 @@ Index: gdb-7.2.90.20110703/gdb/breakpoint.h
 +extern void modify_semaphore (struct bp_location *location, int set);
 +
  #endif /* !defined (BREAKPOINT_H) */
-Index: gdb-7.2.90.20110703/gdb/c-typeprint.c
+Index: gdb-7.3.50.20110722/gdb/c-typeprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/c-typeprint.c	2011-03-22 18:35:22.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/c-typeprint.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/c-typeprint.c	2011-05-18 18:30:34.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/c-typeprint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -625,9 +625,14 @@ c_type_print_varspec_suffix (struct type
  	  fprintf_filtered (stream, ")");
  
@@ -936,10 +874,10 @@ Index: gdb-7.2.90.20110703/gdb/c-typeprint.c
  	fprintf_filtered (stream, "]");
  
  	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,
-Index: gdb-7.2.90.20110703/gdb/cli/cli-utils.c
+Index: gdb-7.3.50.20110722/gdb/cli/cli-utils.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/cli/cli-utils.c	2011-03-16 22:12:12.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/cli/cli-utils.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/cli/cli-utils.c	2011-03-16 22:12:12.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/cli/cli-utils.c	2011-07-22 20:04:21.000000000 +0200
 @@ -245,3 +245,32 @@ remove_trailing_whitespace (const char *
  
    return s;
@@ -973,10 +911,10 @@ Index: gdb-7.2.90.20110703/gdb/cli/cli-utils.c
 +
 +  return copy;
 +}
-Index: gdb-7.2.90.20110703/gdb/cli/cli-utils.h
+Index: gdb-7.3.50.20110722/gdb/cli/cli-utils.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/cli/cli-utils.h	2011-03-16 22:12:12.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/cli/cli-utils.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/cli/cli-utils.h	2011-03-16 22:12:12.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/cli/cli-utils.h	2011-07-22 20:04:21.000000000 +0200
 @@ -103,4 +103,11 @@ extern char *skip_to_space (char *inp);
     START.  */
  
@@ -989,11 +927,11 @@ Index: gdb-7.2.90.20110703/gdb/cli/cli-utils.h
 +extern char *extract_arg (char **arg);
 +
  #endif /* CLI_UTILS_H */
-Index: gdb-7.2.90.20110703/gdb/coffread.c
+Index: gdb-7.3.50.20110722/gdb/coffread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/coffread.c	2011-03-17 14:19:23.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/coffread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -2193,6 +2193,7 @@ static const struct sym_fns coff_sym_fns
+--- gdb-7.3.50.20110722.orig/gdb/coffread.c	2011-06-14 20:53:13.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/coffread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -2197,6 +2197,7 @@ static const struct sym_fns coff_sym_fns
  
    default_symfile_relocate,	/* sym_relocate: Relocate a debug
  				   section.  */
@@ -1001,10 +939,10 @@ Index: gdb-7.2.90.20110703/gdb/coffread.c
    &psym_functions
  };
  
-Index: gdb-7.2.90.20110703/gdb/data-directory/Makefile.in
+Index: gdb-7.3.50.20110722/gdb/data-directory/Makefile.in
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/data-directory/Makefile.in	2011-02-04 19:34:41.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/data-directory/Makefile.in	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/data-directory/Makefile.in	2011-02-04 19:34:41.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/data-directory/Makefile.in	2011-07-22 20:04:21.000000000 +0200
 @@ -52,11 +52,23 @@ SYSCALLS_FILES = \
  PYTHON_DIR = python
  PYTHON_INSTALL_DIR = $(DESTDIR)$(GDB_DATADIR)/$(PYTHON_DIR)
@@ -1032,19 +970,11 @@ Index: gdb-7.2.90.20110703/gdb/data-directory/Makefile.in
  
  FLAGS_TO_PASS = \
  	"prefix=$(prefix)" \
-Index: gdb-7.2.90.20110703/gdb/dbxread.c
+Index: gdb-7.3.50.20110722/gdb/dbxread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dbxread.c	2011-03-23 19:23:54.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/dbxread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1,6 +1,6 @@
- /* Read dbx symbol tables and convert to internal format, for GDB.
-    Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
--   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2008, 2009, 2010.
-+   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2008, 2009, 2010, 2011.
-    Free Software Foundation, Inc.
- 
-    This file is part of GDB.
-@@ -3587,6 +3587,7 @@ static const struct sym_fns aout_sym_fns
+--- gdb-7.3.50.20110722.orig/gdb/dbxread.c	2011-06-27 21:21:50.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dbxread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -3590,6 +3590,7 @@ static const struct sym_fns aout_sym_fns
    default_symfile_segments,	/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -1052,11 +982,11 @@ Index: gdb-7.2.90.20110703/gdb/dbxread.c
    &psym_functions
  };
  
-Index: gdb-7.2.90.20110703/gdb/defs.h
+Index: gdb-7.3.50.20110722/gdb/defs.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/defs.h	2011-03-31 16:32:48.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/defs.h	2011-07-03 10:33:11.000000000 +0200
-@@ -398,6 +398,8 @@ extern struct cleanup *make_cleanup_rest
+--- gdb-7.3.50.20110722.orig/gdb/defs.h	2011-07-22 01:46:08.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/defs.h	2011-07-22 20:04:21.000000000 +0200
+@@ -406,6 +406,8 @@ extern struct cleanup *make_cleanup_rest
  extern struct cleanup *
    set_batch_flag_and_make_cleanup_restore_page_info (void);
  
@@ -1065,11 +995,11 @@ Index: gdb-7.2.90.20110703/gdb/defs.h
  extern char *gdb_realpath (const char *);
  extern char *xfullpath (const char *);
  
-Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
+Index: gdb-7.3.50.20110722/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/doc/gdb.texinfo	2011-07-02 21:59:29.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/doc/gdb.texinfo	2011-07-03 10:33:11.000000000 +0200
-@@ -1177,6 +1177,16 @@ for remote debugging.
+--- gdb-7.3.50.20110722.orig/gdb/doc/gdb.texinfo	2011-07-21 17:13:29.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/doc/gdb.texinfo	2011-07-22 20:04:21.000000000 +0200
+@@ -1175,6 +1175,16 @@ for remote debugging.
  Run using @var{device} for your program's standard input and output.
  @c FIXME: kingdon thinks there is more to -tty.  Investigate.
  
@@ -1086,7 +1016,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @c resolve the situation of these eventually
  @item -tui
  @cindex @code{--tui}
-@@ -3286,6 +3296,7 @@ all breakpoints in that range are operat
+@@ -3295,6 +3305,7 @@ all breakpoints in that range are operat
  * Conditions::                  Break conditions
  * Break Commands::              Breakpoint command lists
  * Save Breakpoints::            How to save breakpoints in a file
@@ -1094,7 +1024,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  * Error in Breakpoints::        ``Cannot insert breakpoints''
  * Breakpoint-related Warnings:: ``Breakpoint address adjusted...''
  @end menu
-@@ -4499,6 +4510,50 @@ and remove the breakpoint definitions yo
+@@ -4525,6 +4536,50 @@ and remove the breakpoint definitions yo
  that can no longer be recreated.
  @end table
  
@@ -1145,7 +1075,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @c  @ifclear BARETARGET
  @node Error in Breakpoints
  @subsection ``Cannot insert breakpoints''
-@@ -6414,6 +6469,29 @@ specify the function unambiguously, e.g.
+@@ -6440,6 +6495,29 @@ specify the function unambiguously, e.g.
  functions with identical names in different source files.
  @end table
  
@@ -1175,7 +1105,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @end table
  
  
-@@ -8500,6 +8578,10 @@ to match the format in which the data wa
+@@ -8526,6 +8604,10 @@ to match the format in which the data wa
  The variable @code{$_exitcode} is automatically set to the exit code when
  the program being debugged terminates.
  
@@ -1186,7 +1116,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @item $_sdata
  @vindex $_sdata@r{, inspect, convenience variable}
  The variable @code{$_sdata} contains extra collected static tracepoint
-@@ -10219,6 +10301,16 @@ Collect all function arguments.
+@@ -10264,6 +10346,16 @@ Collect all function arguments.
  @item $locals
  Collect all local variables.
  
@@ -1203,7 +1133,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @item $_sdata
  @vindex $_sdata@r{, collect}
  Collect static tracepoint marker specific data.  Only available for
-@@ -20720,8 +20812,6 @@ containing @code{end}.  For example:
+@@ -20805,8 +20897,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -1212,9 +1142,9 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  >print 23
  >end
  23
-@@ -20734,6 +20824,14 @@ in a Python script.  This can be control
- python print-stack}: if @code{on}, the default, then Python stack
- printing is enabled; if @code{off}, then Python stack printing is
+@@ -20824,6 +20914,14 @@ occurs in a Python script.  This can be 
+ python print-stack}: if @code{on}, then Python stack printing is
+ enabled; if @code{off}, the default, then Python stack printing is
  disabled.
 +
 +@kindex maint set python auto-load
@@ -1227,7 +1157,7 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @end table
  
  It is also possible to execute a Python script from the @value{GDBN}
-@@ -20755,6 +20853,14 @@ and thus is always available.
+@@ -20845,6 +20943,14 @@ and thus is always available.
  @cindex python api
  @cindex programming in python
  
@@ -1242,10 +1172,10 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdb.texinfo
  @cindex python stdout
  @cindex python pagination
  At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
-Index: gdb-7.2.90.20110703/gdb/doc/gdbint.texinfo
+Index: gdb-7.3.50.20110722/gdb/doc/gdbint.texinfo
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/doc/gdbint.texinfo	2011-02-04 20:10:12.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/doc/gdbint.texinfo	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/doc/gdbint.texinfo	2011-04-19 20:04:08.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/doc/gdbint.texinfo	2011-07-22 20:04:21.000000000 +0200
 @@ -2104,6 +2104,18 @@ time, and so we attempt to handle symbol
  we create @dfn{partial symbol tables} consisting of only selected
  symbols, and only expand them to full symbol tables when necessary.
@@ -1371,12 +1301,12 @@ Index: gdb-7.2.90.20110703/gdb/doc/gdbint.texinfo
  
  
  @node Language Support
-Index: gdb-7.2.90.20110703/gdb/doc/observer.texi
+Index: gdb-7.3.50.20110722/gdb/doc/observer.texi
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/doc/observer.texi	2011-01-05 06:09:54.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/doc/observer.texi	2011-07-03 10:33:11.000000000 +0200
-@@ -223,6 +223,11 @@ Bytes from @var{data} to @var{data} + @v
- to the current inferior at @var{addr}.
+--- gdb-7.3.50.20110722.orig/gdb/doc/observer.texi	2011-07-21 13:03:47.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/doc/observer.texi	2011-07-22 20:04:21.000000000 +0200
+@@ -227,6 +227,11 @@ Called before a top-level prompt is disp
+ the current top-level prompt.
  @end deftypefun
  
 +@c @deftypefun void mark_used (void)
@@ -1387,49 +1317,46 @@ Index: gdb-7.2.90.20110703/gdb/doc/observer.texi
  @deftypefun void test_notification (int @var{somearg})
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
-Index: gdb-7.2.90.20110703/gdb/dwarf2expr.c
+Index: gdb-7.3.50.20110722/gdb/dwarf2expr.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dwarf2expr.c	2011-05-13 20:54:47.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/dwarf2expr.c	2011-07-03 10:33:11.000000000 +0200
-@@ -912,6 +912,13 @@ execute_stack_op (struct dwarf_expr_cont
- 	  ctx->num_pieces = 0;
- 	  goto abort_expression;
+--- gdb-7.3.50.20110722.orig/gdb/dwarf2expr.c	2011-07-15 22:54:32.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dwarf2expr.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1258,6 +1258,14 @@ execute_stack_op (struct dwarf_expr_cont
+ 	  }
+ 	  break;
  
 +	case DW_OP_push_object_address:
-+	  if (ctx->get_object_address == NULL)
++	  if (ctx->funcs->get_object_address == NULL)
 +	    error (_("DWARF-2 expression error: DW_OP_push_object_address must "
 +	           "have a value to push."));
-+	  result = (ctx->get_object_address) (ctx->baton);
++	  result = (ctx->funcs->get_object_address) (ctx->baton);
++	  result_val = value_from_ulongest (address_type, result);
 +	  break;
 +
  	default:
  	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
  	}
-Index: gdb-7.2.90.20110703/gdb/dwarf2expr.h
+Index: gdb-7.3.50.20110722/gdb/dwarf2expr.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dwarf2expr.h	2011-02-27 17:25:37.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/dwarf2expr.h	2011-07-03 10:33:11.000000000 +0200
-@@ -114,9 +114,15 @@ struct dwarf_expr_context
- #if 0
+--- gdb-7.3.50.20110722.orig/gdb/dwarf2expr.h	2011-07-15 22:54:32.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dwarf2expr.h	2011-07-22 20:04:21.000000000 +0200
+@@ -62,12 +62,10 @@ struct dwarf_expr_context_funcs
+      meaningful to substitute a stub type of the correct size.  */
+   struct type *(*get_base_type) (struct dwarf_expr_context *ctx, size_t die);
+ 
+-#if 0
    /* Not yet implemented.  */
  
-+  /* Return the location expression for the dwarf expression
-+     subroutine in the die at OFFSET in the current compilation unit.
-+     The result must be live until the current expression evaluation
-+     is complete.  */
-+  unsigned char *(*get_subr) (void *baton, off_t offset, size_t *length);
-+#endif
-+
    /* Return the `object address' for DW_OP_push_object_address.  */
    CORE_ADDR (*get_object_address) (void *baton);
 -#endif
+ };
  
-   /* The current depth of dwarf expression recursion, via DW_OP_call*,
-      DW_OP_fbreg, DW_OP_push_object_address, etc., and the maximum
-Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
+ /* The location of a value.  */
+Index: gdb-7.3.50.20110722/gdb/dwarf2loc.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dwarf2loc.c	2011-03-22 22:06:33.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/dwarf2loc.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/dwarf2loc.c	2011-07-19 22:28:52.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dwarf2loc.c	2011-07-22 20:04:21.000000000 +0200
 @@ -134,6 +134,9 @@ struct dwarf_expr_baton
  {
    struct frame_info *frame;
@@ -1460,7 +1387,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
 +      gdb_assert (symbaton != NULL);
 +      *start = symbaton->data;
 +      *length = symbaton->size;
-+    }
+     }
 +  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_missing_funcs)
 +    {
 +      struct dwarf2_locexpr_baton *symbaton;
@@ -1469,7 +1396,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
 +      gdb_assert (symbaton == NULL);
 +      *start = NULL;
 +      *length = 0;	/* unused */
-     }
++    }
 +  else
 +    internal_error (__FILE__, __LINE__,
 +		    _("Unsupported SYMBOL_COMPUTED_OPS %p for \"%s\""),
@@ -1483,8 +1410,8 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
  }
  
  /* Helper function for dwarf2_evaluate_loc_desc.  Computes the CFA for
-@@ -286,6 +299,172 @@ dwarf_expr_dwarf_call (struct dwarf_expr
- 		     ctx->get_frame_pc, ctx->baton);
+@@ -291,6 +304,85 @@ dwarf_expr_dwarf_call (struct dwarf_expr
+ 		     ctx->funcs->get_frame_pc, ctx->baton);
  }
  
 +static CORE_ADDR
@@ -1537,93 +1464,6 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
 +  object_address = address;
 +}
 +
-+/* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
-+   by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
-+   get_selected_frame to find it.  Returned dwarf_expr_context freeing is
-+   pushed on the cleanup chain.  */
-+
-+static struct dwarf_expr_context *
-+dwarf_expr_prep_ctx (struct frame_info *frame, const gdb_byte *data,
-+		     size_t size, struct dwarf2_per_cu_data *per_cu)
-+{
-+  struct dwarf_expr_context *ctx;
-+  struct dwarf_expr_baton baton;
-+  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
-+  volatile struct gdb_exception ex;
-+
-+  baton.frame = frame;
-+  baton.per_cu = per_cu;
-+  baton.object_address = object_address;
-+
-+  ctx = new_dwarf_expr_context ();
-+  make_cleanup_free_dwarf_expr_context (ctx);
-+
-+  ctx->gdbarch = get_objfile_arch (objfile);
-+  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
-+  ctx->offset = dwarf2_per_cu_text_offset (per_cu);
-+  ctx->baton = &baton;
-+  ctx->read_reg = dwarf_expr_read_reg;
-+  ctx->read_mem = dwarf_expr_read_mem;
-+  ctx->get_frame_base = dwarf_expr_frame_base;
-+  ctx->get_frame_cfa = dwarf_expr_frame_cfa;
-+  ctx->get_frame_pc = dwarf_expr_frame_pc;
-+  ctx->get_tls_address = dwarf_expr_tls_address;
-+  ctx->dwarf_call = dwarf_expr_dwarf_call;
-+  ctx->get_object_address = dwarf_expr_object_address;
-+
-+  TRY_CATCH (ex, RETURN_MASK_ERROR)
-+    {
-+      dwarf_expr_eval (ctx, data, size);
-+    }
-+  if (ex.reason < 0)
-+    {
-+      if (ex.error == NOT_AVAILABLE_ERROR)
-+	return NULL;
-+      else
-+	throw_exception (ex);
-+    }
-+
-+  /* It was used only during dwarf_expr_eval.  */
-+  ctx->baton = NULL;
-+
-+  return ctx;
-+}
-+
-+/* Evaluate DWARF expression at DLBATON expecting it produces exactly one
-+   CORE_ADDR result on the DWARF stack stack.  */
-+
-+CORE_ADDR
-+dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
-+{
-+  struct dwarf_expr_context *ctx;
-+  CORE_ADDR retval;
-+  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
-+
-+  ctx = dwarf_expr_prep_ctx (get_selected_frame (NULL), dlbaton->data,
-+			     dlbaton->size, dlbaton->per_cu);
-+  if (ctx == NULL)
-+    throw_error (NOT_AVAILABLE_ERROR, _("Value not available"));
-+  if (ctx->num_pieces > 0)
-+    error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
-+
-+  retval = dwarf_expr_fetch (ctx, 0);
-+
-+  if (ctx->location == DWARF_VALUE_REGISTER)
-+    {
-+      /* Inlined dwarf_expr_read_reg as we no longer have the baton. */
-+
-+      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (ctx->gdbarch, retval);
-+      struct type *type = builtin_type (ctx->gdbarch)->builtin_data_ptr;
-+      struct frame_info *frame = get_selected_frame (NULL);
-+
-+      retval = address_from_register (type, gdb_regnum, frame);
-+    }
-+
-+  do_cleanups (back_to);
-+
-+  return retval;
-+}
-+
 +/* Evaluate DWARF location list at DLLBATON expecting it produces exactly one
 +   CORE_ADDR result stored to *ADDRP on the DWARF stack stack.  If the result
 +   could not be found return zero and keep *ADDRP unchanged.  */
@@ -1653,70 +1493,162 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
 +  return 1;
 +}
 +
+ /* Callback function for dwarf2_evaluate_loc_desc.  */
+ 
+ static struct type *
+@@ -301,6 +393,85 @@ dwarf_expr_get_base_type (struct dwarf_e
+   return dwarf2_get_die_type (die_offset, debaton->per_cu);
+ }
+ 
++/* Virtual method table for dwarf2_evaluate_loc_desc_full below.  */
++
++static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
++{
++  dwarf_expr_read_reg,
++  dwarf_expr_read_mem,
++  dwarf_expr_frame_base,
++  dwarf_expr_frame_cfa,
++  dwarf_expr_frame_pc,
++  dwarf_expr_tls_address,
++  dwarf_expr_dwarf_call,
++  dwarf_expr_get_base_type,
++  dwarf_expr_object_address
++};
++
++/* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
++   by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
++   get_selected_frame to find it.  Returned dwarf_expr_context freeing is
++   pushed on the cleanup chain.  */
++
++static void
++dwarf_expr_prep_ctx (struct dwarf_expr_context *ctx, struct frame_info *frame,
++		     const gdb_byte *data, size_t size,
++		     struct dwarf2_per_cu_data *per_cu)
++{
++  struct dwarf_expr_baton baton;
++  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
++  volatile struct gdb_exception ex;
++
++  baton.frame = frame;
++  baton.per_cu = per_cu;
++  baton.object_address = object_address;
++
++  ctx->gdbarch = get_objfile_arch (objfile);
++  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
++  ctx->offset = dwarf2_per_cu_text_offset (per_cu);
++  ctx->baton = &baton;
++  ctx->funcs = &dwarf_expr_ctx_funcs;
++
++  dwarf_expr_eval (ctx, data, size);
++}
++
++/* Evaluate DWARF expression at DLBATON expecting it produces exactly one
++   CORE_ADDR result on the DWARF stack stack.  */
++
++CORE_ADDR
++dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
++{
++  struct dwarf_expr_context *ctx;
++  CORE_ADDR retval;
++  struct cleanup *back_to;
++
++  ctx = new_dwarf_expr_context ();
++  back_to = make_cleanup_free_dwarf_expr_context (ctx);
++
++  dwarf_expr_prep_ctx (ctx, get_selected_frame (NULL), dlbaton->data,
++		       dlbaton->size, dlbaton->per_cu);
++
++  if (ctx->num_pieces > 0)
++    error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
++
++  retval = dwarf_expr_fetch_address (ctx, 0);
++
++  if (ctx->location == DWARF_VALUE_REGISTER)
++    {
++      /* Inlined dwarf_expr_read_reg as we no longer have the baton. */
++
++      int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (ctx->gdbarch, retval);
++      struct type *type = builtin_type (ctx->gdbarch)->builtin_data_ptr;
++      struct frame_info *frame = get_selected_frame (NULL);
++
++      retval = address_from_register (type, gdb_regnum, frame);
++    }
++
++  do_cleanups (back_to);
++
++  return retval;
++}
++
  struct piece_closure
  {
    /* Reference count.  */
-@@ -1072,11 +1251,8 @@ dwarf2_evaluate_loc_desc_full (struct ty
+@@ -1082,20 +1253,6 @@ invalid_synthetic_pointer (void)
+ 	   "referenced via synthetic pointer"));
+ }
+ 
+-/* Virtual method table for dwarf2_evaluate_loc_desc_full below.  */
+-
+-static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
+-{
+-  dwarf_expr_read_reg,
+-  dwarf_expr_read_mem,
+-  dwarf_expr_frame_base,
+-  dwarf_expr_frame_cfa,
+-  dwarf_expr_frame_pc,
+-  dwarf_expr_tls_address,
+-  dwarf_expr_dwarf_call,
+-  dwarf_expr_get_base_type
+-};
+-
+ /* Evaluate a location description, starting at DATA and with length
+    SIZE, to find the current location of variable of TYPE in the
+    context of FRAME.  BYTE_OFFSET is applied after the contents are
+@@ -1108,10 +1265,8 @@ dwarf2_evaluate_loc_desc_full (struct ty
  			       LONGEST byte_offset)
  {
    struct value *retval;
 -  struct dwarf_expr_baton baton;
    struct dwarf_expr_context *ctx;
-   struct cleanup *old_chain;
+   struct cleanup *old_chain, *value_chain;
 -  struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
--  volatile struct gdb_exception ex;
+   volatile struct gdb_exception ex;
  
    if (byte_offset < 0)
-     invalid_synthetic_pointer ();
-@@ -1089,38 +1265,14 @@ dwarf2_evaluate_loc_desc_full (struct ty
-       return retval;
-     }
+@@ -1120,28 +1275,18 @@ dwarf2_evaluate_loc_desc_full (struct ty
+   if (size == 0)
+     return allocate_optimized_out_value (type);
  
 -  baton.frame = frame;
 -  baton.per_cu = per_cu;
 -
--  ctx = new_dwarf_expr_context ();
--  old_chain = make_cleanup_free_dwarf_expr_context (ctx);
--
+   ctx = new_dwarf_expr_context ();
+   old_chain = make_cleanup_free_dwarf_expr_context (ctx);
+   value_chain = make_cleanup_value_free_to_mark (value_mark ());
+ 
 -  ctx->gdbarch = get_objfile_arch (objfile);
 -  ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
 -  ctx->offset = dwarf2_per_cu_text_offset (per_cu);
 -  ctx->baton = &baton;
--  ctx->read_reg = dwarf_expr_read_reg;
--  ctx->read_mem = dwarf_expr_read_mem;
--  ctx->get_frame_base = dwarf_expr_frame_base;
--  ctx->get_frame_cfa = dwarf_expr_frame_cfa;
--  ctx->get_frame_pc = dwarf_expr_frame_pc;
--  ctx->get_tls_address = dwarf_expr_tls_address;
--  ctx->dwarf_call = dwarf_expr_dwarf_call;
-+  old_chain = make_cleanup (null_cleanup, 0);
- 
--  TRY_CATCH (ex, RETURN_MASK_ERROR)
--    {
--      dwarf_expr_eval (ctx, data, size);
--    }
--  if (ex.reason < 0)
-+  ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
-+  if (ctx == NULL)
+-  ctx->funcs = &dwarf_expr_ctx_funcs;
+-
+   TRY_CATCH (ex, RETURN_MASK_ERROR)
      {
--      if (ex.error == NOT_AVAILABLE_ERROR)
--	{
--	  retval = allocate_value (type);
--	  mark_value_bytes_unavailable (retval, 0, TYPE_LENGTH (type));
--	  return retval;
--	}
--      else
--	throw_exception (ex);
-+      retval = allocate_value (type);
-+      mark_value_bytes_unavailable (retval, 0, TYPE_LENGTH (type));
-+      return retval;
+-      dwarf_expr_eval (ctx, data, size);
++      dwarf_expr_prep_ctx (ctx, frame, data, size, per_cu);
      }
- 
-   if (ctx->num_pieces > 0)
-@@ -1166,6 +1318,15 @@ dwarf2_evaluate_loc_desc_full (struct ty
- 	    CORE_ADDR address = dwarf_expr_fetch_address (ctx, 0);
+   if (ex.reason < 0)
+     {
+       if (ex.error == NOT_AVAILABLE_ERROR)
+ 	{
+-	  do_cleanups (old_chain);
+ 	  retval = allocate_value (type);
+ 	  mark_value_bytes_unavailable (retval, 0, TYPE_LENGTH (type));
+ 	  return retval;
+@@ -1198,6 +1343,16 @@ dwarf2_evaluate_loc_desc_full (struct ty
  	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
  
+ 	    do_cleanups (value_chain);
++
 +	    /* Frame may be needed for check_typedef of TYPE_DYNAMIC.  */
 +	    make_cleanup_restore_selected_frame ();
 +	    select_frame (frame);
@@ -1729,7 +1661,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
  	    retval = allocate_value_lazy (type);
  	    VALUE_LVAL (retval) = lval_memory;
  	    if (in_stack_memory)
-@@ -2855,11 +3016,51 @@ loclist_tracepoint_var_ref (struct symbo
+@@ -2974,11 +3129,51 @@ loclist_tracepoint_var_ref (struct symbo
  			       dlbaton->per_cu);
  }
  
@@ -1783,11 +1715,11 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.c
 +  missing_describe_location,
 +  missing_tracepoint_var_ref
 +};
-Index: gdb-7.2.90.20110703/gdb/dwarf2loc.h
+Index: gdb-7.3.50.20110722/gdb/dwarf2loc.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dwarf2loc.h	2011-02-17 17:20:44.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/dwarf2loc.h	2011-07-03 10:33:11.000000000 +0200
-@@ -107,6 +107,15 @@ struct dwarf2_loclist_baton
+--- gdb-7.3.50.20110722.orig/gdb/dwarf2loc.h	2011-05-12 19:40:54.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dwarf2loc.h	2011-07-22 20:04:21.000000000 +0200
+@@ -110,6 +110,15 @@ struct dwarf2_loclist_baton
  
  extern const struct symbol_computed_ops dwarf2_locexpr_funcs;
  extern const struct symbol_computed_ops dwarf2_loclist_funcs;
@@ -1803,11 +1735,11 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2loc.h
  
  /* Compile a DWARF location expression to an agent expression.
     
-Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
+Index: gdb-7.3.50.20110722/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/dwarf2read.c	2011-07-02 21:59:29.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/dwarf2read.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1222,6 +1222,9 @@ static void fill_in_loclist_baton (struc
+--- gdb-7.3.50.20110722.orig/gdb/dwarf2read.c	2011-07-20 17:13:49.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/dwarf2read.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1245,6 +1245,9 @@ static void fill_in_loclist_baton (struc
  				   struct dwarf2_loclist_baton *baton,
  				   struct attribute *attr);
  
@@ -1817,7 +1749,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  static void dwarf2_symbol_mark_computed (struct attribute *attr,
  					 struct symbol *sym,
  					 struct dwarf2_cu *cu);
-@@ -1256,6 +1259,9 @@ static void age_cached_comp_units (void)
+@@ -1279,6 +1282,9 @@ static void age_cached_comp_units (void)
  
  static void free_one_cached_comp_unit (void *);
  
@@ -1827,7 +1759,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1280,6 +1286,9 @@ static struct type *get_die_type_at_offs
+@@ -1303,6 +1309,9 @@ static struct type *get_die_type_at_offs
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -1837,7 +1769,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  static void dwarf2_release_queue (void *dummy);
  
  static void queue_comp_unit (struct dwarf2_per_cu_data *per_cu,
-@@ -7542,6 +7551,29 @@ process_enumeration_scope (struct die_in
+@@ -7759,6 +7768,29 @@ process_enumeration_scope (struct die_in
    new_symbol (die, this_type, cu);
  }
  
@@ -1867,7 +1799,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -7555,7 +7587,7 @@ read_array_type (struct die_info *die, s
+@@ -7772,7 +7804,7 @@ read_array_type (struct die_info *die, s
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -1876,7 +1808,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
    struct cleanup *back_to;
    char *name;
  
-@@ -7608,17 +7640,19 @@ read_array_type (struct die_info *die, s
+@@ -7825,17 +7857,19 @@ read_array_type (struct die_info *die, s
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -1907,7 +1839,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -8102,29 +8136,114 @@ read_tag_string_type (struct die_info *d
+@@ -8319,29 +8353,114 @@ read_tag_string_type (struct die_info *d
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -2035,7 +1967,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -8409,8 +8528,7 @@ read_subrange_type (struct die_info *die
+@@ -8632,8 +8751,7 @@ read_subrange_type (struct die_info *die
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -2045,7 +1977,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
    char *name;
    LONGEST negative_mask;
  
-@@ -8423,53 +8541,126 @@ read_subrange_type (struct die_info *die
+@@ -8646,53 +8764,126 @@ read_subrange_type (struct die_info *die
    if (range_type)
      return range_type;
  
@@ -2103,7 +2035,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
 +    }
 +  else
      {
--      if (attr->form == DW_FORM_block1 || is_ref_attr (attr))
+-      if (attr_form_is_block (attr) || is_ref_attr (attr))
 -        {
 -          /* GCC encodes arrays with unspecified or dynamic length
 -             with a DW_FORM_block1 attribute or a reference attribute.
@@ -2205,7 +2137,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
      }
  
    /* Dwarf-2 specifications explicitly allows to create subrange types
-@@ -8510,24 +8701,41 @@ read_subrange_type (struct die_info *die
+@@ -8733,24 +8924,41 @@ read_subrange_type (struct die_info *die
  	}
      }
  
@@ -2221,7 +2153,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
 -  /* Mark arrays with dynamic length at least as an array of unspecified
 -     length.  GDB could check the boundary but before it gets implemented at
 -     least allow accessing the array elements.  */
--  if (attr && attr->form == DW_FORM_block1)
+-  if (attr && attr_form_is_block (attr))
 -    TYPE_HIGH_BOUND_UNDEFINED (range_type) = 1;
 -
 -  /* Ada expects an empty array on no boundary attributes.  */
@@ -2265,7 +2197,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -11072,10 +11280,12 @@ var_decode_location (struct attribute *a
+@@ -11307,13 +11515,12 @@ var_decode_location (struct attribute *a
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -2276,11 +2208,14 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  
 -  dwarf2_symbol_mark_computed (attr, sym, cu);
    SYMBOL_CLASS (sym) = LOC_COMPUTED;
+-
+-  if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
+-    cu->has_loclist = 1;
 +  dwarf2_symbol_mark_computed (attr, sym, cu);
+ }
  
-   if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
-     cu->has_loclist = 1;
-@@ -11116,6 +11326,8 @@ new_symbol_full (struct die_info *die, s
+ /* Given a pointer to a DWARF information entry, figure out if we need
+@@ -11351,6 +11558,8 @@ new_symbol_full (struct die_info *die, s
        else
  	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
        OBJSTAT (objfile, n_syms++);
@@ -2289,7 +2224,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  
        /* Cache this symbol's name and the name's demangled form (if any).  */
        SYMBOL_SET_LANGUAGE (sym, cu->language);
-@@ -11888,6 +12100,9 @@ read_type_die_1 (struct die_info *die, s
+@@ -12123,6 +12332,9 @@ read_type_die_1 (struct die_info *die, s
        break;
      }
  
@@ -2299,7 +2234,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
    return this_type;
  }
  
-@@ -14742,61 +14957,99 @@ fill_in_loclist_baton (struct dwarf2_cu 
+@@ -15015,61 +15227,100 @@ fill_in_loclist_baton (struct dwarf2_cu 
    baton->base_address = cu->base_address;
  }
  
@@ -2346,7 +2281,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
 +
 +  return baton;
 +}
- 
++
 +static struct dwarf2_loclist_baton *
 +dwarf2_attr_to_loclist_baton (struct attribute *attr, struct dwarf2_cu *cu)
 +{
@@ -2359,7 +2294,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
 +
 +  dwarf2_read_section (dwarf2_per_objfile->objfile,
 +		       &dwarf2_per_objfile->loc);
-+
+ 
 +  if (!(attr_form_is_section_offset (attr)
 +	/* ".debug_loc" may not exist at all, or the offset may be outside
 +	   the section.  If so, fall through to the complaint in the
@@ -2395,6 +2330,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
        SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
 -      SYMBOL_LOCATION_BATON (sym) = baton;
 +      SYMBOL_LOCATION_BATON (sym) = loclist_baton;
++      cu->has_loclist = 1;
 +    }
 +  else if (attr_form_is_block (attr))
 +    {
@@ -2442,7 +2378,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
      }
  }
  
-@@ -15145,6 +15398,25 @@ offset_and_type_eq (const void *item_lhs
+@@ -15418,6 +15669,25 @@ offset_and_type_eq (const void *item_lhs
    return ofs_lhs->offset == ofs_rhs->offset;
  }
  
@@ -2468,7 +2404,7 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.
  
-@@ -15170,6 +15442,8 @@ set_die_type (struct die_info *die, stru
+@@ -15443,6 +15713,8 @@ set_die_type (struct die_info *die, stru
    struct objfile *objfile = cu->objfile;
    htab_t *type_hash_ptr;
  
@@ -2477,24 +2413,20 @@ Index: gdb-7.2.90.20110703/gdb/dwarf2read.c
    /* For Ada types, make sure that the gnat-specific data is always
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
-Index: gdb-7.2.90.20110703/gdb/elfread.c
+Index: gdb-7.3.50.20110722/gdb/elfread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/elfread.c	2011-05-03 18:25:20.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/elfread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -43,6 +43,12 @@
- #include "infcall.h"
- #include "gdbthread.h"
- #include "regcache.h"
+--- gdb-7.3.50.20110722.orig/gdb/elfread.c	2011-05-26 09:47:10.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/elfread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -38,6 +38,8 @@
+ #include "demangle.h"
+ #include "psympriv.h"
+ #include "filenames.h"
 +#include "stap-probe.h"
 +#include "arch-utils.h"
-+#include "value.h"
-+#include "infcall.h"
-+#include "gdbthread.h"
-+#include "regcache.h"
- 
- extern void _initialize_elfread (void);
- 
-@@ -61,6 +67,21 @@ struct elfinfo
+ #include "gdbtypes.h"
+ #include "value.h"
+ #include "infcall.h"
+@@ -61,6 +63,21 @@ struct elfinfo
      asection *mdebugsect;	/* Section pointer for .mdebug section */
    };
  
@@ -2516,7 +2448,7 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
  static void free_elfinfo (void *);
  
  /* Minimal symbols located at the GOT entries for .plt - that is the real
-@@ -1553,7 +1574,266 @@ elfstab_offset_sections (struct objfile 
+@@ -1574,7 +1591,266 @@ elfstab_offset_sections (struct objfile 
      complaint (&symfile_complaints,
  	       _("elf/stab section information missing for %s"), filename);
  }
@@ -2783,7 +2715,7 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
  /* Register that we are able to handle ELF object file formats.  */
  
  static const struct sym_fns elf_sym_fns =
-@@ -1568,6 +1848,7 @@ static const struct sym_fns elf_sym_fns 
+@@ -1589,6 +1865,7 @@ static const struct sym_fns elf_sym_fns 
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -2791,7 +2723,7 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
    &psym_functions
  };
  
-@@ -1586,6 +1867,7 @@ static const struct sym_fns elf_sym_fns_
+@@ -1607,6 +1884,7 @@ static const struct sym_fns elf_sym_fns_
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -2799,7 +2731,7 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
    &psym_functions
  };
  
-@@ -1603,6 +1885,7 @@ static const struct sym_fns elf_sym_fns_
+@@ -1624,6 +1902,7 @@ static const struct sym_fns elf_sym_fns_
    elf_symfile_segments,		/* Get segment information from a file.  */
    NULL,
    default_symfile_relocate,	/* Relocate a debug section.  */
@@ -2807,7 +2739,7 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
    &dwarf2_gdb_index_functions
  };
  
-@@ -1619,6 +1902,8 @@ static const struct gnu_ifunc_fns elf_gn
+@@ -1640,6 +1919,8 @@ static const struct gnu_ifunc_fns elf_gn
  void
  _initialize_elfread (void)
  {
@@ -2816,10 +2748,10 @@ Index: gdb-7.2.90.20110703/gdb/elfread.c
    add_symtab_fns (&elf_sym_fns);
  
    elf_objfile_gnu_ifunc_cache_data = register_objfile_data ();
-Index: gdb-7.2.90.20110703/gdb/eval.c
+Index: gdb-7.3.50.20110722/gdb/eval.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/eval.c	2011-03-28 22:21:03.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/eval.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/eval.c	2011-06-17 22:35:09.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/eval.c	2011-07-22 20:04:21.000000000 +0200
 @@ -44,6 +44,7 @@
  #include "objfiles.h"
  #include "python/python.h"
@@ -3222,7 +3154,7 @@ Index: gdb-7.2.90.20110703/gdb/eval.c
  
      case UNOP_ADDR:
        /* C++: check for and handle pointer to members.  */
-@@ -2991,7 +3151,7 @@ evaluate_subexp_with_coercion (struct ex
+@@ -2987,7 +3147,7 @@ evaluate_subexp_with_coercion (struct ex
  {
    enum exp_opcode op;
    int pc;
@@ -3231,7 +3163,7 @@ Index: gdb-7.2.90.20110703/gdb/eval.c
    struct symbol *var;
    struct type *type;
  
-@@ -3002,13 +3162,18 @@ evaluate_subexp_with_coercion (struct ex
+@@ -2998,13 +3158,18 @@ evaluate_subexp_with_coercion (struct ex
      {
      case OP_VAR_VALUE:
        var = exp->elts[pc + 2].symbol;
@@ -3251,7 +3183,7 @@ Index: gdb-7.2.90.20110703/gdb/eval.c
  	  return value_cast (lookup_pointer_type (TYPE_TARGET_TYPE (type)),
  			     val);
  	}
-@@ -3060,9 +3225,13 @@ evaluate_subexp_for_sizeof (struct expre
+@@ -3056,9 +3221,13 @@ evaluate_subexp_for_sizeof (struct expre
  
      case OP_VAR_VALUE:
        (*pos) += 4;
@@ -3268,7 +3200,7 @@ Index: gdb-7.2.90.20110703/gdb/eval.c
  
      default:
        val = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
-@@ -3093,18 +3262,25 @@ parse_and_eval_type (char *p, int length
+@@ -3089,18 +3258,25 @@ parse_and_eval_type (char *p, int length
  int
  calc_f77_array_dims (struct type *array_type)
  {
@@ -3304,10 +3236,10 @@ Index: gdb-7.2.90.20110703/gdb/eval.c
 -  return ndimen;
 +
  }
-Index: gdb-7.2.90.20110703/gdb/f-exp.y
+Index: gdb-7.3.50.20110722/gdb/f-exp.y
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/f-exp.y	2011-03-18 14:51:41.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/f-exp.y	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/f-exp.y	2011-04-19 20:04:07.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/f-exp.y	2011-07-22 20:04:21.000000000 +0200
 @@ -293,7 +293,9 @@ arglist :	subrange
  			{ arglist_len = 1; }
  	;
@@ -3319,10 +3251,10 @@ Index: gdb-7.2.90.20110703/gdb/f-exp.y
  			{ arglist_len++; }
  	;
  
-Index: gdb-7.2.90.20110703/gdb/f-lang.h
+Index: gdb-7.3.50.20110722/gdb/f-lang.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/f-lang.h	2011-01-07 20:36:16.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/f-lang.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/f-lang.h	2011-01-07 20:36:16.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/f-lang.h	2011-07-22 20:04:21.000000000 +0200
 @@ -28,6 +28,10 @@ extern void f_error (char *);	/* Defined
  extern void f_print_type (struct type *, const char *, struct ui_file *, int,
  			  int);
@@ -3334,10 +3266,10 @@ Index: gdb-7.2.90.20110703/gdb/f-lang.h
  extern int f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
  			struct ui_file *, int,
  			const struct value *,
-Index: gdb-7.2.90.20110703/gdb/f-typeprint.c
+Index: gdb-7.3.50.20110722/gdb/f-typeprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/f-typeprint.c	2011-01-07 20:36:16.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/f-typeprint.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/f-typeprint.c	2011-06-29 17:32:39.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/f-typeprint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -32,7 +32,7 @@
  #include "gdbcore.h"
  #include "target.h"
@@ -3402,10 +3334,10 @@ Index: gdb-7.2.90.20110703/gdb/f-typeprint.c
    switch (TYPE_CODE (type))
      {
      case TYPE_CODE_ARRAY:
-Index: gdb-7.2.90.20110703/gdb/f-valprint.c
+Index: gdb-7.3.50.20110722/gdb/f-valprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/f-valprint.c	2011-02-07 18:49:32.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/f-valprint.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/f-valprint.c	2011-06-29 17:32:39.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/f-valprint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIM
  /* The following macro gives us the size of the nth dimension, Where 
     n is 1 based.  */
@@ -3541,10 +3473,10 @@ Index: gdb-7.2.90.20110703/gdb/f-valprint.c
    CHECK_TYPEDEF (type);
    switch (TYPE_CODE (type))
      {
-Index: gdb-7.2.90.20110703/gdb/findvar.c
+Index: gdb-7.3.50.20110722/gdb/findvar.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/findvar.c	2011-03-18 19:42:41.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/findvar.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/findvar.c	2011-07-12 23:16:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/findvar.c	2011-07-22 20:05:21.000000000 +0200
 @@ -35,6 +35,7 @@
  #include "user-regs.h"
  #include "block.h"
@@ -3655,7 +3587,7 @@ Index: gdb-7.2.90.20110703/gdb/findvar.c
        }
        break;
  
-@@ -587,6 +575,10 @@ read_var_value (struct symbol *var, stru
+@@ -584,6 +572,10 @@ read_var_value (struct symbol *var, stru
        break;
      }
  
@@ -3666,7 +3598,7 @@ Index: gdb-7.2.90.20110703/gdb/findvar.c
    VALUE_LVAL (v) = lval_memory;
    set_value_address (v, addr);
    return v;
-@@ -626,11 +618,12 @@ struct value *
+@@ -623,11 +615,12 @@ struct value *
  value_from_register (struct type *type, int regnum, struct frame_info *frame)
  {
    struct gdbarch *gdbarch = get_frame_arch (frame);
@@ -3681,7 +3613,7 @@ Index: gdb-7.2.90.20110703/gdb/findvar.c
      {
        /* The ISA/ABI need to something weird when obtaining the
           specified value from this register.  It might need to
-@@ -643,7 +636,7 @@ value_from_register (struct type *type, 
+@@ -640,7 +633,7 @@ value_from_register (struct type *type, 
        VALUE_LVAL (v) = lval_register;
        VALUE_FRAME_ID (v) = get_frame_id (frame);
        VALUE_REGNUM (v) = regnum;
@@ -3690,10 +3622,10 @@ Index: gdb-7.2.90.20110703/gdb/findvar.c
  				      value_contents_raw (v), &optim,
  				      &unavail);
      }
-Index: gdb-7.2.90.20110703/gdb/gdbinit.in
+Index: gdb-7.3.50.20110722/gdb/gdbinit.in
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/gdbinit.in	2009-10-05 15:46:52.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/gdbinit.in	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/gdbinit.in	2009-10-05 15:46:52.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/gdbinit.in	2011-07-22 20:04:21.000000000 +0200
 @@ -1,5 +1,15 @@
  echo Setting up the environment for debugging gdb.\n
  
@@ -3710,10 +3642,10 @@ Index: gdb-7.2.90.20110703/gdb/gdbinit.in
  set complaints 1
  
  b internal_error
-Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
+Index: gdb-7.3.50.20110722/gdb/gdbtypes.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/gdbtypes.c	2011-03-28 22:21:03.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/gdbtypes.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/gdbtypes.c	2011-06-24 21:47:37.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/gdbtypes.c	2011-07-22 20:04:21.000000000 +0200
 @@ -39,6 +39,9 @@
  #include "cp-abi.h"
  #include "gdb_assert.h"
@@ -3856,7 +3788,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  
    return result_type;
  }
-@@ -1413,6 +1468,105 @@ stub_noname_complaint (void)
+@@ -1439,6 +1494,105 @@ stub_noname_complaint (void)
    complaint (&symfile_complaints, _("stub type has NULL name"));
  }
  
@@ -3962,7 +3894,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  /* Find the real type of TYPE.  This function returns the real type,
     after removing all layers of typedefs, and completing opaque or stub
     types.  Completion changes the TYPE argument, but stripping of
-@@ -1575,52 +1729,37 @@ check_typedef (struct type *type)
+@@ -1601,52 +1755,37 @@ check_typedef (struct type *type)
          }
      }
  
@@ -4036,7 +3968,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  	  TYPE_TARGET_STUB (type) = 0;
  	}
        else if (TYPE_CODE (type) == TYPE_CODE_RANGE)
-@@ -1628,6 +1767,7 @@ check_typedef (struct type *type)
+@@ -1654,6 +1793,7 @@ check_typedef (struct type *type)
  	  TYPE_LENGTH (type) = TYPE_LENGTH (target_type);
  	  TYPE_TARGET_STUB (type) = 0;
  	}
@@ -4044,7 +3976,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
      }
  
    type = make_qualified_type (type, instance_flags, NULL);
-@@ -3266,33 +3406,42 @@ type_pair_eq (const void *item_lhs, cons
+@@ -3292,33 +3432,42 @@ type_pair_eq (const void *item_lhs, cons
  }
  
  /* Allocate the hash table used by copy_type_recursive to walk
@@ -4102,7 +4034,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
      return type;
  
    /* This type shouldn't be pointing to any types in other objfiles;
-@@ -3307,9 +3456,10 @@ copy_type_recursive (struct objfile *obj
+@@ -3333,9 +3482,10 @@ copy_type_recursive (struct objfile *obj
    new_type = alloc_type_arch (get_type_arch (type));
  
    /* We must add the new type to the hash table immediately, in case
@@ -4116,7 +4048,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
    stored->old = type;
    stored->new = new_type;
    *slot = stored;
-@@ -3320,6 +3470,21 @@ copy_type_recursive (struct objfile *obj
+@@ -3346,6 +3496,21 @@ copy_type_recursive (struct objfile *obj
    TYPE_OBJFILE_OWNED (new_type) = 0;
    TYPE_OWNER (new_type).gdbarch = get_type_arch (type);
  
@@ -4138,7 +4070,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
    if (TYPE_NAME (type))
      TYPE_NAME (new_type) = xstrdup (TYPE_NAME (type));
    if (TYPE_TAG_NAME (type))
-@@ -3328,12 +3493,48 @@ copy_type_recursive (struct objfile *obj
+@@ -3354,12 +3519,48 @@ copy_type_recursive (struct objfile *obj
    TYPE_INSTANCE_FLAGS (new_type) = TYPE_INSTANCE_FLAGS (type);
    TYPE_LENGTH (new_type) = TYPE_LENGTH (type);
  
@@ -4187,7 +4119,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
        TYPE_FIELDS (new_type) = XCALLOC (nfields, struct field);
        for (i = 0; i < nfields; i++)
  	{
-@@ -3342,8 +3543,8 @@ copy_type_recursive (struct objfile *obj
+@@ -3368,8 +3569,8 @@ copy_type_recursive (struct objfile *obj
  	  TYPE_FIELD_BITSIZE (new_type, i) = TYPE_FIELD_BITSIZE (type, i);
  	  if (TYPE_FIELD_TYPE (type, i))
  	    TYPE_FIELD_TYPE (new_type, i)
@@ -4198,7 +4130,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  	  if (TYPE_FIELD_NAME (type, i))
  	    TYPE_FIELD_NAME (new_type, i) = 
  	      xstrdup (TYPE_FIELD_NAME (type, i));
-@@ -3370,24 +3571,184 @@ copy_type_recursive (struct objfile *obj
+@@ -3396,24 +3597,184 @@ copy_type_recursive (struct objfile *obj
  	}
      }
  
@@ -4390,7 +4322,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
    /* Maybe copy the type_specific bits.
  
       NOTE drow/2005-12-09: We do not copy the C++-specific bits like
-@@ -3404,6 +3765,17 @@ copy_type_recursive (struct objfile *obj
+@@ -3430,6 +3791,17 @@ copy_type_recursive (struct objfile *obj
    return new_type;
  }
  
@@ -4408,7 +4340,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  /* Make a copy of the given TYPE, except that the pointer & reference
     types are not preserved.
     
-@@ -3426,6 +3798,201 @@ copy_type (const struct type *type)
+@@ -3452,6 +3824,201 @@ copy_type (const struct type *type)
    return new_type;
  }
  
@@ -4610,7 +4542,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
  
  /* Helper functions to initialize architecture-specific types.  */
  
-@@ -3955,6 +4522,13 @@ void
+@@ -3984,6 +4551,13 @@ void
  _initialize_gdbtypes (void)
  {
    gdbtypes_data = gdbarch_data_register_post_init (gdbtypes_post_init);
@@ -4624,10 +4556,10 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.c
    objfile_type_data = register_objfile_data ();
  
    add_setshow_zinteger_cmd ("overload", no_class, &overload_debug,
-Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
+Index: gdb-7.3.50.20110722/gdb/gdbtypes.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/gdbtypes.h	2011-03-28 22:21:03.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/gdbtypes.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/gdbtypes.h	2011-07-05 15:36:41.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/gdbtypes.h	2011-07-22 20:04:21.000000000 +0200
 @@ -215,6 +215,11 @@ enum type_instance_flag_value
  
  #define TYPE_TARGET_STUB(t)	(TYPE_MAIN_TYPE (t)->flag_target_stub)
@@ -4768,7 +4700,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
  
        /* Flags indicating whether the values of low and high are
           valid.  When true, the respective range value is
-@@ -926,9 +1019,9 @@ extern void allocate_gnat_aux_type (stru
+@@ -929,9 +1022,9 @@ extern void allocate_gnat_aux_type (stru
  #define TYPE_POINTER_TYPE(thistype) (thistype)->pointer_type
  #define TYPE_REFERENCE_TYPE(thistype) (thistype)->reference_type
  #define TYPE_CHAIN(thistype) (thistype)->chain
@@ -4781,7 +4713,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
     calls check_typedef, TYPE_LENGTH (VALUE_TYPE (X)) is safe.  */
  #define TYPE_LENGTH(thistype) (thistype)->length
  /* Note that TYPE_CODE can be TYPE_CODE_TYPEDEF, so if you want the real
-@@ -936,11 +1029,16 @@ extern void allocate_gnat_aux_type (stru
+@@ -939,11 +1032,16 @@ extern void allocate_gnat_aux_type (stru
  #define TYPE_CODE(thistype) TYPE_MAIN_TYPE(thistype)->code
  #define TYPE_NFIELDS(thistype) TYPE_MAIN_TYPE(thistype)->nfields
  #define TYPE_FIELDS(thistype) TYPE_MAIN_TYPE(thistype)->flds_bnds.fields
@@ -4800,7 +4732,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
  #define TYPE_LOW_BOUND_UNDEFINED(range_type) \
     TYPE_RANGE_DATA(range_type)->low_undefined
  #define TYPE_HIGH_BOUND_UNDEFINED(range_type) \
-@@ -957,7 +1055,14 @@ extern void allocate_gnat_aux_type (stru
+@@ -960,7 +1058,14 @@ extern void allocate_gnat_aux_type (stru
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
  
  #define TYPE_ARRAY_LOWER_BOUND_VALUE(arraytype) \
@@ -4816,7 +4748,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
  
  /* C++ */
  
-@@ -1379,6 +1484,18 @@ extern struct type *create_array_type (s
+@@ -1385,6 +1490,18 @@ extern struct type *create_array_type (s
  				       struct type *);
  extern struct type *lookup_array_range_type (struct type *, int, int);
  
@@ -4835,7 +4767,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
  extern struct type *create_string_type (struct type *, struct type *,
  					struct type *);
  extern struct type *lookup_string_range_type (struct type *, int, int);
-@@ -1424,6 +1541,10 @@ extern int is_public_ancestor (struct ty
+@@ -1430,6 +1547,10 @@ extern int is_public_ancestor (struct ty
  
  extern int is_unique_ancestor (struct type *, struct value *);
  
@@ -4846,7 +4778,7 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
  /* Overload resolution */
  
  #define LENGTH_MATCH(bv) ((bv)->rank[0])
-@@ -1496,10 +1617,13 @@ extern void maintenance_print_type (char
+@@ -1502,10 +1623,13 @@ extern void maintenance_print_type (char
  
  extern htab_t create_copied_types_hash (struct objfile *objfile);
  
@@ -4862,10 +4794,10 @@ Index: gdb-7.2.90.20110703/gdb/gdbtypes.h
 +#endif
 +
  #endif /* GDBTYPES_H */
-Index: gdb-7.2.90.20110703/gdb/i386-linux-nat.c
+Index: gdb-7.3.50.20110722/gdb/i386-linux-nat.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/i386-linux-nat.c	2011-02-27 17:25:37.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/i386-linux-nat.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/i386-linux-nat.c	2011-02-27 17:25:37.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/i386-linux-nat.c	2011-07-22 20:04:21.000000000 +0200
 @@ -649,22 +649,13 @@ i386_linux_store_inferior_registers (str
  }
  
@@ -5070,10 +5002,10 @@ Index: gdb-7.2.90.20110703/gdb/i386-linux-nat.c
  }
  
  
-Index: gdb-7.2.90.20110703/gdb/i386-nat.c
+Index: gdb-7.3.50.20110722/gdb/i386-nat.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/i386-nat.c	2011-02-26 23:04:51.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/i386-nat.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/i386-nat.c	2011-02-26 23:04:51.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/i386-nat.c	2011-07-22 20:04:21.000000000 +0200
 @@ -25,6 +25,7 @@
  #include "gdbcmd.h"
  #include "target.h"
@@ -5425,10 +5357,10 @@ Index: gdb-7.2.90.20110703/gdb/i386-nat.c
  }
  
  void
-Index: gdb-7.2.90.20110703/gdb/i386-nat.h
+Index: gdb-7.3.50.20110722/gdb/i386-nat.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/i386-nat.h	2011-01-09 04:08:56.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/i386-nat.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/i386-nat.h	2011-01-09 04:08:56.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/i386-nat.h	2011-07-22 20:04:21.000000000 +0200
 @@ -78,6 +78,28 @@ struct i386_dr_low_type 
  
  extern struct i386_dr_low_type i386_dr_low;
@@ -5458,29 +5390,29 @@ Index: gdb-7.2.90.20110703/gdb/i386-nat.h
  /* Use this function to set i386_dr_low debug_register_length field
     rather than setting it directly to check that the length is only
     set once.  It also enables the 'maint set/show show-debug-regs' 
-Index: gdb-7.2.90.20110703/gdb/infrun.c
+Index: gdb-7.3.50.20110722/gdb/infrun.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/infrun.c	2011-06-03 17:32:13.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/infrun.c	2011-07-03 10:33:11.000000000 +0200
-@@ -54,6 +54,8 @@
- #include "inline-frame.h"
+--- gdb-7.3.50.20110722.orig/gdb/infrun.c	2011-07-22 01:46:09.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/infrun.c	2011-07-22 20:04:21.000000000 +0200
+@@ -55,6 +55,8 @@
  #include "jit.h"
  #include "tracepoint.h"
+ #include "continuations.h"
 +#include "stap-probe.h"
 +#include "objfiles.h"
  
  /* Prototypes for local functions */
  
-@@ -2247,7 +2249,7 @@ static void insert_step_resume_breakpoin
- 						  struct frame_id);
- static void insert_longjmp_resume_breakpoint (struct gdbarch *, CORE_ADDR);
+@@ -2341,7 +2343,7 @@ static void handle_step_into_function (s
+ static void handle_step_into_function_backward (struct gdbarch *gdbarch,
+ 						struct execution_control_state *ecs);
  static void check_exception_resume (struct execution_control_state *,
 -				    struct frame_info *, struct symbol *);
 +				    struct frame_info *);
  
  static void stop_stepping (struct execution_control_state *ecs);
  static void prepare_to_wait (struct execution_control_state *ecs);
-@@ -4169,9 +4171,17 @@ process_event_stop_test:
+@@ -4285,9 +4287,17 @@ process_event_stop_test:
  
  	if (what.is_longjmp)
  	  {
@@ -5501,7 +5433,7 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  	      {
  		if (debug_infrun)
  		  fprintf_unfiltered (gdb_stdlog,
-@@ -4189,12 +4199,7 @@ process_event_stop_test:
+@@ -4305,12 +4315,7 @@ process_event_stop_test:
  	    insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
  	  }
  	else
@@ -5515,7 +5447,7 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  	keep_going (ecs);
  	return;
  
-@@ -5268,15 +5273,65 @@ insert_exception_resume_breakpoint (stru
+@@ -5423,15 +5428,65 @@ insert_exception_resume_breakpoint (stru
      }
  }
  
@@ -5582,7 +5514,7 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  
    TRY_CATCH (e, RETURN_MASK_ERROR)
      {
-@@ -6258,7 +6313,8 @@ static struct lval_funcs siginfo_value_f
+@@ -6434,7 +6489,8 @@ static const struct lval_funcs siginfo_v
     if there's no object available.  */
  
  static struct value *
@@ -5592,7 +5524,7 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  {
    if (target_has_stack
        && !ptid_equal (inferior_ptid, null_ptid)
-@@ -6826,6 +6882,15 @@ show_schedule_multiple (struct ui_file *
+@@ -6929,6 +6985,15 @@ show_schedule_multiple (struct ui_file *
  			    "of all processes is %s.\n"), value);
  }
  
@@ -5608,7 +5540,7 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  void
  _initialize_infrun (void)
  {
-@@ -7098,7 +7163,7 @@ Tells gdb whether to detach the child of
+@@ -7204,7 +7269,7 @@ Tells gdb whether to detach the child of
       value with a void typed value, and when we get here, gdbarch
       isn't initialized yet.  At this point, we're quite sure there
       isn't another convenience variable of the same name.  */
@@ -5617,19 +5549,19 @@ Index: gdb-7.2.90.20110703/gdb/infrun.c
  
    add_setshow_boolean_cmd ("observer", no_class,
  			   &observer_mode_1, _("\
-Index: gdb-7.2.90.20110703/gdb/linespec.c
+Index: gdb-7.3.50.20110722/gdb/linespec.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/linespec.c	2011-07-02 22:13:08.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/linespec.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/linespec.c	2011-07-05 22:30:19.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/linespec.c	2011-07-22 20:04:21.000000000 +0200
 @@ -43,6 +43,7 @@
  #include "arch-utils.h"
  #include <ctype.h>
  #include "cli/cli-utils.h"
 +#include "stap-probe.h"
  
- /* We share this one with symtab.c, but it is not exported widely.  */
+ /* Prototypes for local functions.  */
  
-@@ -786,6 +787,7 @@ keep_name_info (char *p, int on_boundary
+@@ -783,6 +784,7 @@ keep_name_info (char *p, int on_boundary
     PC returned is 0.
     FILE:FUNCTION -- likewise, but prefer functions in that file.
     *EXPR -- line in which address EXPR appears.
@@ -5637,7 +5569,7 @@ Index: gdb-7.2.90.20110703/gdb/linespec.c
  
     This may all be followed by an "if EXPR", which we ignore.
  
-@@ -854,6 +856,9 @@ decode_line_1 (char **argptr, int funfir
+@@ -851,6 +853,9 @@ decode_line_1 (char **argptr, int funfir
    if (**argptr == '*')
      return decode_indirect (argptr);
  
@@ -5647,10 +5579,10 @@ Index: gdb-7.2.90.20110703/gdb/linespec.c
    is_quoted = (strchr (get_gdb_completer_quote_characters (),
  		       **argptr) != NULL);
  
-Index: gdb-7.2.90.20110703/gdb/linespec.h
+Index: gdb-7.3.50.20110722/gdb/linespec.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/linespec.h	2011-07-02 21:33:09.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/linespec.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/linespec.h	2011-04-04 19:41:07.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/linespec.h	2011-07-22 20:04:21.000000000 +0200
 @@ -30,6 +30,10 @@ struct linespec_result
       display mechanism would do the wrong thing.  */
    int special_display;
@@ -5662,11 +5594,11 @@ Index: gdb-7.2.90.20110703/gdb/linespec.h
    /* If non-NULL, an array of canonical names for returned
       symtab_and_line objects.  The array has as many elements as the
       `nelts' field in the symtabs_and_line returned by decode_line_1.
-Index: gdb-7.2.90.20110703/gdb/linux-nat.c
+Index: gdb-7.3.50.20110722/gdb/linux-nat.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/linux-nat.c	2011-04-29 18:02:10.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/linux-nat.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1272,6 +1272,64 @@ iterate_over_lwps (ptid_t filter,
+--- gdb-7.3.50.20110722.orig/gdb/linux-nat.c	2011-07-22 01:46:09.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/linux-nat.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1241,6 +1241,64 @@ iterate_over_lwps (ptid_t filter,
    return NULL;
  }
  
@@ -5731,10 +5663,10 @@ Index: gdb-7.2.90.20110703/gdb/linux-nat.c
  /* Update our internal state when changing from one checkpoint to
     another indicated by NEW_PTID.  We can only switch single-threaded
     applications, so we only create one new LWP, and the previous list
-Index: gdb-7.2.90.20110703/gdb/linux-nat.h
+Index: gdb-7.3.50.20110722/gdb/linux-nat.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/linux-nat.h	2011-01-05 23:22:49.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/linux-nat.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/linux-nat.h	2011-01-05 23:22:49.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/linux-nat.h	2011-07-22 20:04:21.000000000 +0200
 @@ -140,6 +140,11 @@ struct lwp_info *iterate_over_lwps (ptid
  						     void *), 
  				    void *data);
@@ -5747,11 +5679,11 @@ Index: gdb-7.2.90.20110703/gdb/linux-nat.h
  /* Create a prototype generic GNU/Linux target.  The client can
     override it with local methods.  */
  struct target_ops * linux_target (void);
-Index: gdb-7.2.90.20110703/gdb/machoread.c
+Index: gdb-7.3.50.20110722/gdb/machoread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/machoread.c	2011-03-07 17:17:29.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/machoread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -849,6 +849,7 @@ static const struct sym_fns macho_sym_fn
+--- gdb-7.3.50.20110722.orig/gdb/machoread.c	2011-07-01 20:36:45.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/machoread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -842,6 +842,7 @@ static const struct sym_fns macho_sym_fn
    default_symfile_segments,	/* Get segment information from a file.  */
    NULL,
    macho_symfile_relocate,	/* Relocate a debug section.  */
@@ -5759,10 +5691,10 @@ Index: gdb-7.2.90.20110703/gdb/machoread.c
    &psym_functions
  };
  
-Index: gdb-7.2.90.20110703/gdb/main.c
+Index: gdb-7.3.50.20110722/gdb/main.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/main.c	2011-03-07 19:34:31.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/main.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/main.c	2011-06-13 12:55:26.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/main.c	2011-07-22 20:04:21.000000000 +0200
 @@ -39,6 +39,7 @@
  
  #include "interps.h"
@@ -5771,7 +5703,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
  #include "source.h"
  #include "cli/cli-cmds.h"
  #include "python/python.h"
-@@ -260,6 +261,8 @@ captured_main (void *data)
+@@ -262,6 +263,8 @@ captured_main (void *data)
    char *cdarg = NULL;
    char *ttyarg = NULL;
  
@@ -5780,7 +5712,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
    /* These are static so that we can take their address in an
       initializer.  */
    static int print_help;
-@@ -451,10 +454,14 @@ captured_main (void *data)
+@@ -452,10 +455,14 @@ captured_main (void *data)
        {"args", no_argument, &set_args, 1},
        {"l", required_argument, 0, 'l'},
        {"return-child-result", no_argument, &return_child_result, 1},
@@ -5796,7 +5728,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
        {
  	int option_index;
  
-@@ -472,6 +479,9 @@ captured_main (void *data)
+@@ -473,6 +480,9 @@ captured_main (void *data)
  	  case 0:
  	    /* Long option that just sets a flag.  */
  	    break;
@@ -5806,7 +5738,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
  	  case OPT_SE:
  	    symarg = optarg;
  	    execarg = optarg;
-@@ -667,7 +677,31 @@ captured_main (void *data)
+@@ -668,7 +678,31 @@ captured_main (void *data)
  
    /* Now that gdb_init has created the initial inferior, we're in
       position to set args for that inferior.  */
@@ -5839,7 +5771,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
      {
        /* The remaining options are the command-line options for the
  	 inferior.  The first one is the sym/exec file, and the rest
-@@ -916,7 +950,8 @@ captured_main (void *data)
+@@ -917,7 +951,8 @@ captured_main (void *data)
  
    /* Read in the old history after all the command files have been
       read.  */
@@ -5849,7 +5781,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
  
    if (batch_flag)
      {
-@@ -927,13 +962,25 @@ captured_main (void *data)
+@@ -928,13 +963,25 @@ captured_main (void *data)
    /* Show time and/or space usage.  */
    do_cleanups (pre_stat_chain);
  
@@ -5881,7 +5813,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
      }
    /* No exit -- exit is through quit_command.  */
  }
-@@ -965,7 +1012,12 @@ print_gdb_help (struct ui_file *stream)
+@@ -966,7 +1013,12 @@ print_gdb_help (struct ui_file *stream)
    fputs_unfiltered (_("\
  This is the GNU debugger.  Usage:\n\n\
      gdb [options] [executable-file [core-file or process-id]]\n\
@@ -5895,7 +5827,7 @@ Index: gdb-7.2.90.20110703/gdb/main.c
  Options:\n\n\
  "), stream);
    fputs_unfiltered (_("\
-@@ -1003,7 +1055,13 @@ Options:\n\n\
+@@ -1004,7 +1056,13 @@ Options:\n\n\
    --nw		     Do not use a window interface.\n\
    --nx               Do not read "), stream);
    fputs_unfiltered (gdbinit, stream);
@@ -5910,10 +5842,10 @@ Index: gdb-7.2.90.20110703/gdb/main.c
    --quiet            Do not print version number on startup.\n\
    --readnow          Fully read symbol files on first access.\n\
  "), stream);
-Index: gdb-7.2.90.20110703/gdb/mi/mi-cmd-var.c
+Index: gdb-7.3.50.20110722/gdb/mi/mi-cmd-var.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/mi/mi-cmd-var.c	2011-01-12 22:09:39.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/mi/mi-cmd-var.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/mi/mi-cmd-var.c	2011-06-27 21:21:51.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/mi/mi-cmd-var.c	2011-07-22 20:04:21.000000000 +0200
 @@ -707,7 +707,6 @@ mi_cmd_var_update (char *command, char *
      }
    else
@@ -5922,10 +5854,10 @@ Index: gdb-7.2.90.20110703/gdb/mi/mi-cmd-var.c
        struct varobj *var = varobj_get_handle (name);
  
        varobj_update_one (var, print_values, 1 /* explicit */);
-Index: gdb-7.2.90.20110703/gdb/mipsread.c
+Index: gdb-7.3.50.20110722/gdb/mipsread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/mipsread.c	2011-03-07 17:17:29.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/mipsread.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/mipsread.c	2011-04-19 20:04:07.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/mipsread.c	2011-07-22 20:04:21.000000000 +0200
 @@ -402,6 +402,7 @@ static const struct sym_fns ecoff_sym_fn
    default_symfile_segments,	/* Get segment information from a file.  */
    NULL,
@@ -5934,11 +5866,11 @@ Index: gdb-7.2.90.20110703/gdb/mipsread.c
    &psym_functions
  };
  
-Index: gdb-7.2.90.20110703/gdb/objfiles.c
+Index: gdb-7.3.50.20110722/gdb/objfiles.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/objfiles.c	2011-04-25 23:25:18.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/objfiles.c	2011-07-03 10:33:11.000000000 +0200
-@@ -846,6 +846,11 @@ objfile_relocate1 (struct objfile *objfi
+--- gdb-7.3.50.20110722.orig/gdb/objfiles.c	2011-06-14 18:49:41.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/objfiles.c	2011-07-22 20:04:21.000000000 +0200
+@@ -842,6 +842,11 @@ objfile_relocate1 (struct objfile *objfi
  				obj_section_addr (s));
      }
  
@@ -5950,10 +5882,10 @@ Index: gdb-7.2.90.20110703/gdb/objfiles.c
    /* Data changed.  */
    return 1;
  }
-Index: gdb-7.2.90.20110703/gdb/p-valprint.c
+Index: gdb-7.3.50.20110722/gdb/p-valprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/p-valprint.c	2011-03-15 17:00:56.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/p-valprint.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/p-valprint.c	2011-03-15 17:00:56.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/p-valprint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -39,6 +39,7 @@
  #include "cp-abi.h"
  #include "cp-support.h"
@@ -6030,11 +5962,11 @@ Index: gdb-7.2.90.20110703/gdb/p-valprint.c
    return (0);
  }
  
-Index: gdb-7.2.90.20110703/gdb/parse.c
+Index: gdb-7.3.50.20110722/gdb/parse.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/parse.c	2011-03-28 22:21:03.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/parse.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1502,6 +1502,7 @@ parser_fprintf (FILE *x, const char *y, 
+--- gdb-7.3.50.20110722.orig/gdb/parse.c	2011-06-17 22:24:22.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/parse.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1501,6 +1501,7 @@ parser_fprintf (FILE *x, const char *y, 
  
  int
  operator_check_standard (struct expression *exp, int pos,
@@ -6042,7 +5974,7 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  			 int (*objfile_func) (struct objfile *objfile,
  					      void *data),
  			 void *data)
-@@ -1543,7 +1544,7 @@ operator_check_standard (struct expressi
+@@ -1542,7 +1543,7 @@ operator_check_standard (struct expressi
  	    struct type *type = elts[pos + 2 + arg].type;
  	    struct objfile *objfile = TYPE_OBJFILE (type);
  
@@ -6051,7 +5983,7 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  	      return 1;
  	  }
        }
-@@ -1561,7 +1562,8 @@ operator_check_standard (struct expressi
+@@ -1560,7 +1561,8 @@ operator_check_standard (struct expressi
  
  	/* Check objfile where the variable itself is placed.
  	   SYMBOL_OBJ_SECTION (symbol) may be NULL.  */
@@ -6061,7 +5993,7 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  	  return 1;
  
  	/* Check objfile where is placed the code touching the variable.  */
-@@ -1574,24 +1576,27 @@ operator_check_standard (struct expressi
+@@ -1573,24 +1575,27 @@ operator_check_standard (struct expressi
  
    /* Invoke callbacks for TYPE and OBJFILE if they were set as non-NULL.  */
  
@@ -6097,7 +6029,7 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  	     int (*objfile_func) (struct objfile *objfile, void *data),
  	     void *data)
  {
-@@ -1606,7 +1611,9 @@ exp_iterate (struct expression *exp,
+@@ -1605,7 +1610,9 @@ exp_iterate (struct expression *exp,
  
        pos = endpos - oplen;
        if (exp->language_defn->la_exp_desc->operator_check (exp, pos,
@@ -6108,7 +6040,7 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  	return 1;
  
        endpos = pos;
-@@ -1637,8 +1644,29 @@ exp_uses_objfile (struct expression *exp
+@@ -1636,8 +1643,29 @@ exp_uses_objfile (struct expression *exp
  {
    gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
  
@@ -6139,10 +6071,10 @@ Index: gdb-7.2.90.20110703/gdb/parse.c
  
  void
  _initialize_parse (void)
-Index: gdb-7.2.90.20110703/gdb/parser-defs.h
+Index: gdb-7.3.50.20110722/gdb/parser-defs.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/parser-defs.h	2011-01-10 21:38:49.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/parser-defs.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/parser-defs.h	2011-01-10 21:38:49.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/parser-defs.h	2011-07-22 20:04:21.000000000 +0200
 @@ -194,6 +194,8 @@ extern void operator_length_standard (co
  				      int *);
  
@@ -6171,12 +6103,12 @@ Index: gdb-7.2.90.20110703/gdb/parser-defs.h
 +#endif
 +
  #endif /* PARSER_DEFS_H */
-Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
+Index: gdb-7.3.50.20110722/gdb/ppc-linux-nat.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/ppc-linux-nat.c	2011-04-18 23:29:18.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/ppc-linux-nat.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1637,6 +1637,14 @@ booke_remove_point (struct ppc_hw_breakp
-   hw_breaks[i].hw_break = NULL;
+--- gdb-7.3.50.20110722.orig/gdb/ppc-linux-nat.c	2011-05-06 20:46:31.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/ppc-linux-nat.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1647,6 +1647,14 @@ ppc_linux_ranged_break_num_registers (st
+ 	  2 : -1);
  }
  
 +static void
@@ -6187,9 +6119,9 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
 +  booke_insert_point (pp, tid);
 +}
 +
- /* Return the number of registers needed for a ranged breakpoint.  */
+ /* Insert the hardware breakpoint described by BP_TGT.  Returns 0 for
+    success, 1 if hardware breakpoints are not supported or -1 for failure.  */
  
- static int
 @@ -1654,8 +1662,6 @@ static int
  ppc_linux_insert_hw_breakpoint (struct gdbarch *gdbarch,
  				  struct bp_target_info *bp_tgt)
@@ -6237,7 +6169,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
  
    return 0;
  }
-@@ -1946,6 +1956,15 @@ ppc_linux_can_accel_watchpoint_condition
+@@ -2004,6 +2014,15 @@ ppc_linux_can_accel_watchpoint_condition
  	  && check_condition (addr, cond, &data_value, &len));
  }
  
@@ -6253,7 +6185,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
  /* Set up P with the parameters necessary to request a watchpoint covering
     LEN bytes starting at ADDR and if possible with condition expression COND
     evaluated by hardware.  INSERT tells if we are creating a request for
-@@ -2000,8 +2019,6 @@ static int
+@@ -2058,8 +2077,6 @@ static int
  ppc_linux_insert_watchpoint (CORE_ADDR addr, int len, int rw,
  			     struct expression *cond)
  {
@@ -6262,7 +6194,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -2010,8 +2027,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
+@@ -2068,8 +2085,7 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
  
        create_watchpoint_request (&p, addr, len, rw, cond, 1);
  
@@ -6272,7 +6204,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
  
        ret = 0;
      }
-@@ -2054,12 +2070,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
+@@ -2112,12 +2128,8 @@ ppc_linux_insert_watchpoint (CORE_ADDR a
  
        saved_dabr_value = dabr_value;
  
@@ -6286,7 +6218,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
      }
  
    return ret;
-@@ -2069,8 +2081,6 @@ static int
+@@ -2127,8 +2139,6 @@ static int
  ppc_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
  			     struct expression *cond)
  {
@@ -6295,7 +6227,7 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
    int ret = -1;
  
    if (have_ptrace_booke_interface ())
-@@ -2079,20 +2089,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR a
+@@ -2137,20 +2147,16 @@ ppc_linux_remove_watchpoint (CORE_ADDR a
  
        create_watchpoint_request (&p, addr, len, rw, cond, 0);
  
@@ -6318,10 +6250,10 @@ Index: gdb-7.2.90.20110703/gdb/ppc-linux-nat.c
      }
  
    return ret;
-Index: gdb-7.2.90.20110703/gdb/printcmd.c
+Index: gdb-7.3.50.20110722/gdb/printcmd.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/printcmd.c	2011-03-22 15:39:40.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/printcmd.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/printcmd.c	2011-03-22 15:39:40.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/printcmd.c	2011-07-22 20:04:21.000000000 +0200
 @@ -975,6 +975,11 @@ print_command_1 (char *exp, int inspect,
    else
      val = access_value_history (0);
@@ -6368,10 +6300,10 @@ Index: gdb-7.2.90.20110703/gdb/printcmd.c
 +  observer_attach_mark_used (print_types_mark_used);
 +#endif
  }
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameIterator.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/FrameIterator.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameIterator.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/FrameIterator.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,33 @@
 +# Iterator over frames.
 +
@@ -6406,10 +6338,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameIterator.py
 +            raise StopIteration
 +        self.frame = result.older ()
 +        return result
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameWrapper.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/FrameWrapper.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameWrapper.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/FrameWrapper.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,112 @@
 +# Wrapper API for frames.
 +
@@ -6523,10 +6455,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/FrameWrapper.py
 +
 +    def __getattr__ (self, name):
 +        return getattr (self.frame, name)
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/backtrace.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/backtrace.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/backtrace.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/backtrace.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,42 @@
 +# Filtering backtrace.
 +
@@ -6570,10 +6502,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/backtrace.py
 +        return iter
 +    return frame_filter (iter)
 +
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/alias.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/alias.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/alias.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/alias.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,59 @@
 +# Alias command.
 +
@@ -6634,10 +6566,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/alias.py
 +                             "This command is an alias for '%s'." % target)
 +
 +AliasCommand()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/backtrace.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/backtrace.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/backtrace.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/backtrace.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,106 @@
 +# New backtrace command.
 +
@@ -6745,10 +6677,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/backtrace.py
 +            pair[1].describe (sys.stdout, full)
 +
 +FilteringBacktrace()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/ignore_errors.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/ignore_errors.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/ignore_errors.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/ignore_errors.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,37 @@
 +# Ignore errors in user commands.
 +
@@ -6787,10 +6719,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/ignore_errors.py
 +            pass
 +
 +IgnoreErrorsCommand ()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/pahole.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/pahole.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/pahole.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/pahole.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,75 @@
 +# pahole command for gdb
 +
@@ -6867,10 +6799,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/pahole.py
 +        self.pahole (type, 0, '')
 +
 +Pahole()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/require.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/require.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/require.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/require.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,57 @@
 +# Demand-loading commands.
 +
@@ -6929,10 +6861,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/require.py
 +RequireCommand()
 +RequireSubcommand("command")
 +RequireSubcommand("function")
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/upto.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/command/upto.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/command/upto.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/command/upto.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,129 @@
 +# upto command.
 +
@@ -7063,16 +6995,16 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/command/upto.py
 +UptoSourceCommand ()
 +UptoObjectCommand ()
 +UptoWhereCommand ()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/function/__init__.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/function/__init__.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/function/__init__.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/function/__init__.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1 @@
 +
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/function/caller_is.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/function/caller_is.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/function/caller_is.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/function/caller_is.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,58 @@
 +# Caller-is functions.
 +
@@ -7132,10 +7064,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/function/caller_is.py
 +
 +CallerIs()
 +CallerMatches()
-Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/function/in_scope.py
+Index: gdb-7.3.50.20110722/gdb/python/lib/gdb/function/in_scope.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/python/lib/gdb/function/in_scope.py	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/lib/gdb/function/in_scope.py	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,47 @@
 +# In-scope function.
 +
@@ -7184,10 +7116,10 @@ Index: gdb-7.2.90.20110703/gdb/python/lib/gdb/function/in_scope.py
 +	return wanted == found
 +
 +InScope ()
-Index: gdb-7.2.90.20110703/gdb/python/py-type.c
+Index: gdb-7.3.50.20110722/gdb/python/py-type.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/python/py-type.c	2011-01-26 21:53:45.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/python/py-type.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/python/py-type.c	2011-06-24 21:47:37.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/py-type.c	2011-07-22 20:04:21.000000000 +0200
 @@ -29,6 +29,8 @@
  #include "language.h"
  #include "vec.h"
@@ -7382,10 +7314,10 @@ Index: gdb-7.2.90.20110703/gdb/python/py-type.c
  }
  
  
-Index: gdb-7.2.90.20110703/gdb/python/py-value.c
+Index: gdb-7.3.50.20110722/gdb/python/py-value.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/python/py-value.c	2011-03-18 17:09:57.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/python/py-value.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/python/py-value.c	2011-06-27 21:21:51.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/py-value.c	2011-07-22 20:04:21.000000000 +0200
 @@ -28,6 +28,7 @@
  #include "infcall.h"
  #include "expression.h"
@@ -7394,7 +7326,7 @@ Index: gdb-7.2.90.20110703/gdb/python/py-value.c
  
  #ifdef HAVE_PYTHON
  
-@@ -1210,6 +1211,19 @@ gdbpy_is_value_object (PyObject *obj)
+@@ -1208,6 +1209,19 @@ gdbpy_is_value_object (PyObject *obj)
    return PyObject_TypeCheck (obj, &value_object_type);
  }
  
@@ -7414,7 +7346,7 @@ Index: gdb-7.2.90.20110703/gdb/python/py-value.c
  void
  gdbpy_initialize_values (void)
  {
-@@ -1220,6 +1234,10 @@ gdbpy_initialize_values (void)
+@@ -1218,6 +1232,10 @@ gdbpy_initialize_values (void)
    PyModule_AddObject (gdb_module, "Value", (PyObject *) &value_object_type);
  
    values_in_python = NULL;
@@ -7425,11 +7357,11 @@ Index: gdb-7.2.90.20110703/gdb/python/py-value.c
  }
  
  
-Index: gdb-7.2.90.20110703/gdb/python/python.c
+Index: gdb-7.3.50.20110722/gdb/python/python.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/python/python.c	2011-07-02 21:33:10.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/python/python.c	2011-07-03 10:33:11.000000000 +0200
-@@ -49,8 +49,11 @@ static int gdbpy_should_print_stack = 1;
+--- gdb-7.3.50.20110722.orig/gdb/python/python.c	2011-07-21 13:03:47.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/python/python.c	2011-07-22 20:04:21.000000000 +0200
+@@ -49,9 +49,12 @@ static int gdbpy_should_print_stack = 0;
  #include "linespec.h"
  #include "source.h"
  #include "version.h"
@@ -7437,11 +7369,12 @@ Index: gdb-7.2.90.20110703/gdb/python/python.c
 +#include "gdbthread.h"
  #include "target.h"
  #include "gdbthread.h"
+ #include "observer.h"
 +#include "event-top.h"
  
  static PyMethodDef GdbMethods[];
  
-@@ -769,6 +772,53 @@ gdbpy_print_stack (void)
+@@ -849,6 +852,53 @@ gdbpy_print_stack (void)
  
  /* Return the current Progspace.
     There always is one.  */
@@ -7495,7 +7428,7 @@ Index: gdb-7.2.90.20110703/gdb/python/python.c
  
  static PyObject *
  gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
-@@ -1194,6 +1244,8 @@ static PyMethodDef GdbMethods[] =
+@@ -1333,6 +1383,8 @@ static PyMethodDef GdbMethods[] =
      "Get a value from history" },
    { "execute", (PyCFunction) execute_gdb_command, METH_VARARGS | METH_KEYWORDS,
      "Execute a gdb command" },
@@ -7504,10 +7437,10 @@ Index: gdb-7.2.90.20110703/gdb/python/python.c
    { "parameter", gdbpy_parameter, METH_VARARGS,
      "Return a gdb parameter's value" },
  
-Index: gdb-7.2.90.20110703/gdb/python/python.h
+Index: gdb-7.3.50.20110722/gdb/python/python.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/python/python.h	2011-03-14 17:09:54.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/python/python.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/python/python.h	2011-03-14 17:09:54.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/python/python.h	2011-07-22 20:04:21.000000000 +0200
 @@ -32,6 +32,8 @@ void eval_python_from_control_command (s
  
  void source_python_script (FILE *stream, const char *file);
@@ -7517,10 +7450,10 @@ Index: gdb-7.2.90.20110703/gdb/python/python.h
  int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
  			      int embedded_offset, CORE_ADDR address,
  			      struct ui_file *stream, int recurse,
-Index: gdb-7.2.90.20110703/gdb/somread.c
+Index: gdb-7.3.50.20110722/gdb/somread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/somread.c	2011-03-07 17:17:29.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/somread.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/somread.c	2011-03-07 17:17:29.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/somread.c	2011-07-22 20:04:21.000000000 +0200
 @@ -439,6 +439,7 @@ static const struct sym_fns som_sym_fns 
    default_symfile_segments,	/* Get segment information from a file.  */
    NULL,
@@ -7529,10 +7462,10 @@ Index: gdb-7.2.90.20110703/gdb/somread.c
    &psym_functions
  };
  
-Index: gdb-7.2.90.20110703/gdb/stack.c
+Index: gdb-7.3.50.20110722/gdb/stack.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/stack.c	2011-03-18 19:48:56.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/stack.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/stack.c	2011-06-27 21:21:50.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/stack.c	2011-07-22 20:04:21.000000000 +0200
 @@ -366,6 +366,7 @@ print_frame_args (struct symbol *func, s
  	        {
                    const struct language_defn *language;
@@ -7555,11 +7488,11 @@ Index: gdb-7.2.90.20110703/gdb/stack.c
  		  ui_out_field_stream (uiout, "value", stb);
  	        }
  	      else
-Index: gdb-7.2.90.20110703/gdb/stap-probe.c
+Index: gdb-7.3.50.20110722/gdb/stap-probe.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/stap-probe.c	2011-07-03 10:33:11.000000000 +0200
-@@ -0,0 +1,2041 @@
++++ gdb-7.3.50.20110722/gdb/stap-probe.c	2011-07-22 20:04:21.000000000 +0200
+@@ -0,0 +1,2042 @@
 +/* SystemTap probe support for GDB.
 +
 +   Copyright (C) 2011 Free Software Foundation, Inc.
@@ -7917,9 +7850,7 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +  int i;
 +
 +  for (i = 0; i < a->n_args; i++)
-+    {
-+      xfree (a->arg[i].arg_str);
-+    }
++    xfree (a->arg[i].arg_str);
 +
 +  xfree (a->arg);
 +  xfree (a);
@@ -7963,6 +7894,7 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +    return;
 +
 +  args_info = xmalloc (sizeof (struct stap_args_info));
++  args_info->n_args = 0;
 +  back_to = make_cleanup (stap_free_args_info, args_info);
 +  args_info->arg = xcalloc (STAP_MAX_ARGS, sizeof (struct stap_probe_arg));
 +
@@ -8055,6 +7987,7 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +
 +	      args_info->arg[current_arg].arg_str
 +		= savestring (start, cur - start);
++	      ++args_info->n_args;
 +	      /* Start it over again.  */
 +	      cur = skip_spaces ((char *) cur);
 +	      current_state = NEW_ARG;
@@ -8075,7 +8008,6 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +	}
 +    }
 +
-+  args_info->n_args = current_arg + 1;
 +  args_info->arg = xrealloc (args_info->arg,
 +			      args_info->n_args
 +			      * sizeof (struct stap_probe_arg));
@@ -9088,8 +9020,9 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +    return;
 +
 +  for (i = 0; i < parsed_args->n_args; i++)
-+    xfree (parsed_args->arg);
++    xfree (parsed_args->arg[i].arg_str);
 +
++  xfree (parsed_args->arg);
 +  xfree (parsed_args);
 +}
 +
@@ -9295,13 +9228,14 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +
 +/* See definition in stap-probe.h.  */
 +
-+const struct stap_probe *
-+find_probe_in_objfile (struct objfile *objfile,
-+		       const char *provider,
-+		       const char *name)
++VEC (stap_probe_p) *
++find_probes_in_objfile (struct objfile *objfile,
++			const char *provider,
++			const char *name)
 +{
 +  const struct stap_probe *probes;
 +  int i, num_probes;
++  VEC (stap_probe_p) *result = NULL;
 +
 +  if (! objfile->sf || ! objfile->sf->sym_probe_fns)
 +    return NULL;
@@ -9315,10 +9249,10 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +      if (strcmp (probes[i].name, name) != 0)
 +	continue;
 +
-+      return &probes[i];
++      VEC_safe_push (stap_probe_p, result, &probes[i]);
 +    }
 +
-+  return NULL;
++  return result;
 +}
 +
 +/* See definition in stap-probe.h.  */
@@ -9421,7 +9355,7 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +	if (canonical)
 +	  {
 +	    canonical->canonical = xrealloc (canonical->canonical,
-+					     result.nelts * sizeof (char **));
++					     result.nelts * sizeof (char *));
 +	    canonical->canonical[result.nelts - 1] = xstrdup (full_arg);
 +	  }
 +      }
@@ -9601,11 +9535,11 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.c
 +  create_internalvar_type_lazy ("_probe_arg9", &probe_funcs,
 +				(void *) (uintptr_t) 9);
 +}
-Index: gdb-7.2.90.20110703/gdb/stap-probe.h
+Index: gdb-7.3.50.20110722/gdb/stap-probe.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/stap-probe.h	2011-07-03 10:33:11.000000000 +0200
-@@ -0,0 +1,109 @@
++++ gdb-7.3.50.20110722/gdb/stap-probe.h	2011-07-22 20:04:21.000000000 +0200
+@@ -0,0 +1,114 @@
 +/* SystemTap probe support for GDB.
 +
 +   Copyright (C) 2011 Free Software Foundation, Inc.
@@ -9627,6 +9561,8 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.h
 +
 +#if !defined (STAP_PROBE_H)
 +#define STAP_PROBE_H 1
++
++#include "vec.h"
 +
 +struct stap_args_info;
 +struct axs_value;
@@ -9659,6 +9595,8 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.h
 +  struct stap_args_info *parsed_args;
 +};
 +
++typedef const struct stap_probe *stap_probe_p;
++DEF_VEC_P (stap_probe_p);
 +
 +/* A helper for linespec that decodes a stap probe specification.  It
 +   returns a symtabs_and_lines object and updates *ARGPTR or throws an
@@ -9667,12 +9605,13 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.h
 +extern struct symtabs_and_lines parse_stap_probe (char **argptr,
 +						  struct linespec_result *canon);
 +
-+/* Search OBJFILE for a probe with the given PROVIDER and NAME.  If a
-+   probe is found, return it.  If no probe is found, return NULL.  */
++/* Search OBJFILE for a probe with the given PROVIDER and NAME.
++   Return a VEC of all probes that were found.  If no matching probe
++   is found, return NULL.  The caller must free the VEC.  */
 +
-+extern const struct stap_probe *find_probe_in_objfile (struct objfile *objfile,
-+						       const char *provider,
-+						       const char *name);
++extern VEC (stap_probe_p) *find_probes_in_objfile (struct objfile *objfile,
++						   const char *provider,
++						   const char *name);
 +
 +/* Given a PC, find an associated SystemTap probe.  If a probe is
 +   found, set *OBJFILE_OUT to the probe's objfile, and return the
@@ -9715,10 +9654,10 @@ Index: gdb-7.2.90.20110703/gdb/stap-probe.h
 +					       int n);
 +
 +#endif /* !defined (STAP_PROBE_H) */
-Index: gdb-7.2.90.20110703/gdb/symfile.h
+Index: gdb-7.3.50.20110722/gdb/symfile.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/symfile.h	2011-04-25 23:25:18.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/symfile.h	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/symfile.h	2011-06-10 23:48:04.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/symfile.h	2011-07-22 20:04:21.000000000 +0200
 @@ -31,6 +31,11 @@ struct objfile;
  struct obj_section;
  struct obstack;
@@ -9731,8 +9670,8 @@ Index: gdb-7.2.90.20110703/gdb/symfile.h
  
  /* Comparison function for symbol look ups.  */
  
-@@ -290,6 +295,52 @@ struct quick_symbol_functions
- 				void *data);
+@@ -294,6 +299,52 @@ struct quick_symbol_functions
+ 				symbol_filename_ftype *fun, void *data);
  };
  
 +/* Structure of functions used for SystemTap probe support.  If one of
@@ -9784,7 +9723,7 @@ Index: gdb-7.2.90.20110703/gdb/symfile.h
  /* Structure to keep track of symbol reading functions for various
     object file types.  */
  
-@@ -360,6 +411,10 @@ struct sym_fns
+@@ -364,6 +415,10 @@ struct sym_fns
  
    bfd_byte *(*sym_relocate) (struct objfile *, asection *sectp, bfd_byte *buf);
  
@@ -9795,11 +9734,11 @@ Index: gdb-7.2.90.20110703/gdb/symfile.h
    /* The "quick" (aka partial) symbol functions for this symbol
       reader.  */
    const struct quick_symbol_functions *qf;
-Index: gdb-7.2.90.20110703/gdb/symtab.c
+Index: gdb-7.3.50.20110722/gdb/symtab.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/symtab.c	2011-07-02 22:03:43.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/symtab.c	2011-07-03 10:33:11.000000000 +0200
-@@ -770,6 +770,7 @@ init_sal (struct symtab_and_line *sal)
+--- gdb-7.3.50.20110722.orig/gdb/symtab.c	2011-07-21 17:13:29.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/symtab.c	2011-07-22 20:04:21.000000000 +0200
+@@ -776,6 +776,7 @@ init_sal (struct symtab_and_line *sal)
    sal->end = 0;
    sal->explicit_pc = 0;
    sal->explicit_line = 0;
@@ -9807,11 +9746,11 @@ Index: gdb-7.2.90.20110703/gdb/symtab.c
  }
  
  
-Index: gdb-7.2.90.20110703/gdb/symtab.h
+Index: gdb-7.3.50.20110722/gdb/symtab.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/symtab.h	2011-05-06 17:13:37.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/symtab.h	2011-07-03 10:33:11.000000000 +0200
-@@ -1118,6 +1118,10 @@ struct symtab_and_line
+--- gdb-7.3.50.20110722.orig/gdb/symtab.h	2011-06-30 00:19:24.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/symtab.h	2011-07-22 20:04:21.000000000 +0200
+@@ -1115,6 +1115,10 @@ struct symtab_and_line
    CORE_ADDR end;
    int explicit_pc;
    int explicit_line;
@@ -9822,10 +9761,10 @@ Index: gdb-7.2.90.20110703/gdb/symtab.h
  };
  
  extern void init_sal (struct symtab_and_line *sal);
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,457 @@
 +	.file	"x86_64-vla-pointer.c"
 +	.section	.debug_abbrev,"",@progbits
@@ -10284,10 +10223,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer-foo.S
 +	.string	"GNU C 4.3.2 20081105 (Red Hat 4.3.2-7)"
 +	.ident	"GCC: (GNU) 4.3.2 20081105 (Red Hat 4.3.2-7)"
 +	.section	.note.GNU-stack,"",@progbits
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,43 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -10332,10 +10271,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.c
 +}
 +
 +#endif
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-pointer.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,66 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -10403,10 +10342,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-pointer.exp
 +
 +gdb_test "whatis *array" "type = char \\\[78\\\]" "second: whatis *array"
 +gdb_test "ptype *array" "type = char \\\[78\\\]" "second: ptype *array"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,455 @@
 +	.file	"x86_64-vla-typedef.c"
 +	.section	.debug_abbrev,"",@progbits
@@ -10863,10 +10802,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef-foo.S
 +	.string	"GNU C 4.3.2 20081105 (Red Hat 4.3.2-7)"
 +	.ident	"GCC: (GNU) 4.3.2 20081105 (Red Hat 4.3.2-7)"
 +	.section	.note.GNU-stack,"",@progbits
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,43 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -10911,10 +10850,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.c
 +}
 +
 +#endif
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,64 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -10980,10 +10919,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.arch/x86_64-vla-typedef.exp
 +gdb_test "whatis array" "type = array_t" "second: whatis array"
 +
 +gdb_test "ptype array" "type = char \\\[78\\\]" "second: ptype array"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/arrayidx.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.base/arrayidx.c	2011-01-01 16:33:40.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.base/arrayidx.c	2011-01-01 16:33:40.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/arrayidx.c	2011-07-22 20:04:21.000000000 +0200
 @@ -17,6 +17,13 @@
  
  int array[] = {1, 2, 3, 4};
@@ -10998,10 +10937,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.c
  int
  main (void)
  {
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/arrayidx.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.base/arrayidx.exp	2011-01-01 16:33:40.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.base/arrayidx.exp	2011-01-01 16:33:40.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/arrayidx.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -57,4 +57,12 @@ gdb_test "print array" \
           "\\{\\\[0\\\] = 1, \\\[1\\\] = 2, \\\[2\\\] = 3, \\\[3\\\] = 4\\}" \
           "Print array with array-indexes on"
@@ -11016,10 +10955,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/arrayidx.exp
 +	unsupported "$test (no GCC)"
 +    }
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/default.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/default.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.base/default.exp	2011-02-15 22:17:52.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/default.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.base/default.exp	2011-05-20 16:37:20.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/default.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -607,6 +607,17 @@ gdb_test_list_exact "show convenience" "
  	{$_sdata = void} \
  	{$_siginfo = void} \
@@ -11038,10 +10977,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/default.exp
      }
  
  #test show directories
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/internal-var-field-address.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/internal-var-field-address.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,20 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11063,10 +11002,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.c
 +struct {
 +  int field;
 +} staticstruct = { 1 };
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/internal-var-field-address.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/internal-var-field-address.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,26 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -11094,10 +11033,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/internal-var-field-address.exp
 +
 +gdb_test {set $varstruct = staticstruct}
 +gdb_test {p $varstruct.field} " = 1"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/stap-probe.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/stap-probe.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,69 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11168,10 +11107,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.c
 +  m1();
 +  m2();
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/stap-probe.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/stap-probe.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,72 @@
 +# Copyright (C) 2011 Free Software Foundation, Inc.
 +
@@ -11245,10 +11184,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/stap-probe.exp
 +    return -1
 +}
 +stap_test "-DUSE_PROBES"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla-overflow.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla-overflow.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,30 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11280,10 +11219,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.c
 +
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla-overflow.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla-overflow.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,109 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -11394,10 +11333,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla-overflow.exp
 +gdb_test "bt" "in \[^ \]*abort \\(.* in main \\(.*" "Backtrace after abort()"
 +
 +verbose -log "kb_found in bt after abort() = [expr [memory_v_pages_get] * $pagesize / 1024]"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,55 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11454,10 +11393,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.c
 +  foo (78);
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.base/vla.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,62 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -11521,10 +11460,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.base/vla.exp
 +gdb_test "p temp1" " = '1' <repeats 78 times>" "second: print temp1"
 +gdb_test "p temp2" " = '2' <repeats 78 times>" "second: print temp2"
 +gdb_test "p temp3" " = '3' <repeats 48 times>" "second: print temp3"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.cp/nextoverthrow.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.cp/nextoverthrow.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.cp/nextoverthrow.exp	2011-01-01 16:33:44.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.cp/nextoverthrow.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.cp/nextoverthrow.exp	2011-01-01 16:33:44.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.cp/nextoverthrow.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -53,6 +53,17 @@ gdb_test_multiple "print _Unwind_DebugHo
      }
  }
@@ -11543,10 +11482,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.cp/nextoverthrow.exp
      unsupported "nextoverthrow.exp could not find _Unwind_DebugHook"
      return -1
  }
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,246 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11794,10 +11733,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.S
 +	.string		"char"
 +.Luint_str:
 +	.string		"unsigned int"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,54 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +
@@ -11853,10 +11792,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-bound-loclist.exp
 +
 +# The register contains unpredictable value - the array size.
 +gdb_test "ptype reg_string" {type = char \[-?[0-9]+\]}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-stripped.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,42 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -11900,10 +11839,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.c
 +  func1 (1, 2);
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,79 @@
 +# Copyright 2006 Free Software Foundation, Inc.
 +
@@ -11984,10 +11923,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-stripped.exp
 +gdb_test "step" \
 +         "func.* \\(.*\\) at .*" \
 +         "step"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.S
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.S
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.S	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.S	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,83 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -12072,10 +12011,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-locat
 +
 +	.byte		0x0			/* Terminator */
 +	.byte		0x0			/* Terminator */
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-location.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,37 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -12114,10 +12053,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.dwarf2/dw2-struct-member-data-locat
 +clean_restart $binfile
 +
 +gdb_test "ptype struct some_struct" "type = struct some_struct {\[\r\n \t\]*void field;\[\r\n \t\]*}"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dwarf-stride.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dwarf-stride.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,42 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -12148,7 +12087,7 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.exp
 +set testfile dwarf-stride
 +set srcfile ${testfile}.f90
 +
-+if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} {debug f77}] } {
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} {debug f90}] } {
 +    return -1
 +}
 +
@@ -12161,10 +12100,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.exp
 +gdb_continue_to_breakpoint "break-here" ".*break-here.*"
 +gdb_test "p c40pt(1)" " = '0-hello.*"
 +gdb_test "p c40pt(2)" " = '1-hello.*"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dwarf-stride.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dwarf-stride.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,40 @@
 +! Copyright 2009 Free Software Foundation, Inc.
 +!
@@ -12206,10 +12145,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dwarf-stride.f90
 +  print *, c40pt  ! break-here
 +
 +end program repro
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,24 @@
 +! Copyright 2010 Free Software Foundation, Inc.
 +!
@@ -12235,10 +12174,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f9
 +  real :: dummy
 +  dummy = 1
 +end subroutine bar
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,37 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +
@@ -12263,8 +12202,8 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
 +set executable ${testfile}
 +set binfile ${objdir}/${subdir}/${executable}
 +
-+if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f77}] != ""
-+     || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f77}] != "" } {
++if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f90}] != ""
++     || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f90}] != "" } {
 +    untested "Couldn't compile ${srcfile1} or ${srcfile2}"
 +    return -1
 +}
@@ -12277,10 +12216,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
 +}
 +
 +gdb_test "bt" {foo \(string='hello'.*}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,36 @@
 +! Copyright 2010 Free Software Foundation, Inc.
 +!
@@ -12318,10 +12257,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
 +  end interface
 +  call foo ('hello')
 +end
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,145 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -12350,7 +12289,7 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.exp
 +set srcfile ${testfile}.f90
 +set binfile ${objdir}/${subdir}/${testfile}
 +
-+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f77 quiet}] != "" } {
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f90 quiet}] != "" } {
 +    untested "Couldn't compile ${srcfile}"
 +    return -1
 +}
@@ -12468,10 +12407,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.exp
 +gdb_test "p vart(3,8)" "\\$\[0-9\]* = 9"
 +# maps to foo::vary(1,3)
 +gdb_test "p vart(2,9)" "\\$\[0-9\]* = 10"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/dynamic.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,98 @@
 +! Copyright 2007 Free Software Foundation, Inc.
 +!
@@ -12571,10 +12510,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/dynamic.f90
 +  if (x (1, 1) .ne. 8 .or. x (2, 2) .ne. 9 .or. x (1, 2) .ne. 4) call abort
 +  if (x (3, 1) .ne. 10) call abort
 +end
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/string.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/string.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,59 @@
 +# Copyright 2008 Free Software Foundation, Inc.
 +
@@ -12601,7 +12540,7 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.exp
 +set srcfile ${testfile}.f90
 +set binfile ${objdir}/${subdir}/${testfile}
 +
-+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f77 quiet}] != "" } {
++if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f90 quiet}] != "" } {
 +    untested "Couldn't compile ${srcfile}"
 +    return -1
 +}
@@ -12635,10 +12574,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.exp
 +gdb_continue_to_breakpoint "var-finish"
 +gdb_test "p e" "\\$\[0-9\]* = 'e   '" "p e re-set"
 +gdb_test "p f" "\\$\[0-9\]* = \\(\\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f2  ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\( 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   ', 'f   '\\) \\)" "p *f re-set"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/string.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/string.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,37 @@
 +! Copyright 2008 Free Software Foundation, Inc.
 +!
@@ -12677,10 +12616,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/string.f90
 +  h = 'h'
 +  call foo (g, h)
 +end
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/subrange.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/subrange.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,60 @@
 +# Copyright 2011 Free Software Foundation, Inc.
 +
@@ -12701,7 +12640,7 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.exp
 +
 +set testfile "subrange"
 +set srcfile ${testfile}.f90
-+if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} {debug f77}] } {
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} {debug f90}] } {
 +    return -1
 +}
 +
@@ -12742,10 +12681,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.exp
 +delete_breakpoints
 +gdb_unload
 +gdb_test {p $a (3, 2:2)} { = \(23\)}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.f90
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/subrange.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.f90	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.fortran/subrange.f90	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,28 @@
 +! Copyright 2011 Free Software Foundation, Inc.
 +!
@@ -12775,10 +12714,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.fortran/subrange.f90
 +  ptr => a
 +  write (*,*) a                 ! break-static
 +end
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.gdb/selftest.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.gdb/selftest.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.gdb/selftest.exp	2011-07-03 10:33:07.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.gdb/selftest.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.gdb/selftest.exp	2011-07-22 20:04:10.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.gdb/selftest.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -92,6 +92,10 @@ proc do_steps_and_nexts {} {
  		set description "step over ttyarg initialization"
  		set command "step"
@@ -12790,10 +12729,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.gdb/selftest.exp
  	    -re ".*pre_stat_chain = make_command_stats_cleanup.*$gdb_prompt $" {
  		set description "next over make_command_stats_cleanup and everything it calls"
  		set command "next"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.mi/mi2-var-stale-type.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.mi/mi2-var-stale-type.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,26 @@
 +/* Copyright 2011 Free Software Foundation, Inc.
 +
@@ -12821,10 +12760,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.c
 +
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.mi/mi2-var-stale-type.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.mi/mi2-var-stale-type.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,57 @@
 +# Copyright 2011 Free Software Foundation, Inc.
 +#
@@ -12883,10 +12822,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.mi/mi2-var-stale-type.exp
 +mi_create_varobj "vla" "vla" "create local variable vla"
 +
 +mi_gdb_test "-var-update *" "\\^done,changelist=.*" "-var-update *"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.multi/watchpoint-multi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.multi/watchpoint-multi.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,59 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -12947,10 +12886,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.c
 +  marker_exit2 ();
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.multi/watchpoint-multi.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.multi/watchpoint-multi.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,113 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +
@@ -13065,10 +13004,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.multi/watchpoint-multi.exp
 +    }
 +}
 +
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register-func.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register-func.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register-func.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register-func.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,22 @@
 +/* This file is part of GDB, the GNU debugger.
 +
@@ -13092,10 +13031,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register-func.c
 +{
 +  return arr[0];
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,28 @@
 +/* This file is part of GDB, the GNU debugger.
 +
@@ -13125,10 +13064,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.c
 +
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.opt/array-from-register.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,33 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +#
@@ -13163,10 +13102,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.opt/array-from-register.exp
 +# Seen regression:
 +# Address requested for identifier "arr" which is in register $rdi
 +gdb_test "p arr\[0\]" "\\$\[0-9\]+ = 42"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.pascal/arrays.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.pascal/arrays.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,104 @@
 +# Copyright 2008, 2009 Free Software Foundation, Inc.
 +#
@@ -13272,10 +13211,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.exp
 +}
 +gdb_test "print DynArrChar" ".* = 'abcdefghijklm'" "Print dynamic array of char"
 +
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.pas
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.pascal/arrays.pas
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.pas	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.pascal/arrays.pas	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,82 @@
 +{
 + Copyright 2008, 2009 Free Software Foundation, Inc.
@@ -13359,10 +13298,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.pascal/arrays.pas
 +  s := 'test'#0'string';
 +  writeln(s); { set breakpoint 2 here }
 +end.
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-frame.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.python/py-frame.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.python/py-frame.exp	2011-02-26 15:06:28.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-frame.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.python/py-frame.exp	2011-02-26 15:06:28.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.python/py-frame.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -78,8 +78,6 @@ gdb_test "python print bframe == gdb.new
  
  gdb_test "python print 'result =', f0 == f1" " = False" "test equality comparison (false)"
@@ -13378,11 +13317,11 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-frame.exp
  gdb_test "python print 'result =', gdb.selected_frame () == f1" " = True" "test gdb.selected_frame"
 +
 +gdb_test "python print 'result =', f0.block ()" "<gdb.Block object at 0x\[\[:xdigit:\]\]+>" "test Frame.block"
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-value.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.python/py-value.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/gdb.python/py-value.exp	2011-01-01 16:33:49.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-value.exp	2011-07-03 10:33:11.000000000 +0200
-@@ -318,6 +318,15 @@ proc test_value_after_death {} {
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/gdb.python/py-value.exp	2011-04-24 11:04:38.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.python/py-value.exp	2011-07-22 20:04:21.000000000 +0200
+@@ -319,6 +319,15 @@ proc test_value_after_death {} {
      "print value's type"
  }
  
@@ -13398,7 +13337,7 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-value.exp
  # Regression test for invalid subscript operations.  The bug was that
  # the type of the value was not being checked before allowing a
  # subscript operation to proceed.
-@@ -455,6 +464,7 @@ test_value_in_inferior
+@@ -456,6 +465,7 @@ test_value_in_inferior
  test_inferior_function_call
  test_lazy_strings
  test_value_after_death
@@ -13406,10 +13345,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.python/py-value.exp
  
  # The following test recompiles the binary to test either C or C++
  # values. 
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-child.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-child.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-child.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-child.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,127 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -13538,10 +13477,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-child.c
 +  i = sigaction (SIGUSR1, &oldact, NULL);
 +  assert (i == 0);
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,174 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -13717,10 +13656,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-mt.c
 +  mark_exit ();
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,74 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -13796,10 +13735,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-parent.c
 +      marker ();
 +    }
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-st.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-st.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-st.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork-st.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,61 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -13862,10 +13801,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork-st.c
 +  mark_exit ();
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,149 @@
 +# Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
 +
@@ -14016,10 +13955,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.exp
 +} else {
 +    untested "child"
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.h
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.h	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.threads/watchpoint-fork.h	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,32 @@
 +/* Test case for forgotten hw-watchpoints after fork()-off of a process.
 +
@@ -14053,10 +13992,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.threads/watchpoint-fork.h
 +
 +extern void marker (void);
 +extern void forkoff (int nr);
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.c
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.trace/stap-trace.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.c	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.trace/stap-trace.c	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,71 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -14129,10 +14068,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.c
 +
 +  return 0;
 +}
-Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/gdb.trace/stap-trace.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.exp	2011-07-03 10:33:11.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/gdb.trace/stap-trace.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -0,0 +1,129 @@
 +# Copyright 2011
 +# Free Software Foundation, Inc.
@@ -14263,10 +14202,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/gdb.trace/stap-trace.exp
 +
 +# Finished!
 +gdb_test "tfind none" ".*" ""
-Index: gdb-7.2.90.20110703/gdb/testsuite/lib/gdb.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/lib/gdb.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/lib/gdb.exp	2011-03-25 14:08:11.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/lib/gdb.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/lib/gdb.exp	2011-07-15 16:11:22.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/testsuite/lib/gdb.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -141,6 +141,11 @@ proc gdb_unload {} {
  	    send_gdb "y\n"
  	    exp_continue
@@ -14279,10 +14218,10 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/lib/gdb.exp
  	-re "Discard symbol table from .*y or n.*$" {
  	    send_gdb "y\n"
  	    exp_continue
-Index: gdb-7.2.90.20110703/gdb/testsuite/lib/pascal.exp
+Index: gdb-7.3.50.20110722/gdb/testsuite/lib/pascal.exp
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/testsuite/lib/pascal.exp	2011-01-01 16:33:52.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/testsuite/lib/pascal.exp	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/testsuite/lib/pascal.exp	2011-01-01 16:33:52.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/testsuite/lib/pascal.exp	2011-07-22 20:04:21.000000000 +0200
 @@ -37,6 +37,9 @@ proc pascal_init {} {
      global pascal_compiler_is_fpc
      global gpc_compiler
@@ -14314,11 +14253,11 @@ Index: gdb-7.2.90.20110703/gdb/testsuite/lib/pascal.exp
      }
      set pascal_init_done 1
  }   
-Index: gdb-7.2.90.20110703/gdb/thread.c
+Index: gdb-7.3.50.20110722/gdb/thread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/thread.c	2011-04-19 17:24:49.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/thread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1438,7 +1438,8 @@ update_thread_list (void)
+--- gdb-7.3.50.20110722.orig/gdb/thread.c	2011-05-30 20:04:32.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/thread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1441,7 +1441,8 @@ update_thread_list (void)
     no thread is selected, or no threads exist.  */
  
  static struct value *
@@ -14328,7 +14267,7 @@ Index: gdb-7.2.90.20110703/gdb/thread.c
  {
    struct thread_info *tp = find_thread_ptid (inferior_ptid);
  
-@@ -1449,6 +1450,15 @@ thread_id_make_value (struct gdbarch *gd
+@@ -1452,6 +1453,15 @@ thread_id_make_value (struct gdbarch *gd
  /* Commands with a prefix of `thread'.  */
  struct cmd_list_element *thread_cmd_list = NULL;
  
@@ -14344,32 +14283,32 @@ Index: gdb-7.2.90.20110703/gdb/thread.c
  void
  _initialize_thread (void)
  {
-@@ -1494,5 +1504,5 @@ Show printing of thread events (such as 
+@@ -1497,5 +1507,5 @@ Show printing of thread events (such as 
           show_print_thread_events,
           &setprintlist, &showprintlist);
  
 -  create_internalvar_type_lazy ("_thread", thread_id_make_value);
 +  create_internalvar_type_lazy ("_thread", &thread_funcs, NULL);
  }
-Index: gdb-7.2.90.20110703/gdb/top.c
+Index: gdb-7.3.50.20110722/gdb/top.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/top.c	2011-03-12 23:59:24.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/top.c	2011-07-03 10:33:11.000000000 +0200
-@@ -343,6 +343,9 @@ void
- prepare_execute_command (void)
- {
-   free_all_values ();
+--- gdb-7.3.50.20110722.orig/gdb/top.c	2011-07-21 13:03:45.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/top.c	2011-07-22 20:04:21.000000000 +0200
+@@ -347,6 +347,9 @@ prepare_execute_command (void)
+ 
+   mark = value_mark ();
+   cleanup = make_cleanup_value_free_to_mark (mark);
 +#if 0
 +  free_all_types ();
 +#endif
  
    /* With multiple threads running while the one we're examining is
       stopped, the dcache can get stale without us being able to detect
-Index: gdb-7.2.90.20110703/gdb/tracepoint.c
+Index: gdb-7.3.50.20110722/gdb/tracepoint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/tracepoint.c	2011-07-02 21:33:10.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/tracepoint.c	2011-07-03 10:33:11.000000000 +0200
-@@ -1603,6 +1603,8 @@ start_tracing (void)
+--- gdb-7.3.50.20110722.orig/gdb/tracepoint.c	2011-07-07 15:32:55.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/tracepoint.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1609,6 +1609,8 @@ start_tracing (void)
  
    for (ix = 0; VEC_iterate (breakpoint_p, tp_vec, ix, t); ix++)
      {
@@ -14378,7 +14317,7 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
        if ((t->type == bp_fast_tracepoint
  	   ? !may_insert_fast_tracepoints
  	   : !may_insert_tracepoints))
-@@ -1611,6 +1613,9 @@ start_tracing (void)
+@@ -1617,6 +1619,9 @@ start_tracing (void)
        t->number_on_target = 0;
        target_download_tracepoint (t);
        t->number_on_target = t->number;
@@ -14388,7 +14327,7 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
      }
    VEC_free (breakpoint_p, tp_vec);
  
-@@ -1672,7 +1677,28 @@ trace_stop_command (char *args, int from
+@@ -1678,7 +1683,28 @@ trace_stop_command (char *args, int from
  void
  stop_tracing (void)
  {
@@ -14417,7 +14356,7 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
    /* Should change in response to reply?  */
    current_trace_status ()->running = 0;
  }
-@@ -4515,7 +4541,8 @@ info_static_tracepoint_markers_command (
+@@ -4521,7 +4547,8 @@ info_static_tracepoint_markers_command (
     available.  */
  
  static struct value *
@@ -14427,7 +14366,7 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
  {
    LONGEST size;
    gdb_byte *buf;
-@@ -4694,6 +4721,15 @@ traceframe_available_memory (VEC(mem_ran
+@@ -4700,6 +4727,15 @@ traceframe_available_memory (VEC(mem_ran
    return 0;
  }
  
@@ -14443,7 +14382,7 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
  /* module initialization */
  void
  _initialize_tracepoint (void)
-@@ -4704,7 +4740,7 @@ _initialize_tracepoint (void)
+@@ -4710,7 +4746,7 @@ _initialize_tracepoint (void)
       value with a void typed value, and when we get here, gdbarch
       isn't initialized yet.  At this point, we're quite sure there
       isn't another convenience variable of the same name.  */
@@ -14452,10 +14391,10 @@ Index: gdb-7.2.90.20110703/gdb/tracepoint.c
  
    traceframe_number = -1;
    tracepoint_number = -1;
-Index: gdb-7.2.90.20110703/gdb/typeprint.c
+Index: gdb-7.3.50.20110722/gdb/typeprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/typeprint.c	2011-01-11 22:53:25.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/typeprint.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/typeprint.c	2011-01-11 22:53:25.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/typeprint.c	2011-07-22 20:04:21.000000000 +0200
 @@ -36,6 +36,7 @@
  #include "gdb_string.h"
  #include "exceptions.h"
@@ -14509,11 +14448,11 @@ Index: gdb-7.2.90.20110703/gdb/typeprint.c
  }
  
  static void
-Index: gdb-7.2.90.20110703/gdb/utils.c
+Index: gdb-7.3.50.20110722/gdb/utils.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/utils.c	2011-05-17 23:26:28.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/utils.c	2011-07-03 10:33:11.000000000 +0200
-@@ -2243,6 +2243,36 @@ set_batch_flag_and_make_cleanup_restore_
+--- gdb-7.3.50.20110722.orig/gdb/utils.c	2011-07-22 01:46:09.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/utils.c	2011-07-22 20:04:21.000000000 +0200
+@@ -1874,6 +1874,36 @@ set_batch_flag_and_make_cleanup_restore_
    return back_to;
  }
  
@@ -14550,10 +14489,10 @@ Index: gdb-7.2.90.20110703/gdb/utils.c
  /* Set the screen size based on LINES_PER_PAGE and CHARS_PER_LINE.  */
  
  static void
-Index: gdb-7.2.90.20110703/gdb/valarith.c
+Index: gdb-7.3.50.20110722/gdb/valarith.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/valarith.c	2011-02-18 20:10:46.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/valarith.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/valarith.c	2011-02-18 20:10:46.000000000 +0100
++++ gdb-7.3.50.20110722/gdb/valarith.c	2011-07-22 20:04:21.000000000 +0200
 @@ -198,7 +198,10 @@ value_subscripted_rvalue (struct value *
    struct type *array_type = check_typedef (value_type (array));
    struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
@@ -14577,10 +14516,10 @@ Index: gdb-7.2.90.20110703/gdb/valarith.c
    return binop_types_user_defined_p (op, value_type (arg1), value_type (arg2));
  }
  
-Index: gdb-7.2.90.20110703/gdb/valops.c
+Index: gdb-7.3.50.20110722/gdb/valops.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/valops.c	2011-03-29 19:04:30.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/valops.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/valops.c	2011-07-14 17:00:20.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/valops.c	2011-07-22 20:04:21.000000000 +0200
 @@ -47,6 +47,7 @@
  #include "objfiles.h"
  #include "symtab.h"
@@ -14723,7 +14662,7 @@ Index: gdb-7.2.90.20110703/gdb/valops.c
  }
  
  /* Given a value which is a function, return a value which is a pointer
-@@ -3695,6 +3779,8 @@ value_slice (struct value *array, int lo
+@@ -3676,6 +3760,8 @@ value_slice (struct value *array, int lo
  					TYPE_TARGET_TYPE (range_type),
  					lowbound, 
  					lowbound + length - 1);
@@ -14732,19 +14671,19 @@ Index: gdb-7.2.90.20110703/gdb/valops.c
    if (TYPE_CODE (array_type) == TYPE_CODE_BITSTRING)
      {
        int i;
-Index: gdb-7.2.90.20110703/gdb/valprint.c
+Index: gdb-7.3.50.20110722/gdb/valprint.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/valprint.c	2011-04-29 21:23:05.000000000 +0200
-+++ gdb-7.2.90.20110703/gdb/valprint.c	2011-07-03 10:33:11.000000000 +0200
-@@ -36,6 +36,7 @@
- #include "dfp.h"
- #include "python/python.h"
- #include "ada-lang.h"
+--- gdb-7.3.50.20110722.orig/gdb/valprint.c	2011-06-29 17:32:39.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/valprint.c	2011-07-22 20:04:21.000000000 +0200
+@@ -39,6 +39,7 @@
+ #include "gdb_obstack.h"
+ #include "charset.h"
+ #include <ctype.h>
 +#include "dwarf2loc.h"
  
  #include <errno.h>
  
-@@ -239,7 +240,6 @@ scalar_type_p (struct type *type)
+@@ -242,7 +243,6 @@ scalar_type_p (struct type *type)
      case TYPE_CODE_STRUCT:
      case TYPE_CODE_UNION:
      case TYPE_CODE_SET:
@@ -14752,7 +14691,7 @@ Index: gdb-7.2.90.20110703/gdb/valprint.c
      case TYPE_CODE_BITSTRING:
        return 0;
      default:
-@@ -1193,6 +1193,7 @@ val_print_array_elements (struct type *t
+@@ -1196,6 +1196,7 @@ val_print_array_elements (struct type *t
  {
    unsigned int things_printed = 0;
    unsigned len;
@@ -14760,7 +14699,7 @@ Index: gdb-7.2.90.20110703/gdb/valprint.c
    struct type *elttype, *index_type;
    unsigned eltlen;
    /* Position of the array element we are examining to see
-@@ -1201,9 +1202,33 @@ val_print_array_elements (struct type *t
+@@ -1204,9 +1205,33 @@ val_print_array_elements (struct type *t
    /* Number of repetitions we have detected so far.  */
    unsigned int reps;
    LONGEST low_bound, high_bound;
@@ -14796,7 +14735,7 @@ Index: gdb-7.2.90.20110703/gdb/valprint.c
    index_type = TYPE_INDEX_TYPE (type);
  
    if (get_array_bounds (type, &low_bound, &high_bound))
-@@ -1290,6 +1315,8 @@ val_print_array_elements (struct type *t
+@@ -1293,6 +1318,8 @@ val_print_array_elements (struct type *t
      {
        fprintf_filtered (stream, "...");
      }
@@ -14805,10 +14744,10 @@ Index: gdb-7.2.90.20110703/gdb/valprint.c
  }
  
  /* Read LEN bytes of target memory at address MEMADDR, placing the
-Index: gdb-7.2.90.20110703/gdb/value.c
+Index: gdb-7.3.50.20110722/gdb/value.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/value.c	2011-02-27 21:57:15.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/value.c	2011-07-03 10:33:11.000000000 +0200
+--- gdb-7.3.50.20110722.orig/gdb/value.c	2011-07-14 17:00:20.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/value.c	2011-07-22 20:04:21.000000000 +0200
 @@ -43,6 +43,7 @@
  #include "python/python.h"
  #include <ctype.h>
@@ -14817,7 +14756,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  
  /* Prototypes for exported functions.  */
  
-@@ -1339,12 +1340,15 @@ void
+@@ -1354,12 +1355,15 @@ void
  set_value_component_location (struct value *component,
  			      const struct value *whole)
  {
@@ -14832,8 +14771,8 @@ Index: gdb-7.2.90.20110703/gdb/value.c
 +
    if (whole->lval == lval_computed)
      {
-       struct lval_funcs *funcs = whole->location.computed.funcs;
-@@ -1352,6 +1356,12 @@ set_value_component_location (struct val
+       const struct lval_funcs *funcs = whole->location.computed.funcs;
+@@ -1367,6 +1371,12 @@ set_value_component_location (struct val
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
@@ -14846,7 +14785,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  }
  
  
-@@ -1485,6 +1495,31 @@ show_values (char *num_exp, int from_tty
+@@ -1500,6 +1510,31 @@ show_values (char *num_exp, int from_tty
        num_exp[1] = '\0';
      }
  }
@@ -14878,7 +14817,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  
  /* Internal variables.  These are variables within the debugger
     that hold values assigned by debugger commands.
-@@ -1530,7 +1565,14 @@ struct internalvar
+@@ -1545,7 +1580,14 @@ struct internalvar
        struct value *value;
  
        /* The call-back routine used with INTERNALVAR_MAKE_VALUE.  */
@@ -14894,7 +14833,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  
        /* The internal function used with INTERNALVAR_FUNCTION.  */
        struct
-@@ -1629,18 +1671,39 @@ create_internalvar (const char *name)
+@@ -1644,18 +1686,39 @@ create_internalvar (const char *name)
  /* Create an internal variable with name NAME and register FUN as the
     function that value_of_internalvar uses to create a value whenever
     this variable is referenced.  NAME should not normally include a
@@ -14937,7 +14876,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  /* Look up an internal variable with name NAME.  NAME should not
     normally include a dollar sign.
  
-@@ -1713,7 +1776,8 @@ value_of_internalvar (struct gdbarch *gd
+@@ -1728,7 +1791,8 @@ value_of_internalvar (struct gdbarch *gd
        break;
  
      case INTERNALVAR_MAKE_VALUE:
@@ -14947,7 +14886,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
        break;
  
      default:
-@@ -1909,6 +1973,11 @@ clear_internalvar (struct internalvar *v
+@@ -1924,6 +1988,11 @@ clear_internalvar (struct internalvar *v
        xfree (var->u.string);
        break;
  
@@ -14959,7 +14898,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
      default:
        break;
      }
-@@ -1963,6 +2032,38 @@ call_internal_function (struct gdbarch *
+@@ -1978,6 +2047,38 @@ call_internal_function (struct gdbarch *
    return (*ifn->handler) (gdbarch, language, ifn->cookie, argc, argv);
  }
  
@@ -14998,7 +14937,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  /* The 'function' command.  This does nothing -- it is just a
     placeholder to let "help function NAME" work.  This is also used as
     the implementation of the sub-command that is created when
-@@ -2010,11 +2111,10 @@ preserve_one_value (struct value *value,
+@@ -2025,11 +2126,10 @@ preserve_one_value (struct value *value,
  		    htab_t copied_types)
  {
    if (TYPE_OBJFILE (value->type) == objfile)
@@ -15012,7 +14951,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  						 copied_types);
  }
  
-@@ -2029,7 +2129,7 @@ preserve_one_internalvar (struct interna
+@@ -2044,7 +2144,7 @@ preserve_one_internalvar (struct interna
      case INTERNALVAR_INTEGER:
        if (var->u.integer.type && TYPE_OBJFILE (var->u.integer.type) == objfile)
  	var->u.integer.type
@@ -15021,7 +14960,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
        break;
  
      case INTERNALVAR_VALUE:
-@@ -2080,14 +2180,22 @@ show_convenience (char *ignore, int from
+@@ -2095,14 +2195,22 @@ show_convenience (char *ignore, int from
    get_user_print_options (&opts);
    for (var = internalvars; var; var = var->next)
      {
@@ -15047,7 +14986,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
      }
    if (!varseen)
      printf_unfiltered (_("No debugger convenience variables now defined.\n"
-@@ -3047,7 +3155,24 @@ value_from_history_ref (char *h, char **
+@@ -3075,7 +3183,24 @@ value_from_history_ref (char *h, char **
  struct value *
  coerce_ref (struct value *arg)
  {
@@ -15073,7 +15012,7 @@ Index: gdb-7.2.90.20110703/gdb/value.c
  
    if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
      arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
-@@ -3145,4 +3270,10 @@ VARIABLE is already initialized."));
+@@ -3173,4 +3298,10 @@ VARIABLE is already initialized."));
    add_prefix_cmd ("function", no_class, function_command, _("\
  Placeholder command for showing help on convenience functions."),
  		  &functionlist, "function ", 0, &cmdlist);
@@ -15084,11 +15023,11 @@ Index: gdb-7.2.90.20110703/gdb/value.c
 +  observer_attach_mark_used (value_types_mark_used);
 +#endif
  }
-Index: gdb-7.2.90.20110703/gdb/value.h
+Index: gdb-7.3.50.20110722/gdb/value.h
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/value.h	2011-03-04 21:07:22.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/value.h	2011-07-03 10:33:11.000000000 +0200
-@@ -473,6 +473,10 @@ extern struct value *value_from_decfloat
+--- gdb-7.3.50.20110722.orig/gdb/value.h	2011-07-14 17:00:20.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/value.h	2011-07-22 20:04:21.000000000 +0200
+@@ -475,6 +475,10 @@ extern struct value *value_from_decfloat
  					  const gdb_byte *decbytes);
  extern struct value *value_from_history_ref (char *, char **);
  
@@ -15099,7 +15038,7 @@ Index: gdb-7.2.90.20110703/gdb/value.h
  extern struct value *value_at (struct type *type, CORE_ADDR addr);
  extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
  
-@@ -697,10 +701,52 @@ extern struct internalvar *lookup_only_i
+@@ -700,10 +704,52 @@ extern struct internalvar *lookup_only_i
  
  extern struct internalvar *create_internalvar (const char *name);
  
@@ -15155,11 +15094,11 @@ Index: gdb-7.2.90.20110703/gdb/value.h
  
  extern struct internalvar *lookup_internalvar (const char *name);
  
-Index: gdb-7.2.90.20110703/gdb/windows-tdep.c
+Index: gdb-7.3.50.20110722/gdb/windows-tdep.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/windows-tdep.c	2011-01-12 02:23:29.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/windows-tdep.c	2011-07-03 10:33:11.000000000 +0200
-@@ -268,7 +268,7 @@ static struct lval_funcs tlb_value_funcs
+--- gdb-7.3.50.20110722.orig/gdb/windows-tdep.c	2011-07-14 17:00:20.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/windows-tdep.c	2011-07-22 20:04:21.000000000 +0200
+@@ -268,7 +268,7 @@ static const struct lval_funcs tlb_value
     if there's no object available.  */
  
  static struct value *
@@ -15191,11 +15130,11 @@ Index: gdb-7.2.90.20110703/gdb/windows-tdep.c
 -  create_internalvar_type_lazy ("_tlb", tlb_make_value);
 +  create_internalvar_type_lazy ("_tlb", &tlb_funcs, NULL);
  }
-Index: gdb-7.2.90.20110703/gdb/xcoffread.c
+Index: gdb-7.3.50.20110722/gdb/xcoffread.c
 ===================================================================
---- gdb-7.2.90.20110703.orig/gdb/xcoffread.c	2011-03-07 17:17:29.000000000 +0100
-+++ gdb-7.2.90.20110703/gdb/xcoffread.c	2011-07-03 10:33:11.000000000 +0200
-@@ -3090,6 +3090,7 @@ static const struct sym_fns xcoff_sym_fn
+--- gdb-7.3.50.20110722.orig/gdb/xcoffread.c	2011-06-07 14:31:07.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/xcoffread.c	2011-07-22 20:04:21.000000000 +0200
+@@ -3123,6 +3123,7 @@ static const struct sym_fns xcoff_sym_fn
    default_symfile_segments,	/* Get segment information from a file.  */
    aix_process_linenos,
    default_symfile_relocate,	/* Relocate a debug section.  */
