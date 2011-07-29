@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1213,6 +1213,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Jul 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-3.fc16
+- Fix regression from VLA merge affecting -O0 -g watchpoints.
+
 * Fri Jul 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-2.fc16
 - Include gcc -g3 .debug_macro implementation by Tom Tromey.
 
