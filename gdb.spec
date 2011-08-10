@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 5%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -533,6 +533,10 @@ Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 # Improve GDB performance on inferior dlopen calls (Gary Benson, BZ 698001).
 Patch617: gdb-dlopen-skip_inline_frames-perf.patch
 
+# Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
+Patch618: gdb-dlopen-stap-probe.patch
+Patch619: gdb-dlopen-stap-probe-test.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -795,6 +799,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch556 -p1
 %patch579 -p1
 %patch617 -p1
+%patch618 -p1
+%patch619 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1217,6 +1223,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Aug 10 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-5.fc16
+- Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
+
 * Tue Aug  9 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-4.fc16
 - Improve GDB performance on inferior dlopen calls (Gary Benson, BZ 698001).
 - [python] Fix crash when pretty printer fails (Phil Muldoon, BZ 712715).
