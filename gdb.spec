@@ -27,7 +27,7 @@ Version: 7.3
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?_with_upstream:.upstream}%{?dist}
+Release: 42%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -260,7 +260,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -723,7 +723,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -1265,6 +1265,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Aug 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3-42.fc15
+- Python command/function auto-loading (Phil Muldoon, BZ 730976).
+
 * Tue Jul 26 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3-41.fc15
 - Rebase to the final FSF GDB 7.3 release.
 - Improve gcc-4.6 stdarg false prologue end workaround (GDB PR 12435 + GCC PR 47471).
