@@ -27,7 +27,7 @@ Version: 7.3
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?_with_upstream:.upstream}%{?dist}
+Release: 43%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1265,6 +1265,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Aug 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3-43.fc15
+- Fix sleb128 reading (BZ 720332).
+
 * Tue Aug 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3-42.fc15
 - Python command/function auto-loading (Phil Muldoon, BZ 730976).
 
