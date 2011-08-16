@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -537,6 +537,12 @@ Patch617: gdb-dlopen-skip_inline_frames-perf.patch
 Patch618: gdb-dlopen-stap-probe.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 
+# Work around PR libc/13097 "linux-vdso.so.1" warning message.
+Patch627: gdb-glibc-vdso-workaround.patch
+
+# [TUI] Fix stepi on stripped code.
+Patch628: gdb-tui-strip-stepi.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -589,6 +595,8 @@ BuildRequires: texinfo-tex
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
+# archer-sergiodj-stap-patch-split
+BuildRequires: systemtap-sdt-devel
 # Copied from prelink-0.4.2-3.fc13.
 %ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
 # Prelink is broken on sparcv9/sparc64.
@@ -801,6 +809,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch617 -p1
 %patch618 -p1
 %patch619 -p1
+%patch627 -p1
+%patch628 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1223,6 +1233,12 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Aug 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-6.fc16
+- Python command/function auto-loading (Phil Muldoon, BZ 730976).
+- Work around PR libc/13097 "linux-vdso.so.1" warning message.
+- [TUI] Fix stepi on stripped code.
+- Add BuildRequires: systemtap-sdt-devel for archer-sergiodj-stap-patch-split.
+
 * Wed Aug 10 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-5.fc16
 - Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
 
