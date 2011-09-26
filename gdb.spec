@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -543,6 +543,16 @@ Patch627: gdb-glibc-vdso-workaround.patch
 # [TUI] Fix stepi on stripped code.
 Patch628: gdb-tui-strip-stepi.patch
 
+# [vla] Fix VLA arrays displayed in `bt full' (BZ 738482).
+Patch629: gdb-vla-frame-set.patch
+
+# Fix DW_OP_GNU_implicit_pointer for DWARF32 v3+ on 64-bit arches.
+Patch630: gdb-implptr-64bit-1of2.patch
+Patch631: gdb-implptr-64bit-2of2.patch
+
+# Fix internal error on some optimized-out values.
+Patch632: gdb-optimized-out-internal-error.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -811,6 +821,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch619 -p1
 %patch627 -p1
 %patch628 -p1
+%patch629 -p1
+%patch630 -p1
+%patch631 -p1
+%patch632 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1233,6 +1247,11 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon Sep 26 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-7.fc16
+- [vla] Fix VLA arrays displayed in `bt full' (BZ 738482).
+- Fix DW_OP_GNU_implicit_pointer for DWARF32 v3+ on 64-bit arches.
+- Fix internal error on some optimized-out values.
+
 * Tue Aug 16 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-6.fc16
 - Python command/function auto-loading (Phil Muldoon, BZ 730976).
 - Work around PR libc/13097 "linux-vdso.so.1" warning message.
