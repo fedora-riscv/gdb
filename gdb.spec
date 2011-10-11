@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -553,6 +553,9 @@ Patch631: gdb-implptr-64bit-2of2.patch
 # Fix internal error on some optimized-out values.
 Patch632: gdb-optimized-out-internal-error.patch
 
+# Hack for proper PIE run of the testsuite.
+Patch634: gdb-runtest-pie-override.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -825,6 +828,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch630 -p1
 %patch631 -p1
 %patch632 -p1
+%patch634 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1064,7 +1068,8 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
 %if 0%{!?_with_upstream:1}
   # Run all the scheduled testsuite runs also in the PIE mode.
   # Upstream GDB would lock up the testsuite run for too long on its failures.
-  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIE/-pie#g')"
+  # See also: gdb-runtest-pie-override.exp
+  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
 %endif # 0%{!?_with_upstream:1}
 
   ./orphanripper make %{?_smp_mflags} -k $CHECK \
@@ -1247,6 +1252,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Oct 11 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-8.fc16
+- Fix PIE testsuite run; new lib/future.exp hack and use -fPIC instead of -fPIE.
+
 * Mon Sep 26 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-7.fc16
 - [vla] Fix VLA arrays displayed in `bt full' (BZ 738482).
 - Fix DW_OP_GNU_implicit_pointer for DWARF32 v3+ on 64-bit arches.
