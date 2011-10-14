@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 9%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1252,6 +1252,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Oct 14 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-9.fc16
+- Backport `info os processes' crash fix - for Eclipse (Pedro Alves, BZ 746294).
+
 * Tue Oct 11 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-8.fc16
 - Fix PIE testsuite run; new lib/future.exp hack and use -fPIC instead of -fPIE.
 
