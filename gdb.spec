@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.3
+Version: 7.3.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?_with_upstream:.upstream}%{?dist}
+Release: 45%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -260,7 +260,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -730,7 +730,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -1275,6 +1275,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Oct 27 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-45.fc15
+- Rebase to FSF GDB 7.3.1 release.
+  - Fix `layout regs' (BZ 749379, PR 13073, Pedro Alves).
+
 * Mon Sep 26 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3-44.fc15
 - [vla] Fix VLA arrays displayed in `bt full' (BZ 738482).
 - Fix DW_OP_GNU_implicit_pointer for DWARF32 v3+ on 64-bit arches.
