@@ -1401,3 +1401,85 @@ http://sourceware.org/ml/gdb-cvs/2011-08/msg00116.html
  
    return task_count;
  }
+
+
+
+Fix for https://bugzilla.redhat.com/show_bug.cgi?id=750341
+http://sourceware.org/ml/gdb-patches/2011-10/msg00570.html
+
+
+http://sourceware.org/ml/gdb-cvs/2011-10/msg00154.html
+
+### src/gdb/ChangeLog	2011/10/20 13:34:13	1.13446
+### src/gdb/ChangeLog	2011/10/20 20:06:11	1.13447
+## -1,3 +1,15 @@
++2011-10-20  Aleksandar Ristovski  <aristovski@qnx.com>
++
++	* cp-namespace.c (cp_scan_for_anonymous_namespaces): Changed function
++	arguments by adding OBJFILE.  Instead of getting objfile from
++	symbol's symtab, use new argument OBJFILE.
++	* cp-support.h (cp_scan_for_anonymous_namespaces): Changed function
++	arguments by adding OBJFILE.
++	* gdb/dwarf2read.c (new_symbol_full): Change call to
++	cp_scan_for_anonymous_namespaces to match new signature.
++	* gdb/stabsread.c (define_symbol): Change call to
++	cp_scan_for_anonymous_namespaces to match new signature.
++
+ 2011-10-20  Phil Muldoon  <pmuldoon@redhat.com>
+ 
+         PR python/13308
+--- src/gdb/cp-namespace.c	2011/06/29 22:05:15	1.54
++++ src/gdb/cp-namespace.c	2011/10/20 20:06:13	1.55
+@@ -53,7 +53,8 @@
+    anonymous namespace; if so, add an appropriate using directive.  */
+ 
+ void
+-cp_scan_for_anonymous_namespaces (const struct symbol *symbol)
++cp_scan_for_anonymous_namespaces (const struct symbol *const symbol,
++				  struct objfile *const objfile)
+ {
+   if (SYMBOL_DEMANGLED_NAME (symbol) != NULL)
+     {
+@@ -96,7 +97,7 @@
+ 		 namespace given by the previous component if there is
+ 		 one, or to the global namespace if there isn't.  */
+ 	      cp_add_using_directive (dest, src, NULL, NULL, NULL,
+-	                              &SYMBOL_SYMTAB (symbol)->objfile->objfile_obstack);
++	                              &objfile->objfile_obstack);
+ 	    }
+ 	  /* The "+ 2" is for the "::".  */
+ 	  previous_component = next_component + 2;
+--- src/gdb/cp-support.h	2011/08/18 16:17:38	1.45
++++ src/gdb/cp-support.h	2011/10/20 20:06:13	1.46
+@@ -197,7 +197,8 @@
+ 				const char *processing_current_prefix,
+ 				int processing_has_namespace_info);
+ 
+-extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol);
++extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol,
++					      struct objfile *objfile);
+ 
+ extern struct symbol *cp_lookup_symbol_nonlocal (const char *name,
+ 						 const struct block *block,
+--- src/gdb/dwarf2read.c	2011/10/20 01:11:34	1.576
++++ src/gdb/dwarf2read.c	2011/10/20 20:06:13	1.577
+@@ -11992,7 +11992,7 @@
+ 	 namespaces based on the demangled name.  */
+       if (!processing_has_namespace_info
+ 	  && cu->language == language_cplus)
+-	cp_scan_for_anonymous_namespaces (sym);
++	cp_scan_for_anonymous_namespaces (sym, objfile);
+     }
+   return (sym);
+ }
+--- src/gdb/stabsread.c	2011/05/18 16:30:36	1.138
++++ src/gdb/stabsread.c	2011/10/20 20:06:14	1.139
+@@ -729,7 +729,7 @@
+ 	SYMBOL_SET_NAMES (sym, string, p - string, 1, objfile);
+ 
+       if (SYMBOL_LANGUAGE (sym) == language_cplus)
+-	cp_scan_for_anonymous_namespaces (sym);
++	cp_scan_for_anonymous_namespaces (sym, objfile);
+ 
+     }
+   p++;

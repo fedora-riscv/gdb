@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{?dist}
+Release: 10%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1252,6 +1252,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Nov 5 2011 Sergio Durigan Junior <sergiodj@redhat.com> - 7.3.50.20110722-10.fc16
+- Backport fix for crash in cp_scan_for_anonymous_namespace
+  (Aleksandar Ristovski, BZ 750341).
+
 * Fri Oct 14 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-9.fc16
 - Backport `info os processes' crash fix - for Eclipse (Pedro Alves, BZ 746294).
 
