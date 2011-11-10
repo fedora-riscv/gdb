@@ -27,7 +27,7 @@ Version: 7.3.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 45%{?_with_upstream:.upstream}%{?dist}
+Release: 46%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -573,6 +573,13 @@ Patch629: gdb-vla-frame-set.patch
 Patch630: gdb-implptr-64bit-1of2.patch
 Patch631: gdb-implptr-64bit-2of2.patch
 
+# Register all available PythonGDB commands (BZ 752095).
+Patch635: gdb-python-load-commands.patch
+
+# Backport fix for crash in cp_scan_for_anonymous_namespace
+# (Aleksandar Ristovski, BZ 750341).
+Patch636: gdb-anon-namespace-crash.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -853,6 +860,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch629 -p1
 %patch630 -p1
 %patch631 -p1
+%patch635 -p1
+%patch636 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1275,6 +1284,11 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Nov 10 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-46.fc15
+- Register all available PythonGDB commands (BZ 752095).
+- Backport fix for crash in cp_scan_for_anonymous_namespace
+  (Aleksandar Ristovski, BZ 750341).
+
 * Thu Oct 27 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-45.fc15
 - Rebase to FSF GDB 7.3.1 release.
   - Fix `layout regs' (BZ 749379, PR 13073, Pedro Alves).
