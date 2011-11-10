@@ -27,7 +27,7 @@ Version: 7.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 51%{?_with_upstream:.upstream}%{dist}
+Release: 52%{?_with_upstream:.upstream}%{dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and GFDL and BSD and Public Domain
 Group: Development/Debuggers
@@ -750,6 +750,13 @@ Patch575: gdb-vla-gc-disable.patch
 # [ifunc] Fix ppc64 function descriptors compatibility.
 Patch578: gdb-ifunc-ppc64.patch
 
+# Register all available PythonGDB commands (BZ 752095).
+Patch635: gdb-python-load-commands.patch
+
+# Backport fix for crash in cp_scan_for_anonymous_namespace
+# (Aleksandar Ristovski, BZ 750341).
+Patch636: gdb-anon-namespace-crash.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 Requires: readline%{?_isa}
 BuildRequires: readline-devel%{?_isa}
@@ -1071,6 +1078,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch574 -p1
 %patch575 -p1
 %patch578 -p1
+%patch635 -p1
+%patch636 -p1
 
 %patch390 -p1
 %patch393 -p1
@@ -1468,6 +1477,11 @@ fi
 %endif
 
 %changelog
+* Thu Nov 10 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-52.fc14
+- Register all available PythonGDB commands (BZ 752095).
+- Backport fix for crash in cp_scan_for_anonymous_namespace
+  (Aleksandar Ristovski, BZ 750341).
+
 * Tue Mar 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-51.fc14
 - Fix occasional crash on `print errno' with no -pthread and no -g3 (BZ 690908).
 

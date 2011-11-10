@@ -1,0 +1,123 @@
+commit 6e962026419305ae6c540eb01a735cf7c2685c20
+Author: pmuldoon <pmuldoon>
+Date:   Tue Aug 9 12:45:39 2011 +0000
+
+    2011-08-09  Phil Muldoon  <pmuldoon@redhat.com>
+    
+    	* python/lib/gdb/__init__.py: Auto-load files in command and
+    	function directories.
+    	* python/python.c (finish_python_initialization): Use
+    	os.path.join.
+    	* python/lib/gdb/command/pretty_printers.py: Self register
+    	command.
+    	* NEWS: Document auto-loading.
+    
+    2011-08-09  Phil Muldoon  <pmuldoon@redhat.com>
+    
+    	* gdb.texinfo (Python): Document command and function
+    	auto-loading.
+
+[ Backport for F-14.
+  Drop python/python.c changes.
+  Make explicit `import os'.
+  Ignore: register_pretty_printer_commands()
+    - Required for
+	[RFA, doc RFA]: New printing module and info/disable/enable commands
+	http://sourceware.org/ml/gdb-patches/2010-11/msg00001.html
+      	87c4cdd048cfaef8db45587bc58f06df97e992b9
+      which is not present in F-14.
+]
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,13 @@
++2011-08-09  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* python/lib/gdb/__init__.py: Auto-load files in command and
++	function directories.
++	* python/python.c (finish_python_initialization): Use
++	os.path.join.
++	* python/lib/gdb/command/pretty_printers.py: Self register
++	command.
++	* NEWS: Document auto-loading.
++
+ 2011-08-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full) <DWARF_VALUE_STACK>
+### a/gdb/doc/ChangeLog
+### b/gdb/doc/ChangeLog
+## -1,3 +1,8 @@
++2011-08-09  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* gdb.texinfo (Python): Document command and function
++	auto-loading.
++
+ 2011-07-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 	    Eli Zaretskii  <eliz@gnu.org>
+ 
+--- ./gdb/NEWS	2011-11-10 01:05:53.963411574 +0100
++++ ./gdb/NEWS	2011-11-10 01:09:26.457874127 +0100
+@@ -1,6 +1,13 @@
+ 		What has changed in GDB?
+ 	     (Organized release by release)
+ 
++*** Changes after GDB 7.2
++
++** Python commands and convenience-functions located in
++  'data-directory'/python/gdb/command and
++  'data-directory'/python/gdb/function are now automatically loaded
++   on GDB start-up.
++
+ *** Changes since GDB 7.2
+ 
+ * GDB now supports thread debugging of core dumps on GNU/Linux.
+--- ./gdb/doc/gdb.texinfo	2011-11-10 01:05:53.811411957 +0100
++++ ./gdb/doc/gdb.texinfo	2011-11-10 01:06:47.029277357 +0100
+@@ -20389,6 +20389,12 @@ the data directory as determined at @val
+ is automatically added to the Python Search Path in order to allow
+ the Python interpreter to locate all scripts installed at this location.
+ 
++Additionally, @value{GDBN} commands and convenience functions which
++are written in Python and are located in the
++@file{@var{data-directory}/python/gdb/command} or
++@file{@var{data-directory}/python/gdb/function} directories are
++automatically imported when @value{GDBN} starts.
++
+ @menu
+ * Python Commands::             Accessing Python from @value{GDBN}.
+ * Python API::                  Accessing @value{GDBN} from Python.
+--- ./gdb/python/lib/gdb/__init__.py	2011-11-10 01:05:53.528412675 +0100
++++ ./gdb/python/lib/gdb/__init__.py	2011-11-10 01:08:24.443030975 +0100
+@@ -15,5 +15,30 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-# Load the require command by default.
+-import gdb.command.require
++import traceback
++import os
++
++# Auto-load all functions/commands.
++
++# Modules to auto-load, and the paths where those modules exist.
++
++module_dict = {
++  'gdb.function': os.path.join(gdb.PYTHONDIR, 'gdb', 'function'),
++  'gdb.command': os.path.join(gdb.PYTHONDIR, 'gdb', 'command')
++}
++
++# Iterate the dictionary, collating the Python files in each module
++# path.  Construct the module name, and import.
++
++for module, location in module_dict.iteritems():
++  if os.path.exists(location):
++     py_files = filter(lambda x: x.endswith('.py') and x != '__init__.py',
++                       os.listdir(location))
++
++     for py_file in py_files:
++       # Construct from foo.py, gdb.module.foo
++       py_file = module + '.' + py_file[:-3]
++       try:
++         exec('import ' + py_file)
++       except:
++         print >> sys.stderr, traceback.format_exc()
