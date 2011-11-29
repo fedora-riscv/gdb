@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{?dist}
+Release: 11%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -576,12 +576,12 @@ Requires: python-libs%{?_isa}
 Requires: python-libs-%{_arch} >= 2.4.3-32.el5
 %endif
 BuildRequires: python-devel%{?_isa}
-%if 0%{?rhel:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily before python files get moved to libstdc++.rpm
 # libstdc++%{bits_other} is not present in Koji, the .spec script generating
 # gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
 BuildRequires: libstdc++%{?_isa}
-%endif # 0%{?rhel:1}
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 %endif # 0%{!?_without_python:1}
 # gdb-doc in PDF:
 BuildRequires: texinfo-tex
@@ -699,10 +699,10 @@ Requires(preun): /sbin/install-info
 
 %setup -q -n %{gdb_src}
 
-%if 0%{?rhel:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 # libstdc++ pretty printers.
 tar xjf %{SOURCE5}
-%endif # 0%{?rhel:1}
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
@@ -836,9 +836,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch393 -p1 -R
 %patch335 -p1 -R
 %endif
-%if 0%{?rhel:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
-%endif # 0%{?rhel:1}
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1121,7 +1121,7 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
-%if 0%{?rhel:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
 # Temporarily now:
 for LIB in lib lib64;do
@@ -1137,7 +1137,7 @@ test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
       $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 %endif # 0%{!?_without_python:1}
-%endif # 0%{?rhel:1}
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -1252,6 +1252,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Nov 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-11.fc16
+- No longer build bundled libstdc++ pretty printers on RHELs >= 7.
+
 * Sat Nov 5 2011 Sergio Durigan Junior <sergiodj@redhat.com> - 7.3.50.20110722-10.fc16
 - Backport fix for crash in cp_scan_for_anonymous_namespace
   (Aleksandar Ristovski, BZ 750341).
