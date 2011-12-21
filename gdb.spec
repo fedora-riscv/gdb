@@ -27,7 +27,7 @@ Version: 7.3.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?_with_upstream:.upstream}%{?dist}
+Release: 47%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -580,6 +580,9 @@ Patch635: gdb-python-load-commands.patch
 # (Aleksandar Ristovski, BZ 750341).
 Patch636: gdb-anon-namespace-crash.patch
 
+# [python] Fix crash when pretty printer fails (Phil Muldoon, BZ 712715).
+Patch637: gdb-pretty-printer-crash.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -862,6 +865,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch631 -p1
 %patch635 -p1
 %patch636 -p1
+%patch637 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1284,6 +1288,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Dec 21 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-47.fc15
+- [python] Fix crash when pretty printer fails (Phil Muldoon, BZ 712715).
+
 * Thu Nov 10 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-46.fc15
 - Register all available PythonGDB commands (BZ 752095).
 - Backport fix for crash in cp_scan_for_anonymous_namespace

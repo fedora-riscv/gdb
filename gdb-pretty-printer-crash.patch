@@ -1,0 +1,203 @@
+[patch][python] Fix sigsegv when a printer fails to return a value and string_print is set.
+http://sourceware.org/ml/gdb-patches/2011-07/msg00719.html
+http://sourceware.org/ml/gdb-cvs/2011-07/msg00234.html
+
+### src/gdb/ChangeLog	2011/07/27 19:31:30	1.13236
+### src/gdb/ChangeLog	2011/07/28 10:36:37	1.13237
+## -1,3 +1,8 @@
++2011-07-28  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* varobj.c (value_get_print_value): Move hint check later into the
++	function.  Comment function.  Free thevalue before reusing it.
++
+ 2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 	    Pedro Alves  <pedro@codesourcery.com>
+ 
+--- src/gdb/varobj.c	2011/07/18 09:21:43	1.180
++++ src/gdb/varobj.c	2011/07/28 10:36:40	1.181
+@@ -2610,25 +2610,21 @@
+ 
+ 	if (PyObject_HasAttr (value_formatter, gdbpy_to_string_cst))
+ 	  {
+-	    char *hint;
+ 	    struct value *replacement;
+ 	    PyObject *output = NULL;
+ 
+-	    hint = gdbpy_get_display_hint (value_formatter);
+-	    if (hint)
+-	      {
+-		if (!strcmp (hint, "string"))
+-		  string_print = 1;
+-		xfree (hint);
+-	      }
+-
+ 	    output = apply_varobj_pretty_printer (value_formatter,
+ 						  &replacement,
+ 						  stb);
++
++	    /* If we have string like output ...  */
+ 	    if (output)
+ 	      {
+ 		make_cleanup_py_decref (output);
+ 
++		/* If this is a lazy string, extract it.  For lazy
++		   strings we always print as a string, so set
++		   string_print.  */
+ 		if (gdbpy_is_lazy_string (output))
+ 		  {
+ 		    gdbpy_extract_lazy_string (output, &str_addr, &type,
+@@ -2638,12 +2634,27 @@
+ 		  }
+ 		else
+ 		  {
++		    /* If it is a regular (non-lazy) string, extract
++		       it and copy the contents into THEVALUE.  If the
++		       hint says to print it as a string, set
++		       string_print.  Otherwise just return the extracted
++		       string as a value.  */
++
+ 		    PyObject *py_str
+ 		      = python_string_to_target_python_string (output);
+ 
+ 		    if (py_str)
+ 		      {
+ 			char *s = PyString_AsString (py_str);
++			char *hint;
++
++			hint = gdbpy_get_display_hint (value_formatter);
++			if (hint)
++			  {
++			    if (!strcmp (hint, "string"))
++			      string_print = 1;
++			    xfree (hint);
++			  }
+ 
+ 			len = PyString_Size (py_str);
+ 			thevalue = xmemdup (s, len + 1, len + 1);
+@@ -2662,6 +2673,9 @@
+ 		      gdbpy_print_stack ();
+ 		  }
+ 	      }
++	    /* If the printer returned a replacement value, set VALUE
++	       to REPLACEMENT.  If there is not a replacement value,
++	       just use the value passed to this function.  */
+ 	    if (replacement)
+ 	      value = replacement;
+ 	  }
+@@ -2672,12 +2686,18 @@
+   get_formatted_print_options (&opts, format_code[(int) format]);
+   opts.deref_ref = 0;
+   opts.raw = 1;
++
++  /* If the THEVALUE has contents, it is a regular string.  */
+   if (thevalue)
+     LA_PRINT_STRING (stb, type, thevalue, len, encoding, 0, &opts);
+   else if (string_print)
++    /* Otherwise, if string_print is set, and it is not a regular
++       string, it is a lazy string.  */
+     val_print_string (type, encoding, str_addr, len, stb, &opts);
+   else
++    /* All other cases.  */
+     common_val_print (value, stb, 0, &opts, current_language);
++
+   thevalue = ui_file_xstrdup (stb, NULL);
+ 
+   do_cleanups (old_chain);
+### src/gdb/testsuite/ChangeLog	2011/07/27 21:18:39	1.2816
+### src/gdb/testsuite/ChangeLog	2011/07/28 10:36:40	1.2817
+## -1,3 +1,10 @@
++2011-07-28  Phil Muldoon  <pmuldoon@redhat.com>
++
++	* gdb.python/py-mi.exp: Test printers returning string hint, and
++	also not returning a value.
++	* gdb.python/py-prettyprint.c: Add testcase for above.
++	* gdb.python/py-prettyprint.py: Add test printer for above.
++
+ 2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* gdb.dwarf2/dw2-simple-locdesc.S: Change DWARF version to 3.
+--- src/gdb/testsuite/gdb.python/py-mi.exp	2011/07/26 18:38:55	1.13
++++ src/gdb/testsuite/gdb.python/py-mi.exp	2011/07/28 10:36:40	1.14
+@@ -284,6 +284,13 @@ mi_list_varobj_children nstype2 {
+     { {nstype2.<error at 0>} {<error at 0>} 6 {char \[6\]} }
+ } "list children after setting exception flag"
+ 
++mi_create_varobj me me \
++  "create me varobj"
++
++mi_gdb_test "-var-evaluate-expression me" \
++	"\\^done,value=\"<error reading variable: Cannot access memory.>.*\"" \
++	"evaluate me varobj"
++
+ # C++ MI tests
+ gdb_exit
+ if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
+--- src/gdb/testsuite/gdb.python/py-prettyprint.c	2011/04/29 12:45:46	1.12
++++ src/gdb/testsuite/gdb.python/py-prettyprint.c	2011/07/28 10:36:40	1.13
+@@ -149,6 +149,11 @@
+ 
+ typedef struct justchildren nostring_type;
+ 
++struct memory_error
++{
++  const char *s;
++};
++
+ struct container
+ {
+   string name;
+@@ -227,6 +232,7 @@
+   /* Clearing by being `static' could invoke an other GDB C++ bug.  */
+   struct nullstr nullstr;
+   nostring_type nstype, nstype2;
++  struct memory_error me;
+   struct ns ns, ns2;
+   struct lazystring estring, estring2;
+   struct hint_error hint_error;
+@@ -234,6 +240,8 @@
+   nstype.elements = narray;
+   nstype.len = 0;
+ 
++  me.s = "blah";
++
+   init_ss(&ss, 1, 2);
+   init_ss(ssa+0, 3, 4);
+   init_ss(ssa+1, 5, 6);
+--- src/gdb/testsuite/gdb.python/py-prettyprint.py	2011/04/11 17:40:41	1.11
++++ src/gdb/testsuite/gdb.python/py-prettyprint.py	2011/07/28 10:36:40	1.12
+@@ -17,6 +17,7 @@
+ # printers.
+ 
+ import re
++import gdb
+ 
+ # Test returning a Value from a printer.
+ class string_print:
+@@ -186,6 +187,18 @@
+         yield 's', self.val['s']
+         yield 'x', self.val['x']
+ 
++class MemoryErrorString:
++    "Raise an error"
++
++    def __init__(self, val):
++        self.val = val
++
++    def to_string(self):
++        raise gdb.MemoryError ("Cannot access memory.");
++
++    def display_hint (self):
++        return 'string'
++
+ def lookup_function (val):
+     "Look-up and return a pretty-printer that can print val."
+ 
+@@ -261,6 +274,8 @@
+     pretty_printers_dict[re.compile ('^struct hint_error$')]  = pp_hint_error
+     pretty_printers_dict[re.compile ('^hint_error$')]  = pp_hint_error
+ 
++    pretty_printers_dict[re.compile ('^memory_error$')]  = MemoryErrorString
++
+ pretty_printers_dict = {}
+ 
+ register_pretty_printers ()
