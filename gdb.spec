@@ -27,7 +27,7 @@ Version: 7.4.50.20120103
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?_with_upstream:.upstream}%{?dist}
+Release: 2%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1197,6 +1197,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Jan  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-2.fc17
+- Fix SystemTap support regression on i686 (Sergio Durigan Junior).
+
 * Tue Jan  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-1.fc17
 - Rebase to FSF GDB 7.4.50.20120103.
 
