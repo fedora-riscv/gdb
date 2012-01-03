@@ -23,11 +23,11 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.3.50.20110722
+Version: 7.4.50.20120103
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 1%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -108,11 +108,6 @@ Patch2: gdb-6.3-rh-testversion-20041202.patch
 #=ia64
 Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 
-# Use convert_from_func_ptr_addr on the solib breakpoint address;
-# simplifies and makes more consistent the logic.
-#=maybepush+ppc: Write new testcase.
-Patch104: gdb-6.3-ppcdotsolib-20041022.patch
-
 # Better parse 64-bit PPC system call prologues.
 #=maybepush+ppc: Write new testcase.
 Patch105: gdb-6.3-ppc64syscall-20040622.patch
@@ -157,12 +152,6 @@ Patch136: gdb-6.3-test-movedir-20050125.patch
 # Fix gcore for threads
 #=ia64
 Patch140: gdb-6.3-gcore-thread-20050204.patch
-
-# Stop while intentionally stepping and the thread exit is met.
-#=push
-Patch141: gdb-6.6-step-thread-exit.patch
-#=push
-Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Test sibling threads to set threaded watchpoints for x86 and x86-64
 #=fedoratest
@@ -260,7 +249,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -358,10 +347,6 @@ Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 #=fedoratest
 Patch320: gdb-6.5-section-num-fixup-test.patch
 
-# Create a single binary `gdb' autodetecting --tui by its argv[0].
-#=push+work: IIRC Tom told argv[0] should not be used by GNU programs, also drop libgdb.a.
-Patch326: gdb-6.8-tui-singlebinary.patch
-
 # Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
 #=push
 Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
@@ -371,12 +356,8 @@ Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
 Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 
 # Make the GDB quit processing non-abortable to cleanup everything properly.
-#=push: Useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
+#=push: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
 Patch331: gdb-6.8-quit-never-aborts.patch
-
-# Fix attaching to stopped processes and/or pending signals.
-#=push+work
-Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
 
 # Test the watchpoints conditionals works.
 #=fedoratest
@@ -513,10 +494,6 @@ Patch547: gdb-test-dw2-aranges.patch
 # =fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
-# Workaround gcc-4.6 stdarg false prologue end (GDB PR 12435 + GCC PR 47471).
-# =push
-Patch556: gdb-gcc46-stdarg-prologue.patch
-
 # Toolchain on sparc is slightly broken and debuginfo files are generated
 # with non 64bit aligned tables/offsets.
 # See for example readelf -S ../Xvnc.debug.
@@ -530,31 +507,18 @@ Patch556: gdb-gcc46-stdarg-prologue.patch
 # rebuild to fix it, we need to be able to use gdb :)
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
-# Improve GDB performance on inferior dlopen calls (Gary Benson, BZ 698001).
-Patch617: gdb-dlopen-skip_inline_frames-perf.patch
-
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
-Patch618: gdb-dlopen-stap-probe.patch
+#FIXME:Patch618: gdb-dlopen-stap-probe.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 Patch627: gdb-glibc-vdso-workaround.patch
 
-# [TUI] Fix stepi on stripped code.
-Patch628: gdb-tui-strip-stepi.patch
-
-# [vla] Fix VLA arrays displayed in `bt full' (BZ 738482).
-Patch629: gdb-vla-frame-set.patch
-
-# Fix DW_OP_GNU_implicit_pointer for DWARF32 v3+ on 64-bit arches.
-Patch630: gdb-implptr-64bit-1of2.patch
-Patch631: gdb-implptr-64bit-2of2.patch
-
-# Fix internal error on some optimized-out values.
-Patch632: gdb-optimized-out-internal-error.patch
-
 # Hack for proper PIE run of the testsuite.
 Patch634: gdb-runtest-pie-override.patch
+
+# Fix zero registers core files w/gcc-4.7.
+Patch638: gdb-gcc47-gcore-zero.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
@@ -715,12 +679,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
 
-%patch104 -p1
 %patch105 -p1
 %patch111 -p1
 %patch112 -p1
@@ -730,8 +693,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch133 -p1
 %patch136 -p1
 %patch140 -p1
-%patch141 -p1
-%patch259 -p1
 %patch145 -p1
 %patch153 -p1
 %patch157 -p1
@@ -779,11 +740,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch315 -p1
 %patch317 -p1
 %patch320 -p1
-%patch326 -p1
 %patch329 -p1
 %patch330 -p1
 %patch331 -p1
-%patch337 -p1
 %patch343 -p1
 %patch348 -p1
 %patch360 -p1
@@ -817,18 +776,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
-%patch556 -p1
 %patch579 -p1
-%patch617 -p1
-%patch618 -p1
+#FIXME:patch618 -p1
 %patch619 -p1
 %patch627 -p1
-%patch628 -p1
-%patch629 -p1
-%patch630 -p1
-%patch631 -p1
-%patch632 -p1
 %patch634 -p1
+%patch638 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1106,12 +1059,6 @@ make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_bindir}/gcore
 chmod 755 $RPM_BUILD_ROOT%{_bindir}/gcore
 
-# Remove the gdb/gdbtui binaries duplicity.
-test -x $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
-ln -sf gdb $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
-cmp $RPM_BUILD_ROOT%{_mandir}/*/gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
-ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/*/gdbtui.1
-
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
 sed 's#%%{_sysconfdir}#%{_sysconfdir}#g' <%{SOURCE4} >$RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
 
@@ -1215,11 +1162,9 @@ fi
 %doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gcore
 %{_bindir}/gdb
-%{_bindir}/gdbtui
 %{_sysconfdir}/gdbinit
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdb.1*
-%{_mandir}/*/gdbtui.1*
 %if 0%{!?_with_upstream:1}
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
@@ -1252,6 +1197,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Jan  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-1.fc17
+- Rebase to FSF GDB 7.4.50.20120103.
+
 * Mon Nov 28 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-11.fc17
 - No longer build bundled libstdc++ pretty printers on RHELs >= 7.
 
