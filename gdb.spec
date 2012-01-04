@@ -27,7 +27,7 @@ Version: 7.4.50.20120103
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?_with_upstream:.upstream}%{?dist}
+Release: 3%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -369,12 +369,7 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 
 # The merged branch `archer-jankratochvil-fedora15' of:
 # http://sourceware.org/gdb/wiki/ProjectArcher
-#=push
-#archer-jankratochvil-vla
-#=push
-#archer-jankratochvil-watchpoint3
-#=push
-#archer-jankratochvil-ifunc
+#=push+work
 Patch349: gdb-archer.patch
 
 # Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
@@ -487,11 +482,11 @@ Patch526: gdb-bz634108-solib_address.patch
 Patch542: gdb-test-pid0-core.patch
 
 # [archer-tromey-delayed-symfile] New test gdb.dwarf2/dw2-aranges.exp.
-# =fedoratest
+#=fedoratest
 Patch547: gdb-test-dw2-aranges.patch
 
 # [archer-keiths-expr-cumulative+upstream] Import C++ testcases.
-# =fedoratest
+#=fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
 # Toolchain on sparc is slightly broken and debuginfo files are generated
@@ -505,19 +500,24 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 #
 # While we figure out what's wrong in the toolchain and do a full archive
 # rebuild to fix it, we need to be able to use gdb :)
+#=push+work
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
-#FIXME:Patch618: gdb-dlopen-stap-probe.patch
+#=push
+Patch618: gdb-dlopen-stap-probe.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
+#=push
 Patch627: gdb-glibc-vdso-workaround.patch
 
 # Hack for proper PIE run of the testsuite.
+#=push+work
 Patch634: gdb-runtest-pie-override.patch
 
 # Fix zero registers core files w/gcc-4.7.
+#=push
 Patch638: gdb-gcc47-gcore-zero.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
@@ -777,7 +777,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch547 -p1
 %patch548 -p1
 %patch579 -p1
-#FIXME:patch618 -p1
+%patch618 -p1
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
@@ -1197,6 +1197,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Jan  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-3.fc17
+- Reinclude gdb-dlopen-stap-probe.patch (missing in Fedora glibc - BZ 752476).
+
 * Tue Jan  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-2.fc17
 - Fix SystemTap support regression on i686 (Sergio Durigan Junior).
 
