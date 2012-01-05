@@ -1,0 +1,370 @@
+http://sourceware.org/ml/gdb-patches/2012-01/msg00170.html
+Subject: [patch 2/2] Fix linking on non-x86* after libgdb.a removal
+
+Hi,
+
+this is the second part for solving corelow after the s390x regression:
+	[patch 2/2] Do not build libgdb.a by default
+	http://sourceware.org/ml/gdb-patches/2011-12/msg00716.html
+->
+	corelow.o:(.bss+0x0): multiple definition of `core_gdbarch'
+	corelow.o:(.bss+0x0): first defined here
+	corelow.o: In function `deprecated_add_core_fns':
+	corelow.c:(.text+0x0): multiple definition of `deprecated_add_core_fns'
+	corelow.o:corelow.c:(.text+0x0): first defined here
+
+
+For targets using new set_gdbarch_regset_from_core_section it would not be
+a problem, just put corelow.o into the right entry of gdb/configure.tgt.
+
+But for legacy targets still using deprecated_add_core_fns (like
+sparc-solaris2.6 etc.) the addition to gdb/configure.tgt would enable
+corelow.o even for cross-targeted GDBs where there is unfortunately still no
+core files support.
+
+Created the original configuration, just avoiding a duplicate corelow.o entry.
+A better idea is welcome.
+
+(s390x not available now for a test but it should work I hope.)
+
+
+Sorry,
+Jan
+
+
+2012-01-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix duplicate .o files after omitting libbfd.a.
+	* Makefile.in (CORELOW_O): New definition.
+	(ALL_TARGET_OBS): Remove corelow.o.
+	(DEPFILES): Add $(CORELOW_O).
+	* config/alpha/alpha-linux.mh (NATDEPFILES): Remove corelow.o.
+	(CORELOW_O): New definition.
+	* config/alpha/alpha-osf3.mh: Likewise.
+	* config/alpha/fbsd.mh: Likewise.
+	* config/arm/nbsdaout.mh: Likewise.
+	* config/arm/nbsdelf.mh: Likewise.
+	* config/i386/i386gnu.mh: Likewise.
+	* config/ia64/hpux.mh: Likewise.
+	* config/ia64/linux.mh: Likewise.
+	* config/m32r/linux.mh: Likewise.
+	* config/m68k/linux.mh: Likewise.
+	* config/mips/irix5.mh: Likewise.
+	* config/mips/irix6.mh: Likewise.
+	* config/pa/hpux.mh: Likewise.
+	* config/pa/linux.mh: Likewise.
+	* config/powerpc/aix.mh: Likewise.
+	* config/s390/s390.mh: Likewise.
+	* config/sparc/linux.mh: Likewise.
+	* config/sparc/linux64.mh: Likewise.
+	* config/sparc/sol2.mh: Likewise.
+	* config/vax/vax.mh: Likewise.
+	* configure: Regenerate.
+	* configure.ac (CORELOW_O): New variable.
+	(gdb_target_obs): Exclude corelow.o and set CORELOW_O instead.
+	(all_targets): Set CORELOW_O.
+	(CORELOW_O): AC_SUBST it.
+
+--- a/gdb/Makefile.in
++++ b/gdb/Makefile.in
+@@ -512,6 +512,12 @@ SIM_OBS = @SIM_OBS@
+ # Target-dependent object files.
+ TARGET_OBS = @TARGET_OBS@
+ 
++# corelow.o may be requested by either config/*/*.mh file or for ALL_TARGET_OBS
++# or for specific target(s) from configure.tgt.  Avoid duplicating it.
++# CORELOW_O may get overriden (set to corelow.o) by 'host_makefile_frag' below.
++# CORELOW_O is assumed to be corelow.o for ALL_TARGET_OBS.
++CORELOW_O := @CORELOW_O@
++
+ # All target-dependent objects files that require 64-bit CORE_ADDR
+ # (used with --enable-targets=all --enable-64-bit-bfd).
+ ALL_64_TARGET_OBS = \
+@@ -581,7 +587,6 @@ ALL_TARGET_OBS = \
+ 	remote-m32r-sdi.o remote-mips.o \
+ 	xcoffread.o \
+ 	symfile-mem.o \
+-	corelow.o \
+ 	windows-tdep.o \
+ 	linux-record.o
+ 
+@@ -843,7 +848,7 @@ REMOTE_EXAMPLES = m68k-stub.c i386-stub.c sparc-stub.c rem-multi.shar
+ # variables analogous to SER_HARDWIRE which get defaulted in this
+ # Makefile.in
+ 
+-DEPFILES = $(TARGET_OBS) $(SER_HARDWIRE) $(NATDEPFILES) \
++DEPFILES = $(TARGET_OBS) $(SER_HARDWIRE) $(NATDEPFILES) $(CORELOW_O) \
+ 	   $(REMOTE_OBS) $(SIM_OBS)
+ 
+ SOURCES = $(SFILES) $(ALLDEPFILES) $(YYFILES) $(CONFIG_SRCS)
+--- a/gdb/config/alpha/alpha-linux.mh
++++ b/gdb/config/alpha/alpha-linux.mh
+@@ -1,8 +1,9 @@
+ # Host: Little-endian Alpha running Linux
+ NAT_FILE= config/nm-linux.h
+-NATDEPFILES= inf-ptrace.o corelow.o alpha-linux-nat.o \
++NATDEPFILES= inf-ptrace.o alpha-linux-nat.o \
+ 	fork-child.o proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ # The dynamically loaded libthread_db needs access to symbols in the
+--- a/gdb/config/alpha/alpha-osf3.mh
++++ b/gdb/config/alpha/alpha-osf3.mh
+@@ -1,6 +1,7 @@
+ # Host: Little-endian Alpha running OSF/1-3.x and higher using procfs
+ NAT_FILE= nm-osf3.h
+-NATDEPFILES= corelow.o alpha-nat.o fork-child.o \
++NATDEPFILES= alpha-nat.o fork-child.o \
+ 	solib-osf.o procfs.o proc-api.o proc-events.o proc-flags.o \
+ 	proc-why.o dec-thread.o
++CORELOW_O := corelow.o
+ NAT_CLIBS= -lpthreaddebug
+--- a/gdb/config/alpha/fbsd.mh
++++ b/gdb/config/alpha/fbsd.mh
+@@ -1,6 +1,7 @@
+ # Host: FreeBSD/alpha
+ NATDEPFILES= fork-child.o inf-ptrace.o \
+ 	fbsd-nat.o alphabsd-nat.o bsd-kvm.o \
+-	corelow.o core-regset.o
++	core-regset.o
++CORELOW_O := corelow.o
+ 
+ LOADLIBES= -lkvm
+--- a/gdb/config/arm/nbsdaout.mh
++++ b/gdb/config/arm/nbsdaout.mh
+@@ -1,3 +1,4 @@
+ # Host: NetBSD/arm
+-NATDEPFILES= fork-child.o inf-ptrace.o corelow.o armnbsd-nat.o \
++NATDEPFILES= fork-child.o inf-ptrace.o armnbsd-nat.o \
+ 	solib-sunos.o
++CORELOW_O := corelow.o
+--- a/gdb/config/arm/nbsdelf.mh
++++ b/gdb/config/arm/nbsdelf.mh
+@@ -1,2 +1,3 @@
+ # Host: NetBSD/arm
+-NATDEPFILES= fork-child.o inf-ptrace.o corelow.o armnbsd-nat.o
++NATDEPFILES= fork-child.o inf-ptrace.o armnbsd-nat.o
++CORELOW_O := corelow.o
+--- a/gdb/config/i386/i386gnu.mh
++++ b/gdb/config/i386/i386gnu.mh
+@@ -1,7 +1,8 @@
+ # Host: Intel 386 running the GNU Hurd
+-NATDEPFILES= i386gnu-nat.o gnu-nat.o corelow.o core-regset.o fork-child.o \
++NATDEPFILES= i386gnu-nat.o gnu-nat.o core-regset.o fork-child.o \
+ 	     notify_S.o process_reply_S.o msg_reply_S.o \
+ 	     msg_U.o exc_request_U.o exc_request_S.o
++CORELOW_O := corelow.o
+ 
+ NAT_FILE= nm-i386gnu.h
+ MH_CFLAGS = -D_GNU_SOURCE
+--- a/gdb/config/ia64/hpux.mh
++++ b/gdb/config/ia64/hpux.mh
+@@ -1,3 +1,4 @@
+ # Host: ia64 running HP-UX
+-NATDEPFILES= fork-child.o inf-ttrace.o corelow.o ia64-hpux-nat.o \
++NATDEPFILES= fork-child.o inf-ttrace.o ia64-hpux-nat.o \
+         solib-ia64-hpux.o
++CORELOW_O := corelow.o
+--- a/gdb/config/ia64/linux.mh
++++ b/gdb/config/ia64/linux.mh
+@@ -1,11 +1,12 @@
+ # Host: Intel IA-64 running GNU/Linux
+ 
+ NAT_FILE= config/nm-linux.h
+-NATDEPFILES= inf-ptrace.o fork-child.o corelow.o \
++NATDEPFILES= inf-ptrace.o fork-child.o \
+ 	core-regset.o ia64-linux-nat.o \
+ 	proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o \
+ 	linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ LOADLIBES = -ldl $(RDYNAMIC)
+--- a/gdb/config/m32r/linux.mh
++++ b/gdb/config/m32r/linux.mh
+@@ -1,9 +1,10 @@
+ # Host: M32R based machine running GNU/Linux
+ 
+ NAT_FILE= config/nm-linux.h
+-NATDEPFILES= inf-ptrace.o fork-child.o corelow.o	\
++NATDEPFILES= inf-ptrace.o fork-child.o				\
+ 	m32r-linux-nat.o proc-service.o linux-thread-db.o	\
+ 	linux-nat.o linux-osdata.o linux-fork.o linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ LOADLIBES= -ldl $(RDYNAMIC)
+--- a/gdb/config/m68k/linux.mh
++++ b/gdb/config/m68k/linux.mh
+@@ -2,9 +2,10 @@
+ 
+ NAT_FILE= config/nm-linux.h
+ NATDEPFILES= inf-ptrace.o fork-child.o \
+-	corelow.o m68klinux-nat.o \
++	m68klinux-nat.o \
+ 	proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ # The dynamically loaded libthread_db needs access to symbols in the
+--- a/gdb/config/mips/irix5.mh
++++ b/gdb/config/mips/irix5.mh
+@@ -1,3 +1,4 @@
+ # Host: SGI Iris running irix 5.x
+-NATDEPFILES= fork-child.o irix5-nat.o corelow.o procfs.o \
++NATDEPFILES= fork-child.o irix5-nat.o procfs.o \
+ 	proc-api.o proc-events.o proc-flags.o proc-why.o
++CORELOW_O := corelow.o
+--- a/gdb/config/mips/irix6.mh
++++ b/gdb/config/mips/irix6.mh
+@@ -1,3 +1,4 @@
+ # Host: SGI Iris running irix 6.x
+-NATDEPFILES= fork-child.o irix5-nat.o corelow.o procfs.o \
++NATDEPFILES= fork-child.o irix5-nat.o procfs.o \
+ 	proc-api.o proc-events.o proc-flags.o proc-why.o
++CORELOW_O := corelow.o
+--- a/gdb/config/pa/hpux.mh
++++ b/gdb/config/pa/hpux.mh
+@@ -1,3 +1,4 @@
+ # Host: PA-RISC HP-UX
+ NATDEPFILES= fork-child.o inf-ptrace.o inf-ttrace.o \
+-	hppa-hpux-nat.o corelow.o somread.o
++	hppa-hpux-nat.o somread.o
++CORELOW_O := corelow.o
+--- a/gdb/config/pa/linux.mh
++++ b/gdb/config/pa/linux.mh
+@@ -1,9 +1,10 @@
+ # Host: Hewlett-Packard PA-RISC machine, running Linux
+ NAT_FILE= config/nm-linux.h
+-NATDEPFILES= inf-ptrace.o fork-child.o corelow.o \
++NATDEPFILES= inf-ptrace.o fork-child.o \
+ 	hppa-linux-nat.o proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o \
+ 	linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ LOADLIBES = -ldl $(RDYNAMIC)
+--- a/gdb/config/powerpc/aix.mh
++++ b/gdb/config/powerpc/aix.mh
+@@ -3,8 +3,9 @@
+ NAT_FILE= config/rs6000/nm-rs6000.h
+ 
+ # aix-thread.o is not listed in NATDEPFILES as it is pulled in by configure.
+-NATDEPFILES= fork-child.o inf-ptrace.o corelow.o rs6000-nat.o \
++NATDEPFILES= fork-child.o inf-ptrace.o rs6000-nat.o \
+ 	     xcoffsolib.o
++CORELOW_O := corelow.o
+ 
+ # When compiled with cc, for debugging, this argument should be passed.
+ # We have no idea who our current compiler is though, so we skip it.
+--- a/gdb/config/s390/s390.mh
++++ b/gdb/config/s390/s390.mh
+@@ -1,7 +1,8 @@
+ # Host: S390, running Linux
+ NAT_FILE= config/nm-linux.h
+-NATDEPFILES= inf-ptrace.o fork-child.o corelow.o s390-nat.o \
++NATDEPFILES= inf-ptrace.o fork-child.o s390-nat.o \
+ 	linux-thread-db.o proc-service.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ LOADLIBES = -ldl $(RDYNAMIC)
+--- a/gdb/config/sparc/linux.mh
++++ b/gdb/config/sparc/linux.mh
+@@ -1,10 +1,11 @@
+ # Host: GNU/Linux SPARC
+ NAT_FILE= config/nm-linux.h
+ NATDEPFILES= sparc-nat.o sparc-linux-nat.o \
+-	corelow.o core-regset.o fork-child.o inf-ptrace.o \
++	core-regset.o fork-child.o inf-ptrace.o \
+ 	proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o \
+ 	linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ # The dynamically loaded libthread_db needs access to symbols in the
+--- a/gdb/config/sparc/linux64.mh
++++ b/gdb/config/sparc/linux64.mh
+@@ -1,11 +1,12 @@
+ # Host: GNU/Linux UltraSPARC
+ NAT_FILE= config/nm-linux.h
+ NATDEPFILES= sparc-nat.o sparc64-nat.o sparc64-linux-nat.o \
+-	corelow.o core-regset.o \
++	core-regset.o \
+ 	fork-child.o inf-ptrace.o \
+ 	proc-service.o linux-thread-db.o \
+ 	linux-nat.o linux-osdata.o linux-fork.o \
+ 	linux-procfs.o
++CORELOW_O := corelow.o
+ NAT_CDEPS = $(srcdir)/proc-service.list
+ 
+ # The dynamically loaded libthread_db needs access to symbols in the
+--- a/gdb/config/sparc/sol2.mh
++++ b/gdb/config/sparc/sol2.mh
+@@ -1,5 +1,6 @@
+ # Host: Solaris SPARC & UltraSPARC
+ NAT_FILE= nm-sol2.h
+ NATDEPFILES= sparc-sol2-nat.o \
+-	corelow.o core-regset.o fork-child.o \
++	core-regset.o fork-child.o \
+ 	procfs.o proc-api.o proc-events.o proc-flags.o proc-why.o
++CORELOW_O := corelow.o
+--- a/gdb/config/vax/vax.mh
++++ b/gdb/config/vax/vax.mh
+@@ -1,2 +1,3 @@
+ # Host: VAX running 4.2BSD or Ultrix
+-NATDEPFILES= vax-nat.o fork-child.o inf-ptrace.o corelow.o
++NATDEPFILES= vax-nat.o fork-child.o inf-ptrace.o
++CORELOW_O := corelow.o
+--- a/gdb/configure.ac
++++ b/gdb/configure.ac
+@@ -174,6 +174,7 @@ fi
+ # Accumulate some settings from configure.tgt over all enabled targets
+ 
+ TARGET_OBS=
++CORELOW_O=
+ all_targets=
+ 
+ for targ_alias in `echo $target_alias $enable_targets | sed 's/,/ /g'`
+@@ -196,12 +197,16 @@ do
+ 
+     # Target-specific object files
+     for i in ${gdb_target_obs}; do
+-        case " $TARGET_OBS " in
+-        *" ${i} "*) ;;
+-        *)
+-          TARGET_OBS="$TARGET_OBS ${i}"
+-          ;;
+-        esac
++        if test "$i" = corelow.o; then
++            CORELOW_O=corelow.o
++        else
++            case " $TARGET_OBS " in
++            *" ${i} "*) ;;
++            *)
++              TARGET_OBS="$TARGET_OBS ${i}"
++              ;;
++            esac
++        fi
+     done
+ 
+     # Check whether this target needs 64-bit CORE_ADDR
+@@ -233,9 +238,11 @@ if test x${all_targets} = xtrue; then
+   else
+     TARGET_OBS='$(ALL_TARGET_OBS)'
+   fi
++  CORELOW_O=corelow.o
+ fi
+ 
+ AC_SUBST(TARGET_OBS)
++AC_SUBST(CORELOW_O)
+ 
+ # For other settings, only the main target counts.
+ gdb_sim=
+

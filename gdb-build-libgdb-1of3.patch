@@ -1,0 +1,123 @@
+http://sourceware.org/ml/gdb-patches/2012-01/msg00168.html
+Subject: [patch 1/2] Fix linking on non-x86* after libgdb.a removal
+
+Hi,
+
+I am sorry but I found after the patch
+	[patch 2/2] Do not build libgdb.a by default
+	http://sourceware.org/ml/gdb-patches/2011-12/msg00716.html
+
+For example s390x-linux-gnu no longer builds native GDB:
+	corelow.o:(.bss+0x0): multiple definition of `core_gdbarch'
+	corelow.o:(.bss+0x0): first defined here
+	corelow.o: In function `deprecated_add_core_fns':
+	corelow.c:(.text+0x0): multiple definition of `deprecated_add_core_fns'
+	corelow.o:corelow.c:(.text+0x0): first defined here
+
+I have found more such duplicates:
+
+solib.o is clear, that one is now in COMMON_OBS.  BTW it seems this change
+broke functionality of xcoffsolib.c due to:
+powerpc-*-aix* | rs6000-*-*)
+                        gdb_host=aix ;;
+as xcoffsolib.c probably cannot work with solib.c together but that is offtopic
+here, I do not have access+interest in AIX.
+
+xcoffread.o is also clear, powerpc/aix.mh NATDEPFILES get used only together
+with configure.tgt entry for the same target which is:
+powerpc-*-aix* | rs6000-*-*)
+        # Target: PowerPC running AIX
+        gdb_target_obs="rs6000-tdep.o rs6000-aix-tdep.o xcoffread.o \
+                        ppc-sysv-tdep.o solib-svr4.o"
+
+There remains that more complicated corelow.o for the next patch.
+
+gdbtui was bigger performance hit than libgdb.a but after libgdb.a got removed
+I do not want to revert that patch as this duplicity fix does not look hard.
+
+
+Sorry,
+Jan
+
+
+2012-01-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Partially fix duplicate .o files after omitting libbfd.a.
+	* config/alpha/alpha-osf3.mh (NATDEPFILES): Remove solib.o.
+	* config/i386/nbsdaout.mh (NATDEPFILES): Remove solib.o.
+	* config/i386/obsdaout.mh (NATDEPFILES): Remove solib.o.
+	* config/m68k/nbsdaout.mh (NATDEPFILES): Remove solib.o.
+	* config/m68k/obsd.mh (NATDEPFILES): Remove solib.o.
+	* config/powerpc/aix.mh (NATDEPFILES): Remove xcoffread.o.
+	* config/vax/nbsdaout.mh (NATDEPFILES): Remove solib.o.
+
+--- a/gdb/config/alpha/alpha-osf3.mh
++++ b/gdb/config/alpha/alpha-osf3.mh
+@@ -1,6 +1,6 @@
+ # Host: Little-endian Alpha running OSF/1-3.x and higher using procfs
+ NAT_FILE= nm-osf3.h
+ NATDEPFILES= corelow.o alpha-nat.o fork-child.o \
+-	solib-osf.o solib.o procfs.o proc-api.o proc-events.o proc-flags.o \
++	solib-osf.o procfs.o proc-api.o proc-events.o proc-flags.o \
+ 	proc-why.o dec-thread.o
+ NAT_CLIBS= -lpthreaddebug
+--- a/gdb/config/i386/nbsdaout.mh
++++ b/gdb/config/i386/nbsdaout.mh
+@@ -1,6 +1,6 @@
+ # Host: NetBSD/i386 a.out
+ NATDEPFILES= fork-child.o inf-ptrace.o \
+ 	nbsd-nat.o i386bsd-nat.o i386nbsd-nat.o bsd-kvm.o \
+-	solib.o solib-sunos.o
++	solib-sunos.o
+ 
+ LOADLIBES= -lkvm
+--- a/gdb/config/i386/obsdaout.mh
++++ b/gdb/config/i386/obsdaout.mh
+@@ -1,6 +1,6 @@
+ # Host: OpenBSD/i386 a.out
+ NATDEPFILES= fork-child.o inf-ptrace.o \
+ 	i386bsd-nat.o i386nbsd-nat.o i386obsd-nat.o bsd-kvm.o \
+-	solib.o solib-sunos.o
++	solib-sunos.o
+ 
+ LOADLIBES= -lkvm
+--- a/gdb/config/m68k/nbsdaout.mh
++++ b/gdb/config/m68k/nbsdaout.mh
+@@ -1,5 +1,5 @@
+ # Host: NetBSD/m68k a.out
+ NATDEPFILES= m68kbsd-nat.o fork-child.o inf-ptrace.o \
+-	solib.o solib-sunos.o
++	solib-sunos.o
+ 
+ LOADLIBES= -lkvm
+--- a/gdb/config/m68k/obsd.mh
++++ b/gdb/config/m68k/obsd.mh
+@@ -1,5 +1,5 @@
+ # Host: OpenBSD/m68k
+ NATDEPFILES= m68kbsd-nat.o bsd-kvm.o fork-child.o inf-ptrace.o \
+-	solib.o solib-sunos.o
++	solib-sunos.o
+ 
+ LOADLIBES= -lkvm
+--- a/gdb/config/powerpc/aix.mh
++++ b/gdb/config/powerpc/aix.mh
+@@ -4,7 +4,7 @@ NAT_FILE= config/rs6000/nm-rs6000.h
+ 
+ # aix-thread.o is not listed in NATDEPFILES as it is pulled in by configure.
+ NATDEPFILES= fork-child.o inf-ptrace.o corelow.o rs6000-nat.o \
+-	     xcoffread.o xcoffsolib.o
++	     xcoffsolib.o
+ 
+ # When compiled with cc, for debugging, this argument should be passed.
+ # We have no idea who our current compiler is though, so we skip it.
+--- a/gdb/config/vax/nbsdaout.mh
++++ b/gdb/config/vax/nbsdaout.mh
+@@ -1,6 +1,6 @@
+ # Host: NetBSD/vax a.out
+ NATDEPFILES= fork-child.o inf-ptrace.o \
+ 	vaxbsd-nat.o bsd-kvm.o \
+-	solib.o solib-sunos.o
++	solib-sunos.o
+ 
+ LOADLIBES= -lkvm
+

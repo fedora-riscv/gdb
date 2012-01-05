@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 8cc17242e1d8f61a4aabc9e08e4272e8dbe77e52
+commit 9d032ca6bf6de39c55d99ffc09056683c7a6498b
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
@@ -8514,91 +8514,14 @@ index 9bfebd2..44aeaae 100644
    char *pkt;
    struct breakpoint *b = loc->owner;
 diff --git a/gdb/s390-nat.c b/gdb/s390-nat.c
-index 6381675..883620c 100644
+index 6381675..0c2ea24 100644
 --- a/gdb/s390-nat.c
 +++ b/gdb/s390-nat.c
-@@ -438,11 +438,36 @@ struct watch_area
-   CORE_ADDR hi_addr;
- };
- 
--static struct watch_area *watch_base = NULL;
-+/* Per-inferior data key.  */
-+
-+struct s390_inferior_data
-+  {
-+    struct watch_area *watch_base;
-+  };
-+
-+static struct s390_inferior_data *
-+s390_inferior_data_get (void)
-+{
-+  /* Intermediate patch stub.  */
-+  static struct i386_inferior_data inf_data_local;
-+  struct inferior *inf = current_inferior ();
-+  struct i386_inferior_data *inf_data = &inf_data_local;
-+
-+  return inf->pid == ptid_get_pid (inferior_ptid) ? inf_data : NULL;
-+}
-+
-+static struct watch_area *
-+s390_watch_base_get (void)
-+{
-+  struct s390_inferior_data *inferior_data = s390_inferior_data_get ();
-+
-+  return inferior_data ? inferior_data->watch_base : NULL;
-+}
- 
- static int
- s390_stopped_by_watchpoint (void)
- {
-+  struct watch_area *watch_base = s390_watch_base_get ();
-   per_lowcore_bits per_lowcore;
-   ptrace_area parea;
-   int result;
-@@ -471,9 +496,13 @@ s390_stopped_by_watchpoint (void)
-   return result;
- }
- 
-+/* Update hardware registers of this specific LP.  LP must belong to
-+   CURRENT_INFERIOR.  */
-+
- static void
- s390_fix_watch_points (struct lwp_info *lp)
- {
-+  struct watch_area *watch_base;
-   int tid;
- 
-   per_struct per_info;
-@@ -482,9 +511,20 @@ s390_fix_watch_points (struct lwp_info *lp)
-   CORE_ADDR watch_lo_addr = (CORE_ADDR)-1, watch_hi_addr = 0;
-   struct watch_area *area;
- 
--  tid = TIDGET (lp->ptid);
--  if (tid == 0)
--    tid = PIDGET (lp->ptid);
-+  gdb_assert (lp == NULL || current_inferior ()->pid == PIDGET (lp->ptid));
-+
-+  if (lp == NULL)
-+    {
-+      tid = PIDGET (inferior_ptid);
-+      watch_base = NULL;
-+    }
-+  else
-+    {
-+      tid = TIDGET (lp->ptid);
-+      if (tid == 0)
-+	tid = PIDGET (lp->ptid);
-+      watch_base = s390_watch_base_get ();
-+    }
- 
-   for (area = watch_base; area; area = area->next)
-     {
-@@ -515,6 +555,18 @@ s390_fix_watch_points (struct lwp_info *lp)
+@@ -515,6 +515,17 @@ s390_fix_watch_points (struct lwp_info *lp)
      perror_with_name (_("Couldn't modify watchpoint status"));
  }
  
-+/* Callback for linux_nat_iterate_watchpoint_lwps,
-+   to call s390_fix_watch_points.  */
++/* Callback for iterate_over_lwps, to call s390_fix_watch_points.  */
 +
 +static int
 +s390_fix_watch_points_iterate (struct lwp_info *lp, void *arg)
@@ -8612,24 +8535,24 @@ index 6381675..883620c 100644
  static int
  s390_insert_watchpoint (CORE_ADDR addr, int len, int type,
  			struct expression *cond)
-@@ -531,8 +583,8 @@ s390_insert_watchpoint (CORE_ADDR addr, int len, int type,
+@@ -531,8 +542,8 @@ s390_insert_watchpoint (CORE_ADDR addr, int len, int type,
    area->next = watch_base;
    watch_base = area;
  
 -  ALL_LWPS (lp)
 -    s390_fix_watch_points (lp);
-+  linux_nat_iterate_watchpoint_lwps (s390_fix_watch_points_iterate, NULL);
++  iterate_over_lwps (minus_one_ptid, s390_fix_watch_points_iterate, NULL);
 +
    return 0;
  }
  
-@@ -559,8 +611,8 @@ s390_remove_watchpoint (CORE_ADDR addr, int len, int type,
+@@ -559,8 +570,8 @@ s390_remove_watchpoint (CORE_ADDR addr, int len, int type,
    *parea = area->next;
    xfree (area);
  
 -  ALL_LWPS (lp)
 -    s390_fix_watch_points (lp);
-+  linux_nat_iterate_watchpoint_lwps (s390_fix_watch_points_iterate, NULL);
++  iterate_over_lwps (minus_one_ptid, s390_fix_watch_points_iterate, NULL);
 +
    return 0;
  }

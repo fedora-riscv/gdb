@@ -27,7 +27,7 @@ Version: 7.4.50.20120103
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?_with_upstream:.upstream}%{?dist}
+Release: 4%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -520,6 +520,12 @@ Patch634: gdb-runtest-pie-override.patch
 #=push
 Patch638: gdb-gcc47-gcore-zero.patch
 
+# Fix linking on non-x86* (such as s390*) after libgdb.a removal.
+#=push
+Patch639: gdb-build-libgdb-1of3.patch
+Patch640: gdb-build-libgdb-2of3.patch
+Patch641: gdb-build-libgdb-3of3.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -782,6 +788,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch627 -p1
 %patch634 -p1
 %patch638 -p1
+%patch639 -p1
+%patch640 -p1
+%patch641 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1197,6 +1206,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Jan  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-4.fc17
+- Fix linking on non-x86* (such as s390*) after libgdb.a removal.
+
 * Wed Jan  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-3.fc17
 - Reinclude gdb-dlopen-stap-probe.patch (missing in Fedora glibc - BZ 752476).
 
