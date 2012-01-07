@@ -27,7 +27,7 @@ Version: 7.4.50.20120103
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?_with_upstream:.upstream}%{?dist}
+Release: 5%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -67,6 +67,14 @@ Provides: pstack = 1.2-7.2.2.1
 
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
 Conflicts: elfutils < 0.149
+
+# See BZ 701131 and: https://fedorahosted.org/fpc/ticket/129
+Provides: bundled(readline) = 6.2
+
+# https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
+Provides: bundled(libiberty) bundled(gnulib) bundled(binutils)
+# https://fedorahosted.org/fpc/ticket/109#comment:8
+Provides: bundled(md5-libiberty)
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -528,19 +536,14 @@ Patch641: gdb-build-libgdb-3of3.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
-# Requires: readline%{?_isa}
 # BuildRequires: readline-devel%{?_isa}
 %if 0%{!?el5:1}
-# dlopen() no longer makes rpm-libs a mandatory dependency.
-#Requires: rpm-libs%{?_isa}
+# dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
 %endif # 0%{!?el5:1}
-Requires: zlib%{?_isa}
 BuildRequires: zlib-devel%{?_isa}
 %if 0%{!?_without_python:1}
-%if 0%{!?el5:1}
-Requires: python-libs%{?_isa}
-%else
+%if 0%{?el5:1}
 # This RHEL-5.6 python version got split out python-libs for ppc64.
 # RHEL-5 rpm does not support .%{_arch} dependencies.
 Requires: python-libs-%{_arch} >= 2.4.3-32.el5
@@ -1069,7 +1072,9 @@ cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_bindir}/gcore
 chmod 755 $RPM_BUILD_ROOT%{_bindir}/gcore
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
+touch -r %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
 sed 's#%%{_sysconfdir}#%{_sysconfdir}#g' <%{SOURCE4} >$RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
+touch -r %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
 
 for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb -name "*.py"`
 do
@@ -1171,7 +1176,7 @@ fi
 %doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gcore
 %{_bindir}/gdb
-%{_sysconfdir}/gdbinit
+%config(noreplace) %{_sysconfdir}/gdbinit
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdb.1*
 %if 0%{!?_with_upstream:1}
@@ -1206,6 +1211,11 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Jan  7 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-5.fc17
+- Mark %{_sysconfdir}/gdbinit as %%config(noreplace).
+- Add appropriate: Provides: bundled(librarypackage).
+- Remove excessive explicit Requires: librarypackage.
+
 * Thu Jan  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-4.fc17
 - Fix linking on non-x86* (such as s390*) after libgdb.a removal.
 
