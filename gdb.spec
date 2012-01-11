@@ -8,26 +8,27 @@
 
 # RHEL-5 was the last not providing `/etc/rpm/macros.dist'.
 %if 0%{!?dist:1}
-%define rhel 5
-%define dist .el5
-%define el5 1
+%global rhel 5
+%global dist .el5
+%global el5 1
 %endif
 # RHEL-5 Brew does not set %{el5}.
 %if "%{?dist}" == ".el5"
-%define el5 1
+%global el5 1
 %endif
 
-Summary: A GNU source-level debugger for C, C++, Java and other languages
+Summary: A GNU source-level debugger for C, C++, Fortran and other languages
 Name: gdb%{?_with_debug:-debug}
 
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-Version: 7.4.50.20120103
+%global snap 20120103
+Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?_with_upstream:.upstream}%{?dist}
+Release: 6%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -40,15 +41,15 @@ Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%define gdb_src gdb-%{version}
-%define gdb_build build-%{_target_platform}
-%define gdb_docdir %{_docdir}/%{name}-doc-%{version}
+%global gdb_src gdb-%{version}
+%global gdb_build build-%{_target_platform}
+%global gdb_docdir %{_docdir}/%{name}-doc-%{version}
 
 %if 0%{?_with_debug:1}
 # Define this if you want to skip the strip step and preserve debug info.
 # Useful for testing.
-%define __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
-%define debug_package %{nil}
+%global __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
+%global debug_package %{nil}
 %endif
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -68,13 +69,12 @@ Provides: pstack = 1.2-7.2.2.1
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
 Conflicts: elfutils < 0.149
 
-# See BZ 701131 and: https://fedorahosted.org/fpc/ticket/129
-Provides: bundled(readline) = 6.2
-
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
-Provides: bundled(libiberty) bundled(gnulib) bundled(binutils)
-# https://fedorahosted.org/fpc/ticket/109#comment:8
-Provides: bundled(md5-libiberty)
+Provides: bundled(libiberty) = %{snap}
+Provides: bundled(gnulib) = %{snap}
+Provides: bundled(binutils) = %{snap}
+# https://fedorahosted.org/fpc/ticket/130
+Provides: bundled(md5-gcc) = %{snap}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -101,7 +101,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%define libstdcxxpython libstdc++-v3-python-r155978
+%global libstdcxxpython libstdc++-v3-python-r155978
 Source5: %{libstdcxxpython}.tar.bz2
 
 # Work around out-of-date dejagnu that does not have KFAIL
@@ -534,9 +534,12 @@ Patch639: gdb-build-libgdb-1of3.patch
 Patch640: gdb-build-libgdb-2of3.patch
 Patch641: gdb-build-libgdb-3of3.patch
 
+# Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
+Patch642: gdb-readline62-ask-more-rh.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
-# --without-system-readline
-# BuildRequires: readline-devel%{?_isa}
+# --with-system-readline
+BuildRequires: readline-devel%{?_isa}
 %if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
@@ -562,17 +565,17 @@ BuildRequires: texinfo-tex
 %if 0%{?_with_testsuite:1}
 
 # Ensure the devel libraries are installed for both multilib arches.
-%define bits_local %{?_isa}
-%define bits_other %{?_isa}
+%global bits_local %{?_isa}
+%global bits_other %{?_isa}
 %if 0%{!?el5:1}
 %ifarch s390x
-%define bits_other (%{__isa_name}-32)
+%global bits_other (%{__isa_name}-32)
 %else #!s390x
 %ifarch ppc
-%define bits_other (%{__isa_name}-64)
+%global bits_other (%{__isa_name}-64)
 %else #!ppc
 %ifarch sparc64 ppc64 s390x x86_64
-%define bits_other (%{__isa_name}-32)
+%global bits_other (%{__isa_name}-32)
 %endif #sparc64 ppc64 s390x x86_64
 %endif #!ppc
 %endif #!s390x
@@ -794,6 +797,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch639 -p1
 %patch640 -p1
 %patch641 -p1
+%patch642 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -825,6 +829,13 @@ rm -f bfd/doc/*.info
 rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
+
+# RL_STATE_FEDORA_GDB would not be found for:
+# Patch642: gdb-readline62-ask-more-rh.patch
+# --with-system-readline
+mv -f readline/doc readline-doc
+rm -rf readline/*
+mv -f readline-doc readline/doc
 
 %build
 
@@ -874,7 +885,7 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-	--without-system-readline				\
+	--with-system-readline				\
 	--with-expat						\
 $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--without-libexpat-prefix				\
@@ -1211,6 +1222,13 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-6.fc17
+- Provide %%snap timestamp for: Provides: bundled(librarypackage)
+- Replace %%define by %%global.
+- Replace Java in Summary with Fortran (only GCC-compiled Java is supported).
+- Unbundle readline-6.2 with a workaround of skipped "ask" (BZ 701131).
+- Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
+
 * Sat Jan  7 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-5.fc17
 - Mark %{_sysconfdir}/gdbinit as %%config(noreplace).
 - Add appropriate: Provides: bundled(librarypackage).
