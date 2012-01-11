@@ -28,7 +28,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?_with_upstream:.upstream}%{?dist}
+Release: 7%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -535,11 +535,19 @@ Patch640: gdb-build-libgdb-2of3.patch
 Patch641: gdb-build-libgdb-3of3.patch
 
 # Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
+#=fedora
 Patch642: gdb-readline62-ask-more-rh.patch
 
-BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+# RL_STATE_FEDORA_GDB would not be found for:
+# Patch642: gdb-readline62-ask-more-rh.patch
 # --with-system-readline
+BuildRequires: readline-devel%{?_isa} >= 6.2-4.fc17
+%else
 BuildRequires: readline-devel%{?_isa}
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+
+BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 %if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
@@ -797,7 +805,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch639 -p1
 %patch640 -p1
 %patch641 -p1
-%patch642 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -808,6 +815,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%patch642 -p1
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -830,12 +840,14 @@ rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
 
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
 # --with-system-readline
 mv -f readline/doc readline-doc
 rm -rf readline/*
 mv -f readline-doc readline/doc
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
 %build
 
@@ -1222,6 +1234,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-7.fc17
+- Fix BuildRequires for RHEL compatibility (BZ 701131).
+
 * Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-6.fc17
 - Provide %%snap timestamp for: Provides: bundled(librarypackage)
 - Replace %%define by %%global.
