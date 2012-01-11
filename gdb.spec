@@ -28,7 +28,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?_with_upstream:.upstream}%{?dist}
+Release: 8%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -968,7 +968,13 @@ else
   FPROFILE_CFLAGS=""
 fi
 
+# Prepare gdb/config.h first.
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS" maybe-configure-gdb
+perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
+
 make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS"
+
+! grep '_RELOCATABLE.*1' gdb/config.h
 
 if [ "$fprofile" = "-fprofile" ]
 then
@@ -1234,6 +1240,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-8.fc17
+- Disable unexpected GDB directories relocatability.
+
 * Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-7.fc17
 - Fix BuildRequires for RHEL compatibility (BZ 701131).
 
