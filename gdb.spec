@@ -28,7 +28,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?_with_upstream:.upstream}%{?dist}
+Release: 9%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -538,13 +538,15 @@ Patch641: gdb-build-libgdb-3of3.patch
 #=fedora
 Patch642: gdb-readline62-ask-more-rh.patch
 
+# Enable smaller %{_bindir}/gdb in future by no longer using -rdynamic.
+#=push
+Patch643: gdb-python-rdynamic.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
 # --with-system-readline
 BuildRequires: readline-devel%{?_isa} >= 6.2-4.fc17
-%else
-BuildRequires: readline-devel%{?_isa}
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
@@ -664,7 +666,10 @@ machine than the one which is running the program being debugged.
 Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
+# It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu.
+%if 0%{!?el5:1}
 BuildArch: noarch
+%endif # 0%{!?el5:1}
 
 %description doc
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -805,6 +810,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch639 -p1
 %patch640 -p1
 %patch641 -p1
+%patch643 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -897,7 +903,11 @@ CFLAGS="$CFLAGS -O0 -ggdb2"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-	--with-system-readline				\
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+	--with-system-readline					\
+%else # 0%{!?rhel:1} || 0%{?rhel} > 6
+	--without-system-readline				\
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-expat						\
 $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--without-libexpat-prefix				\
@@ -1240,6 +1250,12 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Jan 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-9.fc17
+- Enable smaller %{_bindir}/gdb in future by no longer using -rdynamic.
+- Make --enablerepo to use '*-debug*' for RHEL compatibility (BZ 781571).
+- On older RHELs make readline bundled again (BZ 701131).
+- Fix build compatibility with RHEL-5 due to false noarch build.
+
 * Wed Jan 11 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-8.fc17
 - Disable unexpected GDB directories relocatability.
 
