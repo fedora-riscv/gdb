@@ -23,12 +23,12 @@ Name: gdb%{?_with_debug:-debug}
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120103
+%global snap 20120120
 Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?_with_upstream:.upstream}%{?dist}
+Release: 10%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -524,16 +524,6 @@ Patch627: gdb-glibc-vdso-workaround.patch
 #=push+work
 Patch634: gdb-runtest-pie-override.patch
 
-# Fix zero registers core files w/gcc-4.7.
-#=push
-Patch638: gdb-gcc47-gcore-zero.patch
-
-# Fix linking on non-x86* (such as s390*) after libgdb.a removal.
-#=push
-Patch639: gdb-build-libgdb-1of3.patch
-Patch640: gdb-build-libgdb-2of3.patch
-Patch641: gdb-build-libgdb-3of3.patch
-
 # Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
 #=fedora
 Patch642: gdb-readline62-ask-more-rh.patch
@@ -806,10 +796,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
-%patch638 -p1
-%patch639 -p1
-%patch640 -p1
-%patch641 -p1
 %patch643 -p1
 
 %patch393 -p1
@@ -867,10 +853,6 @@ do
 
 mkdir %{gdb_build}$fprofile
 cd %{gdb_build}$fprofile
-
-# g77 executable is no longer present in Fedora gcc-4.x+.
-g77="`which gfortran 2>/dev/null || true`"
-test -z "$g77" || ln -s "$g77" ./g77
 
 export CFLAGS="$RPM_OPT_FLAGS"
 
@@ -1250,6 +1232,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Jan 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-10.fc17
+- Rebase to FSF GDB 7.4.50.20120120.
+- Drop the g77 .spec provisioning as it has been fixed in FSF GDB.
+
 * Thu Jan 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-9.fc17
 - Enable smaller %{_bindir}/gdb in future by no longer using -rdynamic.
 - Make --enablerepo to use '*-debug*' for RHEL compatibility (BZ 781571).
