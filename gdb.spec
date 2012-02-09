@@ -28,7 +28,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -532,6 +532,10 @@ Patch642: gdb-readline62-ask-more-rh.patch
 #=push
 Patch643: gdb-python-rdynamic.patch
 
+# Improve performance for C++ symbols expansion (Tom Tromey, BZ 787487).
+#=push
+Patch644: gdb-expand-cxx-accel.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -797,6 +801,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch627 -p1
 %patch634 -p1
 %patch643 -p1
+%patch644 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1103,6 +1108,9 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
+mkdir -p $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}
+cp -p $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
+
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
 # Temporarily now:
@@ -1232,8 +1240,12 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Feb  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-12.fc17
+- Improve performance for C++ symbols expansion (Tom Tromey, BZ 787487).
+- Install also gdb-gdb.py pretty printers.
+
 * Thu Feb  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-11.fc17
-- Fix possible NULL crash in find_charset_names (Trom Tromey, BZ 786091).
+- Fix possible NULL crash in find_charset_names (Tom Tromey, BZ 786091).
 - [ppc*] Fix build failure due to GCC aliasing warning (BZ 786504).
 
 * Sat Jan 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-10.fc17
