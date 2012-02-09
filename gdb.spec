@@ -28,7 +28,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?_with_upstream:.upstream}%{?dist}
+Release: 11%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -257,7 +257,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -694,7 +694,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 
 %if 0%{!?_with_upstream:1}
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -1232,6 +1232,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Thu Feb  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-11.fc17
+- Fix possible NULL crash in find_charset_names (Trom Tromey, BZ 786091).
+- [ppc*] Fix build failure due to GCC aliasing warning (BZ 786504).
+
 * Sat Jan 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-10.fc17
 - Rebase to FSF GDB 7.4.50.20120120.
 - Drop the g77 .spec provisioning as it has been fixed in FSF GDB.
