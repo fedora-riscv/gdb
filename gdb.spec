@@ -26,7 +26,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -48,12 +48,6 @@ URL: http://gnu.org/software/gdb/
 %ifarch ppc64
 Obsoletes: gdb64 < 5.3.91
 %endif
-
-%if 0%{!?el5:1}
-# The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
-Obsoletes: pstack < 1.2-7.2.2.1
-Provides: pstack = 1.2-7.2.2.1
-%endif # 0%{!?el5:1}
 
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
 Conflicts: elfutils < 0.149
@@ -394,11 +388,6 @@ Patch392: gdb-bz533176-fortran-omp-step.patch
 #=fedoratest
 Patch393: gdb-rhel5-gcc44.patch
 
-# Disable warning messages new for gdb-6.8+ for RHEL-5 backward compatibility.
-# Workaround RHEL-5 kernels for detaching SIGSTOPped processes (BZ 498595).
-#=fedoratest
-Patch335: gdb-rhel5-compat.patch
-
 # Fix regression by python on ia64 due to stale current frame.
 #=push
 Patch397: gdb-follow-child-stale-parent.patch
@@ -631,7 +620,6 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
-%if 0%{!?el5:1}
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
 Group: Development/Debuggers
@@ -643,7 +631,6 @@ and printing their data.
 
 This package provides a program that allows you to run GDB on a different
 machine than the one which is running the program being debugged.
-%endif # 0%{!?el5:1}
 
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
@@ -787,10 +774,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch644 -p1
 
 %patch393 -p1
-%patch335 -p1
 %if 0%{!?el5:1}
 %patch393 -p1 -R
-%patch335 -p1 -R
 %endif
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
@@ -1028,12 +1013,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   # See also: gdb-runtest-pie-override.exp
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
 
-  ./orphanripper make %{?_smp_mflags} -k $CHECK \
-$(: Serialize the output to keep the order for regression checks. ) \
-%if 0%{?el5:1}
-    RUNTESTFLAGS="--tool gdb" \
-%endif
-    || :
+  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
 )
 for t in sum log
 do
@@ -1073,8 +1053,13 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
+# RHEL-5: error: Installed (but unpackaged) file(s) found:
+#           /usr/lib/debug/usr/bin/gdb-gdb.pyc
+#           /usr/lib/debug/usr/bin/gdb-gdb.pyo
+%if 0%{!?el5:1}
 mkdir -p $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}
 cp -p $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
+%endif # 0%{!?el5:1}
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
@@ -1116,10 +1101,8 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
-%if 0%{!?el5:1}
 ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
-%endif # 0%{!?el5:1}
 
 # Packaged GDB is not a cross-target one.
 (cd $RPM_BUILD_ROOT%{_datadir}/gdb/syscalls
@@ -1174,19 +1157,15 @@ fi
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
 %{_bindir}/gdb-add-index
-%if 0%{!?el5:1}
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
-%endif # 0%{!?el5:1}
 %{_datadir}/gdb
 
 # don't include the files in include, they are part of binutils
 
 %ifnarch sparc sparcv9
-%if 0%{!?el5:1}
 %files gdbserver
 %defattr(-,root,root)
-%endif
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
 %ifarch %{ix86} x86_64
@@ -1201,6 +1180,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-16.fc17
+- [RHELs] Drop simulation of legacy behavior - new GDB should behave as new GDB.
+
 * Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-15.fc17
 - Simplify %%setup .spec rule.
 
