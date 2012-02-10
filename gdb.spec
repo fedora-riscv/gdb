@@ -1,6 +1,5 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
-# --with upstream: No Fedora specific patches get applied.
 # --without python: No python support.
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
 #                 workload gets run it decreases the general performance now.
@@ -27,7 +26,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -51,11 +50,9 @@ Obsoletes: gdb64 < 5.3.91
 %endif
 
 %if 0%{!?el5:1}
-%if 0%{!?_with_upstream:1}
 # The last Rawhide release was (no dist tag) pstack-1.2-7.2.2
 Obsoletes: pstack < 1.2-7.2.2.1
 Provides: pstack = 1.2-7.2.2.1
-%endif # 0%{!?_with_upstream:1}
 %endif # 0%{!?el5:1}
 
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
@@ -688,8 +685,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 # Match the Fedora's version info.
 %patch2 -p1
 
-%if 0%{!?_with_upstream:1}
-
 %patch232 -p1
 %patch349 -p1
 %patch1 -p1
@@ -811,8 +806,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
 
-%endif # 0%{!?_with_upstream:1}
-
 # Change the version that gets printed at GDB startup, so it is Fedora
 # specific.
 # Fedora (%{version}-%{release})
@@ -867,11 +860,7 @@ export CFLAGS="$RPM_OPT_FLAGS"
 %ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparc sparcv9 sparc64
 	--disable-werror					\
 %else
-%if 0%{?_with_upstream:1}
-	--disable-werror					\
-%else
 	--enable-werror						\
-%endif
 %endif
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
@@ -1039,12 +1028,9 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
 
-%if 0%{!?_with_upstream:1}
   # Run all the scheduled testsuite runs also in the PIE mode.
-  # Upstream GDB would lock up the testsuite run for too long on its failures.
   # See also: gdb-runtest-pie-override.exp
   CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
-%endif # 0%{!?_with_upstream:1}
 
   ./orphanripper make %{?_smp_mflags} -k $CHECK \
 $(: Serialize the output to keep the order for regression checks. ) \
@@ -1131,7 +1117,6 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
-%if 0%{!?_with_upstream:1}
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
@@ -1139,7 +1124,6 @@ cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
 ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 %endif # 0%{!?el5:1}
-%endif # 0%{!?_with_upstream:1}
 
 # Packaged GDB is not a cross-target one.
 (cd $RPM_BUILD_ROOT%{_datadir}/gdb/syscalls
@@ -1191,7 +1175,6 @@ fi
 %config(noreplace) %{_sysconfdir}/gdbinit
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdb.1*
-%if 0%{!?_with_upstream:1}
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
 %{_bindir}/gdb-add-index
@@ -1199,7 +1182,6 @@ fi
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %endif # 0%{!?el5:1}
-%endif # 0%{!?_with_upstream:1}
 %{_datadir}/gdb
 
 # don't include the files in include, they are part of binutils
@@ -1223,6 +1205,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-14.fc17
+- Drop --with upstream .spec rules.
+
 * Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-13.fc17
 - Drop --with debug .spec rules.
 
