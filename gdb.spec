@@ -1,6 +1,5 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
-# --with debug: Build without optimizations and without splitting the debuginfo.
 # --with upstream: No Fedora specific patches get applied.
 # --without python: No python support.
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
@@ -18,7 +17,7 @@
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Fortran and other languages
-Name: gdb%{?_with_debug:-debug}
+Name: gdb
 
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
@@ -28,7 +27,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -44,13 +43,6 @@ URL: http://gnu.org/software/gdb/
 %global gdb_src gdb-%{version}
 %global gdb_build build-%{_target_platform}
 %global gdb_docdir %{_docdir}/%{name}-doc-%{version}
-
-%if 0%{?_with_debug:1}
-# Define this if you want to skip the strip step and preserve debug info.
-# Useful for testing.
-%global __debug_install_post : > %{_builddir}/%{?buildsubdir}/debugfiles.list
-%global debug_package %{nil}
-%endif
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -861,12 +853,6 @@ cd %{gdb_build}$fprofile
 
 export CFLAGS="$RPM_OPT_FLAGS"
 
-%if 0%{?_with_debug:1}
-# --enable-werror could conflict with `-Wall -O0' but this is no longer true
-# for recent GCCs.
-CFLAGS="$CFLAGS -O0 -ggdb2"
-%endif
-
 ../configure							\
 	--prefix=%{_prefix}					\
 	--libdir=%{_libdir}					\
@@ -924,9 +910,6 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	--without-mmap						\
 %endif
 	--enable-64-bit-bfd					\
-%if 0%{?_with_debug:1}
-	--enable-static --disable-shared --enable-debug		\
-%endif
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1240,6 +1223,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-13.fc17
+- Drop --with debug .spec rules.
+
 * Thu Feb  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-12.fc17
 - Improve performance for C++ symbols expansion (Tom Tromey, BZ 787487).
 - Install also gdb-gdb.py pretty printers.
