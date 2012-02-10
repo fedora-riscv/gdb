@@ -26,7 +26,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -39,7 +39,7 @@ Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%global gdb_src gdb-%{version}
+%global gdb_src %{name}-%{version}
 %global gdb_build build-%{_target_platform}
 %global gdb_docdir %{_docdir}/%{name}-doc-%{version}
 
@@ -665,11 +665,7 @@ Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
 
 %prep
-
-# This allows the tarball name to be different from our
-# version-release name.
-
-%setup -q -n %{gdb_src}
+%setup -q
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # libstdc++ pretty printers.
@@ -1205,6 +1201,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-15.fc17
+- Simplify %%setup .spec rule.
+
 * Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-14.fc17
 - Drop --with upstream .spec rules.
 
