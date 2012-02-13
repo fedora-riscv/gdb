@@ -67,7 +67,7 @@ Index: gdb-7.4.50.20120103/gdb/gstack.sh
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
 +++ gdb-7.4.50.20120103/gdb/gstack.sh	2012-01-03 05:52:37.278385632 +0100
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,43 @@
 +#!/bin/sh
 +
 +if test $# -ne 1; then
@@ -99,14 +99,9 @@ Index: gdb-7.4.50.20120103/gdb/gstack.sh
 +
 +GDB=${GDB:-/usr/bin/gdb}
 +
-+if $GDB -nx --quiet --batch --readnever > /dev/null 2>&1; then
-+    readnever=--readnever
-+else
-+    readnever=
-+fi
-+
 +# Run GDB, strip out unwanted noise.
-+$GDB --quiet $readnever -nx /proc/$1/exe $1 <<EOF 2>&1 | 
++# --readnever is no longer used since .gdb_index is now in use.
++$GDB --quiet -nx /proc/$1/exe $1 <<EOF 2>&1 | 
 +set width 0
 +set height 0
 +set pagination no
@@ -120,8 +115,8 @@ Index: gdb-7.4.50.20120103/gdb/testsuite/gdb.base/gstack.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
 +++ gdb-7.4.50.20120103/gdb/testsuite/gdb.base/gstack.exp	2012-01-03 05:52:37.279385629 +0100
-@@ -0,0 +1,71 @@
-+# Copyright (C) 2010 Free Software Foundation, Inc.
+@@ -0,0 +1,66 @@
++# Copyright (C) 2012 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
 +# it under the terms of the GNU General Public License as published by
@@ -151,6 +146,7 @@ Index: gdb-7.4.50.20120103/gdb/testsuite/gdb.base/gstack.exp
 +    fail $test
 +    return
 +}
++set use_gdb_stub 1
 +set pid [exp_pid -i $res]
 +gdb_expect {
 +    -re "looping\r\n" {
@@ -178,15 +174,9 @@ Index: gdb-7.4.50.20120103/gdb/testsuite/gdb.base/gstack.exp
 +    fail $test
 +}
 +set pid [exp_pid -i $res]
-+gdb_expect {
-+    -re {^#0 +0x[0-9a-f]+ in \.?func \(\)\r\n#1 +0x[0-9a-f]+ in \.?main \(\)\r\nGSTACK-END\r\n$} {
++gdb_test_multiple "" $test {
++    -re "^#0 +(0x\[0-9a-f\]+ in )?\\.?func \\(\\) at \[^\r\n\]*\r\n#1 +0x\[0-9a-f\]+ in \\.?main \\(\\) at \[^\r\n\]*\r\nGSTACK-END\r\n\$" {
 +	pass $test
-+    }
-+    eof {
-+	fail "$test (eof)"
-+    }
-+    timeout {
-+	fail "$test (timeout)"
 +    }
 +}
 +gdb_exit

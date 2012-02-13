@@ -26,7 +26,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1180,6 +1180,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Mon Feb 13 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-17.fc17
+- gstack: Turn off --readnever (suggested by Oliver Henshaw).
+
 * Fri Feb 10 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-16.fc17
 - [RHELs] Drop simulation of legacy behavior - new GDB should behave as new GDB.
 
