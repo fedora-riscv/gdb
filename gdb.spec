@@ -26,7 +26,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1053,13 +1053,14 @@ do
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
 
-# RHEL-5: error: Installed (but unpackaged) file(s) found:
-#           /usr/lib/debug/usr/bin/gdb-gdb.pyc
-#           /usr/lib/debug/usr/bin/gdb-gdb.pyo
-%if 0%{!?el5:1}
+%if 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 mkdir -p $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}
 cp -p $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
-%endif # 0%{!?el5:1}
+for pyo in "" "-O";do
+  # RHEL-5: AttributeError: 'module' object has no attribute 'compile_file'
+  python $pyo -c 'import compileall, re, sys; sys.exit (not compileall.compile_dir("'"$RPM_BUILD_ROOT/usr/lib/debug%{_bindir}"'", 1, "'"/usr/lib/debug%{_bindir}"'"))'
+done
+%endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
@@ -1180,6 +1181,10 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Feb 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-18.fc17
+- Fix debuginfo gdb-gdb.py build without redhat-rpm-config and on RHEL-5.
+- Provide precompiled variants of gdb-gdb.py.
+
 * Mon Feb 13 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-17.fc17
 - gstack: Turn off --readnever (suggested by Oliver Henshaw).
 
