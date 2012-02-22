@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -55,6 +55,15 @@ URL: http://gnu.org/software/gdb/
 %ifarch ppc64
 Obsoletes: gdb64 < 5.3.91
 %endif
+
+%global have_inproctrace 0
+%ifarch %{ix86} x86_64
+# RHEL-5.i386: [int foo, bar; bar = __sync_val_compare_and_swap(&foo, 0, 1);]
+#              undefined reference to `__sync_val_compare_and_swap_4'
+%if 0%{!?el5:1}
+%global have_inproctrace 1
+%endif # 0%{!?el5:1}
+%endif # %{ix86} x86_64
 
 # Nobody is going to run gdb-add-index from SCL package on RHEL-5.
 %if !(0%{?el5:1} && 0%{?scl:1})
@@ -892,6 +901,11 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	--without-mmap						\
 %endif
 	--enable-64-bit-bfd					\
+%if %{have_inproctrace}
+	--enable-inprocess-agent				\
+%else # !%{have_inproctrace}
+	--disable-inprocess-agent				\
+%endif # !%{have_inproctrace}
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1191,9 +1205,9 @@ fi
 %defattr(-,root,root)
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
-%ifarch %{ix86} x86_64
+%if %{have_inproctrace}
 %{_libdir}/libinproctrace.so
-%endif
+%endif # %{have_inproctrace}
 %endif
 
 %files doc
@@ -1203,6 +1217,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Feb 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-20.fc17
+- Fix libinproctrace.so build on RHEL-5 i386 (disable it on RHEL-5).
+
 * Wed Feb 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-19.fc17
 - Implement SCL (scl-utils-build) macros.
 
