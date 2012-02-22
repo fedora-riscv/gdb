@@ -3,6 +3,7 @@
 # --without python: No python support.
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
 #                 workload gets run it decreases the general performance now.
+# --define 'scl somepkgname': Independent packages by scl-utils-build.
 
 # RHEL-5 was the last not providing `/etc/rpm/macros.dist'.
 %if 0%{!?dist:1}
@@ -15,8 +16,14 @@
 %global el5 1
 %endif
 
+%{?scl:%scl_package gdb}
+%{!?scl:
+ %global pkg_name %{name}
+ %global _root_prefix %{_prefix}
+}
+
 Summary: A GNU source-level debugger for C, C++, Fortran and other languages
-Name: gdb
+Name: %{?scl_prefix}gdb
 
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
@@ -26,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -39,7 +46,7 @@ Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
-%global gdb_src %{name}-%{version}
+%global gdb_src %{pkg_name}-%{version}
 %global gdb_build build-%{_target_platform}
 %global gdb_docdir %{_docdir}/%{name}-doc-%{version}
 
@@ -49,8 +56,11 @@ URL: http://gnu.org/software/gdb/
 Obsoletes: gdb64 < 5.3.91
 %endif
 
+# Nobody is going to run gdb-add-index from SCL package on RHEL-5.
+%if !(0%{?el5:1} && 0%{?scl:1})
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
 Conflicts: elfutils < 0.149
+%endif # !(0%{?el5:1} && 0%{?scl:1})
 
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
 Provides: bundled(libiberty) = %{snap}
@@ -615,6 +625,8 @@ Requires: libunwind >= 0.96-3
 %endif
 %endif
 
+%{?scl:Requires:%scl_runtime}
+
 %description
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
@@ -652,7 +664,7 @@ Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
 
 %prep
-%setup -q
+%setup -q -n %{gdb_src}
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # libstdc++ pretty printers.
@@ -1066,19 +1078,26 @@ done
 %if 0%{!?_without_python:1}
 # Temporarily now:
 for LIB in lib lib64;do
-  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix}/$LIB"
+  LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_root_prefix}/$LIB"
   mkdir -p $LIBPATH
   # basename is being run only for the native (non-biarch) file.
   sed -e 's,@pythondir@,%{_datadir}/gdb/python,'		\
-      -e 's,@toolexeclibdir@,%{_prefix}/'"$LIB,"		\
+      -e 's,@toolexeclibdir@,%{_root_prefix}/'"$LIB,"		\
       < $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/hook.in	\
-      > $LIBPATH/$(basename %{_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+      > $LIBPATH/$(basename %{_root_prefix}/%{_lib}/libstdc++.so.6.*)-gdb.py
+  # Test the filename 'libstdc++.so.6.*' has matched.
+  test -f $LIBPATH/libstdc++.so.6.[0-9]*-gdb.py
 done
 test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
       $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 %endif # 0%{!?_without_python:1}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+
+# gdb-add-index does not have sufficient version of elfutils on RHEL-5 (in SCL).
+%if 0%{?el5:1} && 0%{?scl:1}
+rm -f $RPM_BUILD_ROOT%{_bindir}/gdb-add-index
+%endif # 0%{?el5:1} && 0%{?scl:1}
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -1157,7 +1176,10 @@ fi
 %{_mandir}/*/gdb.1*
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
+# gdb-add-index does not have sufficient version of elfutils on RHEL-5 (in SCL).
+%if !(0%{?el5:1} && 0%{?scl:1})
 %{_bindir}/gdb-add-index
+%endif # !(0%{?el5:1} && 0%{?scl:1})
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
@@ -1181,6 +1203,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Feb 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-19.fc17
+- Implement SCL (scl-utils-build) macros.
+
 * Tue Feb 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-18.fc17
 - Fix debuginfo gdb-gdb.py build without redhat-rpm-config and on RHEL-5.
 - Provide precompiled variants of gdb-gdb.py.
