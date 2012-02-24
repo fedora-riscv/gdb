@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -795,9 +795,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch644 -p1
 
 %patch393 -p1
-%if 0%{!?el5:1}
+%if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
-%endif
+%endif # 0%{!?el5:1} || 0%{?scl:1}
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
@@ -1217,6 +1217,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Fri Feb 24 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-21.fc17
+- Do not use gcc44/gfortran44 on RHEL-5 if in SCL mode.
+
 * Wed Feb 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-20.fc17
 - Fix libinproctrace.so build on RHEL-5 i386 (disable it on RHEL-5).
 
