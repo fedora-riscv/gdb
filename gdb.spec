@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -105,6 +105,9 @@ Source4: gdbinit
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
 %global libstdcxxpython libstdc++-v3-python-r155978
 Source5: %{libstdcxxpython}.tar.bz2
+
+# Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
+Source6: gdbtui
 
 # Work around out-of-date dejagnu that does not have KFAIL
 #=drop: That dejagnu is too old to be supported.
@@ -808,12 +811,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
 
-# Change the version that gets printed at GDB startup, so it is Fedora
-# specific.
-# Fedora (%{version}-%{release})
-# Red Hat Enterprise Linux (%{version}-%{release})
+# Change the version that gets printed at GDB startup, so it is RH specific.
 cat > gdb/version.in << _FOO
+%if 0%{!?rhel:1}
 Fedora (%{version}-%{release})
+%else # !0%{!?rhel:1} 
+Red Hat Enterprise Linux (%{version}-%{release})
+%endif # !0%{!?rhel:1} 
 _FOO
 
 # Remove the info and other generated files added by the FSF release
@@ -1068,6 +1072,13 @@ make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_bindir}/gcore
 chmod 755 $RPM_BUILD_ROOT%{_bindir}/gcore
 
+# Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
+test ! -e $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
+install -m 755 %{SOURCE6} $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
+ln -sf gdb.1 $RPM_BUILD_ROOT%{_mandir}/man1/gdbtui.1
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
 touch -r %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
 sed 's#%%{_sysconfdir}#%{_sysconfdir}#g' <%{SOURCE4} >$RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
@@ -1190,6 +1201,11 @@ fi
 %{_mandir}/*/gdb.1*
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
+# Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
+%{_bindir}/gdbtui
+%{_mandir}/*/gdbtui.1*
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 # gdb-add-index does not have sufficient version of elfutils on RHEL-5 (in SCL).
 %if !(0%{?el5:1} && 0%{?scl:1})
 %{_bindir}/gdb-add-index
@@ -1217,8 +1233,13 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Feb 28 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-22.fc17
+- testsuite: Fix gdb.base/macscp.exp ccache workaround in SCL mode.
+- Adjust the RHEL/F version string automatically (BZ 797651, BZ 797646).
+- Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
+
 * Fri Feb 24 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-21.fc17
-- Do not use gcc44/gfortran44 on RHEL-5 if in SCL mode.
+- testsuite: Do not use gcc44/gfortran44 on RHEL-5 if in SCL mode.
 
 * Wed Feb 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-20.fc17
 - Fix libinproctrace.so build on RHEL-5 i386 (disable it on RHEL-5).
