@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -307,6 +307,10 @@ Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 #=push
 Patch519: gdb-6.6-buildid-locate-rpm-librpm-workaround.patch
 
+# Add kernel vDSO workaround (`no loadable ...') on RHEL-5 (kernel BZ 765875).
+#=push
+Patch276: gdb-6.6-bfd-vdso8k.patch
+
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 #=fedoratest: But it is failing anyway, one should check the behavior more.
 Patch282: gdb-6.7-charsign-test.patch
@@ -536,6 +540,14 @@ Patch643: gdb-python-rdynamic.patch
 #=push
 Patch644: gdb-expand-cxx-accel.patch
 
+# Fix skipping of prologues on RHEL-5 gcc-4.1 -O2 -g code (BZ 797889).
+#=push
+Patch645: gdb-prologue-not-skipped.patch
+
+# Fix breakpoint warning during 'next' over exit() (Tom Tromey, BZ 797892).
+#=push
+Patch646: gdb-exit-warning.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -740,6 +752,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch271 -p1
 %patch274 -p1
 %patch353 -p1
+%patch276 -p1
 %patch282 -p1
 %patch284 -p1
 %patch287 -p1
@@ -796,6 +809,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch634 -p1
 %patch643 -p1
 %patch644 -p1
+%patch645 -p1
+%patch646 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1233,6 +1248,11 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Feb 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-23.fc17
+- Add kernel vDSO workaround (`no loadable ...') on RHEL-5 (kernel BZ 765875).
+- Fix skipping of prologues on RHEL-5 gcc-4.1 -O2 -g code (BZ 797889).
+- Fix breakpoint warning during 'next' over exit() (Tom Tromey, BZ 797892).
+
 * Tue Feb 28 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-22.fc17
 - testsuite: Fix gdb.base/macscp.exp ccache workaround in SCL mode.
 - Adjust the RHEL/F version string automatically (BZ 797651, BZ 797646).
