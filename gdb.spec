@@ -842,6 +842,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+%patch647 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.

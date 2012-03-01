@@ -48,3 +48,28 @@ Index: gdb-7.3.50.20110722/gdb/elfread.c
 @@ -2650,15 +2651,19 @@
    if (ret->name)
      {
+       ret->args = memchr (ret->name, '\0',
+-			  (unsigned long *) el->data
+-			  + el->size - (unsigned long *) ret->name);
++			  (char *) el->data + el->size - ret->name);
+ 
+-      if (ret->args++ != NULL
+-	  || memchr (ret->args, '\0', (unsigned long *) el->data
+-		     + el->size - (unsigned long *) ret->name)
+-	  != el->data + el->size - 1)
+-	complaint (&symfile_complaints, _("corrupt probe when reading `%s'"),
+-		   objfile->name);
++      if (ret->args != NULL)
++	++ret->args;
++      if (ret->args == NULL
++	  || (memchr (ret->args, '\0',
++		      (char *) el->data + el->size - ret->name)
++	      != el->data + el->size - 1))
++	{
++	  complaint (&symfile_complaints, _("corrupt probe when reading `%s'"),
++		     objfile->name);
++	  ret->args = NULL;
++	}
+     }
+   else
+     ret->args = NULL;
