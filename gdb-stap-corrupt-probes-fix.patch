@@ -1,0 +1,50 @@
+Index: gdb-7.3.50.20110722/gdb/elfread.c
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/elfread.c	2012-02-29 15:26:27.445214760 -0300
++++ gdb-7.3.50.20110722/gdb/elfread.c	2012-02-29 15:27:46.556248946 -0300
+@@ -2612,30 +2612,31 @@
+   bfd *abfd = objfile->obfd;
+   int size = bfd_get_arch_size (abfd) / 8;
+   struct gdbarch *gdbarch = get_objfile_arch (objfile);
++  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+   struct type *ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
+   CORE_ADDR base_ref;
+ 
+   /* Provider and the name of the probe.  */
+-  ret->provider = (const char *) &el->data[3 * size];
++  ret->provider = &el->data[3 * size];
+   ret->name = memchr (ret->provider, '\0',
+-		      (unsigned long *) el->data
+-		      + el->size - (unsigned long *) ret->provider);
++		      (char *) el->data + el->size - ret->provider);
+   /* Making sure there is a name.  */
+   if (!ret->name)
+-    complaint (&symfile_complaints, _("corrupt probe when reading `%s'"),
+-	       objfile->name);
++    {
++      complaint (&symfile_complaints, _("corrupt probe when reading `%s'"),
++		 objfile->name);
++      ret->provider = NULL;
++      ret->name = NULL;
++    }
+   else
+     ++ret->name;
+ 
+   /* Retrieving the probe's address.  */
+-  ret->address = extract_typed_address ((const gdb_byte *) &el->data[0],
+-					ptr_type);
++  ret->address = extract_typed_address (&el->data[0], ptr_type);
+   /* Link-time sh_addr of `.stapsdt.base' section.  */
+-  base_ref = extract_typed_address ((const gdb_byte *) &el->data[size],
+-				    ptr_type);
++  base_ref = extract_typed_address (&el->data[size], ptr_type);
+   /* Semaphore address.  */
+-  ret->sem_addr = extract_typed_address ((const gdb_byte *) &el->data[2 * size],
+-					 ptr_type);
++  ret->sem_addr = extract_typed_address (&el->data[2 * size], ptr_type);
+ 
+   ret->address += (ANOFFSET (objfile->section_offsets,
+ 			     SECT_OFF_TEXT (objfile))
+@@ -2650,15 +2651,19 @@
+   if (ret->name)
+     {

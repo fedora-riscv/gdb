@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?_with_upstream:.upstream}%{?dist}
+Release: 12%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -555,6 +555,9 @@ Patch632: gdb-optimized-out-internal-error.patch
 
 # Hack for proper PIE run of the testsuite.
 Patch634: gdb-runtest-pie-override.patch
+
+# Fix `corrupt probe' warnings for SystemTap probes.
+Patch647: gdb-stap-corrupt-probes-fix.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
@@ -1252,6 +1255,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Mar 1 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.3.50.20110722-12.fc16
+- Fix `corrupt probe' complaint when reading SystemTap probes.
+
 * Tue Nov 29 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-11.fc16
 - No longer build bundled libstdc++ pretty printers on RHELs >= 7.
 
