@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -582,6 +582,11 @@ BuildRequires: libstdc++%{?_isa}
 # gdb-doc in PDF:
 BuildRequires: texinfo-tex
 
+# BuildArch would break RHEL-5 by overriding arch and not building noarch.
+%if 0%{?el5:1}
+ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
+%endif # 0%{?el5:1}
+
 %if 0%{?_with_testsuite:1}
 
 # Ensure the devel libraries are installed for both multilib arches.
@@ -684,11 +689,9 @@ Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
 # It would break RHEL-5 by overriding arch and not building noarch separately.
-%if 0%{?el5:1}
-ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
-%else # !0%{?el5:1}
+%if 0%{!?el5:1}
 BuildArch: noarch
-%endif # !0%{?el5:1}
+%endif # 0%{!?el5:1}
 
 %description doc
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -1293,6 +1296,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-27.fc17
+- [rhel5] Fix up the previous commit (BZ 799318).
+
 * Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-26.fc17
 - [rhel5] Fix up the previous commit (BZ 799318).
 
