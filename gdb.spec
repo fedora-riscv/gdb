@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -677,6 +677,7 @@ machine than the one which is running the program being debugged.
 
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
 %endif # !noarch
+%if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
@@ -698,6 +699,8 @@ This package provides INFO, HTML and PDF user manual for GDB.
 
 Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
+
+%endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %prep
 %setup -q -n %{gdb_src}
@@ -1195,6 +1198,10 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 )
 
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%if 0%{?el5:1}
+rm -f $RPM_BUILD_ROOT%{_infodir}/annotate.info*
+rm -f $RPM_BUILD_ROOT%{_infodir}/gdb.info*
+%endif # 0%{?el5:1} 
 %else # noarch
 # -j1: There is some race resulting in:
 # /usr/bin/texi2dvi: texinfo.tex appears to be broken, quitting.
@@ -1212,28 +1219,6 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
 %clean
 rm -rf $RPM_BUILD_ROOT
-
-%post doc
-# This step is part of the installation of the RPM. Not to be confused
-# with the 'make install ' of the build (rpmbuild) process.
-
-# For --excludedocs:
-if [ -e %{_infodir}/gdb.info.gz ]
-then
-  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
-  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-fi
-
-%preun doc
-if [ $1 = 0 ]
-then
-  # For --excludedocs:
-  if [ -e %{_infodir}/gdb.info.gz ]
-  then
-    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
-    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
-  fi
-fi
 
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
 %ifnarch noarch
@@ -1275,6 +1260,7 @@ fi
 
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
 %endif # !noarch
+%if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %files doc
 %doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
@@ -1282,7 +1268,34 @@ fi
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 
+%post doc
+# This step is part of the installation of the RPM. Not to be confused
+# with the 'make install ' of the build (rpmbuild) process.
+
+# For --excludedocs:
+if [ -e %{_infodir}/gdb.info.gz ]
+then
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+  /sbin/install-info --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+fi
+
+%preun doc
+if [ $1 = 0 ]
+then
+  # For --excludedocs:
+  if [ -e %{_infodir}/gdb.info.gz ]
+  then
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/annotate.info.gz || :
+    /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
+  fi
+fi
+
+%endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
+
 %changelog
+* Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-26.fc17
+- [rhel5] Fix up the previous commit (BZ 799318).
+
 * Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-25.fc17
 - [rhel5] Workaround rpmbuild to make the doc subpkg noarch again (BZ 799318).
 
