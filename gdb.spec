@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -660,6 +660,9 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%ifnarch noarch
+
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
 Group: Development/Debuggers
@@ -672,14 +675,19 @@ and printing their data.
 This package provides a program that allows you to run GDB on a different
 machine than the one which is running the program being debugged.
 
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%endif # !noarch
+
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
-# It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu.
-%if 0%{!?el5:1}
+# It would break RHEL-5 by overriding arch and not building noarch separately.
+%if 0%{?el5:1}
+ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
+%else # !0%{?el5:1}
 BuildArch: noarch
-%endif # 0%{!?el5:1}
+%endif # !0%{?el5:1}
 
 %description doc
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -933,7 +941,12 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
+$(: It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu ) \
+%ifarch noarch
+	$(:)
+%else
 	%{_target_platform}
+%endif
 %endif
 
 if [ -z "%{!?_with_profile:no}" ]
@@ -1086,6 +1099,9 @@ echo ====================TESTING END=====================
 cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
 
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%ifnarch noarch
+
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
 # install the gcore script in /usr/bin
@@ -1151,17 +1167,9 @@ rm -f $RPM_BUILD_ROOT%{_bindir}/gdb-add-index
 rm -rf $RPM_BUILD_ROOT%{_datadir}/locale/
 rm -f $RPM_BUILD_ROOT%{_infodir}/bfd*
 rm -f $RPM_BUILD_ROOT%{_infodir}/standard*
-rm -f $RPM_BUILD_ROOT%{_infodir}/mmalloc*
 rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
-rm -f $RPM_BUILD_ROOT%{_infodir}/gdbint*
-rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 rm -rf $RPM_BUILD_ROOT%{_includedir}
-rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,mmalloc*}
-
-# Delete this too because the dir file will be updated at rpm install time.
-# We don't want a gdb specific one overwriting the system wide one.
-
-rm -f $RPM_BUILD_ROOT%{_infodir}/dir
+rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
 
 # pstack obsoletion
 
@@ -1185,6 +1193,22 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
  rm -f ppc{,64}-linux.xml
 %endif
 )
+
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%else # noarch
+# -j1: There is some race resulting in:
+# /usr/bin/texi2dvi: texinfo.tex appears to be broken, quitting.
+make -j1 -C gdb/doc install DESTDIR=$RPM_BUILD_ROOT
+%endif # noarch
+
+# Documentation only for development; keep 'rm's here after "noarch" above.
+rm -f $RPM_BUILD_ROOT%{_infodir}/gdbint*
+rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
+
+# Delete this too because the dir file will be updated at rpm install time.
+# We don't want a gdb specific one overwriting the system wide one.
+
+rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -1210,6 +1234,9 @@ then
     /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
   fi
 fi
+
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%ifnarch noarch
 
 %files
 %defattr(-,root,root)
@@ -1246,6 +1273,9 @@ fi
 %endif # %{have_inproctrace}
 %endif
 
+# It would break RHEL-5 by leaving excessive files for the doc subpackage.
+%endif # !noarch
+
 %files doc
 %doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
 %defattr(-,root,root)
@@ -1253,6 +1283,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-25.fc17
+- [rhel5] Workaround rpmbuild to make the doc subpkg noarch again (BZ 799318).
+
 * Fri Mar  2 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-24.fc17
 - [vla] Fix crash for dynamic.exp with gcc-gfortran-4.1.2-51.el5.x86_64.
 - Reintroduce RHEL-5 glibc workaround for bt-clone-stop.exp.
