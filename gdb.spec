@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -552,6 +552,14 @@ Patch646: gdb-exit-warning.patch
 #=push+work
 Patch648: gdb-archer-vla-rhel5gcc.patch
 
+# Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
+#=push
+Patch649: gdb-attach-fail-reasons-1of5.patch
+Patch650: gdb-attach-fail-reasons-2of5.patch
+Patch651: gdb-attach-fail-reasons-3of5.patch
+Patch652: gdb-attach-fail-reasons-4of5.patch
+Patch653: gdb-attach-fail-reasons-5of5.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -830,6 +838,11 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch645 -p1
 %patch646 -p1
 %patch648 -p1
+%patch649 -p1
+%patch650 -p1
+%patch651 -p1
+%patch652 -p1
+%patch653 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1296,6 +1309,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Mar  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-28.fc17
+- Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
+
 * Sun Mar  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-27.fc17
 - [rhel5] Fix up the previous commit (BZ 799318).
 
