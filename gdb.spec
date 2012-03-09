@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -559,6 +559,7 @@ Patch650: gdb-attach-fail-reasons-2of5.patch
 Patch651: gdb-attach-fail-reasons-3of5.patch
 Patch652: gdb-attach-fail-reasons-4of5.patch
 Patch653: gdb-attach-fail-reasons-5of5.patch
+Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
 # Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
 Patch654: gdb-x86-onstack.patch
@@ -579,7 +580,7 @@ BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_i
 # dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
 %endif # 0%{!?el5:1}
-BuildRequires: zlib-devel%{?_isa}
+BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
 %if 0%{!?_without_python:1}
 %if 0%{?el5:1}
 # This RHEL-5.6 python version got split out python-libs for ppc64.
@@ -850,6 +851,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch651 -p1
 %patch652 -p1
 %patch653 -p1
+%patch657 -p1
 %patch654 -p1
 %patch655 -p1
 %patch656 -p1
@@ -1017,6 +1019,8 @@ perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config
 make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS"
 
 ! grep '_RELOCATABLE.*1' gdb/config.h
+grep '^#define HAVE_LIBSELINUX 1$' gdb/config.h
+grep '^#define HAVE_SELINUX_SELINUX_H 1$' gdb/config.h
 
 if [ "$fprofile" = "-fprofile" ]
 then
@@ -1319,6 +1323,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Mar  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-30.fc17
+- Fix SELinux deny_ptrace .spec build rules (BZ 786878).
+
 * Tue Mar  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-29.fc17
 - Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
 - Fix DWARF DIEs CU vs. section relative offsets (Joel Brobecker, me).
