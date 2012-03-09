@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -562,7 +562,8 @@ Patch653: gdb-attach-fail-reasons-5of5.patch
 Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
 # Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
-Patch654: gdb-x86-onstack.patch
+Patch654: gdb-x86-onstack-1of2.patch
+Patch658: gdb-x86-onstack-2of2.patch
 
 # Fix DWARF DIEs CU vs. section relative offsets (Joel Brobecker, me).
 Patch655: gdb-die-cu-offset-1of2.patch
@@ -853,6 +854,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch653 -p1
 %patch657 -p1
 %patch654 -p1
+%patch658 -p1
 %patch655 -p1
 %patch656 -p1
 
@@ -1323,6 +1325,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Mar  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-31.fc17
+- Fix an implied regression by the inferior calls fix below (BZ 799531).
+
 * Fri Mar  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-30.fc17
 - Fix SELinux deny_ptrace .spec build rules (BZ 786878).
 
