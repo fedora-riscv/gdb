@@ -1,0 +1,60 @@
+--- gdb-7.2/gdb/solib-svr4.c.orig	2012-03-17 09:39:54.874090162 +0100
++++ gdb-7.2/gdb/solib-svr4.c	2012-03-17 09:42:12.561810807 +0100
+@@ -1179,14 +1179,30 @@ svr4_current_sos (void)
+ 		     safe_strerror (errcode));
+ 	  else
+ 	    {
+-	      struct build_id *build_id;
++	      struct build_id *build_id = NULL;
+ 
+ 	      strncpy (new->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
+ 	      new->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+ 	      /* May get overwritten below.  */
+ 	      strcpy (new->so_name, new->so_original_name);
+ 
+-	      build_id = build_id_addr_get (lm_dynamic_from_link_map (new));
++	      /* In the case the main executable was found according to its
++		 build-id (from a core file) prevent loading a different build
++		 of a library with accidentally the same SO_NAME.
++
++		 It suppresses bogus backtraces (and prints "??" there instead)
++		 if the on-disk files no longer match the running program
++		 version.
++		 
++		 If the main executable was not loaded according to its
++		 build-id do not do any build-id checking of the libraries.
++		 There may be missing build-ids dumped in the core file and we
++		 would map all the libraries to the only existing file loaded
++		 that time - the executable.  */
++
++	      if (symfile_objfile != NULL
++		  && (symfile_objfile->flags & OBJF_BUILD_ID_CORE_LOADED) != 0)
++		build_id = build_id_addr_get (lm_dynamic_from_link_map (new));
+ 	      if (build_id != NULL)
+ 		{
+ 		  char *name, *build_id_filename;
+@@ -1224,23 +1240,7 @@ svr4_current_sos (void)
+ 		      xfree (name);
+ 		    }
+ 		  else
+-		    {
+-		      debug_print_missing (new->so_name, build_id_filename);
+-
+-		      /* In the case the main executable was found according to
+-			 its build-id (from a core file) prevent loading
+-			 a different build of a library with accidentally the
+-			 same SO_NAME.
+-
+-			 It suppresses bogus backtraces (and prints "??" there
+-			 instead) if the on-disk files no longer match the
+-			 running program version.  */
+-
+-		      if (symfile_objfile != NULL
+-			  && (symfile_objfile->flags
+-			      & OBJF_BUILD_ID_CORE_LOADED) != 0)
+-			new->so_name[0] = 0;
+-		    }
++		    debug_print_missing (new->so_name, build_id_filename);
+ 
+ 		  xfree (build_id_filename);
+ 		  xfree (build_id);

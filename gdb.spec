@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?_with_upstream:.upstream}%{?dist}
+Release: 13%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -297,6 +297,9 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 #=push
 Patch274: gdb-6.6-buildid-locate.patch
+# Fix loading of core files without build-ids but with build-ids in executables.
+#=push
+Patch659: gdb-6.6-buildid-locate-solib-missing-ids.patch
 #=push
 Patch353: gdb-6.6-buildid-locate-rpm.patch
 #=push
@@ -768,6 +771,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch263 -p1
 %patch271 -p1
 %patch274 -p1
+%patch659 -p1
 %patch353 -p1
 %patch282 -p1
 %patch284 -p1
@@ -1256,6 +1260,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Mar 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-13.fc16
+- Fix loading of core files without build-ids but with build-ids in executables.
+
 * Wed Mar 1 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.3.50.20110722-12.fc16
 - Fix `corrupt probe' complaint when reading SystemTap probes.
 
