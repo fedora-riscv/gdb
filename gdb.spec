@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -299,6 +299,9 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 # New locating of the matching binaries from the pure core file (build-id).
 #=push
 Patch274: gdb-6.6-buildid-locate.patch
+# Fix loading of core files without build-ids but with build-ids in executables.
+#=push
+Patch659: gdb-6.6-buildid-locate-solib-missing-ids.patch
 #=push
 Patch353: gdb-6.6-buildid-locate-rpm.patch
 #=push
@@ -786,6 +789,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch263 -p1
 %patch271 -p1
 %patch274 -p1
+%patch659 -p1
 %patch353 -p1
 %patch276 -p1
 %patch282 -p1
@@ -1325,6 +1329,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Mar 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-32.fc17
+- Fix loading of core files without build-ids but with build-ids in executables.
+
 * Fri Mar  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-31.fc17
 - Fix an implied regression by the inferior calls fix below (BZ 799531).
 
