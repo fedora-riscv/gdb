@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1195,6 +1195,12 @@ done
 test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
       $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
+for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python -name "*.py"` \
+         `find $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_prefix} -name "*.py"` \
+; do
+  # Files come from gdb-archer.patch and can be also further patched.
+  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
+done
 %endif # 0%{!?_without_python:1}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
@@ -1217,7 +1223,7 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
-ln -s gstack.1.gz $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1.gz
+ln -s gstack.1%{!?el5:.gz} $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1%{!?el5:.gz}
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 
 # Packaged GDB is not a cross-target one.
@@ -1333,6 +1339,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Mar 30 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-34.fc17
+- Fixup %{_datadir}/gdb timestamps for multilib conflicts on RHELs.
+
 * Mon Mar 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-33.fc17
 - [vla] Fix regression on no type for subrange from IBM XLF Fortran (BZ 806920).
 
