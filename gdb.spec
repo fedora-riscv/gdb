@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -378,6 +378,10 @@ Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 # Make the GDB quit processing non-abortable to cleanup everything properly.
 #=push: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
 Patch331: gdb-6.8-quit-never-aborts.patch
+
+# [RHEL5,RHEL6] Fix attaching to stopped processes.
+#=fedora
+Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
 
 # Test the watchpoints conditionals works.
 #=fedoratest
@@ -869,13 +873,18 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
-%endif # 0%{!?el5:1} || 0%{?scl:1}
+%endif
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
-%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%endif
 %patch642 -p1
-%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
+%patch642 -p1 -R
+%endif
+%patch337 -p1
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%patch337 -p1 -R
+%endif
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1339,6 +1348,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-36.fc17
+- [RHEL5,RHEL6] Reintroduce fix attaching to stopped processes.
+
 * Fri Mar 30 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-35.fc17
 - Fix performance regressions with .gdb_index (Tom Tromey, BZ 805274).
 
