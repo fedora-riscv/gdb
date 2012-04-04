@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1348,6 +1348,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-37.fc17
+- testsuite: Fix break-interp.exp expections for updated glibc (BZ 752834).
+
 * Wed Apr  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-36.fc17
 - [RHEL5,RHEL6] Reintroduce fix attaching to stopped processes.
 
