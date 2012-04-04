@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?_with_upstream:.upstream}%{?dist}
+Release: 14%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -562,6 +562,9 @@ Patch634: gdb-runtest-pie-override.patch
 # Fix `corrupt probe' warnings for SystemTap probes.
 Patch647: gdb-stap-corrupt-probes-fix.patch
 
+# Workaround crashes from stale frame_info pointer (BZ 804256).
+Patch661: gdb-stale-frame_info.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -836,6 +839,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch631 -p1
 %patch632 -p1
 %patch634 -p1
+%patch661 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -1260,6 +1264,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Wed Apr  4 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-14.fc16
+- Workaround crashes from stale frame_info pointer (BZ 804256).
+
 * Sat Mar 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-13.fc16
 - Fix loading of core files without build-ids but with build-ids in executables.
 
