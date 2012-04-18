@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?dist}
+Release: 41%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -981,9 +981,9 @@ export CFLAGS="$RPM_OPT_FLAGS"
 	--disable-rpath						\
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
-%else # 0%{!?rhel:1} || 0%{?rhel} > 6
+%else
 	--without-system-readline				\
-%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+%endif
 	--with-expat						\
 $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--without-libexpat-prefix				\
@@ -998,7 +998,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?el5:1}
 	--without-rpm						\
 %else
-%if 0%{?el6:1} || (0%{?fedora} && 0%{?fedora} <= 14)
+%if 0%{?el6:1}
 	--with-rpm=librpm.so.1					\
 %else
 	--with-rpm=librpm.so.2					\
@@ -1015,10 +1015,14 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	--enable-64-bit-bfd					\
 %if %{have_inproctrace}
 	--enable-inprocess-agent				\
-%else # !%{have_inproctrace}
+%else
 	--disable-inprocess-agent				\
-%endif # !%{have_inproctrace}
-	--with-auto-load-safe-path=%{_prefix}			\
+%endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+	--with-auto-load-safe-path=%{_root_prefix}%{?scl::%{_scl_root}}				\
+%else
+	--with-auto-load-safe-path=%{_root_prefix}:/bin:/sbin:/lib:/lib64%{?scl::%{_scl_root}}	\
+%endif
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1379,6 +1383,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-41.fc17
+- [RHEL] Fix --with-auto-load-safe-path systems prior to /usr move.
+
 * Wed Apr 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-40.fc17
 - Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
 
