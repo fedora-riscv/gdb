@@ -33,7 +33,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?dist}
+Release: 40%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -173,10 +173,6 @@ Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 # Do not issue warning message about first page of storage for ia64 gcore
 #=ia64
 Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
-
-# Security errata for untrusted .gdbinit
-#=push
-Patch157: gdb-6.3-security-errata-20050610.patch
 
 # IA64 sigtramp prev register patch
 #=ia64
@@ -569,18 +565,37 @@ Patch653: gdb-attach-fail-reasons-5of5.patch
 Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
 # Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
+#=push+work
 Patch654: gdb-x86-onstack-1of2.patch
 Patch658: gdb-x86-onstack-2of2.patch
 
 # Fix DWARF DIEs CU vs. section relative offsets (Joel Brobecker, me).
+#=push
 Patch655: gdb-die-cu-offset-1of2.patch
 Patch656: gdb-die-cu-offset-2of2.patch
 
 # [vla] Fix regression on no type for subrange from IBM XLF Fortran (BZ 806920).
+#=push
 Patch660: gdb-subrange-no-type.patch
 
 # Workaround crashes from stale frame_info pointer (BZ 804256).
+#=push+work
 Patch661: gdb-stale-frame_info.patch
+
+# Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
+#=push
+Patch662: gdb-autoload-01of12.patch
+Patch663: gdb-autoload-02of12.patch
+Patch664: gdb-autoload-03of12.patch
+Patch665: gdb-autoload-04of12.patch
+Patch666: gdb-autoload-05of12.patch
+Patch667: gdb-autoload-06of12.patch
+Patch668: gdb-autoload-07of12.patch
+Patch669: gdb-autoload-08of12.patch
+Patch670: gdb-autoload-09of12.patch
+Patch671: gdb-autoload-10of12.patch
+Patch672: gdb-autoload-11of12.patch
+Patch673: gdb-autoload-12of12.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -768,7 +783,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch140 -p1
 %patch145 -p1
 %patch153 -p1
-%patch157 -p1
 %patch158 -p1
 %patch160 -p1
 %patch161 -p1
@@ -873,6 +887,18 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch656 -p1
 %patch660 -p1
 %patch661 -p1
+%patch662 -p1
+%patch663 -p1
+%patch664 -p1
+%patch665 -p1
+%patch666 -p1
+%patch667 -p1
+%patch668 -p1
+%patch669 -p1
+%patch670 -p1
+%patch671 -p1
+%patch672 -p1
+%patch673 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -992,6 +1018,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %else # !%{have_inproctrace}
 	--disable-inprocess-agent				\
 %endif # !%{have_inproctrace}
+	--with-auto-load-safe-path=%{_prefix}			\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1352,6 +1379,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-40.fc17
+- Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
+
 * Fri Apr 13 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-39.fc17
 - [RHEL7] Fix/remove readline-devel BuildRequires redundant distro suffic .fc17.
 
