@@ -27,7 +27,7 @@ Version: 7.3.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?_with_upstream:.upstream}%{?dist}
+Release: 49%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -171,10 +171,6 @@ Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 # Do not issue warning message about first page of storage for ia64 gcore
 #=ia64
 Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
-
-# Security errata for untrusted .gdbinit
-#=push
-Patch157: gdb-6.3-security-errata-20050610.patch
 
 # IA64 sigtramp prev register patch
 #=ia64
@@ -586,6 +582,28 @@ Patch636: gdb-anon-namespace-crash.patch
 # [python] Fix crash when pretty printer fails (Phil Muldoon, BZ 712715).
 Patch637: gdb-pretty-printer-crash.patch
 
+# Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
+#=push
+Patch662: gdb-autoload-01of19.patch
+Patch663: gdb-autoload-02of19.patch
+Patch664: gdb-autoload-03of19.patch
+Patch665: gdb-autoload-04of19.patch
+Patch666: gdb-autoload-05of19.patch
+Patch667: gdb-autoload-06of19.patch
+Patch668: gdb-autoload-07of19.patch
+Patch669: gdb-autoload-08of19.patch
+Patch670: gdb-autoload-09of19.patch
+Patch671: gdb-autoload-10of19.patch
+Patch672: gdb-autoload-11of19.patch
+Patch673: gdb-autoload-12of19.patch
+Patch674: gdb-autoload-13of19.patch
+Patch675: gdb-autoload-14of19.patch
+Patch676: gdb-autoload-15of19.patch
+Patch677: gdb-autoload-16of19.patch
+Patch678: gdb-autoload-17of19.patch
+Patch679: gdb-autoload-18of19.patch
+Patch680: gdb-autoload-19of19.patch
+
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
 # Requires: readline%{?_isa}
@@ -762,7 +780,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch259 -p1
 %patch145 -p1
 %patch153 -p1
-%patch157 -p1
 %patch158 -p1
 %patch160 -p1
 %patch161 -p1
@@ -870,6 +887,25 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch635 -p1
 %patch636 -p1
 %patch637 -p1
+%patch662 -p1
+%patch663 -p1
+%patch664 -p1
+%patch665 -p1
+%patch666 -p1
+%patch667 -p1
+%patch668 -p1
+%patch669 -p1
+%patch670 -p1
+%patch671 -p1
+%patch672 -p1
+%patch673 -p1
+%patch674 -p1
+%patch675 -p1
+%patch676 -p1
+%patch677 -p1
+%patch678 -p1
+%patch679 -p1
+%patch680 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -983,6 +1019,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?_with_debug:1}
 	--enable-static --disable-shared --enable-debug		\
 %endif
+	--with-auto-load-safe-path=%{_root_prefix}:/bin:/sbin:/lib:/lib64	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1292,6 +1329,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Sat Apr 21 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-49.fc15
+- Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
+
 * Sat Mar 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.1-48.fc15
 - Fix loading of core files without build-ids but with build-ids in executables.
 

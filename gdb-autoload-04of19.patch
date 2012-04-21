@@ -1,0 +1,70 @@
+http://sourceware.org/ml/gdb-cvs/2011-09/msg00121.html
+
+### src/gdb/ChangeLog	2011/09/19 10:50:53	1.13352
+### src/gdb/ChangeLog	2011/09/19 19:01:38	1.13353
+## -1,3 +1,9 @@
++2011-09-19  Doug Evans  <dje@google.com>
++
++	* python/py-auto-load.c (source_section_scripts): Fix file
++	descriptor leak.
++	* python/python.c (source_python_script_for_objfile): Tweak comments.
++
+ 2011-09-18  Yao Qi  <yao@codesourcery.com>
+ 	    Ulrich Weigand  <ulrich.weigand@linaro.org>
+ 
+--- src/gdb/python/python.c	2011/09/15 12:42:30	1.72
++++ src/gdb/python/python.c	2011/09/19 19:01:40	1.73
+@@ -903,7 +903,10 @@
+ static struct objfile *gdbpy_current_objfile;
+ 
+ /* Set the current objfile to OBJFILE and then read STREAM,FILE as
+-   Python code.  */
++   Python code.
++   STREAM is left open, it is up to the caller to close it.
++   If an exception occurs python will print the traceback and
++   clear the error indicator.  */
+ 
+ void
+ source_python_script_for_objfile (struct objfile *objfile,
+@@ -914,8 +917,6 @@
+   cleanups = ensure_python_env (get_objfile_arch (objfile), current_language);
+   gdbpy_current_objfile = objfile;
+ 
+-  /* Note: If an exception occurs python will print the traceback and
+-     clear the error indicator.  */
+   PyRun_SimpleFile (stream, file);
+ 
+   do_cleanups (cleanups);
+--- src/gdb/python/py-auto-load.c	2011/08/04 19:10:14	1.12
++++ src/gdb/python/py-auto-load.c	2011/09/19 19:01:40	1.13
+@@ -296,9 +296,6 @@
+       in_hash_table = maybe_add_script (pspace_info->loaded_scripts, file,
+ 					opened ? full_path : NULL);
+ 
+-      if (opened)
+-	free (full_path);
+-
+       if (! opened)
+ 	{
+ 	  /* We don't throw an error, the program is still debuggable.  */
+@@ -310,12 +307,15 @@
+ 		       GDBPY_AUTO_SECTION_NAME, objfile->name);
+ 	      pspace_info->script_not_found_warning_printed = TRUE;
+ 	    }
+-	  continue;
+ 	}
+-
+-      /* If this file is not currently loaded, load it.  */
+-      if (! in_hash_table)
+-	source_python_script_for_objfile (objfile, stream, file);
++      else
++	{
++	  /* If this file is not currently loaded, load it.  */
++	  if (! in_hash_table)
++	    source_python_script_for_objfile (objfile, stream, file);
++	  fclose (stream);
++	  free (full_path);
++	}
+     }
+ }
+ 
