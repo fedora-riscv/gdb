@@ -27,7 +27,7 @@ Version: 7.3.50.20110722
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?_with_upstream:.upstream}%{?dist}
+Release: 16%{?_with_upstream:.upstream}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -563,22 +563,28 @@ Patch661: gdb-stale-frame_info.patch
 
 # Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
 #=push
-Patch662: gdb-autoload-01of16.patch
-Patch663: gdb-autoload-02of16.patch
-Patch664: gdb-autoload-03of16.patch
-Patch665: gdb-autoload-04of16.patch
-Patch666: gdb-autoload-05of16.patch
-Patch667: gdb-autoload-06of16.patch
-Patch668: gdb-autoload-07of16.patch
-Patch669: gdb-autoload-08of16.patch
-Patch670: gdb-autoload-09of16.patch
-Patch671: gdb-autoload-10of16.patch
-Patch672: gdb-autoload-11of16.patch
-Patch673: gdb-autoload-12of16.patch
-Patch674: gdb-autoload-13of16.patch
-Patch675: gdb-autoload-14of16.patch
-Patch676: gdb-autoload-15of16.patch
-Patch677: gdb-autoload-16of16.patch
+Patch662: gdb-autoload-01of22.patch
+Patch663: gdb-autoload-02of22.patch
+Patch664: gdb-autoload-03of22.patch
+Patch665: gdb-autoload-04of22.patch
+Patch666: gdb-autoload-05of22.patch
+Patch667: gdb-autoload-06of22.patch
+Patch668: gdb-autoload-07of22.patch
+Patch669: gdb-autoload-08of22.patch
+Patch670: gdb-autoload-09of22.patch
+Patch671: gdb-autoload-10of22.patch
+Patch672: gdb-autoload-11of22.patch
+Patch673: gdb-autoload-12of22.patch
+Patch674: gdb-autoload-13of22.patch
+Patch675: gdb-autoload-14of22.patch
+Patch676: gdb-autoload-15of22.patch
+Patch677: gdb-autoload-16of22.patch
+Patch678: gdb-autoload-17of22.patch
+Patch679: gdb-autoload-18of22.patch
+Patch680: gdb-autoload-19of22.patch
+Patch681: gdb-autoload-20of22.patch
+Patch682: gdb-autoload-21of22.patch
+Patch683: gdb-autoload-22of22.patch
 
 BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
 # --without-system-readline
@@ -853,6 +859,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch631 -p1
 %patch632 -p1
 %patch634 -p1
+%patch647 -p1
 %patch661 -p1
 %patch662 -p1
 %patch663 -p1
@@ -870,6 +877,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch675 -p1
 %patch676 -p1
 %patch677 -p1
+%patch678 -p1
+%patch679 -p1
+%patch680 -p1
+%patch681 -p1
+%patch682 -p1
+%patch683 -p1
 
 %patch393 -p1
 %patch335 -p1
@@ -880,7 +893,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch487 -p1
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
-%patch647 -p1
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -984,7 +996,8 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?_with_debug:1}
 	--enable-static --disable-shared --enable-debug		\
 %endif
-	--with-auto-load-safe-path=%{_root_prefix}:/bin:/sbin:/lib:/lib64	\
+$(: %{_bindir}/mono-gdb.py is workaround for mono BZ 815501. )						\
+	--with-auto-load-safe-path=%{_datadir}/gdb/auto-load:/usr/lib/debug:%{_bindir}/mono-gdb.py	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1295,6 +1308,9 @@ fi
 %{_infodir}/gdb.info*
 
 %changelog
+* Tue Apr 24 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-16.fc16
+- Update "set auto-load" patchset and the --with-auto-load-safe-path setting.
+
 * Thu Apr 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.3.50.20110722-15.fc16
 - Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
 
