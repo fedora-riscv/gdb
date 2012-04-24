@@ -1,0 +1,231 @@
+http://sourceware.org/ml/gdb-patches/2012-04/msg00758.html
+Subject: [patch] auto-load safe-path default=$ddir/auto-load  [Re: [patch] auto-load safe-path reset back by set ""]
+
+On Sun, 22 Apr 2012 23:26:16 +0200, Doug Evans wrote:
+> A thought occurred to me regarding the default value of auto-load-path
+> = ${prefix}.
+
+This is unrelated to this patch but thanks for the suggestion.
+
+
+> So I was wondering if we really want security to be on by default,
+> should the default value be gdb's data-directory (e.g.,
+> $prefix/share/gdb) + $exec_prefix/lib{,32,64} + ???
+
+Made it therefore $ddir/auto-load, on an ideal system/distro we can change all
+the auto-loaded GDB files to be located under $ddir/auto-load.  I have filed
+for the only remaining violation (/usr/bin/mono-gdb.py) known to me:
+	https://bugzilla.redhat.com/show_bug.cgi?id=815501
+	(Sure I will ask about upstreaming of the change.)
+
+
+> Plus, it seems like at least data-directory should be relocatable.
+> Implementing this might be cumbersome unless data-directory was
+> represented as something like "$ddir".
+
+Done.  Unfortunately this still does not fix the "./gdb" run for a newly built
+GDB.  Newly built GDB probably could use "-data-directory $PWD/data-directory"
+(if GDB's program dir contains "data-directory" sort of relocation).
+We could then change current
+	gdb-gdb.gdb.in -> gdb-gdb.gdb
+to
+	gdb-gdb.gdb.in -> data-directory/auto-load/$PWD/gdb-gdb.gdb
+and even install the file (with proper installation directories) as:
+	/usr/share/gdb/usr/bin/gdb-gdb.gdb
+	(additionally ensuring for example in Fedora - in its .spec file
+	@srcdir@ gets substituted right for Fedora *-debuginfo.rpm)
+
+Would it make everyone happy?
+
+
+Thanks,
+Jan
+
+
+gdb/
+2012-04-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Change auto-load safe-path default to $ddir/auto-load.
+	* auto-load.c (auto_load_safe_path_vec_update): Call
+	substitute_path_component for $ddir.
+	* configure: Regenerate.
+	* configure.ac (--with-auto-load-safe-path): Suggest $ddir syntax.
+	Change the default to \\\$ddir/auto-load.
+	* defs.h (substitute_path_component): New declaration.
+	* utils.c (substitute_path_component): New function.
+
+gdb/doc/
+2012-04-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Change auto-load safe-path default to $ddir/auto-load.
+	* gdb.texinfo (Auto-loading): Change shown safe-path default to
+	$ddir/auto-load.
+	(Auto-loading safe path): Change the sample warning to $ddir/auto-load.
+	Twice.  Mention the $ddir substitution.
+
+Index: gdb-7.3.50.20110722/gdb/auto-load.c
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/auto-load.c	2012-04-24 20:37:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/auto-load.c	2012-04-24 20:37:53.902703805 +0200
+@@ -141,8 +141,12 @@ auto_load_safe_path_vec_update (void)
+   for (ix = 0; ix < len; ix++)
+     {
+       char *dir = VEC_index (char_ptr, auto_load_safe_path_vec, ix);
+-      char *expanded = tilde_expand (dir);
+-      char *real_path = gdb_realpath (expanded);
++      char *expanded, *real_path;
++
++      expanded = tilde_expand (dir);
++      substitute_path_component (&expanded, "$ddir", gdb_datadir);
++
++      real_path = gdb_realpath (expanded);
+ 
+       /* Ensure the current entry is at least tilde_expand-ed.  */
+       VEC_replace (char_ptr, auto_load_safe_path_vec, ix, expanded);
+Index: gdb-7.3.50.20110722/gdb/configure
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/configure	2012-04-24 20:37:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/configure	2012-04-24 20:37:53.904703800 +0200
+@@ -1664,7 +1664,8 @@ Optional Packages:
+   --with-rpm              query rpm database for missing debuginfos (yes/no,
+                           def. auto=librpm.so)
+   --with-auto-load-safe-path=PATH
+-                          directories safe to hold auto-loaded files
++                          directories safe to hold auto-loaded files, use
++                          '\\\$ddir' for -data-directory
+   --without-auto-load-safe-path
+                           do not restrict auto-loaded files locations
+   --with-libunwind        use libunwind frame unwinding support
+@@ -8392,7 +8393,7 @@ if test "${with_auto_load_safe_path+set}
+    with_auto_load_safe_path="/"
+  fi
+ else
+-  with_auto_load_safe_path="$prefix"
++  with_auto_load_safe_path='\\\$ddir/auto-load'
+ fi
+ 
+ 
+Index: gdb-7.3.50.20110722/gdb/configure.ac
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/configure.ac	2012-04-24 20:37:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/configure.ac	2012-04-24 20:37:53.904703800 +0200
+@@ -303,12 +303,13 @@ fi
+  
+ AC_MSG_CHECKING([for default auto-load safe-path])
+ AC_ARG_WITH(auto-load-safe-path,
+-AS_HELP_STRING([--with-auto-load-safe-path=PATH], [directories safe to hold auto-loaded files])
++AS_HELP_STRING([--with-auto-load-safe-path=PATH],
++  [directories safe to hold auto-loaded files, use '\\\$ddir' for -data-directory])
+ AS_HELP_STRING([--without-auto-load-safe-path], [do not restrict auto-loaded files locations]),
+ [if test "$with_auto_load_safe_path" = "no"; then
+    with_auto_load_safe_path="/"
+  fi],
+-[with_auto_load_safe_path="$prefix"])
++[with_auto_load_safe_path='\\\$ddir/auto-load'])
+ AC_DEFINE_DIR(DEFAULT_AUTO_LOAD_SAFE_PATH, with_auto_load_safe_path,
+ 	      [Directories safe to hold auto-loaded files.])
+ AC_MSG_RESULT([$with_auto_load_safe_path])
+Index: gdb-7.3.50.20110722/gdb/defs.h
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/defs.h	2012-04-24 20:37:47.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/defs.h	2012-04-24 20:38:42.944581730 +0200
+@@ -432,6 +432,9 @@ extern const char *gdb_bfd_errmsg (bfd_e
+ 
+ extern int parse_pid_to_attach (char *args);
+ 
++extern void substitute_path_component (char **stringp, const char *from,
++				       const char *to);
++
+ /* From demangle.c */
+ 
+ extern void set_demangling_style (char *);
+Index: gdb-7.3.50.20110722/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/doc/gdb.texinfo	2012-04-24 20:37:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/doc/gdb.texinfo	2012-04-24 20:37:53.909703788 +0200
+@@ -20113,7 +20113,7 @@ libthread-db:  Auto-loading of inferior
+ local-gdbinit:  Auto-loading of .gdbinit script from current directory is on.
+ python-scripts:  Auto-loading of Python scripts is on.
+ safe-path:  List of directories from which it is safe to auto-load files
+-            is /usr/local.
++            is $ddir/auto-load.
+ @end smallexample
+ 
+ @anchor{info auto-load}
+@@ -20315,9 +20315,9 @@ get loaded:
+ $ ./gdb -q ./gdb
+ Reading symbols from /home/user/gdb/gdb...done.
+ warning: File "/home/user/gdb/gdb-gdb.gdb" auto-loading has been
+-         declined by your `auto-load safe-path' set to "/usr/local".
++         declined by your `auto-load safe-path' set to "$ddir/auto-load".
+ warning: File "/home/user/gdb/gdb-gdb.py" auto-loading has been
+-         declined by your `auto-load safe-path' set to "/usr/local".
++         declined by your `auto-load safe-path' set to "$ddir/auto-load".
+ @end smallexample
+ 
+ The list of trusted directories is controlled by the following commands:
+@@ -20349,6 +20349,11 @@ loading and execution of scripts.  Multi
+ host platform directory separator in use.
+ @end table
+ 
++Any used string @file{$ddir} will get replaced by @var{data-directory} which is
++determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$ddir} must be
++be placed as a directory component - either alone or delimited by @file{/} or
++@file{\} directory separators, depending on the host platform.
++
+ Setting this variable to @file{/} disables this security
+ protection.
+ This variable is supposed to be set to the system directories writable by the
+Index: gdb-7.3.50.20110722/gdb/utils.c
+===================================================================
+--- gdb-7.3.50.20110722.orig/gdb/utils.c	2012-04-24 20:37:48.000000000 +0200
++++ gdb-7.3.50.20110722/gdb/utils.c	2012-04-24 20:39:12.745507543 +0200
+@@ -3797,6 +3797,48 @@ dirnames_to_char_ptr_vec (const char *di
+   return retval;
+ }
+ 
++/* Substitute all occurences of string FROM by string TO in *STRINGP.  *STRINGP
++   must come from xrealloc-compatible allocator and it may be updated.  FROM
++   needs to be delimited by IS_DIR_SEPARATOR (or be located at the start or
++   end of *STRINGP.  */
++
++void
++substitute_path_component (char **stringp, const char *from, const char *to)
++{
++  char *string = *stringp, *s;
++  const size_t from_len = strlen (from);
++  const size_t to_len = strlen (to);
++
++  for (s = string;;)
++    {
++      s = strstr (s, from);
++      if (s == NULL)
++	break;
++
++      if ((s == string || IS_DIR_SEPARATOR (s[-1]))
++          && (s[from_len] == '\0' || IS_DIR_SEPARATOR (s[from_len])))
++	{
++	  char *string_new;
++
++	  string_new = xrealloc (string, (strlen (string) + to_len + 1));
++
++	  /* Relocate the current S pointer.  */
++	  s = s - string + string_new;
++	  string = string_new;
++
++	  /* Replace from by to.  */
++	  memmove (&s[to_len], &s[from_len], strlen (&s[from_len]) + 1);
++	  memcpy (s, to, to_len);
++
++	  s += to_len;
++	}
++      else
++	s++;
++    }
++
++  *stringp = string;
++}
++
+ /* Provide a prototype to silence -Wmissing-prototypes.  */
+ extern initialize_file_ftype _initialize_utils;
+ 
