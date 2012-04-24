@@ -20,6 +20,8 @@
 %{!?scl:
  %global pkg_name %{name}
  %global _root_prefix %{_prefix}
+ %global _root_datadir %{_datadir}
+ %global _root_bindir %{_bindir}
 }
 
 Summary: A GNU source-level debugger for C, C++, Fortran and other languages
@@ -33,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?dist}
+Release: 42%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -65,11 +67,11 @@ Obsoletes: gdb64 < 5.3.91
 %endif # 0%{!?el5:1}
 %endif # %{ix86} x86_64
 
-# Nobody is going to run gdb-add-index from SCL package on RHEL-5.
-%if !(0%{?el5:1} && 0%{?scl:1})
+# gdb-add-index cannot be run even for SCL package on RHEL<=6.
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 # eu-strip: -g recognizes .gdb_index as a debugging section. (#631997)
 Conflicts: elfutils < 0.149
-%endif # !(0%{?el5:1} && 0%{?scl:1})
+%endif
 
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
 Provides: bundled(libiberty) = %{snap}
@@ -584,18 +586,24 @@ Patch661: gdb-stale-frame_info.patch
 
 # Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
 #=push
-Patch662: gdb-autoload-01of12.patch
-Patch663: gdb-autoload-02of12.patch
-Patch664: gdb-autoload-03of12.patch
-Patch665: gdb-autoload-04of12.patch
-Patch666: gdb-autoload-05of12.patch
-Patch667: gdb-autoload-06of12.patch
-Patch668: gdb-autoload-07of12.patch
-Patch669: gdb-autoload-08of12.patch
-Patch670: gdb-autoload-09of12.patch
-Patch671: gdb-autoload-10of12.patch
-Patch672: gdb-autoload-11of12.patch
-Patch673: gdb-autoload-12of12.patch
+Patch662: gdb-autoload-01of18.patch
+Patch663: gdb-autoload-02of18.patch
+Patch664: gdb-autoload-03of18.patch
+Patch665: gdb-autoload-04of18.patch
+Patch666: gdb-autoload-05of18.patch
+Patch667: gdb-autoload-06of18.patch
+Patch668: gdb-autoload-07of18.patch
+Patch669: gdb-autoload-08of18.patch
+Patch670: gdb-autoload-09of18.patch
+Patch671: gdb-autoload-10of18.patch
+Patch672: gdb-autoload-11of18.patch
+Patch673: gdb-autoload-12of18.patch
+Patch674: gdb-autoload-13of18.patch
+Patch675: gdb-autoload-14of18.patch
+Patch676: gdb-autoload-15of18.patch
+Patch677: gdb-autoload-16of18.patch
+Patch678: gdb-autoload-17of18.patch
+Patch679: gdb-autoload-18of18.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -899,6 +907,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch671 -p1
 %patch672 -p1
 %patch673 -p1
+%patch674 -p1
+%patch675 -p1
+%patch676 -p1
+%patch677 -p1
+%patch678 -p1
+%patch679 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1018,11 +1032,9 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %else
 	--disable-inprocess-agent				\
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-	--with-auto-load-safe-path=%{_root_prefix}%{?scl::%{_scl_root}}				\
-%else
-	--with-auto-load-safe-path=%{_root_prefix}:/bin:/sbin:/lib:/lib64%{?scl::%{_scl_root}}	\
-%endif
+$(: %{_bindir}/mono-gdb.py is workaround for mono BZ 815501. )											\
+$(: for the scl part see unfixed BZ 815910. )													\
+	--with-auto-load-safe-path=%{_datadir}/gdb/auto-load:/usr/lib/debug%{?scl::%{_root_datadir}/gdb/auto-load}:%{_root_bindir}/mono-gdb.py	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1248,10 +1260,10 @@ done
 %endif # 0%{!?_without_python:1}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
-# gdb-add-index does not have sufficient version of elfutils on RHEL-5 (in SCL).
-%if 0%{?el5:1} && 0%{?scl:1}
+# gdb-add-index cannot be run even for SCL package on RHEL<=6.
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 rm -f $RPM_BUILD_ROOT%{_bindir}/gdb-add-index
-%endif # 0%{?el5:1} && 0%{?scl:1}
+%endif
 
 # Remove the files that are part of a gdb build but that are owned and
 # provided by other packages.
@@ -1328,10 +1340,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/gdbtui
 %{_mandir}/*/gdbtui.1*
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
-# gdb-add-index does not have sufficient version of elfutils on RHEL-5 (in SCL).
-%if !(0%{?el5:1} && 0%{?scl:1})
+# gdb-add-index cannot be run even for SCL package on RHEL<=6.
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 %{_bindir}/gdb-add-index
-%endif # !(0%{?el5:1} && 0%{?scl:1})
+%endif
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
@@ -1383,6 +1395,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Apr 24 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-42.fc17
+- Update "set auto-load" patchset and the --with-auto-load-safe-path setting.
+- [RHEL] Disable gdb-add-index even on RHEL-6 as RHEL-6.0 had too old elfutils.
+
 * Wed Apr 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-41.fc17
 - [RHEL] Fix --with-auto-load-safe-path systems prior to /usr move.
 
