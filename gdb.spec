@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?dist}
+Release: 43%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -376,6 +376,10 @@ Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 # Make the GDB quit processing non-abortable to cleanup everything properly.
 #=push: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
 Patch331: gdb-6.8-quit-never-aborts.patch
+
+# [RHEL5] Workaround kernel for detaching SIGSTOPped processes (BZ 809382).
+#=fedora
+Patch335: gdb-rhel5-compat.patch
 
 # [RHEL5,RHEL6] Fix attaching to stopped processes.
 #=fedora
@@ -926,7 +930,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch642 -p1 -R
 %endif
 %patch337 -p1
+%patch335 -p1
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+%patch335 -p1 -R
 %patch337 -p1 -R
 %endif
 
@@ -1395,6 +1401,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr 25 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-43.fc17
+- [RHEL5] Workaround kernel for detaching SIGSTOPped processes (BZ 809382).
+
 * Tue Apr 24 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-42.fc17
 - Update "set auto-load" patchset and the --with-auto-load-safe-path setting.
 - [RHEL] Disable gdb-add-index even on RHEL-6 as RHEL-6.0 had too old elfutils.
