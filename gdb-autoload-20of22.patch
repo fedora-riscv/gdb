@@ -1,0 +1,76 @@
+http://sourceware.org/ml/gdb-patches/2012-05/msg00180.html
+Subject: [patch] auto-load fix multi-dir debug-file-directory
+
+Hi,
+
+I forgot to fix this case myself, Python auto-load was implemented by:
+	commit 1e5e2afd7cfa6bb62abb9493a514c70489e19c32
+	Author: Tom Tromey <tromey@redhat.com>
+	Date:   Thu May 28 00:40:23 2009 +0000
+
+while multi-dir debug-file-directory was implemented by
+	commit 36ae52d16cc9d38cfe317a79bb5d63c624359154
+	Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+	Date:   Mon Nov 2 14:59:48 2009 +0000
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora17-linux-gnu.
+
+And debug_file_directory really cannot be NULL after GDB initialization code.
+
+
+Thanks,
+Jan
+
+
+gdb/
+2012-05-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make auto-load handle multiple components of DEBUG_FILE_DIRECTORY.
+	* auto-load.c (auto_load_objfile_script): Remove check for NULL
+	DEBUG_FILE_DIRECTORY.  Handle multiple components of
+	DEBUG_FILE_DIRECTORY.
+
+Diff --git a/gdb/auto-load.c b/gdb/auto-load.c
+index 9d4d0bc..254de3b 100644
+--- a/gdb/auto-load.c
++++ b/gdb/auto-load.c
+@@ -587,17 +587,29 @@ auto_load_objfile_script (struct objfile *objfile,
+   input = fopen (filename, "r");
+   debugfile = filename;
+ 
+-  if (!input && debug_file_directory)
++  if (!input)
+     {
+-      /* Also try the same file in the separate debug info directory.  */
+-      debugfile = xmalloc (strlen (filename)
+-			   + strlen (debug_file_directory) + 1);
+-      strcpy (debugfile, debug_file_directory);
+-      /* FILENAME is absolute, so we don't need a "/" here.  */
+-      strcat (debugfile, filename);
++      char *debugdir;
++      VEC (char_ptr) *debugdir_vec;
++      int ix;
+ 
+-      make_cleanup (xfree, debugfile);
+-      input = fopen (debugfile, "r");
++      debugdir_vec = dirnames_to_char_ptr_vec (debug_file_directory);
++      make_cleanup_free_char_ptr_vec (debugdir_vec);
++
++      for (ix = 0; VEC_iterate (char_ptr, debugdir_vec, ix, debugdir); ++ix)
++	{
++	  /* Also try the same file in the separate debug info directory.  */
++	  debugfile = xmalloc (strlen (debugdir) + strlen (filename) + 1);
++	  strcpy (debugfile, debugdir);
++
++	  /* FILENAME is absolute, so we don't need a "/" here.  */
++	  strcat (debugfile, filename);
++
++	  make_cleanup (xfree, debugfile);
++	  input = fopen (debugfile, "r");
++	  if (input != NULL)
++	    break;
++	}
+     }
+ 
+   if (!input && gdb_datadir)
+
