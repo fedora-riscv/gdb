@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 45%{?dist}
+Release: 46%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1130,7 +1130,15 @@ done	# fprofile
 
 cd %{gdb_build}
 
-make %{?_smp_mflags} -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split
+make \
+$(: There was a race on RHEL-5: ) \
+$(: fmtutil: format directory '/builddir/.texmf-var/web2c' does not exist. ) \
+%if 0%{?el5:1}
+     -j1 \
+%else
+     %{?_smp_mflags} \
+%endif
+     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1421,6 +1429,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon May 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-46.fc17
+- [RHEL5] Workaround doc build race.
+
 * Mon May 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-45.fc17
 - Rename "set auto-load" patchset variable $ddir to $datadir.
 
