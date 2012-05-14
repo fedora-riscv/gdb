@@ -1,93 +1,35 @@
-http://sourceware.org/ml/gdb-patches/2012-05/msg00301.html
-Subject: Re: [patch 2/2] Implement multi-component --with-auto-load-dir
+http://sourceware.org/ml/gdb-cvs/2012-05/msg00081.html
 
-On Wed, 09 May 2012 19:47:07 +0200, Eli Zaretskii wrote:
-> > Date: Wed, 9 May 2012 17:48:47 +0200
-> > From: Jan Kratochvil <jan.kratochvil@redhat.com>
-> > 
-> > +set auto-load scripts-directory <dir1>[:<dir2>...]
-> > +  Set a list of directories with auto-loaded scripts.  Automatically
-> 
->   "Set a list of directories from which to load auto-loaded scripts."
-
-OK.
-
-
-> > +Set the list of directories with auto-loaded scripts."), _("\
-> > +Show the list of directories with auto-loaded scripts."), _("\
-> 
-> Likewise here.
-
-But used "the", "the" is present/reviewed in many other locations in code.
-
-
-> > +may be delimited by the host platform directory separator in use.
-> 
-> I believe the correct term is "path separator".
-
-done.
-
-
-> I suggest to say
-> 
->   (@samp{:} on Unix, @samp{;} on Windows and DOS)
-> 
-> for clarity here, and not further down.
-
-Used, with MS- prefixes.
-
-
-> 
-> > +Each entry here needs to be covered also by the security setting
-> > +@xref{set auto-load safe-path}.
->    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> You want "(@pxref{...})" here.
-
-Used:
-Each entry here needs to be covered also by the security setting
-@code{set auto-load safe-path} (@pxref{set auto-load safe-path}).
-
-
-Thanks,
-Jan
-
-
-gdb/
-2012-05-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Implement multi-component --with-auto-load-dir.
-	* NEWS (set auto-load scripts-directory, --with-auto-load-dir): New
-	entries.
-	(--with-auto-load-safe-path): Update the default value description.
-	* auto-load.c (auto_load_dir, set_auto_load_dir, show_auto_load_dir):
-	New.
-	(auto_load_objfile_script): Add DEBUG_AUTO_LOAD output.  Remove
-	GDB_DATADIR NULL check.  Replace GDB_DATADIR/auto-load by
-	AUTO_LOAD_DIR.  Support $ddir and multiple components in it.
-	(_initialize_auto_load): Initialize also auto_load_dir.  Install new
-	"set auto-load scripts-directory".
-	* config.in: Regenerate.
-	* configure: Regenerate.
-	* configure.ac (--with-auto-load-dir): New configure option.
-	(--auto-load-safe-path): Change the default to --with-auto-load-dir.
-
-gdb/doc/
-2012-05-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Implement multi-component --with-auto-load-dir.
-	* gdb.texinfo (Auto-loading): New references
-	for 'set auto-load scripts-directory'
-	and 'show auto-load scripts-directory'.
-	(Auto-loading safe path): Describe the new default.  Move $ddir
-	substituation reference to 'objfile-gdb.py file'.
-	(objfile-gdb.py file): Describe script-name alias.  Change real-name to
-	script-name.  Describe new 'set auto-load scripts-directory'
-	and 'show auto-load scripts-directory'.
-
+### src/gdb/ChangeLog	2012/05/11 18:13:22	1.14237
+### src/gdb/ChangeLog	2012/05/11 18:20:25	1.14238
+## -1,5 +1,23 @@
+ 2012-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
++	Implement multi-component --with-auto-load-dir.
++	* NEWS (set auto-load scripts-directory, --with-auto-load-dir): New
++	entries.
++	(--with-auto-load-safe-path): Update the default value description.
++	* auto-load.c (auto_load_dir, set_auto_load_dir, show_auto_load_dir):
++	New.
++	(auto_load_objfile_script): Add DEBUG_AUTO_LOAD output.  Remove
++	GDB_DATADIR NULL check.  Replace GDB_DATADIR/auto-load by
++	AUTO_LOAD_DIR.  Support $ddir and multiple components in it.
++	(_initialize_auto_load): Initialize also auto_load_dir.  Install new
++	"set auto-load scripts-directory".
++	* config.in: Regenerate.
++	* configure: Regenerate.
++	* configure.ac (--with-auto-load-dir): New configure option.
++	(--auto-load-safe-path): Change the default to --with-auto-load-dir.
++
++2012-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
+ 	Provide $ddir substitution for --with-auto-load-safe-path.
+ 	* NEWS (--with-auto-load-safe-path, --without-auto-load-safe-path): New
+ 	entries.
 Index: gdb-7.4.50.20120120/gdb/NEWS
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/NEWS	2012-05-09 22:14:29.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/NEWS	2012-05-09 22:17:16.416914184 +0200
+--- gdb-7.4.50.20120120.orig/gdb/NEWS	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/NEWS	2012-05-14 14:18:29.712985871 +0200
 @@ -67,6 +67,12 @@ set auto-load libthread-db on|off
  show auto-load libthread-db
    Control auto-loading of inferior specific thread debugging shared library.
@@ -101,27 +43,27 @@ Index: gdb-7.4.50.20120120/gdb/NEWS
  set auto-load safe-path <dir1>[:<dir2>...]
  show auto-load safe-path
    Set a list of directories from which it is safe to auto-load files.
-@@ -78,10 +84,14 @@ show debug auto-load
+@@ -309,10 +315,14 @@ show trace-stop-notes
  
  * New configure options
  
 +--with-auto-load-dir
 +  Configure default value for the 'set auto-load scripts-directory'
 +  setting above.  It defaults to '$ddir/auto-load', $ddir representing
-+  the value of configure option --with-gdb-datadir.
++  GDB's data directory (available via show data-directory).
 +
  --with-auto-load-safe-path
    Configure default value for the 'set auto-load safe-path' setting
--  above.  It defaults to '$ddir/auto-load', $ddir representing the value
--  of configure option --with-gdb-datadir.
+-  above.  It defaults to '$ddir/auto-load', $ddir representing GDB's
+-  data directory (available via show data-directory).
 +  above.  It defaults to the --with-auto-load-dir setting.
  
  --without-auto-load-safe-path
    Set 'set auto-load safe-path' to '/', effectively disabling this
 Index: gdb-7.4.50.20120120/gdb/auto-load.c
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/auto-load.c	2012-05-09 22:14:04.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/auto-load.c	2012-05-09 22:17:16.417914182 +0200
+--- gdb-7.4.50.20120120.orig/gdb/auto-load.c	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/auto-load.c	2012-05-14 14:18:29.713985869 +0200
 @@ -108,6 +108,35 @@ show_auto_load_local_gdbinit (struct ui_
  		    value);
  }
@@ -266,8 +208,8 @@ Index: gdb-7.4.50.20120120/gdb/auto-load.c
    add_setshow_optional_filename_cmd ("safe-path", class_support,
 Index: gdb-7.4.50.20120120/gdb/config.in
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/config.in	2012-05-09 22:14:04.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/config.in	2012-05-09 22:17:16.417914182 +0200
+--- gdb-7.4.50.20120120.orig/gdb/config.in	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/config.in	2012-05-14 14:18:29.713985869 +0200
 @@ -7,6 +7,9 @@
  /* Define if building universal (internal helper macro) */
  #undef AC_APPLE_UNIVERSAL_BUILD
@@ -280,8 +222,8 @@ Index: gdb-7.4.50.20120120/gdb/config.in
  
 Index: gdb-7.4.50.20120120/gdb/configure
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/configure	2012-05-09 22:16:19.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/configure	2012-05-09 22:19:19.192716798 +0200
+--- gdb-7.4.50.20120120.orig/gdb/configure	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/configure	2012-05-14 14:21:13.068849103 +0200
 @@ -955,6 +955,7 @@ with_separate_debug_dir
  with_gdb_datadir
  with_relocated_sources
@@ -348,8 +290,8 @@ Index: gdb-7.4.50.20120120/gdb/configure
  escape_dir=`echo $with_auto_load_safe_path | sed 's/[$]ddir\>/\\\\\\\\\\\\&/g'`
 Index: gdb-7.4.50.20120120/gdb/configure.ac
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/configure.ac	2012-05-09 22:16:10.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/configure.ac	2012-05-09 22:19:08.390734167 +0200
+--- gdb-7.4.50.20120120.orig/gdb/configure.ac	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/configure.ac	2012-05-14 14:21:01.597871716 +0200
 @@ -339,16 +339,26 @@ extern rpmdbMatchIterator rpmtsInitItera
    fi
  fi
@@ -381,8 +323,8 @@ Index: gdb-7.4.50.20120120/gdb/configure.ac
  	      [Directories safe to hold auto-loaded files.])
 Index: gdb-7.4.50.20120120/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/doc/gdb.texinfo	2012-05-09 22:16:43.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/doc/gdb.texinfo	2012-05-09 22:18:38.294782549 +0200
+--- gdb-7.4.50.20120120.orig/gdb/doc/gdb.texinfo	2012-05-14 14:18:01.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/doc/gdb.texinfo	2012-05-14 14:20:13.653966212 +0200
 @@ -20804,6 +20804,8 @@ local-gdbinit:  Auto-loading of .gdbinit
  python-scripts:  Auto-loading of Python scripts is on.
  safe-path:  List of directories from which it is safe to auto-load files
@@ -404,7 +346,7 @@ Index: gdb-7.4.50.20120120/gdb/doc/gdb.texinfo
  @tab Control for init file in the current directory.
  @item @xref{show auto-load local-gdbinit}.
 @@ -21040,15 +21046,13 @@ loading and execution of scripts.  Multi
- host platform directory separator in use.
+ host platform path separator in use.
  @end table
  
 -This variable defaults to @file{$ddir/auto-load}.  The default @code{set

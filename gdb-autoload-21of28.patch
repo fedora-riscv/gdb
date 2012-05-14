@@ -1,0 +1,57 @@
+http://sourceware.org/ml/gdb-cvs/2012-05/msg00079.html
+
+### src/gdb/ChangeLog	2012/05/10 20:17:46	1.14235
+### src/gdb/ChangeLog	2012/05/11 18:06:26	1.14236
+## -1,3 +1,10 @@
++2012-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Make auto-load handle multiple components of DEBUG_FILE_DIRECTORY.
++	* auto-load.c (auto_load_objfile_script): Remove check for NULL
++	DEBUG_FILE_DIRECTORY.  Handle multiple components of
++	DEBUG_FILE_DIRECTORY.
++
+ 2012-05-10  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* dwarf2read.c (recursively_write_psymbols): New function.
+--- src/gdb/auto-load.c	2012/05/06 15:31:02	1.6
++++ src/gdb/auto-load.c	2012/05/11 18:06:28	1.7
+@@ -587,17 +587,29 @@
+   input = fopen (filename, "r");
+   debugfile = filename;
+ 
+-  if (!input && debug_file_directory)
++  if (!input)
+     {
+-      /* Also try the same file in the separate debug info directory.  */
+-      debugfile = xmalloc (strlen (filename)
+-			   + strlen (debug_file_directory) + 1);
+-      strcpy (debugfile, debug_file_directory);
+-      /* FILENAME is absolute, so we don't need a "/" here.  */
+-      strcat (debugfile, filename);
+-
+-      make_cleanup (xfree, debugfile);
+-      input = fopen (debugfile, "r");
++      char *debugdir;
++      VEC (char_ptr) *debugdir_vec;
++      int ix;
++
++      debugdir_vec = dirnames_to_char_ptr_vec (debug_file_directory);
++      make_cleanup_free_char_ptr_vec (debugdir_vec);
++
++      for (ix = 0; VEC_iterate (char_ptr, debugdir_vec, ix, debugdir); ++ix)
++	{
++	  /* Also try the same file in the separate debug info directory.  */
++	  debugfile = xmalloc (strlen (debugdir) + strlen (filename) + 1);
++	  strcpy (debugfile, debugdir);
++
++	  /* FILENAME is absolute, so we don't need a "/" here.  */
++	  strcat (debugfile, filename);
++
++	  make_cleanup (xfree, debugfile);
++	  input = fopen (debugfile, "r");
++	  if (input != NULL)
++	    break;
++	}
+     }
+ 
+   if (!input && gdb_datadir)

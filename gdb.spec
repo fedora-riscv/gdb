@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?dist}
+Release: 45%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -590,28 +590,34 @@ Patch661: gdb-stale-frame_info.patch
 
 # Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
 #=push
-Patch662: gdb-autoload-01of22.patch
-Patch663: gdb-autoload-02of22.patch
-Patch664: gdb-autoload-03of22.patch
-Patch665: gdb-autoload-04of22.patch
-Patch666: gdb-autoload-05of22.patch
-Patch667: gdb-autoload-06of22.patch
-Patch668: gdb-autoload-07of22.patch
-Patch669: gdb-autoload-08of22.patch
-Patch670: gdb-autoload-09of22.patch
-Patch671: gdb-autoload-10of22.patch
-Patch672: gdb-autoload-11of22.patch
-Patch673: gdb-autoload-12of22.patch
-Patch674: gdb-autoload-13of22.patch
-Patch675: gdb-autoload-14of22.patch
-Patch676: gdb-autoload-15of22.patch
-Patch677: gdb-autoload-16of22.patch
-Patch678: gdb-autoload-17of22.patch
-Patch679: gdb-autoload-18of22.patch
-Patch680: gdb-autoload-19of22.patch
-Patch681: gdb-autoload-20of22.patch
-Patch682: gdb-autoload-21of22.patch
-Patch683: gdb-autoload-22of22.patch
+Patch662: gdb-autoload-01of28.patch
+Patch663: gdb-autoload-02of28.patch
+Patch664: gdb-autoload-03of28.patch
+Patch665: gdb-autoload-04of28.patch
+Patch666: gdb-autoload-05of28.patch
+Patch667: gdb-autoload-06of28.patch
+Patch668: gdb-autoload-07of28.patch
+Patch669: gdb-autoload-08of28.patch
+Patch670: gdb-autoload-09of28.patch
+Patch671: gdb-autoload-10of28.patch
+Patch672: gdb-autoload-11of28.patch
+Patch673: gdb-autoload-12of28.patch
+Patch674: gdb-autoload-13of28.patch
+Patch675: gdb-autoload-14of28.patch
+Patch676: gdb-autoload-15of28.patch
+Patch677: gdb-autoload-16of28.patch
+Patch678: gdb-autoload-17of28.patch
+Patch679: gdb-autoload-18of28.patch
+Patch680: gdb-autoload-19of28.patch
+Patch681: gdb-autoload-20of28.patch
+Patch682: gdb-autoload-21of28.patch
+Patch683: gdb-autoload-22of28.patch
+Patch684: gdb-autoload-23of28.patch
+Patch685: gdb-autoload-24of28.patch
+Patch686: gdb-autoload-25of28.patch
+Patch687: gdb-autoload-26of28.patch
+Patch688: gdb-autoload-27of28.patch
+Patch689: gdb-autoload-28of28.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -925,6 +931,12 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch681 -p1
 %patch682 -p1
 %patch683 -p1
+%patch684 -p1
+%patch685 -p1
+%patch686 -p1
+%patch687 -p1
+%patch688 -p1
+%patch689 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1047,8 +1059,8 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	--disable-inprocess-agent				\
 %endif
 $(: %{_bindir}/mono-gdb.py is workaround for mono BZ 815501. )										\
-	      --with-auto-load-dir='$ddir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'						\
-	--with-auto-load-safe-path='$ddir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}:/usr/lib/debug:%{_root_bindir}/mono-gdb.py'	\
+	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'				\
+	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}:%{_root_bindir}/mono-gdb.py'	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1409,6 +1421,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon May 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-45.fc17
+- Rename "set auto-load" patchset variable $ddir to $datadir.
+
 * Wed May  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-44.fc17
 - Fix in "set auto-load" patchset for SCL scripts inheritance (BZ 815910).
 

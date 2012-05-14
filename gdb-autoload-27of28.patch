@@ -1,0 +1,225 @@
+http://sourceware.org/ml/gdb-patches/2012-05/msg00476.html
+Subject: [patch 1/2] auto-load: Rename $ddir to $datadir
+
+Hi,
+
+when Doug suggested $ddir for data-directory, similar to $cdir, $pdir and
+$sdir already in use, it made sense.
+
+But currently I need to introduce also a variable for debug-file-directory and
+having both $ddir and $debugdir valid in the same string seems to be confusing.
+
+Therefore proposing to have $datadir and $debugdir instead in the next patch,
+this patch is just a machanical rename $ddir -> $datadir.
+
+I do not think it needs backward compatibiluty as $ddir has not yet been in
+any GDB release.
+
+
+Thanks,
+Jan
+
+
+gdb/
+2012-05-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Rename $ddir to $datadir.
+	* NEWS (--with-auto-load-dir): Rename $ddir to $datadir.
+	* auto-load.c (auto_load_safe_path_vec_update)
+	(auto_load_gdb_datadir_changed, auto_load_objfile_script): Likewise.
+	* configure: Regenerate.
+	* configure.ac (--with-auto-load-dir, --with-auto-load-safe-path):
+	Likewise.  Remove the 'use $ddir' help string.
+
+gdb/doc/
+2012-05-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Rename $ddir to $datadir.
+	* gdb.texinfo (Auto-loading, Auto-loading safe path)
+	(objfile-gdb.py file): Rename $ddir to $datadir.
+
+Index: gdb-7.4.50.20120120/gdb/NEWS
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/NEWS	2012-05-14 14:24:15.112490286 +0200
++++ gdb-7.4.50.20120120/gdb/NEWS	2012-05-14 14:24:20.224480210 +0200
+@@ -317,8 +317,8 @@ show trace-stop-notes
+ 
+ --with-auto-load-dir
+   Configure default value for the 'set auto-load scripts-directory'
+-  setting above.  It defaults to '$ddir/auto-load', $ddir representing
+-  GDB's data directory (available via show data-directory).
++  setting above.  It defaults to '$datadir/auto-load', $datadir
++  representing GDB's data directory (available via show data-directory).
+ 
+ --with-auto-load-safe-path
+   Configure default value for the 'set auto-load safe-path' setting
+Index: gdb-7.4.50.20120120/gdb/auto-load.c
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/auto-load.c	2012-05-14 14:24:15.112490286 +0200
++++ gdb-7.4.50.20120120/gdb/auto-load.c	2012-05-14 14:24:20.224480210 +0200
+@@ -174,13 +174,13 @@ auto_load_safe_path_vec_update (void)
+       char *ddir_subst, *expanded, *real_path;
+ 
+       ddir_subst = xstrdup (dir);
+-      substitute_path_component (&ddir_subst, "$ddir", gdb_datadir);
++      substitute_path_component (&ddir_subst, "$datadir", gdb_datadir);
+       expanded = tilde_expand (ddir_subst);
+       xfree (ddir_subst);
+       real_path = gdb_realpath (expanded);
+ 
+       /* Ensure the current entry is at least a valid path (therefore
+-	 $ddir-expanded and tilde-expanded).  */
++	 $datadir-expanded and tilde-expanded).  */
+       VEC_replace (char_ptr, auto_load_safe_path_vec, ix, expanded);
+ 
+       if (debug_auto_load)
+@@ -212,7 +212,7 @@ auto_load_safe_path_vec_update (void)
+     }
+ }
+ 
+-/* Variable gdb_datadir has been set.  Update content depending on $ddir.  */
++/* Variable gdb_datadir has been set.  Update content depending on $datadir.  */
+ 
+ static void
+ auto_load_gdb_datadir_changed (void)
+@@ -699,7 +699,7 @@ auto_load_objfile_script (struct objfile
+       for (ix = 0; VEC_iterate (char_ptr, vec, ix, dir); ++ix)
+ 	{
+ 	  debugfile = xstrdup (dir);
+-	  substitute_path_component (&debugfile, "$ddir", gdb_datadir);
++	  substitute_path_component (&debugfile, "$datadir", gdb_datadir);
+ 	  debugfile = xrealloc (debugfile, (strlen (debugfile)
+ 					    + strlen (filename) + 1));
+ 
+Index: gdb-7.4.50.20120120/gdb/configure
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/configure	2012-05-14 14:24:15.112490286 +0200
++++ gdb-7.4.50.20120120/gdb/configure	2012-05-14 14:24:38.564444061 +0200
+@@ -1669,11 +1669,10 @@ Optional Packages:
+   --with-rpm              query rpm database for missing debuginfos (yes/no,
+                           def. auto=librpm.so)
+   --with-auto-load-dir=PATH
+-                          directories from which to load auto-loaded scripts,
+-                          use '$ddir' for -data-directory [$ddir/auto-load]
++                          directories from which to load auto-loaded scripts
++                          [$datadir/auto-load]
+   --with-auto-load-safe-path=PATH
+-                          directories safe to hold auto-loaded files, use
+-                          $ddir for --with-gdb-datadir path
++                          directories safe to hold auto-loaded files
+                           [--with-auto-load-dir]
+   --without-auto-load-safe-path
+                           do not restrict auto-loaded files locations
+@@ -8495,10 +8494,10 @@ $as_echo_n "checking for default auto-lo
+ if test "${with_auto_load_dir+set}" = set; then :
+   withval=$with_auto_load_dir;
+ else
+-  with_auto_load_dir='$ddir/auto-load'
++  with_auto_load_dir='$datadir/auto-load'
+ fi
+ 
+-escape_dir=`echo $with_auto_load_dir | sed 's/[$]ddir\>/\\\\\\\\\\\\&/g'`
++escape_dir=`echo $with_auto_load_dir | sed 's/[$]datadir\>/\\\\\\\\\\\\&/g'`
+ 
+   test "x$prefix" = xNONE && prefix="$ac_default_prefix"
+   test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+@@ -8525,7 +8524,7 @@ else
+   with_auto_load_safe_path="$with_auto_load_dir"
+ fi
+ 
+-escape_dir=`echo $with_auto_load_safe_path | sed 's/[$]ddir\>/\\\\\\\\\\\\&/g'`
++escape_dir=`echo $with_auto_load_safe_path | sed 's/[$]datadir\>/\\\\\\\\\\\\&/g'`
+ 
+   test "x$prefix" = xNONE && prefix="$ac_default_prefix"
+   test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+Index: gdb-7.4.50.20120120/gdb/configure.ac
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/configure.ac	2012-05-14 14:24:15.112490286 +0200
++++ gdb-7.4.50.20120120/gdb/configure.ac	2012-05-14 14:24:20.228480202 +0200
+@@ -342,9 +342,9 @@ fi
+ AC_MSG_CHECKING([for default auto-load directory])
+ AC_ARG_WITH(auto-load-dir,
+ AS_HELP_STRING([--with-auto-load-dir=PATH],
+-  [directories from which to load auto-loaded scripts, use '$ddir' for -data-directory @<:@$ddir/auto-load@:>@]),,
+-  [with_auto_load_dir='$ddir/auto-load'])
+-escape_dir=`echo $with_auto_load_dir | sed 's/[[$]]ddir\>/\\\\\\\\\\\\&/g'`
++  [directories from which to load auto-loaded scripts @<:@$datadir/auto-load@:>@]),,
++  [with_auto_load_dir='$datadir/auto-load'])
++escape_dir=`echo $with_auto_load_dir | sed 's/[[$]]datadir\>/\\\\\\\\\\\\&/g'`
+ AC_DEFINE_DIR(AUTO_LOAD_DIR, escape_dir,
+ 	      [Directories from which to load auto-loaded scripts.])
+ AC_MSG_RESULT([$with_auto_load_dir])
+@@ -352,14 +352,14 @@ AC_MSG_RESULT([$with_auto_load_dir])
+ AC_MSG_CHECKING([for default auto-load safe-path])
+ AC_ARG_WITH(auto-load-safe-path,
+ AS_HELP_STRING([--with-auto-load-safe-path=PATH],
+-  [directories safe to hold auto-loaded files, use $ddir for --with-gdb-datadir path @<:@--with-auto-load-dir@:>@])
++  [directories safe to hold auto-loaded files @<:@--with-auto-load-dir@:>@])
+ AS_HELP_STRING([--without-auto-load-safe-path],
+                [do not restrict auto-loaded files locations]),
+     [if test "$with_auto_load_safe_path" = "no"; then
+      with_auto_load_safe_path="/"
+      fi],
+ [with_auto_load_safe_path="$with_auto_load_dir"])
+-escape_dir=`echo $with_auto_load_safe_path | sed 's/[[$]]ddir\>/\\\\\\\\\\\\&/g'`
++escape_dir=`echo $with_auto_load_safe_path | sed 's/[[$]]datadir\>/\\\\\\\\\\\\&/g'`
+ AC_DEFINE_DIR(AUTO_LOAD_SAFE_PATH, escape_dir,
+ 	      [Directories safe to hold auto-loaded files.])
+ AC_MSG_RESULT([$with_auto_load_safe_path])
+Index: gdb-7.4.50.20120120/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/doc/gdb.texinfo	2012-05-14 14:24:15.113490284 +0200
++++ gdb-7.4.50.20120120/gdb/doc/gdb.texinfo	2012-05-14 14:24:20.234480190 +0200
+@@ -20807,9 +20807,9 @@ local-gdbinit:  Auto-loading of .gdbinit
+                 is on.
+ python-scripts:  Auto-loading of Python scripts is on.
+ safe-path:  List of directories from which it is safe to auto-load files
+-            is $ddir/auto-load.
++            is $datadir/auto-load.
+ scripts-directory:  List of directories from which to load auto-loaded scripts
+-                    is $ddir/auto-load.
++                    is $datadir/auto-load.
+ @end smallexample
+ 
+ @anchor{info auto-load}
+@@ -21025,9 +21025,9 @@ get loaded:
+ $ ./gdb -q ./gdb
+ Reading symbols from /home/user/gdb/gdb...done.
+ warning: File "/home/user/gdb/gdb-gdb.gdb" auto-loading has been
+-         declined by your `auto-load safe-path' set to "$ddir/auto-load".
++         declined by your `auto-load safe-path' set to "$datadir/auto-load".
+ warning: File "/home/user/gdb/gdb-gdb.py" auto-loading has been
+-         declined by your `auto-load safe-path' set to "$ddir/auto-load".
++         declined by your `auto-load safe-path' set to "$datadir/auto-load".
+ @end smallexample
+ 
+ The list of trusted directories is controlled by the following commands:
+@@ -21060,7 +21060,7 @@ host platform path separator in use.
+ @end table
+ 
+ This variable defaults to what @code{--with-auto-load-dir} has been configured
+-to (@pxref{with-auto-load-dir}).  @file{$ddir} substituation applies the same
++to (@pxref{with-auto-load-dir}).  @file{$datadir} substituation applies the same
+ as for @xref{set auto-load scripts-directory}.
+ The default @code{set
+ auto-load safe-path} value can be also overriden by @value{GDBN} configuration
+@@ -25181,14 +25181,14 @@ Each entry here needs to be covered also
+ @code{set auto-load safe-path} (@pxref{set auto-load safe-path}).
+ 
+ @anchor{with-auto-load-dir}
+-This variable defaults to @file{$ddir/auto-load}.  The default @code{set
++This variable defaults to @file{$datadir/auto-load}.  The default @code{set
+ auto-load safe-path} value can be also overriden by @value{GDBN} configuration
+ option @option{--with-auto-load-dir}.
+ 
+-Any used string @file{$ddir} will get replaced by @var{data-directory} which is
+-determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$ddir} must be
+-be placed as a directory component --- either alone or delimited by @file{/} or
+-@file{\} directory separators, depending on the host platform.
++Any used string @file{$datadir} will get replaced by @var{data-directory} which
++is determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$datadir}
++must be placed as a directory component --- either alone or delimited by
++@file{/} or @file{\} directory separators, depending on the host platform.
+ 
+ The list of directories uses path separator (@samp{:} on GNU and Unix
+ systems, @samp{;} on MS-Windows and MS-DOS) to separate directories, similarly

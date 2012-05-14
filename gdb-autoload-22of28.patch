@@ -1,78 +1,63 @@
-http://sourceware.org/ml/gdb-patches/2012-05/msg00303.html
-Subject: Re: [patch 1/2] Provide $ddir substitution for --with-auto-load-safe-path
+http://sourceware.org/ml/gdb-cvs/2012-05/msg00080.html
 
-On Wed, 09 May 2012 19:41:08 +0200, Eli Zaretskii wrote:
-> Okay with that.  Thanks.
-
-Updated just the doc.
-
-
-Thanks,
-Jan
-
-
-
-gdb/
-2012-05-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Provide $ddir substitution for --with-auto-load-safe-path.
-	* NEWS (--with-auto-load-safe-path, --without-auto-load-safe-path): New
-	entries.
-	* auto-load.c: Include observer.h.
-	(auto_load_safe_path_vec_update): Call substitute_path_component for
-	each component.  New variable ddir_subst.
-	(auto_load_gdb_datadir_changed): New function.
-	(set_auto_load_safe_path): Rename DEFAULT_AUTO_LOAD_SAFE_PATH to
-	AUTO_LOAD_SAFE_PATH.  New comment.
-	(_initialize_auto_load): Rename DEFAULT_AUTO_LOAD_SAFE_PATH to
-	AUTO_LOAD_SAFE_PATH.  Install auto_load_gdb_datadir_changed.
-	* config.in: Regenerate.
-	* configure: Regenerate.
-	* configure.ac (--auto-load-safe-path): Rename
-	DEFAULT_AUTO_LOAD_SAFE_PATH to AUTO_LOAD_SAFE_PATH.  Default to
-	GDB_DATADIR/auto-load.
-	* defs.h (substitute_path_component): New declaration.
-	* top.c: Include observer.h.
-	(set_gdb_datadir): New function.
-	(init_main): Install it for "set data-directory".
-	* utils.c (substitute_path_component): New function.
-
-gdb/doc/
-2012-05-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
-
-	Provide $ddir substitution for --with-auto-load-safe-path.
-	* gdb.texinfo (Auto-loading): Replace /usr/local by $ddir/auto-load.
-	(Auto-loading safe path): Likewise.  Mention the default value,
-	$ddir substitution, --with-auto-load-safe-path and
-	--without-auto-load-safe-path.
-	* observer.texi (gdb_datadir_changed): New.
-
+### src/gdb/ChangeLog	2012/05/11 18:06:26	1.14236
+### src/gdb/ChangeLog	2012/05/11 18:13:22	1.14237
+## -1,5 +1,29 @@
+ 2012-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
++	Provide $ddir substitution for --with-auto-load-safe-path.
++	* NEWS (--with-auto-load-safe-path, --without-auto-load-safe-path): New
++	entries.
++	* auto-load.c: Include observer.h.
++	(auto_load_safe_path_vec_update): Call substitute_path_component for
++	each component.  New variable ddir_subst.
++	(auto_load_gdb_datadir_changed): New function.
++	(set_auto_load_safe_path): Rename DEFAULT_AUTO_LOAD_SAFE_PATH to
++	AUTO_LOAD_SAFE_PATH.  New comment.
++	(_initialize_auto_load): Rename DEFAULT_AUTO_LOAD_SAFE_PATH to
++	AUTO_LOAD_SAFE_PATH.  Install auto_load_gdb_datadir_changed.
++	* config.in: Regenerate.
++	* configure: Regenerate.
++	* configure.ac (--auto-load-safe-path): Rename
++	DEFAULT_AUTO_LOAD_SAFE_PATH to AUTO_LOAD_SAFE_PATH.  Default to
++	GDB_DATADIR/auto-load.
++	* defs.h (substitute_path_component): New declaration.
++	* top.c: Include observer.h.
++	(set_gdb_datadir): New function.
++	(init_main): Install it for "set data-directory".
++	* utils.c (substitute_path_component): New function.
++
++2012-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
+ 	Make auto-load handle multiple components of DEBUG_FILE_DIRECTORY.
+ 	* auto-load.c (auto_load_objfile_script): Remove check for NULL
+ 	DEBUG_FILE_DIRECTORY.  Handle multiple components of
 Index: gdb-7.4.50.20120120/gdb/NEWS
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/NEWS	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/NEWS	2012-05-09 22:14:29.091183190 +0200
-@@ -76,6 +76,17 @@ set debug auto-load on|off
- show debug auto-load
-   Control display of debugging info for auto-loading the files above.
+--- gdb-7.4.50.20120120.orig/gdb/NEWS	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/NEWS	2012-05-14 14:18:01.915041258 +0200
+@@ -307,6 +307,17 @@ show trace-stop-notes
+   instance as an explanation, if you are stopping a trace run that was
+   started by someone else.
  
 +* New configure options
 +
 +--with-auto-load-safe-path
 +  Configure default value for the 'set auto-load safe-path' setting
-+  above.  It defaults to '$ddir/auto-load', $ddir representing the value
-+  of configure option --with-gdb-datadir.
++  above.  It defaults to '$ddir/auto-load', $ddir representing GDB's
++  data directory (available via show data-directory).
 +
 +--without-auto-load-safe-path
 +  Set 'set auto-load safe-path' to '/', effectively disabling this
 +  security feature.
 +
- * New command line options
+ * New remote packets
  
- --init-command=FILE, -ix          Like --command, -x but execute it
+ QTEnable
 Index: gdb-7.4.50.20120120/gdb/auto-load.c
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/auto-load.c	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/auto-load.c	2012-05-09 22:14:04.812222226 +0200
+--- gdb-7.4.50.20120120.orig/gdb/auto-load.c	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/auto-load.c	2012-05-14 14:18:01.915041258 +0200
 @@ -35,6 +35,7 @@
  #include "gdb_vecs.h"
  #include "readline/tilde.h"
@@ -146,8 +131,8 @@ Index: gdb-7.4.50.20120120/gdb/auto-load.c
  		 add_auto_load_safe_path,
 Index: gdb-7.4.50.20120120/gdb/config.in
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/config.in	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/config.in	2012-05-09 22:14:04.812222226 +0200
+--- gdb-7.4.50.20120120.orig/gdb/config.in	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/config.in	2012-05-14 14:18:01.915041258 +0200
 @@ -7,6 +7,9 @@
  /* Define if building universal (internal helper macro) */
  #undef AC_APPLE_UNIVERSAL_BUILD
@@ -170,8 +155,8 @@ Index: gdb-7.4.50.20120120/gdb/config.in
  
 Index: gdb-7.4.50.20120120/gdb/configure
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/configure	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/configure	2012-05-09 22:16:19.877005083 +0200
+--- gdb-7.4.50.20120120.orig/gdb/configure	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/configure	2012-05-14 14:18:01.918041252 +0200
 @@ -1668,7 +1668,8 @@ Optional Packages:
    --with-rpm              query rpm database for missing debuginfos (yes/no,
                            def. auto=librpm.so)
@@ -211,8 +196,8 @@ Index: gdb-7.4.50.20120120/gdb/configure
  
 Index: gdb-7.4.50.20120120/gdb/configure.ac
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/configure.ac	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/configure.ac	2012-05-09 22:16:10.592020012 +0200
+--- gdb-7.4.50.20120120.orig/gdb/configure.ac	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/configure.ac	2012-05-14 14:18:01.919041250 +0200
 @@ -341,13 +341,16 @@ fi
   
  AC_MSG_CHECKING([for default auto-load safe-path])
@@ -239,8 +224,8 @@ Index: gdb-7.4.50.20120120/gdb/configure.ac
  
 Index: gdb-7.4.50.20120120/gdb/defs.h
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/defs.h	2012-05-09 22:13:57.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/defs.h	2012-05-09 22:14:04.816222220 +0200
+--- gdb-7.4.50.20120120.orig/gdb/defs.h	2012-05-14 14:17:48.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/defs.h	2012-05-14 14:18:01.919041250 +0200
 @@ -442,6 +442,9 @@ extern struct cleanup *make_bpstat_clear
  
  extern int producer_is_gcc_ge_4 (const char *producer);
@@ -251,70 +236,10 @@ Index: gdb-7.4.50.20120120/gdb/defs.h
  #ifdef HAVE_WAITPID
  extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
  #endif
-Index: gdb-7.4.50.20120120/gdb/doc/gdb.texinfo
-===================================================================
---- gdb-7.4.50.20120120.orig/gdb/doc/gdb.texinfo	2012-05-09 22:13:58.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/doc/gdb.texinfo	2012-05-09 22:16:43.759966688 +0200
-@@ -20803,7 +20803,7 @@ local-gdbinit:  Auto-loading of .gdbinit
-                 is on.
- python-scripts:  Auto-loading of Python scripts is on.
- safe-path:  List of directories from which it is safe to auto-load files
--            is /usr/local.
-+            is $ddir/auto-load.
- @end smallexample
- 
- @anchor{info auto-load}
-@@ -21006,9 +21006,9 @@ get loaded:
- $ ./gdb -q ./gdb
- Reading symbols from /home/user/gdb/gdb...done.
- warning: File "/home/user/gdb/gdb-gdb.gdb" auto-loading has been
--         declined by your `auto-load safe-path' set to "/usr/local".
-+         declined by your `auto-load safe-path' set to "$ddir/auto-load".
- warning: File "/home/user/gdb/gdb-gdb.py" auto-loading has been
--         declined by your `auto-load safe-path' set to "/usr/local".
-+         declined by your `auto-load safe-path' set to "$ddir/auto-load".
- @end smallexample
- 
- The list of trusted directories is controlled by the following commands:
-@@ -21040,7 +21040,18 @@ loading and execution of scripts.  Multi
- host platform directory separator in use.
- @end table
- 
--Setting this variable to @file{/} disables this security protection.
-+This variable defaults to @file{$ddir/auto-load}.  The default @code{set
-+auto-load safe-path} value can be also overriden by @value{GDBN} configuration
-+option @option{--with-auto-load-safe-path}.
-+
-+Any used string @file{$ddir} will get replaced by @var{data-directory} which is
-+determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$ddir} must be
-+be placed as a directory component --- either alone or delimited by @file{/} or
-+@file{\} directory separators, depending on the host platform.
-+
-+Setting this variable to @file{/} disables this security protection,
-+corresponding @value{GDBN} configuration option is
-+@option{--without-auto-load-safe-path}.
- This variable is supposed to be set to the system directories writable by the
- system superuser only.  Users can add their source directories in init files in
- their home directories (@pxref{Home Directory Init File}).  See also deprecated
-Index: gdb-7.4.50.20120120/gdb/doc/observer.texi
-===================================================================
---- gdb-7.4.50.20120120.orig/gdb/doc/observer.texi	2012-05-09 22:13:56.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/doc/observer.texi	2012-05-09 22:17:04.118933948 +0200
-@@ -231,6 +231,10 @@ the current top-level prompt.
- @c collector pass.  Currently only @code{type_mark_used} marker is supported.
- @c @end deftypefun
- 
-+@deftypefun void gdb_datadir_changed (void)
-+Variable gdb_datadir has been set.  The value may not necessarily change.
-+@end deftypefun
-+
- @deftypefun void test_notification (int @var{somearg})
- This observer is used for internal testing.  Do not use.  
- See testsuite/gdb.gdb/observer.exp.
 Index: gdb-7.4.50.20120120/gdb/top.c
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/top.c	2012-05-09 22:13:57.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/top.c	2012-05-09 22:14:04.823222208 +0200
+--- gdb-7.4.50.20120120.orig/gdb/top.c	2012-05-14 14:17:48.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/top.c	2012-05-14 14:18:01.919041250 +0200
 @@ -47,6 +47,7 @@
  #include "gdbthread.h"
  #include "python/python.h"
@@ -350,8 +275,8 @@ Index: gdb-7.4.50.20120120/gdb/top.c
  }
 Index: gdb-7.4.50.20120120/gdb/utils.c
 ===================================================================
---- gdb-7.4.50.20120120.orig/gdb/utils.c	2012-05-09 22:13:57.000000000 +0200
-+++ gdb-7.4.50.20120120/gdb/utils.c	2012-05-09 22:14:04.824222206 +0200
+--- gdb-7.4.50.20120120.orig/gdb/utils.c	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/utils.c	2012-05-14 14:18:01.920041248 +0200
 @@ -3925,6 +3925,48 @@ dirnames_to_char_ptr_vec (const char *di
    return retval;
  }
@@ -401,3 +326,63 @@ Index: gdb-7.4.50.20120120/gdb/utils.c
  #ifdef HAVE_WAITPID
  
  #ifdef SIGALRM
+Index: gdb-7.4.50.20120120/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/doc/gdb.texinfo	2012-05-14 14:17:49.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/doc/gdb.texinfo	2012-05-14 14:18:01.925041238 +0200
+@@ -20803,7 +20803,7 @@ local-gdbinit:  Auto-loading of .gdbinit
+                 is on.
+ python-scripts:  Auto-loading of Python scripts is on.
+ safe-path:  List of directories from which it is safe to auto-load files
+-            is /usr/local.
++            is $ddir/auto-load.
+ @end smallexample
+ 
+ @anchor{info auto-load}
+@@ -21006,9 +21006,9 @@ get loaded:
+ $ ./gdb -q ./gdb
+ Reading symbols from /home/user/gdb/gdb...done.
+ warning: File "/home/user/gdb/gdb-gdb.gdb" auto-loading has been
+-         declined by your `auto-load safe-path' set to "/usr/local".
++         declined by your `auto-load safe-path' set to "$ddir/auto-load".
+ warning: File "/home/user/gdb/gdb-gdb.py" auto-loading has been
+-         declined by your `auto-load safe-path' set to "/usr/local".
++         declined by your `auto-load safe-path' set to "$ddir/auto-load".
+ @end smallexample
+ 
+ The list of trusted directories is controlled by the following commands:
+@@ -21040,7 +21040,18 @@ loading and execution of scripts.  Multi
+ host platform path separator in use.
+ @end table
+ 
+-Setting this variable to @file{/} disables this security protection.
++This variable defaults to @file{$ddir/auto-load}.  The default @code{set
++auto-load safe-path} value can be also overriden by @value{GDBN} configuration
++option @option{--with-auto-load-safe-path}.
++
++Any used string @file{$ddir} will get replaced by @var{data-directory} which is
++determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$ddir} must be
++be placed as a directory component --- either alone or delimited by @file{/} or
++@file{\} directory separators, depending on the host platform.
++
++Setting this variable to @file{/} disables this security protection,
++corresponding @value{GDBN} configuration option is
++@option{--without-auto-load-safe-path}.
+ This variable is supposed to be set to the system directories writable by the
+ system superuser only.  Users can add their source directories in init files in
+ their home directories (@pxref{Home Directory Init File}).  See also deprecated
+Index: gdb-7.4.50.20120120/gdb/doc/observer.texi
+===================================================================
+--- gdb-7.4.50.20120120.orig/gdb/doc/observer.texi	2012-05-14 14:17:47.000000000 +0200
++++ gdb-7.4.50.20120120/gdb/doc/observer.texi	2012-05-14 14:18:01.926041236 +0200
+@@ -231,6 +231,10 @@ the current top-level prompt.
+ @c collector pass.  Currently only @code{type_mark_used} marker is supported.
+ @c @end deftypefun
+ 
++@deftypefun void gdb_datadir_changed (void)
++Variable gdb_datadir has been set.  The value may not necessarily change.
++@end deftypefun
++
+ @deftypefun void test_notification (int @var{somearg})
+ This observer is used for internal testing.  Do not use.  
+ See testsuite/gdb.gdb/observer.exp.
