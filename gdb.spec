@@ -24,13 +24,13 @@
  %global _root_bindir %{_bindir}
 }
 
-Summary: A GNU source-level debugger for C, C++, Fortran and other languages
+Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120120
+%global snap 20120602
 Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
@@ -133,10 +133,10 @@ Patch105: gdb-6.3-ppc64syscall-20040622.patch
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
 # Fix upstream `set scheduler-locking step' vs. upstream PPC atomic seqs.
-#=maybepush+work: It is a bit difficult patch, a part is ppc specific.
+#=push+work: It is a bit difficult patch, a part is ppc specific.
 Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 # Make upstream `set scheduler-locking step' as default.
-#=maybepush+work: How much is scheduler-locking relevant after non-stop?
+#=push+work: How much is scheduler-locking relevant after non-stop?
 Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
 
 # Add a wrapper script to GDB that implements pstack using the
@@ -147,13 +147,13 @@ Patch118: gdb-6.3-gstack-20050411.patch
 # VSYSCALL and PIE
 #=fedoratest
 Patch122: gdb-6.3-test-pie-20050107.patch
-#=maybepush: May get obsoleted by Tom's unrelocated objfiles patch.
+#=push: May get obsoleted by Tom's unrelocated objfiles patch.
 Patch389: gdb-archer-pie-addons.patch
 #=push+work: Breakpoints disabling matching should not be based on address.
 Patch394: gdb-archer-pie-addons-keep-disabled.patch
 
 # Get selftest working with sep-debug-info
-#=maybepush
+#=fedoratest
 Patch125: gdb-6.3-test-self-20050110.patch
 
 # Test support of multiple destructors just like multiple constructors
@@ -235,7 +235,7 @@ Patch208: gdb-6.5-BEA-testsuite.patch
 Patch213: gdb-6.5-readline-long-line-crash-test.patch
 
 # Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
-#=push
+#=fedora
 Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 
 # Test sideeffects of skipping ppc .so libs trampolines (BZ 218379).
@@ -243,7 +243,7 @@ Patch214: gdb-6.5-bz216711-clone-is-outermost.patch
 Patch216: gdb-6.5-bz218379-ppc-solib-trampoline-test.patch
 
 # Fix lockup on trampoline vs. its function lookup; unreproducible (BZ 218379).
-#=push
+#=fedora
 Patch217: gdb-6.5-bz218379-solib-trampoline-lookup-lock-fix.patch
 
 # Find symbols properly at their original (included) file (BZ 109921).
@@ -279,7 +279,7 @@ Patch245: gdb-6.6-bz229517-gcore-without-terminal.patch
 Patch247: gdb-6.6-bz235197-fork-detach-info.patch
 
 # Avoid too long timeouts on failing cases of "annota1.exp annota3.exp".
-#=push
+#=fedoratest
 Patch254: gdb-6.6-testsuite-timeouts.patch
 
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
@@ -321,7 +321,7 @@ Patch282: gdb-6.7-charsign-test.patch
 Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
 # Testsuite fixes for more stable/comparable results.
-#=push
+#=fedoratest
 Patch287: gdb-6.7-testsuite-stable-results.patch
 
 # Test ia64 memory leaks of the code using libunwind.
@@ -428,7 +428,7 @@ Patch393: gdb-rhel5-gcc44.patch
 Patch397: gdb-follow-child-stale-parent.patch
 
 # Workaround ccache making lineno non-zero for command-line definitions.
-#=drop: ccache is rarely used and it is even fixed now.
+#=fedoratest: ccache is rarely used and it is even fixed now.
 Patch403: gdb-ccache-workaround.patch
 
 # Implement `info common' for Fortran.
@@ -444,10 +444,6 @@ Patch407: gdb-lineno-makeup-test.patch
 # Test power7 ppc disassembly.
 #=fedoratest+ppc
 Patch408: gdb-ppc-power7-test.patch
-
-# Revert: Add -Wunused-function to compile flags.
-#=drop
-Patch412: gdb-unused-revert.patch
 
 # Fix i386+x86_64 rwatch+awatch before run, regression against 6.8 (BZ 541866).
 # Fix i386 rwatch+awatch before run (BZ 688788, on top of BZ 541866).
@@ -466,18 +462,12 @@ Patch470: gdb-archer-next-over-throw-cxx-exec.patch
 #=fedoratest
 Patch475: gdb-bz601887-dwarf4-rh-test.patch
 
-# Print 2D C++ vectors as matrices (BZ 562763, sourceware10659, Chris Moller).
-#=push+work: There are some outstanding issues, check the mails.
-Patch486: gdb-bz562763-pretty-print-2d-vectors.patch
-#=push+work: There are some outstanding issues, check the mails.
-Patch487: gdb-bz562763-pretty-print-2d-vectors-libstdcxx.patch
-
 # [delayed-symfile] Test a backtrace regression on CFIs without DIE (BZ 614604).
 #=fedoratest
 Patch490: gdb-test-bt-cfi-without-die.patch
 
 # Provide /usr/bin/gdb-add-index for rpm-build (Tom Tromey).
-#=drop: Re-check against the upstream version.
+#=fedora: Re-check against the upstream version.
 Patch491: gdb-gdb-add-index-script.patch
 
 # Out of memory is just an error, not fatal (uninitialized VLS vars, BZ 568248).
@@ -534,7 +524,7 @@ Patch619: gdb-dlopen-stap-probe-test.patch
 Patch627: gdb-glibc-vdso-workaround.patch
 
 # Hack for proper PIE run of the testsuite.
-#=push+work
+#=fedoratest
 Patch634: gdb-runtest-pie-override.patch
 
 # Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
@@ -545,29 +535,10 @@ Patch642: gdb-readline62-ask-more-rh.patch
 #=push
 Patch643: gdb-python-rdynamic.patch
 
-# Improve performance for C++ symbols expansion (Tom Tromey, BZ 787487).
-#=push
-Patch644: gdb-expand-cxx-accel.patch
-
-# Fix skipping of prologues on RHEL-5 gcc-4.1 -O2 -g code (BZ 797889).
-#=push
-Patch645: gdb-prologue-not-skipped.patch
-
-# Fix breakpoint warning during 'next' over exit() (Tom Tromey, BZ 797892).
-#=push
-Patch646: gdb-exit-warning.patch
-
-# [vla] Fix crash for dynamic.exp with gcc-gfortran-4.1.2-51.el5.x86_64.
-#=push+work
-Patch648: gdb-archer-vla-rhel5gcc.patch
-
 # Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
 #=push
-Patch649: gdb-attach-fail-reasons-1of5.patch
-Patch650: gdb-attach-fail-reasons-2of5.patch
-Patch651: gdb-attach-fail-reasons-3of5.patch
-Patch652: gdb-attach-fail-reasons-4of5.patch
 Patch653: gdb-attach-fail-reasons-5of5.patch
+#=fedora
 Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
 # Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
@@ -575,55 +546,20 @@ Patch657: gdb-attach-fail-reasons-5of5configure.patch
 Patch654: gdb-x86-onstack-1of2.patch
 Patch658: gdb-x86-onstack-2of2.patch
 
-# Fix DWARF DIEs CU vs. section relative offsets (Joel Brobecker, me).
-#=push
-Patch655: gdb-die-cu-offset-1of2.patch
-Patch656: gdb-die-cu-offset-2of2.patch
-
-# [vla] Fix regression on no type for subrange from IBM XLF Fortran (BZ 806920).
-#=push
-Patch660: gdb-subrange-no-type.patch
-
 # Workaround crashes from stale frame_info pointer (BZ 804256).
 #=push+work
 Patch661: gdb-stale-frame_info.patch
 
-# Security fix for loading untrusted inferiors, see "set auto-load" (BZ 756117).
-#=push
-Patch662: gdb-autoload-01of28.patch
-Patch663: gdb-autoload-02of28.patch
-Patch664: gdb-autoload-03of28.patch
-Patch665: gdb-autoload-04of28.patch
-Patch666: gdb-autoload-05of28.patch
-Patch667: gdb-autoload-06of28.patch
-Patch668: gdb-autoload-07of28.patch
-Patch669: gdb-autoload-08of28.patch
-Patch670: gdb-autoload-09of28.patch
-Patch671: gdb-autoload-10of28.patch
-Patch672: gdb-autoload-11of28.patch
-Patch673: gdb-autoload-12of28.patch
-Patch674: gdb-autoload-13of28.patch
-Patch675: gdb-autoload-14of28.patch
-Patch676: gdb-autoload-15of28.patch
-Patch677: gdb-autoload-16of28.patch
-Patch678: gdb-autoload-17of28.patch
-Patch679: gdb-autoload-18of28.patch
-Patch680: gdb-autoload-19of28.patch
-Patch681: gdb-autoload-20of28.patch
-Patch682: gdb-autoload-21of28.patch
-Patch683: gdb-autoload-22of28.patch
-Patch684: gdb-autoload-23of28.patch
-Patch685: gdb-autoload-24of28.patch
-Patch686: gdb-autoload-25of28.patch
-Patch687: gdb-autoload-26of28.patch
-Patch688: gdb-autoload-27of28.patch
-Patch689: gdb-autoload-28of28.patch
-
 # Workaround PR libc/14166 for inferior calls of strstr.
+#=push+work: But push it to glibc.
 Patch690: gdb-glibc-strstr-workaround.patch
 
-# [ppc] Fix hardware watchpoints on PowerPC (BZ 827600, Edjunior Machado).
-Patch691: gdb-ppc-watchpoint.patch
+# Fix dejagnu-1.5-4.fc17 compatibility for Go (for BZ 635651).
+#=fedoratest
+Patch692: gdb-dejagnu-go.patch
+
+# Revert recent breakage of UNIX objfiles order for symbols lookup.
+Patch693: gdb-objfile-order.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -682,6 +618,9 @@ ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
+%if 0%{!?rhel:1} || 0%{?scl:1} || 0%{?rhel} > 6
+BuildRequires: gcc-go
+%endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
 # Copied from prelink-0.4.2-3.fc13.
@@ -707,6 +646,9 @@ BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 BuildRequires: libgcj%{bits_local} libgcj%{bits_other}
+%if 0%{!?rhel:1} || 0%{?scl:1} || 0%{?rhel} > 6
+BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
+%endif
 %if 0%{!?el5:1}
 BuildRequires: glibc-static%{bits_local}
 %endif
@@ -875,12 +817,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch394 -p1
 %patch407 -p1
 %patch408 -p1
-%patch412 -p1
 %patch417 -p1
 %patch459 -p1
 %patch470 -p1
 %patch475 -p1
-%patch486 -p1
 %patch415 -p1
 %patch519 -p1
 %patch490 -p1
@@ -899,59 +839,18 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch627 -p1
 %patch634 -p1
 %patch643 -p1
-%patch644 -p1
-%patch645 -p1
-%patch646 -p1
-%patch648 -p1
-%patch649 -p1
-%patch650 -p1
-%patch651 -p1
-%patch652 -p1
 %patch653 -p1
 %patch657 -p1
 %patch654 -p1
 %patch658 -p1
-%patch655 -p1
-%patch656 -p1
-%patch660 -p1
 %patch661 -p1
-%patch662 -p1
-%patch663 -p1
-%patch664 -p1
-%patch665 -p1
-%patch666 -p1
-%patch667 -p1
-%patch668 -p1
-%patch669 -p1
-%patch670 -p1
-%patch671 -p1
-%patch672 -p1
-%patch673 -p1
-%patch674 -p1
-%patch675 -p1
-%patch676 -p1
-%patch677 -p1
-%patch678 -p1
-%patch679 -p1
-%patch680 -p1
-%patch681 -p1
-%patch682 -p1
-%patch683 -p1
-%patch684 -p1
-%patch685 -p1
-%patch686 -p1
-%patch687 -p1
-%patch688 -p1
-%patch689 -p1
 %patch690 -p1
-%patch691 -p1
+%patch692 -p1
+%patch693 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
-%endif
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
-%patch487 -p1
 %endif
 %patch642 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
@@ -1049,7 +948,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %if 0%{?el6:1}
 	--with-rpm=librpm.so.1					\
 %else
-	--with-rpm=librpm.so.2					\
+	--with-rpm=librpm.so.3					\
 %endif
 %endif
 %ifarch ia64
@@ -1437,6 +1336,14 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jun  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120602-1.fc18
+- Rebase to FSF GDB 7.4.50.20120602.
+- [testsuite] BuildRequire gcc-go.
+- Drop printing 2D C++ vectors as matrices which no longer worked (BZ 562763).
+- Fix dejagnu-1.5-4.fc17 compatibility for Go (for BZ 635651).
+- Use librpm.so.3 for rpm-4.10.0 in Fedora 18.
+- Revert recent breakage of UNIX objfiles order for symbols lookup.
+
 * Sat Jun  2 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-48.fc17
 - [ppc] Fix hardware watchpoints on PowerPC (BZ 827600, Edjunior Machado).
 
