@@ -30,12 +30,12 @@ Name: %{?scl_prefix}gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120602
+%global snap 20120603
 Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1336,6 +1336,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jun  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-2.fc18
+- Fix Release.
+- Make yum --enablerepo compatible with at least mock-1.1.21-1.fc16 Rawhide cfg.
+
 * Sun Jun  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120602-1.fc18
 - Rebase to FSF GDB 7.4.50.20120602.
 - [testsuite] BuildRequire gcc-go.
