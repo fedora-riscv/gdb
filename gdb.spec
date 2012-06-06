@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -561,6 +561,12 @@ Patch692: gdb-dejagnu-go.patch
 # Revert recent breakage of UNIX objfiles order for symbols lookup.
 Patch693: gdb-objfile-order.patch
 
+# Disable -lmcheck in the development builds.
+Patch694: gdb-disable-mcheck.patch
+
+# Fix assertion on some files as glibc-2.15.90-8.fc18 (Doug Evans).
+Patch695: gdb-index-assert.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -847,6 +853,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch690 -p1
 %patch692 -p1
 %patch693 -p1
+%patch694 -p1
+%patch695 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1336,6 +1344,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Jun  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-3.fc18
+- Disable -lmcheck in the development builds.
+- Fix assertion on some files as glibc-2.15.90-8.fc18 (Doug Evans).
+
 * Sun Jun  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-2.fc18
 - Fix Release.
 - Make yum --enablerepo compatible with at least mock-1.1.21-1.fc16 Rawhide cfg.
