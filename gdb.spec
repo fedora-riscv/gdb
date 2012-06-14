@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?dist}
+Release: 49%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -625,6 +625,10 @@ Patch690: gdb-glibc-strstr-workaround.patch
 # [ppc] Fix hardware watchpoints on PowerPC (BZ 827600, Edjunior Machado).
 Patch691: gdb-ppc-watchpoint.patch
 
+# Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
+Patch696: gdb-parameterref-1of2.patch
+Patch697: gdb-parameterref-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -945,6 +949,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch689 -p1
 %patch690 -p1
 %patch691 -p1
+%patch696 -p1
+%patch697 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1437,6 +1443,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jun 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-49.fc17
+- Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
+
 * Sat Jun  2 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-48.fc17
 - [ppc] Fix hardware watchpoints on PowerPC (BZ 827600, Edjunior Machado).
 
