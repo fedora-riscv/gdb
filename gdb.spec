@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -567,6 +567,10 @@ Patch694: gdb-disable-mcheck.patch
 # Fix assertion on some files as glibc-2.15.90-8.fc18 (Doug Evans).
 Patch695: gdb-index-assert.patch
 
+# Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
+Patch696: gdb-parameterref-1of2.patch
+Patch697: gdb-parameterref-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -855,6 +859,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch693 -p1
 %patch694 -p1
 %patch695 -p1
+%patch696 -p1
+%patch697 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1344,6 +1350,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jun 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-4.fc18
+- Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
+
 * Wed Jun  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-3.fc18
 - Disable -lmcheck in the development builds.
 - Fix assertion on some files as glibc-2.15.90-8.fc18 (Doug Evans).
