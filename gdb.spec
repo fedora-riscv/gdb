@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -571,6 +571,11 @@ Patch695: gdb-index-assert.patch
 Patch696: gdb-parameterref-1of2.patch
 Patch697: gdb-parameterref-2of2.patch
 
+# Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
+#=fedoratest
+#+ppc
+Patch698: gdb-rhel5.9-testcase-xlf-var-inside-mod.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -861,6 +866,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch695 -p1
 %patch696 -p1
 %patch697 -p1
+%patch698 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1350,6 +1356,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jun 17 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.4.50.20120603-5.fc18
+- Include testcase for BZ 823789.
+
 * Thu Jun 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-4.fc18
 - Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
 
