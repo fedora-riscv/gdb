@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -408,6 +408,7 @@ Patch360: gdb-6.8-bz457187-largefile-test.patch
 Patch381: gdb-simultaneous-step-resume-breakpoint-test.patch
 
 # Fix GNU/Linux core open: Can't read pathname for load map: Input/output error.
+# Fix regression of undisplayed missing shared libraries caused by a fix for.
 #=push+work: It should be in glibc: libc-alpha: <20091004161706.GA27450@.*>
 Patch382: gdb-core-open-vdso-warning.patch
 
@@ -1356,6 +1357,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Jun 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-6.fc18
+- Fix regression of undisplayed missing shared libraries caused by a fix for:
+  GNU/Linux core open: Can't read pathname for load map: Input/output error.
+
 * Sun Jun 17 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.4.50.20120603-5.fc18
 - Include testcase for BZ 823789.
 
