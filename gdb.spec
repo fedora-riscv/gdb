@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -572,6 +572,9 @@ Patch695: gdb-index-assert.patch
 Patch696: gdb-parameterref-1of2.patch
 Patch697: gdb-parameterref-2of2.patch
 
+# Testcase for `Setting solib-absolute-prefix breaks vDSO' (BZ 818343).
+Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
+
 # Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
 #=fedoratest
 #+ppc
@@ -868,6 +871,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch696 -p1
 %patch697 -p1
 %patch698 -p1
+%patch703 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1357,6 +1361,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jun 21 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.4.50.20120603-7.fc18
+- Include testcase for BZ 818343.
+
 * Tue Jun 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120603-6.fc18
 - Fix regression of undisplayed missing shared libraries caused by a fix for:
   GNU/Linux core open: Can't read pathname for load map: Input/output error.
