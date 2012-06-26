@@ -572,13 +572,14 @@ Patch695: gdb-index-assert.patch
 Patch696: gdb-parameterref-1of2.patch
 Patch697: gdb-parameterref-2of2.patch
 
-# Testcase for `Setting solib-absolute-prefix breaks vDSO' (BZ 818343).
-Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
-
 # Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
 #=fedoratest
 #+ppc
 Patch698: gdb-rhel5.9-testcase-xlf-var-inside-mod.patch
+
+# Testcase for `Setting solib-absolute-prefix breaks vDSO' (BZ 818343).
+#=fedoratest
+Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
