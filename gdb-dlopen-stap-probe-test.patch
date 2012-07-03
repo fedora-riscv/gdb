@@ -4,10 +4,10 @@ Date:   Mon Aug 8 12:08:53 2011 +0200
 
     +testcase
 
-Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread-lib.c
+Index: gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread-lib.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread-lib.c	2012-06-02 20:03:42.711393776 +0200
++++ gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread-lib.c	2012-07-03 17:44:45.797698656 +0200
 @@ -0,0 +1,40 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -49,10 +49,10 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread-lib.c
 +  i = pthread_join (t, NULL);
 +  assert (i == 0);
 +}
-Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.c
+Index: gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.c	2012-06-02 20:03:42.712393775 +0200
++++ gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread.c	2012-07-03 17:44:45.798698655 +0200
 @@ -0,0 +1,46 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -100,10 +100,10 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.c
 +
 +  return 0;
 +}
-Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.exp
+Index: gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.exp	2012-06-02 20:03:42.724393771 +0200
++++ gdb-7.4.50.20120703/gdb/testsuite/gdb.threads/dlopen-libpthread.exp	2012-07-03 17:44:45.798698655 +0200
 @@ -0,0 +1,74 @@
 +# Copyright 2011 Free Software Foundation, Inc.
 +#
@@ -179,15 +179,15 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.threads/dlopen-libpthread.exp
 +gdb_continue_to_breakpoint "notify" ".* notify-here .*"
 +
 +gdb_test "info sharedlibrary" {/libpthread\.so.*} "libpthread.so found"
-Index: gdb-7.4.50.20120602/gdb/testsuite/lib/gdb.exp
+Index: gdb-7.4.50.20120703/gdb/testsuite/lib/gdb.exp
 ===================================================================
---- gdb-7.4.50.20120602.orig/gdb/testsuite/lib/gdb.exp	2012-06-02 19:11:56.000000000 +0200
-+++ gdb-7.4.50.20120602/gdb/testsuite/lib/gdb.exp	2012-06-02 20:03:42.727393770 +0200
-@@ -3693,30 +3693,49 @@ proc build_executable { testname executa
+--- gdb-7.4.50.20120703.orig/gdb/testsuite/lib/gdb.exp	2012-07-03 17:34:18.000000000 +0200
++++ gdb-7.4.50.20120703/gdb/testsuite/lib/gdb.exp	2012-07-03 17:46:44.316514076 +0200
+@@ -3758,23 +3758,7 @@ proc build_executable { testname executa
          set sources ${executable}.c
      }
  
--    set binfile ${objdir}/${subdir}/${executable}
+-    set binfile [standard_output_file $executable]
 -
 -    set objects {}
 -    for {set i 0} "\$i<[llength $sources]" {incr i} {
@@ -197,29 +197,29 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/lib/gdb.exp
 -            return -1
 -        }
 -        lappend objects "${binfile}${i}.o"
-+    # get_compiler_info by gdb_compile_shlib and gdb_compile_shlib_pthreads.
-+    set info_options ""
-+    if { [lsearch -exact $options "c++"] >= 0 } {
-+	set info_options "c++"
-     }
+-    }
 -    
 -    if  { [gdb_compile $objects "${binfile}" executable $options] != "" } {
 -        untested $testname
-+    if [get_compiler_info binfile_unused ${info_options}] {
+-        return -1
+-    }
+-
++    # get_compiler_info by gdb_compile_shlib and gdb_compile_shlib_pthreads.
+     set info_options ""
+     if { [lsearch -exact $options "c++"] >= 0 } {
+ 	set info_options "c++"
+@@ -3782,6 +3766,41 @@ proc build_executable { testname executa
+     if [get_compiler_info ${info_options}] {
          return -1
      }
- 
--    set info_options ""
--    if { [lsearch -exact $options "c++"] >= 0 } {
--	set info_options "c++"
-+    set binfile ${objdir}/${subdir}/${executable}
++
++    set binfile [standard_output_file $executable]
 +
 +    set func gdb_compile
 +    set func_index [lsearch -regexp $options {^(pthreads|shlib|shlib_pthreads)$}]
 +    if {$func_index != -1} {
 +	set func "${func}_[lindex $options $func_index]"
-     }
--    if [get_compiler_info ${binfile} ${info_options}] {
++    }
 +
 +    # gdb_compile_shlib and gdb_compile_shlib_pthreads do not use the 3rd
 +    # parameter.  They also requires $sources while gdb_compile and
@@ -244,16 +244,16 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/lib/gdb.exp
 +    }
 +    if  { $ret != "" } {
 +        untested $testname
-         return -1
-     }
++        return -1
++    }
 +
      return 0
  }
  
-Index: gdb-7.4.50.20120602/gdb/testsuite/lib/prelink-support.exp
+Index: gdb-7.4.50.20120703/gdb/testsuite/lib/prelink-support.exp
 ===================================================================
---- gdb-7.4.50.20120602.orig/gdb/testsuite/lib/prelink-support.exp	2012-01-04 09:27:56.000000000 +0100
-+++ gdb-7.4.50.20120602/gdb/testsuite/lib/prelink-support.exp	2012-06-02 20:03:42.733393768 +0200
+--- gdb-7.4.50.20120703.orig/gdb/testsuite/lib/prelink-support.exp	2012-01-04 09:27:56.000000000 +0100
++++ gdb-7.4.50.20120703/gdb/testsuite/lib/prelink-support.exp	2012-07-03 17:44:45.803698648 +0200
 @@ -95,8 +95,9 @@ proc file_copy {src dest} {
  # Wrap function build_executable so that the resulting executable is fully
  # self-sufficient (without dependencies on system libraries).  Parameter
@@ -306,10 +306,10 @@ Index: gdb-7.4.50.20120602/gdb/testsuite/lib/prelink-support.exp
      return $prelink_args
  }
  
-Index: gdb-7.4.50.20120602/gdb/testsuite/gdb.base/break-interp.exp
+Index: gdb-7.4.50.20120703/gdb/testsuite/gdb.base/break-interp.exp
 ===================================================================
---- gdb-7.4.50.20120602.orig/gdb/testsuite/gdb.base/break-interp.exp	2012-02-24 15:09:08.000000000 +0100
-+++ gdb-7.4.50.20120602/gdb/testsuite/gdb.base/break-interp.exp	2012-06-02 20:04:56.135369687 +0200
+--- gdb-7.4.50.20120703.orig/gdb/testsuite/gdb.base/break-interp.exp	2012-06-21 22:46:21.000000000 +0200
++++ gdb-7.4.50.20120703/gdb/testsuite/gdb.base/break-interp.exp	2012-07-03 17:44:45.804698647 +0200
 @@ -109,14 +109,21 @@ proc strip_debug {dest} {
      }
  }

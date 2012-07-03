@@ -30,12 +30,12 @@ Name: %{?scl_prefix}gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120603
+%global snap 20120703
 Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -481,8 +481,6 @@ Patch504: gdb-bz623749-gcore-relro.patch
 
 # Fix lost siginfo_t in linux-nat (BZ 592031).
 #=push
-Patch510: gdb-bz592031-siginfo-lost-4of5.patch
-#=push
 Patch511: gdb-bz592031-siginfo-lost-5of5.patch
 
 # Verify GDB Python built-in function gdb.solib_address exists (BZ # 634108).
@@ -542,35 +540,21 @@ Patch653: gdb-attach-fail-reasons-5of5.patch
 #=fedora
 Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
-# Fix inferior calls, particularly uncaught thrown exceptions (BZ 799531).
-#=push+work
-Patch654: gdb-x86-onstack-1of2.patch
-Patch658: gdb-x86-onstack-2of2.patch
-
 # Workaround crashes from stale frame_info pointer (BZ 804256).
-#=push+work
+#=fedora
 Patch661: gdb-stale-frame_info.patch
 
 # Workaround PR libc/14166 for inferior calls of strstr.
 #=push+work: But push it to glibc.
 Patch690: gdb-glibc-strstr-workaround.patch
 
-# Fix dejagnu-1.5-4.fc17 compatibility for Go (for BZ 635651).
-#=fedoratest
-Patch692: gdb-dejagnu-go.patch
-
-# Revert recent breakage of UNIX objfiles order for symbols lookup.
-Patch693: gdb-objfile-order.patch
-
 # Disable -lmcheck in the development builds.
+#=fedora
 Patch694: gdb-disable-mcheck.patch
 
 # Fix assertion on some files as glibc-2.15.90-8.fc18 (Doug Evans).
+#=push
 Patch695: gdb-index-assert.patch
-
-# Support DW_OP_GNU_parameter_ref for -O2 -g inferiors (BZ 827375).
-Patch696: gdb-parameterref-1of2.patch
-Patch697: gdb-parameterref-2of2.patch
 
 # Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
 #=fedoratest
@@ -580,6 +564,10 @@ Patch698: gdb-rhel5.9-testcase-xlf-var-inside-mod.patch
 # Testcase for `Setting solib-absolute-prefix breaks vDSO' (BZ 818343).
 #=fedoratest
 Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
+
+# Revert function returning pointer fix (PR 9514) regressing Fedora errno patch.
+#=push
+Patch715: gdb-errno-func-datatype-revert.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -651,7 +639,10 @@ BuildRequires: prelink
 %endif
 %endif
 %if 0%{!?rhel:1}
+# Fedora arm does not yet have fpc built.
+%ifnarch %{arm}
 BuildRequires: fpc
+%endif
 %endif
 %if 0%{?el5:1}
 BuildRequires: gcc44 gcc44-gfortran
@@ -758,6 +749,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch2 -p1
 
 %patch232 -p1
+%patch715 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -847,7 +839,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch491 -p1
 %patch496 -p1
 %patch504 -p1
-%patch510 -p1
 %patch511 -p1
 %patch526 -p1
 %patch542 -p1
@@ -861,16 +852,10 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch643 -p1
 %patch653 -p1
 %patch657 -p1
-%patch654 -p1
-%patch658 -p1
 %patch661 -p1
 %patch690 -p1
-%patch692 -p1
-%patch693 -p1
 %patch694 -p1
 %patch695 -p1
-%patch696 -p1
-%patch697 -p1
 %patch698 -p1
 %patch703 -p1
 
@@ -1362,6 +1347,12 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Jul  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-8.fc18
+- Rebase to FSF GDB 7.4.50.20120703.
+- [archer-tromey-dwz-multifile-rebase] Merge new branch (Tom Tromey).
+- [arm] <--with testsuite>: Disable fpc BuildRequires as it is not yet built.
+- Revert function returning pointer fix (PR 9514) regressing Fedora errno patch.
+
 * Thu Jun 21 2012 Sergio Durigan Junior <sergiodj@redhat.com> - 7.4.50.20120603-7.fc18
 - Include testcase for BZ 818343.
 
