@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -569,6 +569,10 @@ Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 #=push
 Patch715: gdb-errno-func-datatype-revert.patch
 
+# Implement MiniDebugInfo F-18 Feature consumer (Alexander Larsson, BZ 834068).
+#=fedora
+Patch716: gdb-minidebuginfo.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -858,6 +862,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch695 -p1
 %patch698 -p1
 %patch703 -p1
+%patch716 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1347,6 +1352,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jul  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-9.fc18
+- Implement MiniDebugInfo F-18 Feature consumer (Alexander Larsson, BZ 834068).
+
 * Tue Jul  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-8.fc18
 - Rebase to FSF GDB 7.4.50.20120703.
 - [archer-tromey-dwz-multifile-rebase] Merge new branch (Tom Tromey).
