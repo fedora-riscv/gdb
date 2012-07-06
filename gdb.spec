@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -580,7 +580,8 @@ Patch716: gdb-minidebuginfo.patch
 BuildRequires: readline-devel%{?_isa} >= 6.2-4
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
-BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison expat-devel%{?_isa}
+BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison
+BuildRequires: expat-devel%{?_isa} xz-devel%{?_isa}
 %if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
@@ -675,6 +676,7 @@ BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %ifarch %{ix86} x86_64 ppc ppc64
 BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
 %endif
+BuildRequires: xz
 
 %endif # 0%{?_with_testsuite:1}
 
@@ -967,6 +969,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 	--with-rpm=librpm.so.3					\
 %endif
 %endif
+	--with-lzma						\
 %ifarch ia64
 	--with-libunwind					\
 %else
@@ -1352,6 +1355,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Jul  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-12.fc18
+- Fix .spec metadata for the MiniDebugInfo F-18 feature (BZ 834068).
+
 * Fri Jul  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-11.fc18
 - [archer-tromey-dwz-multifile-rebase] Fix DWARF files reading (Tom Tromey).
 
