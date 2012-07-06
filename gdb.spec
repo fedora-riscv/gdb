@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1352,6 +1352,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Jul  6 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-10.fc18
+- Fix build-id-core-loads internal error (BZ 837870).
+
 * Thu Jul  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120703-9.fc18
 - Implement MiniDebugInfo F-18 Feature consumer (Alexander Larsson, BZ 834068).
 
