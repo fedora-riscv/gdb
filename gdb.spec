@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -46,6 +46,10 @@ Group: Development/Debuggers
 Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
+
+%if "%{scl}" == "devtoolset-1.1"
+Obsoletes: devtoolset-1.0-%{pkg_name}
+%endif
 
 # For our convenience
 %global gdb_src %{pkg_name}-%{version}
@@ -701,6 +705,10 @@ and printing their data.
 Summary: A standalone server for GDB (the GNU source-level debugger)
 Group: Development/Debuggers
 
+%if "%{scl}" == "devtoolset-1.1"
+Obsoletes: devtoolset-1.0-%{pkg_name}-gdbserver
+%endif
+
 %description gdbserver
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
@@ -721,6 +729,10 @@ Group: Documentation
 %if 0%{!?el5:1}
 BuildArch: noarch
 %endif # 0%{!?el5:1}
+
+%if "%{scl}" == "devtoolset-1.1"
+Obsoletes: devtoolset-1.0-%{pkg_name}-doc
+%endif
 
 %description doc
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -1354,6 +1366,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Jul 16 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120714-15.fc18
+- [devtoolset] Include Obsoletes of devtoolset-1.0-* by devtoolset-1.1-*.
+
 * Sun Jul 15 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120714-14.fc18
 - Rebase to FSF GDB 7.4.50.20120714.
   - Fix entryval feature crash on some .debug files optimized by dwz (BZ 839596).
