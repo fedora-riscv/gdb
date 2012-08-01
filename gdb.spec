@@ -30,12 +30,12 @@ Name: %{?scl_prefix}gdb
 # Set version to contents of gdb/version.in.
 # NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
 # and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120714
-Version: 7.4.50.%{snap}
+%global snap 20120801
+Version: 7.4.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -264,7 +264,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -548,10 +548,6 @@ Patch661: gdb-stale-frame_info.patch
 #=push+work: But push it to glibc.
 Patch690: gdb-glibc-strstr-workaround.patch
 
-# Disable -lmcheck in the development builds.
-#=fedora
-Patch694: gdb-disable-mcheck.patch
-
 # Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
 #=fedoratest
 #+ppc
@@ -564,10 +560,6 @@ Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 # Implement MiniDebugInfo F-18 Feature consumer (Alexander Larsson, BZ 834068).
 #=fedora
 Patch716: gdb-minidebuginfo.patch
-
-# Fix another stale frame_info * (PR 11914, like PR 13866).
-#=push
-Patch718: gdb-stale-frame_info-python.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -763,7 +755,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1 -p1
 %patch3 -p1
@@ -867,11 +859,9 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch657 -p1
 %patch661 -p1
 %patch690 -p1
-%patch694 -p1
 %patch698 -p1
 %patch703 -p1
 %patch716 -p1
-%patch718 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1366,6 +1356,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Aug  1 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-17
+- Rebase to FSF GDB 7.4.91.20120801.
+- [dwz] Rebase it from FSF GDB HEAD.
+
 * Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.4.50.20120714-16
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
 

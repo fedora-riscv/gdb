@@ -2,12 +2,12 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit 814db9ee87e8d609ce60324760cf80cd4e4ec43a
+commit 897686c0aedb7a6da59b823f22b1d24ec5a1d2ba
 
 branch `archer' - the merge of branches:
 archer-jankratochvil-vla
 archer-tromey-python
-archer-tromey-dwz-multifile-rebase
+archer-tromey-dwz-multifile-rebase (but from post-7.5 FSF GDB commits)
 
 
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
@@ -54,6 +54,24 @@ index a41cff9..d7786a6 100644
  config.status: $(srcdir)/configure configure.tgt configure.host
  	$(SHELL) config.status --recheck
  
+diff --git a/gdb/NEWS b/gdb/NEWS
+index b281824..4da886c 100644
+--- a/gdb/NEWS
++++ b/gdb/NEWS
+@@ -1,6 +1,13 @@
+ 		What has changed in GDB?
+ 	     (Organized release by release)
+ 
++*** Changes since GDB 7.5
++
++* New commands (for set/show, see "New options" below)
++
++maint info bfds
++  List the BFDs known to GDB.
++
+ *** Changes in GDB 7.5
+ 
+ * GDB now supports x32 ABI.  Visit <http://sites.google.com/site/x32abi/>
 diff --git a/gdb/ada-lang.c b/gdb/ada-lang.c
 index aa090af..e672731 100644
 --- a/gdb/ada-lang.c
@@ -85,7 +103,7 @@ index aa090af..e672731 100644
      return 1;
  
 diff --git a/gdb/bfd-target.c b/gdb/bfd-target.c
-index 6728800..21f53bb 100644
+index 6728800..455d3e6 100644
 --- a/gdb/bfd-target.c
 +++ b/gdb/bfd-target.c
 @@ -21,6 +21,7 @@
@@ -105,15 +123,31 @@ index 6728800..21f53bb 100644
    xfree (data->table.sections);
    xfree (data);
    xfree (t);
-@@ -83,7 +84,7 @@ target_bfd_reopen (struct bfd *abfd)
-   struct target_bfd_data *data;
+@@ -84,6 +85,7 @@ target_bfd_reopen (struct bfd *abfd)
  
    data = XZALLOC (struct target_bfd_data);
--  data->bfd = abfd;
-+  data->bfd = gdb_bfd_ref (abfd);
+   data->bfd = abfd;
++  gdb_bfd_ref (abfd);
    build_section_table (abfd, &data->table.sections, &data->table.sections_end);
  
    t = XZALLOC (struct target_ops);
+diff --git a/gdb/bfd-target.h b/gdb/bfd-target.h
+index 71001c5..7f4e628 100644
+--- a/gdb/bfd-target.h
++++ b/gdb/bfd-target.h
+@@ -23,9 +23,9 @@
+ struct bfd;
+ struct target_ops;
+ 
+-/* Given an existing BFD, re-open it as a "struct target_ops".  On
+-   close, it will also close the corresponding BFD (which is like
+-   freopen and fdopen).  */
++/* Given an existing BFD, re-open it as a "struct target_ops".  This
++   acquires a new reference to the BFD.  This reference will be
++   released when the target is closed.  */
+ struct target_ops *target_bfd_reopen (struct bfd *bfd);
+ 
+ #endif
 diff --git a/gdb/block.c b/gdb/block.c
 index a0f82ec..097dbf6 100644
 --- a/gdb/block.c
@@ -152,10 +186,10 @@ index 99c4788..6ceb704 100644
 +
  #endif /* BLOCK_H */
 diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
-index 6b9faf3..43ff16a 100644
+index 78fffd3..224ba49 100644
 --- a/gdb/breakpoint.c
 +++ b/gdb/breakpoint.c
-@@ -15508,6 +15508,24 @@ all_tracepoints (void)
+@@ -15519,6 +15519,24 @@ all_tracepoints (void)
    return tp_vec;
  }
  
@@ -180,7 +214,7 @@ index 6b9faf3..43ff16a 100644
  
  /* This help string is used for the break, hbreak, tbreak and thbreak
     commands.  It is defined as a macro to prevent duplication.
-@@ -16473,4 +16491,7 @@ agent-printf \"printf format string\", arg1, arg2, arg3, ..., argn\n\
+@@ -16484,4 +16502,7 @@ agent-printf \"printf format string\", arg1, arg2, arg3, ..., argn\n\
    automatic_hardware_breakpoints = 1;
  
    observer_attach_about_to_proceed (breakpoint_about_to_proceed);
@@ -189,10 +223,18 @@ index 6b9faf3..43ff16a 100644
 +#endif
  }
 diff --git a/gdb/buildsym.c b/gdb/buildsym.c
-index d547012..e2f3192 100644
+index d547012..e4882fb 100644
 --- a/gdb/buildsym.c
 +++ b/gdb/buildsym.c
-@@ -970,7 +970,7 @@ reset_symtab_globals (void)
+@@ -966,11 +966,14 @@ reset_symtab_globals (void)
+    file's text.
+ 
+    If EXPANDABLE is non-zero the STATIC_BLOCK dictionary is made
+-   expandable.  */
++   expandable.
++
++   If REQUIRED is non-zero, then a symtab is created even if it does
++   not contain any symbols.  */
  
  struct block *
  end_symtab_get_static_block (CORE_ADDR end_addr, struct objfile *objfile,
@@ -201,7 +243,7 @@ index d547012..e2f3192 100644
  {
    /* Finish the lexical context of the last function in the file; pop
       the context stack.  */
-@@ -1038,7 +1038,8 @@ end_symtab_get_static_block (CORE_ADDR end_addr, struct objfile *objfile,
+@@ -1038,7 +1041,8 @@ end_symtab_get_static_block (CORE_ADDR end_addr, struct objfile *objfile,
    cleanup_undefined_stabs_types (objfile);
    finish_global_stabs (objfile);
  
@@ -211,7 +253,7 @@ index d547012..e2f3192 100644
        && file_symbols == NULL
        && global_symbols == NULL
        && have_line_numbers == 0
-@@ -1296,7 +1297,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
+@@ -1296,7 +1300,7 @@ end_symtab (CORE_ADDR end_addr, struct objfile *objfile, int section)
  {
    struct block *static_block;
  
@@ -220,7 +262,7 @@ index d547012..e2f3192 100644
    return end_symtab_from_static_block (static_block, objfile, section, 0);
  }
  
-@@ -1308,7 +1309,7 @@ end_expandable_symtab (CORE_ADDR end_addr, struct objfile *objfile,
+@@ -1308,7 +1312,7 @@ end_expandable_symtab (CORE_ADDR end_addr, struct objfile *objfile,
  {
    struct block *static_block;
  
@@ -230,15 +272,16 @@ index d547012..e2f3192 100644
  }
  
 diff --git a/gdb/buildsym.h b/gdb/buildsym.h
-index 162ee8c..2c1d179 100644
+index 162ee8c..33b34c8 100644
 --- a/gdb/buildsym.h
 +++ b/gdb/buildsym.h
-@@ -260,7 +260,7 @@ extern char *pop_subfile (void);
+@@ -260,7 +260,8 @@ extern char *pop_subfile (void);
  
  extern struct block *end_symtab_get_static_block (CORE_ADDR end_addr,
  						  struct objfile *objfile,
 -						  int expandable);
-+						  int expandable, int required);
++						  int expandable,
++						  int required);
  
  extern struct symtab *end_symtab_from_static_block (struct block *static_block,
  						    struct objfile *objfile,
@@ -483,7 +526,7 @@ index 644ba34..0000000
 -rm -f "$index_file"
 -exit $rc
 diff --git a/gdb/cli/cli-dump.c b/gdb/cli/cli-dump.c
-index 4a8b5d1..1244767 100644
+index 4a8b5d1..7341f00 100644
 --- a/gdb/cli/cli-dump.c
 +++ b/gdb/cli/cli-dump.c
 @@ -32,6 +32,7 @@
@@ -499,7 +542,7 @@ index 4a8b5d1..1244767 100644
    bfd *ibfd;
  
 -  ibfd = bfd_openr (filename, target);
-+  ibfd = gdb_bfd_ref (bfd_openr (filename, target));
++  ibfd = gdb_bfd_openr (filename, target);
    if (ibfd == NULL)
      error (_("Failed to open %s: %s."), filename, 
  	   bfd_errmsg (bfd_get_error ()));
@@ -514,7 +557,7 @@ index 4a8b5d1..1244767 100644
    if (*mode == 'w')	/* Write: create new file */
      {
 -      obfd = bfd_openw (filename, target);
-+      obfd = gdb_bfd_ref (bfd_openw (filename, target));
++      obfd = gdb_bfd_openw (filename, target);
        if (obfd == NULL)
  	error (_("Failed to open %s: %s."), filename, 
  	       bfd_errmsg (bfd_get_error ()));
@@ -523,9 +566,29 @@ index 4a8b5d1..1244767 100644
        if (!bfd_set_format (obfd, bfd_object))
  	error (_("bfd_openw_with_cleanup: %s."), bfd_errmsg (bfd_get_error ()));
      }
+diff --git a/gdb/coffread.c b/gdb/coffread.c
+index b0a8b82..0c7e6d9 100644
+--- a/gdb/coffread.c
++++ b/gdb/coffread.c
+@@ -653,13 +653,14 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
+       char *debugfile;
+ 
+       debugfile = find_separate_debug_file_by_debuglink (objfile);
++      make_cleanup (xfree, debugfile);
+ 
+       if (debugfile)
+ 	{
+ 	  bfd *abfd = symfile_bfd_open (debugfile);
+ 
++	  make_cleanup_bfd_unref (abfd);
+ 	  symbol_file_add_separate (abfd, symfile_flags, objfile);
+-	  xfree (debugfile);
+ 	}
+     }
+ 
 diff --git a/gdb/contrib/cc-with-tweaks.sh b/gdb/contrib/cc-with-tweaks.sh
 new file mode 100755
-index 0000000..9270db4
+index 0000000..7d7932c
 --- /dev/null
 +++ b/gdb/contrib/cc-with-tweaks.sh
 @@ -0,0 +1,162 @@
@@ -557,8 +620,8 @@ index 0000000..9270db4
 +#
 +# bash$ cd $objdir/gdb/testsuite
 +# bash$ runtest \
-+#   CC_FOR_TARGET="/bin/sh $srcdir/cc-with-tweaks.sh ARGS gcc" \
-+#   CXX_FOR_TARGET="/bin/sh $srcdir/cc-with-tweaks.sh ARGS g++"
++#   CC_FOR_TARGET="/bin/sh $srcdir/gdb/contrib/cc-with-tweaks.sh ARGS gcc" \
++#   CXX_FOR_TARGET="/bin/sh $srcdir/gdb/contrib/cc-with-tweaks.sh ARGS g++"
 +#
 +# For documentation on index files: info -f gdb.info -n "Index Files"
 +# For information about 'dwz', see the announcement:
@@ -692,7 +755,7 @@ index 0000000..9270db4
 +rm -f "$index_file"
 +exit $rc
 diff --git a/gdb/corelow.c b/gdb/corelow.c
-index dd62560..380c0dc 100644
+index dd62560..340b149 100644
 --- a/gdb/corelow.c
 +++ b/gdb/corelow.c
 @@ -46,6 +46,7 @@
@@ -714,25 +777,20 @@ index dd62560..380c0dc 100644
        core_bfd = NULL;
      }
    core_vec = NULL;
-@@ -319,12 +318,14 @@ core_open (char *filename, int from_tty)
+@@ -319,9 +318,9 @@ core_open (char *filename, int from_tty)
    if (scratch_chan < 0)
      perror_with_name (filename);
  
 -  temp_bfd = bfd_fopen (filename, gnutarget, 
 -			write_files ? FOPEN_RUB : FOPEN_RB,
 -			scratch_chan);
-+  temp_bfd = gdb_bfd_ref (bfd_fopen (filename, gnutarget, 
-+				     write_files ? FOPEN_RUB : FOPEN_RB,
-+				     scratch_chan));
++  temp_bfd = gdb_bfd_fopen (filename, gnutarget, 
++			    write_files ? FOPEN_RUB : FOPEN_RB,
++			    scratch_chan);
    if (temp_bfd == NULL)
      perror_with_name (filename);
  
-+  gdb_bfd_stash_filename (temp_bfd);
-+
-   if (!bfd_check_format (temp_bfd, bfd_core)
-       && !gdb_check_format (temp_bfd))
-     {
-@@ -332,7 +333,7 @@ core_open (char *filename, int from_tty)
+@@ -332,7 +331,7 @@ core_open (char *filename, int from_tty)
        /* FIXME: should be checking for errors from bfd_close (for one
           thing, on error it does not free all the storage associated
           with the bfd).  */
@@ -741,7 +799,7 @@ index dd62560..380c0dc 100644
        error (_("\"%s\" is not a core dump: %s"),
  	     filename, bfd_errmsg (bfd_get_error ()));
      }
-@@ -340,7 +341,7 @@ core_open (char *filename, int from_tty)
+@@ -340,7 +339,7 @@ core_open (char *filename, int from_tty)
    /* Looks semi-reasonable.  Toss the old core file and work on the
       new.  */
  
@@ -807,7 +865,7 @@ index 1c6fa79..ec08348 100644
  extern char *xfullpath (const char *);
  
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index a92df86..29a62ad 100644
+index 68ea817..5945bac 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
 @@ -1200,6 +1200,16 @@ for remote debugging.
@@ -827,7 +885,7 @@ index a92df86..29a62ad 100644
  @c resolve the situation of these eventually
  @item -tui
  @cindex @code{--tui}
-@@ -22548,8 +22558,6 @@ containing @code{end}.  For example:
+@@ -22563,8 +22573,6 @@ containing @code{end}.  For example:
  
  @smallexample
  (@value{GDBP}) python
@@ -836,7 +894,7 @@ index a92df86..29a62ad 100644
  >print 23
  >end
  23
-@@ -22563,6 +22571,14 @@ controlled using @code{set python print-stack}: if @code{full}, then
+@@ -22578,6 +22586,14 @@ controlled using @code{set python print-stack}: if @code{full}, then
  full Python stack printing is enabled; if @code{none}, then Python stack
  and message printing is disabled; if @code{message}, the default, only
  the message component of the error is printed.
@@ -851,7 +909,7 @@ index a92df86..29a62ad 100644
  @end table
  
  It is also possible to execute a Python script from the @value{GDBN}
-@@ -22584,6 +22600,14 @@ and thus is always available.
+@@ -22599,6 +22615,14 @@ and thus is always available.
  @cindex python api
  @cindex programming in python
  
@@ -866,6 +924,18 @@ index a92df86..29a62ad 100644
  @cindex python stdout
  @cindex python pagination
  At startup, @value{GDBN} overrides Python's @code{sys.stdout} and
+@@ -34536,6 +34560,11 @@ Shared library events.
+ 
+ @end table
+ 
++@kindex maint info bfds
++@item maint info bfds
++This prints information about each @code{bfd} object that is known to
++@value{GDBN}.  @xref{Top, , BFD, bfd, The Binary File Descriptor Library}.
++
+ @kindex set displaced-stepping
+ @kindex show displaced-stepping
+ @cindex displaced stepping support
 diff --git a/gdb/doc/gdbint.texinfo b/gdb/doc/gdbint.texinfo
 index 5e00f1f..c5c432b 100644
 --- a/gdb/doc/gdbint.texinfo
@@ -1012,7 +1082,7 @@ index 6827ed8..c63b901 100644
  This observer is used for internal testing.  Do not use.  
  See testsuite/gdb.gdb/observer.exp.
 diff --git a/gdb/dsrec.c b/gdb/dsrec.c
-index d2c99b2..66d4c13 100644
+index d2c99b2..f39d0ed 100644
 --- a/gdb/dsrec.c
 +++ b/gdb/dsrec.c
 @@ -23,6 +23,7 @@
@@ -1032,7 +1102,7 @@ index d2c99b2..66d4c13 100644
    srec = (char *) alloca (maxrecsize + 1);
  
 -  abfd = bfd_openr (file, 0);
-+  abfd = gdb_bfd_ref (bfd_openr (file, 0));
++  abfd = gdb_bfd_openr (file, 0);
    if (!abfd)
      {
        printf_filtered (_("Unable to open file %s\n"), file);
@@ -1503,7 +1573,7 @@ index e9d06a3..bfa6776 100644
  /* Compile a DWARF location expression to an agent expression.
     
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 1d51db2..fe56709 100644
+index deee5a2..b2f052b 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -64,20 +64,12 @@
@@ -1530,7 +1600,7 @@ index 1d51db2..fe56709 100644
  DEF_VEC_P (symbolp);
 @@ -95,8 +87,6 @@ static int check_physname = 0;
  /* When non-zero, do not reject deprecated .gdb_index sections.  */
- int use_deprecated_index_sections = 0;
+ static int use_deprecated_index_sections = 0;
  
 -static int pagesize;
 -
@@ -1587,7 +1657,7 @@ index 1d51db2..fe56709 100644
    /* The section this CU/TU lives in.
       If the DIE refers to a DWO file, this is always the original die,
       not the DWO file.  */
-@@ -695,6 +686,22 @@ struct dwo_file
+@@ -715,6 +706,22 @@ struct dwo_file
    htab_t tus;
  };
  
@@ -1610,7 +1680,7 @@ index 1d51db2..fe56709 100644
  /* Struct used to pass misc. parameters to read_die_and_children, et
     al.  which are used for both .debug_info and .debug_types dies.
     All parameters here are unchanging for the life of the call.  This
-@@ -808,6 +815,12 @@ struct partial_die_info
+@@ -828,6 +835,12 @@ struct partial_die_info
      /* Flag set if fixup_partial_die has been called on this die.  */
      unsigned int fixup_called : 1;
  
@@ -1623,7 +1693,7 @@ index 1d51db2..fe56709 100644
      /* The name of this DIE.  Normally the value of DW_AT_name, but
         sometimes a default name for unnamed DIEs.  */
      char *name;
-@@ -1193,7 +1206,7 @@ static gdb_byte *read_partial_die (const struct die_reader_specs *,
+@@ -1213,7 +1226,7 @@ static gdb_byte *read_partial_die (const struct die_reader_specs *,
  				   unsigned int,
  				   gdb_byte *);
  
@@ -1632,7 +1702,7 @@ index 1d51db2..fe56709 100644
  						  struct dwarf2_cu *);
  
  static void fixup_partial_die (struct partial_die_info *,
-@@ -1238,6 +1251,8 @@ static char *read_indirect_string (bfd *, gdb_byte *,
+@@ -1258,6 +1271,8 @@ static char *read_indirect_string (bfd *, gdb_byte *,
                                     const struct comp_unit_head *,
                                     unsigned int *);
  
@@ -1641,7 +1711,7 @@ index 1d51db2..fe56709 100644
  static ULONGEST read_unsigned_leb128 (bfd *, gdb_byte *, unsigned int *);
  
  static LONGEST read_signed_leb128 (bfd *, gdb_byte *, unsigned int *);
-@@ -1489,6 +1504,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
+@@ -1509,6 +1524,9 @@ static void fill_in_loclist_baton (struct dwarf2_cu *cu,
  				   struct dwarf2_loclist_baton *baton,
  				   struct attribute *attr);
  
@@ -1651,7 +1721,7 @@ index 1d51db2..fe56709 100644
  static void dwarf2_symbol_mark_computed (struct attribute *attr,
  					 struct symbol *sym,
  					 struct dwarf2_cu *cu);
-@@ -1504,7 +1522,7 @@ static hashval_t partial_die_hash (const void *item);
+@@ -1524,7 +1542,7 @@ static hashval_t partial_die_hash (const void *item);
  static int partial_die_eq (const void *item_lhs, const void *item_rhs);
  
  static struct dwarf2_per_cu_data *dwarf2_find_containing_comp_unit
@@ -1660,7 +1730,7 @@ index 1d51db2..fe56709 100644
  
  static void init_one_comp_unit (struct dwarf2_cu *cu,
  				struct dwarf2_per_cu_data *per_cu);
-@@ -1521,6 +1539,9 @@ static void age_cached_comp_units (void);
+@@ -1541,6 +1559,9 @@ static void age_cached_comp_units (void);
  
  static void free_one_cached_comp_unit (struct dwarf2_per_cu_data *);
  
@@ -1670,7 +1740,7 @@ index 1d51db2..fe56709 100644
  static struct type *set_die_type (struct die_info *, struct type *,
  				  struct dwarf2_cu *);
  
-@@ -1549,6 +1570,9 @@ static struct type *get_die_type_at_offset (sect_offset,
+@@ -1569,6 +1590,9 @@ static struct type *get_die_type_at_offset (sect_offset,
  
  static struct type *get_die_type (struct die_info *die, struct dwarf2_cu *cu);
  
@@ -1680,7 +1750,7 @@ index 1d51db2..fe56709 100644
  static void dwarf2_release_queue (void *dummy);
  
  static void queue_comp_unit (struct dwarf2_per_cu_data *per_cu,
-@@ -1567,6 +1591,12 @@ static void find_file_and_directory (struct die_info *die,
+@@ -1587,6 +1611,12 @@ static void find_file_and_directory (struct die_info *die,
  static char *file_full_name (int file, struct line_header *lh,
  			     const char *comp_dir);
  
@@ -1693,7 +1763,7 @@ index 1d51db2..fe56709 100644
  static void init_cutu_and_read_dies
    (struct dwarf2_per_cu_data *this_cu, struct abbrev_table *abbrev_table,
     int use_existing_cu, int keep,
-@@ -1588,8 +1618,6 @@ static struct dwo_unit *lookup_dwo_type_unit
+@@ -1608,8 +1638,6 @@ static struct dwo_unit *lookup_dwo_type_unit
  
  static void free_dwo_file_cleanup (void *);
  
@@ -1702,7 +1772,7 @@ index 1d51db2..fe56709 100644
  static void process_cu_includes (void);
  
  #if WORDS_BIGENDIAN
-@@ -1759,85 +1787,6 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *vnames)
+@@ -1779,85 +1807,6 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *vnames)
      dwarf2_per_objfile->has_section_at_zero = 1;
  }
  
@@ -1788,7 +1858,7 @@ index 1d51db2..fe56709 100644
  /* A helper function that decides whether a section is empty,
     or not present.  */
  
-@@ -1864,56 +1813,27 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
+@@ -1884,56 +1833,27 @@ dwarf2_read_section (struct objfile *objfile, struct dwarf2_section_info *info)
    if (info->readin)
      return;
    info->buffer = NULL;
@@ -1855,7 +1925,7 @@ index 1d51db2..fe56709 100644
  
    /* When debugging .o files, we may need to apply relocations; see
       http://sourceware.org/ml/gdb-patches/2002-04/msg00136.html .
-@@ -1989,6 +1909,111 @@ dwarf2_get_section_info (struct objfile *objfile,
+@@ -2009,6 +1929,111 @@ dwarf2_get_section_info (struct objfile *objfile,
    *sizep = info->size;
  }
  
@@ -1967,7 +2037,7 @@ index 1d51db2..fe56709 100644
  
  /* DWARF quick_symbols_functions support.  */
  
-@@ -2237,23 +2262,19 @@ extract_cu_value (const char *bytes, ULONGEST *result)
+@@ -2279,23 +2304,19 @@ extract_cu_value (const char *bytes, ULONGEST *result)
    return 1;
  }
  
@@ -1999,7 +2069,7 @@ index 1d51db2..fe56709 100644
      {
        struct dwarf2_per_cu_data *the_cu;
        ULONGEST offset, length;
-@@ -2268,15 +2289,45 @@ create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
+@@ -2310,15 +2331,45 @@ create_cus_from_index (struct objfile *objfile, const gdb_byte *cu_list,
        the_cu->offset.sect_off = offset;
        the_cu->length = length;
        the_cu->objfile = objfile;
@@ -2047,7 +2117,7 @@ index 1d51db2..fe56709 100644
  /* Create the signatured type hash table from the index.  */
  
  static int
-@@ -2466,33 +2517,44 @@ find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
+@@ -2508,33 +2559,44 @@ find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
      }
  }
  
@@ -2105,7 +2175,7 @@ index 1d51db2..fe56709 100644
    /* Version check.  */
    version = MAYBE_SWAP (*(offset_type *) addr);
    /* Versions earlier than 3 emitted every copy of a psymbol.  This
-@@ -2505,7 +2567,7 @@ dwarf2_read_index (struct objfile *objfile)
+@@ -2547,7 +2609,7 @@ dwarf2_read_index (struct objfile *objfile)
        if (!warning_printed)
  	{
  	  warning (_("Skipping obsolete .gdb_index section in %s."),
@@ -2114,24 +2184,25 @@ index 1d51db2..fe56709 100644
  	  warning_printed = 1;
  	}
        return 0;
-@@ -2518,14 +2580,14 @@ dwarf2_read_index (struct objfile *objfile)
+@@ -2560,7 +2622,7 @@ dwarf2_read_index (struct objfile *objfile)
       set breakpoints on inlined functions by name, so we ignore these
-      indices unless the --use-deprecated-index-sections command line
-      option was supplied.  */
+      indices unless the user has done
+      "set use-deprecated-index-sections on".  */
 -  if (version < 6 && !use_deprecated_index_sections)
 +  if (version < 6 && !deprecated_ok)
      {
        static int warning_printed = 0;
        if (!warning_printed)
- 	{
- 	  warning (_("Skipping deprecated .gdb_index section in %s, pass "
- 		     "--use-deprecated-index-sections to use them anyway"),
+@@ -2569,7 +2631,7 @@ dwarf2_read_index (struct objfile *objfile)
+ Skipping deprecated .gdb_index section in %s.\n\
+ Do \"set use-deprecated-index-sections on\" before the file is read\n\
+ to use the section anyway."),
 -		   objfile->name);
 +		   filename);
  	  warning_printed = 1;
  	}
        return 0;
-@@ -2535,22 +2597,21 @@ dwarf2_read_index (struct objfile *objfile)
+@@ -2579,22 +2641,21 @@ to use the section anyway."),
    if (version > 7)
      return 0;
  
@@ -2162,7 +2233,7 @@ index 1d51db2..fe56709 100644
    ++i;
  
    map->address_table = addr + MAYBE_SWAP (metadata[i]);
-@@ -2566,11 +2627,55 @@ dwarf2_read_index (struct objfile *objfile)
+@@ -2610,11 +2671,55 @@ to use the section anyway."),
  
    map->constant_pool = addr + MAYBE_SWAP (metadata[i]);
  
@@ -2220,7 +2291,7 @@ index 1d51db2..fe56709 100644
      return 0;
  
    if (types_list_elements)
-@@ -2591,7 +2696,10 @@ dwarf2_read_index (struct objfile *objfile)
+@@ -2635,7 +2740,10 @@ to use the section anyway."),
  	return 0;
      }
  
@@ -2232,7 +2303,7 @@ index 1d51db2..fe56709 100644
  
    dwarf2_per_objfile->index_table = map;
    dwarf2_per_objfile->using_index = 1;
-@@ -3624,6 +3732,22 @@ read_comp_unit_head (struct comp_unit_head *cu_header,
+@@ -3686,6 +3794,22 @@ read_comp_unit_head (struct comp_unit_head *cu_header,
    return info_ptr;
  }
  
@@ -2255,7 +2326,7 @@ index 1d51db2..fe56709 100644
  /* Subroutine of read_and_check_comp_unit_head and
     read_and_check_type_unit_head to simplify them.
     Perform various error checking on the header.  */
-@@ -3642,8 +3766,7 @@ error_check_comp_unit_head (struct comp_unit_head *header,
+@@ -3704,8 +3828,7 @@ error_check_comp_unit_head (struct comp_unit_head *header,
  	   filename);
  
    if (header->abbrev_offset.sect_off
@@ -2265,7 +2336,7 @@ index 1d51db2..fe56709 100644
      error (_("Dwarf Error: bad offset (0x%lx) in compilation unit header "
  	   "(offset 0x%lx + 6) [in module %s]"),
  	   (long) header->abbrev_offset.sect_off, (long) header->offset.sect_off,
-@@ -3880,6 +4003,7 @@ create_debug_types_hash_table (struct dwo_file *dwo_file,
+@@ -3942,6 +4065,7 @@ create_debug_types_hash_table (struct dwo_file *dwo_file,
      {
        bfd *abfd;
        gdb_byte *info_ptr, *end_ptr;
@@ -2273,7 +2344,7 @@ index 1d51db2..fe56709 100644
  
        dwarf2_read_section (objfile, section);
        info_ptr = section->buffer;
-@@ -3891,6 +4015,11 @@ create_debug_types_hash_table (struct dwo_file *dwo_file,
+@@ -3953,6 +4077,11 @@ create_debug_types_hash_table (struct dwo_file *dwo_file,
  	 not present, in which case section->asection will be NULL.  */
        abfd = section->asection->owner;
  
@@ -2285,7 +2356,7 @@ index 1d51db2..fe56709 100644
        if (types_htab == NULL)
  	{
  	  if (dwo_file)
-@@ -4130,7 +4259,8 @@ init_cutu_and_read_dies (struct dwarf2_per_cu_data *this_cu,
+@@ -4192,7 +4321,8 @@ init_cutu_and_read_dies (struct dwarf2_per_cu_data *this_cu,
    dwarf2_read_section (objfile, section);
  
    begin_info_ptr = info_ptr = section->buffer + this_cu->offset.sect_off;
@@ -2295,7 +2366,7 @@ index 1d51db2..fe56709 100644
  
    if (use_existing_cu && this_cu->cu != NULL)
      {
-@@ -4512,7 +4642,7 @@ init_cutu_and_read_dies_simple (struct dwarf2_per_cu_data *this_cu,
+@@ -4574,7 +4704,7 @@ init_cutu_and_read_dies_simple (struct dwarf2_per_cu_data *this_cu,
  				void *data)
  {
    init_cutu_and_read_dies_no_follow (this_cu,
@@ -2304,7 +2375,7 @@ index 1d51db2..fe56709 100644
  				     NULL,
  				     die_reader_func, data);
  }
-@@ -5132,6 +5262,9 @@ set_partial_user (struct objfile *objfile)
+@@ -5202,6 +5332,9 @@ set_partial_user (struct objfile *objfile)
        struct partial_symtab *pst = per_cu->v.psymtab;
        int j;
  
@@ -2314,7 +2385,7 @@ index 1d51db2..fe56709 100644
        for (j = 0; j < pst->number_of_dependencies; ++j)
  	{
  	  /* Set the 'user' field only if it is not already set.  */
-@@ -5226,38 +5359,32 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu)
+@@ -5296,38 +5429,32 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu)
  			   load_partial_comp_unit_reader, NULL);
  }
  
@@ -2365,7 +2436,7 @@ index 1d51db2..fe56709 100644
  
        /* Save the compilation unit for later lookup.  */
        this_cu = obstack_alloc (&objfile->objfile_obstack,
-@@ -5265,20 +5392,50 @@ create_all_comp_units (struct objfile *objfile)
+@@ -5335,20 +5462,50 @@ create_all_comp_units (struct objfile *objfile)
        memset (this_cu, 0, sizeof (*this_cu));
        this_cu->offset = offset;
        this_cu->length = length + initial_length_size;
@@ -2423,7 +2494,7 @@ index 1d51db2..fe56709 100644
  
    dwarf2_per_objfile->all_comp_units
      = obstack_alloc (&objfile->objfile_obstack,
-@@ -5371,6 +5528,7 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
+@@ -5441,6 +5598,7 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
  		  }
  
  		per_cu = dwarf2_find_containing_comp_unit (pdi->d.offset,
@@ -2431,7 +2502,7 @@ index 1d51db2..fe56709 100644
  							   cu->objfile);
  
  		/* Go read the partial unit, if needed.  */
-@@ -5428,7 +5586,8 @@ partial_die_parent_scope (struct partial_die_info *pdi,
+@@ -5498,7 +5656,8 @@ partial_die_parent_scope (struct partial_die_info *pdi,
  
    real_pdi = pdi;
    while (real_pdi->has_specification)
@@ -2441,7 +2512,7 @@ index 1d51db2..fe56709 100644
  
    parent = real_pdi->die_parent;
    if (parent == NULL)
-@@ -5928,6 +6087,9 @@ skip_one_die (const struct die_reader_specs *reader, gdb_byte *info_ptr,
+@@ -5998,6 +6157,9 @@ skip_one_die (const struct die_reader_specs *reader, gdb_byte *info_ptr,
  	  else
  	    info_ptr += cu->header.offset_size;
  	  break;
@@ -2451,7 +2522,7 @@ index 1d51db2..fe56709 100644
  	case DW_FORM_addr:
  	  info_ptr += cu->header.addr_size;
  	  break;
-@@ -5957,6 +6119,7 @@ skip_one_die (const struct die_reader_specs *reader, gdb_byte *info_ptr,
+@@ -6027,6 +6189,7 @@ skip_one_die (const struct die_reader_specs *reader, gdb_byte *info_ptr,
  	  break;
  	case DW_FORM_sec_offset:
  	case DW_FORM_strp:
@@ -2459,17 +2530,18 @@ index 1d51db2..fe56709 100644
  	  info_ptr += cu->header.offset_size;
  	  break;
  	case DW_FORM_exprloc:
-@@ -6624,7 +6787,8 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu,
+@@ -6694,7 +6857,9 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu,
       it, by scanning the DIE's below the compilation unit.  */
    get_scope_pc_bounds (cu->dies, &lowpc, &highpc, cu);
  
 -  static_block = end_symtab_get_static_block (highpc + baseaddr, objfile, 0);
-+  static_block = end_symtab_get_static_block (highpc + baseaddr, objfile, 0,
-+					    per_cu->s.imported_symtabs != NULL);
++  static_block
++    = end_symtab_get_static_block (highpc + baseaddr, objfile, 0,
++				   per_cu->s.imported_symtabs != NULL);
  
    /* If the comp unit has DW_AT_ranges, it may have discontiguous ranges.
       Also, DW_AT_ranges may record ranges not belonging to any child DIEs
-@@ -6775,9 +6939,11 @@ process_imported_unit_die (struct die_info *die, struct dwarf2_cu *cu)
+@@ -6845,9 +7010,11 @@ process_imported_unit_die (struct die_info *die, struct dwarf2_cu *cu)
        struct dwarf2_per_cu_data *per_cu;
        struct symtab *imported_symtab;
        sect_offset offset;
@@ -2482,7 +2554,7 @@ index 1d51db2..fe56709 100644
  
        /* Queue the unit, if needed.  */
        if (maybe_queue_comp_unit (cu, per_cu, cu->language))
-@@ -8046,24 +8212,22 @@ try_open_dwo_file (const char *file_name)
+@@ -8116,24 +8283,21 @@ try_open_dwo_file (const char *file_name)
    if (desc < 0)
      return NULL;
  
@@ -2493,7 +2565,6 @@ index 1d51db2..fe56709 100644
        xfree (absolute_name);
        return NULL;
      }
-+  gdb_bfd_stash_filename (sym_bfd);
 +  xfree (absolute_name);
    bfd_set_cacheable (sym_bfd, 1);
  
@@ -2511,7 +2582,7 @@ index 1d51db2..fe56709 100644
    return sym_bfd;
  }
  
-@@ -8255,20 +8419,7 @@ free_dwo_file (struct dwo_file *dwo_file, struct objfile *objfile)
+@@ -8325,20 +8489,7 @@ free_dwo_file (struct dwo_file *dwo_file, struct objfile *objfile)
    struct dwarf2_section_info *section;
  
    gdb_assert (dwo_file->dwo_bfd != objfile->obfd);
@@ -2533,7 +2604,7 @@ index 1d51db2..fe56709 100644
  
    VEC_free (dwarf2_section_info_def, dwo_file->sections.types);
  }
-@@ -10651,6 +10802,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -10721,6 +10872,29 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
    new_symbol (die, this_type, cu);
  }
  
@@ -2563,7 +2634,7 @@ index 1d51db2..fe56709 100644
  /* Extract all information from a DW_TAG_array_type DIE and put it in
     the DIE's type field.  For now, this only handles one dimensional
     arrays.  */
-@@ -10664,7 +10838,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -10734,7 +10908,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *element_type, *range_type, *index_type;
    struct type **range_types = NULL;
    struct attribute *attr;
@@ -2572,7 +2643,7 @@ index 1d51db2..fe56709 100644
    struct cleanup *back_to;
    char *name;
  
-@@ -10717,17 +10891,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -10787,17 +10961,19 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
    type = element_type;
  
    if (read_array_order (die, cu) == DW_ORD_col_major)
@@ -2603,7 +2674,7 @@ index 1d51db2..fe56709 100644
  
    /* Understand Dwarf2 support for vector types (like they occur on
       the PowerPC w/ AltiVec).  Gcc just adds another attribute to the
-@@ -11211,29 +11387,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11281,29 +11457,114 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -2731,7 +2802,7 @@ index 1d51db2..fe56709 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -11537,7 +11798,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11607,7 +11868,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -2740,7 +2811,7 @@ index 1d51db2..fe56709 100644
    int low_default_is_valid;
    char *name;
    LONGEST negative_mask;
-@@ -11593,42 +11854,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11663,42 +11924,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  				      "- DIE at 0x%x [in module %s]"),
  	       die->offset.sect_off, cu->objfile->name);
  
@@ -2783,7 +2854,7 @@ index 1d51db2..fe56709 100644
    /* Dwarf-2 specifications explicitly allows to create subrange types
       without specifying a base type.
       In that case, the base type must be set to the type of
-@@ -11667,24 +11892,163 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11737,24 +11962,163 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  	}
      }
  
@@ -2961,7 +3032,7 @@ index 1d51db2..fe56709 100644
  
    name = dwarf2_name (die, cu);
    if (name)
-@@ -12474,6 +12838,8 @@ read_partial_die (const struct die_reader_specs *reader,
+@@ -12544,6 +12908,8 @@ read_partial_die (const struct die_reader_specs *reader,
  	case DW_AT_extension:
  	  part_die->has_specification = 1;
  	  part_die->spec_offset = dwarf2_get_ref_die_offset (&attr);
@@ -2970,7 +3041,7 @@ index 1d51db2..fe56709 100644
  	  break;
  	case DW_AT_sibling:
  	  /* Ignore absolute siblings, they might point outside of
-@@ -12520,7 +12886,11 @@ read_partial_die (const struct die_reader_specs *reader,
+@@ -12590,7 +12956,11 @@ read_partial_die (const struct die_reader_specs *reader,
  
  	case DW_AT_import:
  	  if (part_die->tag == DW_TAG_imported_unit)
@@ -2983,7 +3054,7 @@ index 1d51db2..fe56709 100644
  	  break;
  
  	default:
-@@ -12591,13 +12961,14 @@ find_partial_die_in_comp_unit (sect_offset offset, struct dwarf2_cu *cu)
+@@ -12661,13 +13031,14 @@ find_partial_die_in_comp_unit (sect_offset offset, struct dwarf2_cu *cu)
     DW_FORM_ref_sig8).  */
  
  static struct partial_die_info *
@@ -3000,7 +3071,7 @@ index 1d51db2..fe56709 100644
      {
        pd = find_partial_die_in_comp_unit (offset, cu);
        if (pd != NULL)
-@@ -12616,7 +12987,8 @@ find_partial_die (sect_offset offset, struct dwarf2_cu *cu)
+@@ -12686,7 +13057,8 @@ find_partial_die (sect_offset offset, struct dwarf2_cu *cu)
  		 (long) cu->header.offset.sect_off, (long) offset.sect_off,
  		 bfd_get_filename (objfile->obfd));
  	}
@@ -3010,7 +3081,7 @@ index 1d51db2..fe56709 100644
  
        if (per_cu->cu == NULL || per_cu->cu->partial_dies == NULL)
  	load_partial_comp_unit (per_cu);
-@@ -12674,7 +13046,8 @@ guess_partial_die_structure_name (struct partial_die_info *struct_pdi,
+@@ -12744,7 +13116,8 @@ guess_partial_die_structure_name (struct partial_die_info *struct_pdi,
  
    real_pdi = struct_pdi;
    while (real_pdi->has_specification)
@@ -3020,7 +3091,7 @@ index 1d51db2..fe56709 100644
  
    if (real_pdi->die_parent != NULL)
      return;
-@@ -12722,7 +13095,8 @@ fixup_partial_die (struct partial_die_info *part_die,
+@@ -12792,7 +13165,8 @@ fixup_partial_die (struct partial_die_info *part_die,
      {
        struct partial_die_info *spec_die;
  
@@ -3030,7 +3101,7 @@ index 1d51db2..fe56709 100644
  
        fixup_partial_die (spec_die, cu);
  
-@@ -12810,6 +13184,10 @@ read_attribute_value (const struct die_reader_specs *reader,
+@@ -12880,6 +13254,10 @@ read_attribute_value (const struct die_reader_specs *reader,
  				       &cu->header, &bytes_read);
        info_ptr += bytes_read;
        break;
@@ -3041,7 +3112,7 @@ index 1d51db2..fe56709 100644
      case DW_FORM_addr:
        DW_ADDR (attr) = read_address (abfd, info_ptr, cu, &bytes_read);
        info_ptr += bytes_read;
-@@ -12852,10 +13230,25 @@ read_attribute_value (const struct die_reader_specs *reader,
+@@ -12922,10 +13300,25 @@ read_attribute_value (const struct die_reader_specs *reader,
        info_ptr += bytes_read;
        break;
      case DW_FORM_strp:
@@ -3071,7 +3142,7 @@ index 1d51db2..fe56709 100644
        break;
      case DW_FORM_exprloc:
      case DW_FORM_block:
-@@ -12967,6 +13360,10 @@ read_attribute_value (const struct die_reader_specs *reader,
+@@ -13037,6 +13430,10 @@ read_attribute_value (const struct die_reader_specs *reader,
  	     bfd_get_filename (abfd));
      }
  
@@ -3082,7 +3153,7 @@ index 1d51db2..fe56709 100644
    /* We have seen instances where the compiler tried to emit a byte
       size attribute of -1 which ended up being encoded as an unsigned
       0xffffffff.  Although 0xffffffff is technically a valid size value,
-@@ -13263,6 +13660,30 @@ read_indirect_string_at_offset (bfd *abfd, LONGEST str_offset)
+@@ -13333,6 +13730,30 @@ read_indirect_string_at_offset (bfd *abfd, LONGEST str_offset)
    return (char *) (dwarf2_per_objfile->str.buffer + str_offset);
  }
  
@@ -3113,7 +3184,7 @@ index 1d51db2..fe56709 100644
  static char *
  read_indirect_string (bfd *abfd, gdb_byte *buf,
  		      const struct comp_unit_head *cu_header,
-@@ -13734,6 +14155,30 @@ add_file_name (struct line_header *lh,
+@@ -13804,6 +14225,30 @@ add_file_name (struct line_header *lh,
    fe->symtab = NULL;
  }
  
@@ -3144,7 +3215,7 @@ index 1d51db2..fe56709 100644
  /* Read the statement program header starting at OFFSET in
     .debug_line, or .debug_line.dwo.  Return a pointer
     to a struct line_header, allocated using xmalloc.
-@@ -13754,13 +14199,7 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
+@@ -13824,13 +14269,7 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
    struct dwarf2_section_info *section;
    bfd *abfd;
  
@@ -3159,7 +3230,7 @@ index 1d51db2..fe56709 100644
    dwarf2_read_section (dwarf2_per_objfile->objfile, section);
    if (section->buffer == NULL)
      {
-@@ -14085,7 +14524,7 @@ dwarf_decode_lines_1 (struct line_header *lh, const char *comp_dir,
+@@ -14155,7 +14594,7 @@ dwarf_decode_lines_1 (struct line_header *lh, const char *comp_dir,
  			 GCd by the linker.  Ignore it.  PR gdb/12528 */
  
  		      long line_offset
@@ -3168,7 +3239,7 @@ index 1d51db2..fe56709 100644
  
  		      complaint (&symfile_complaints,
  				 _(".debug_line address at offset 0x%lx is 0 "
-@@ -14464,10 +14903,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
+@@ -14534,10 +14973,12 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
       (i.e. when the value of a register or memory location is
       referenced, or a thread-local block, etc.).  Then again, it might
       not be worthwhile.  I'm assuming that it isn't unless performance
@@ -3183,7 +3254,7 @@ index 1d51db2..fe56709 100644
  
    if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
      cu->has_loclist = 1;
-@@ -14508,6 +14949,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
+@@ -14578,6 +15019,8 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
        else
  	sym = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct symbol);
        OBJSTAT (objfile, n_syms++);
@@ -3192,7 +3263,7 @@ index 1d51db2..fe56709 100644
  
        /* Cache this symbol's name and the name's demangled form (if any).  */
        SYMBOL_SET_LANGUAGE (sym, cu->language);
-@@ -14931,6 +15374,7 @@ dwarf2_const_value_attr (struct attribute *attr, struct type *type,
+@@ -15001,6 +15444,7 @@ dwarf2_const_value_attr (struct attribute *attr, struct type *type,
      case DW_FORM_string:
      case DW_FORM_strp:
      case DW_FORM_GNU_str_index:
@@ -3200,7 +3271,7 @@ index 1d51db2..fe56709 100644
        /* DW_STRING is already allocated on the objfile obstack, point
  	 directly to it.  */
        *bytes = (gdb_byte *) DW_STRING (attr);
-@@ -15117,7 +15561,15 @@ lookup_die_type (struct die_info *die, struct attribute *attr,
+@@ -15187,7 +15631,15 @@ lookup_die_type (struct die_info *die, struct attribute *attr,
  
    /* First see if we have it cached.  */
  
@@ -3217,7 +3288,7 @@ index 1d51db2..fe56709 100644
      {
        sect_offset offset = dwarf2_get_ref_die_offset (attr);
  
-@@ -15282,6 +15734,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
+@@ -15352,6 +15804,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -3227,7 +3298,7 @@ index 1d51db2..fe56709 100644
    return this_type;
  }
  
-@@ -15890,6 +16345,10 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
+@@ -15960,6 +16415,10 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
  	  fprintf_unfiltered (f, "ref address: ");
  	  fputs_filtered (hex_string (DW_UNSND (&die->attrs[i])), f);
  	  break;
@@ -3238,7 +3309,7 @@ index 1d51db2..fe56709 100644
  	case DW_FORM_ref1:
  	case DW_FORM_ref2:
  	case DW_FORM_ref4:
-@@ -15921,6 +16380,7 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
+@@ -15991,6 +16450,7 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
  	case DW_FORM_string:
  	case DW_FORM_strp:
  	case DW_FORM_GNU_str_index:
@@ -3246,7 +3317,7 @@ index 1d51db2..fe56709 100644
  	  fprintf_unfiltered (f, "string: \"%s\" (%s canonicalized)",
  		   DW_STRING (&die->attrs[i])
  		   ? DW_STRING (&die->attrs[i]) : "",
-@@ -16024,6 +16484,7 @@ is_ref_attr (struct attribute *attr)
+@@ -16094,6 +16554,7 @@ is_ref_attr (struct attribute *attr)
      case DW_FORM_ref4:
      case DW_FORM_ref8:
      case DW_FORM_ref_udata:
@@ -3254,7 +3325,7 @@ index 1d51db2..fe56709 100644
        return 1;
      default:
        return 0;
-@@ -16101,7 +16562,8 @@ follow_die_ref_or_sig (struct die_info *src_die, struct attribute *attr,
+@@ -16171,7 +16632,8 @@ follow_die_ref_or_sig (struct die_info *src_die, struct attribute *attr,
     Returns NULL if OFFSET is invalid.  */
  
  static struct die_info *
@@ -3264,7 +3335,7 @@ index 1d51db2..fe56709 100644
  {
    struct die_info temp_die;
    struct dwarf2_cu *target_cu, *cu = *ref_cu;
-@@ -16118,11 +16580,13 @@ follow_die_offset (sect_offset offset, struct dwarf2_cu **ref_cu)
+@@ -16188,11 +16650,13 @@ follow_die_offset (sect_offset offset, struct dwarf2_cu **ref_cu)
        if (! offset_in_cu_p (&cu->header, offset))
  	return NULL;
      }
@@ -3280,7 +3351,7 @@ index 1d51db2..fe56709 100644
  
        /* If necessary, add it to the queue and load its DIEs.  */
        if (maybe_queue_comp_unit (cu, per_cu, cu->language))
-@@ -16154,7 +16618,10 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
+@@ -16224,7 +16688,10 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
    struct dwarf2_cu *cu = *ref_cu;
    struct die_info *die;
  
@@ -3292,7 +3363,7 @@ index 1d51db2..fe56709 100644
    if (!die)
      error (_("Dwarf Error: Cannot find DIE at 0x%x referenced from DIE "
  	   "at 0x%x [in module %s]"),
-@@ -16185,7 +16652,7 @@ dwarf2_fetch_die_location_block (cu_offset offset_in_cu,
+@@ -16255,7 +16722,7 @@ dwarf2_fetch_die_location_block (cu_offset offset_in_cu,
      load_cu (per_cu);
    cu = per_cu->cu;
  
@@ -3301,7 +3372,7 @@ index 1d51db2..fe56709 100644
    if (!die)
      error (_("Dwarf Error: Cannot find DIE at 0x%x referenced in module %s"),
  	   offset.sect_off, per_cu->objfile->name);
-@@ -16979,6 +17446,7 @@ skip_form_bytes (bfd *abfd, gdb_byte *bytes, gdb_byte *buffer_end,
+@@ -17049,6 +17516,7 @@ skip_form_bytes (bfd *abfd, gdb_byte *bytes, gdb_byte *buffer_end,
  
      case DW_FORM_sec_offset:
      case DW_FORM_strp:
@@ -3309,7 +3380,7 @@ index 1d51db2..fe56709 100644
        bytes += offset_size;
        break;
  
-@@ -17134,7 +17602,7 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17204,7 +17672,7 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
  			  struct macro_source_file *current_file,
  			  struct line_header *lh, char *comp_dir,
  			  struct dwarf2_section_info *section,
@@ -3318,7 +3389,7 @@ index 1d51db2..fe56709 100644
  			  unsigned int offset_size,
  			  struct objfile *objfile,
  			  htab_t include_hash)
-@@ -17185,6 +17653,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17255,6 +17723,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
          case DW_MACRO_GNU_undef:
  	case DW_MACRO_GNU_define_indirect:
  	case DW_MACRO_GNU_undef_indirect:
@@ -3327,13 +3398,14 @@ index 1d51db2..fe56709 100644
            {
              unsigned int bytes_read;
              int line;
-@@ -17207,11 +17677,20 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17277,11 +17747,21 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
  		str_offset = read_offset_1 (abfd, mac_ptr, offset_size);
  		mac_ptr += offset_size;
  
 -		body = read_indirect_string_at_offset (abfd, str_offset);
 +		if (macinfo_type == DW_MACRO_GNU_define_indirect_alt
-+		    || macinfo_type == DW_MACRO_GNU_undef_indirect_alt)
++		    || macinfo_type == DW_MACRO_GNU_undef_indirect_alt
++		    || section_is_dwz)
 +		  {
 +		    struct dwz_file *dwz = dwarf2_get_dwz_file ();
 +
@@ -3350,7 +3422,7 @@ index 1d51db2..fe56709 100644
              if (! current_file)
  	      {
  		/* DWARF violation as no main source is present.  */
-@@ -17235,7 +17714,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17305,7 +17785,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
  	    else
  	      {
  		gdb_assert (macinfo_type == DW_MACRO_GNU_undef
@@ -3360,7 +3432,7 @@ index 1d51db2..fe56709 100644
  		macro_undef (current_file, line, body);
  	      }
            }
-@@ -17310,6 +17790,7 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17380,6 +17861,7 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
            break;
  
  	case DW_MACRO_GNU_transparent_include:
@@ -3368,7 +3440,7 @@ index 1d51db2..fe56709 100644
  	  {
  	    LONGEST offset;
  	    void **slot;
-@@ -17328,13 +17809,32 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
+@@ -17398,13 +17880,32 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
  	      }
  	    else
  	      {
@@ -3405,7 +3477,24 @@ index 1d51db2..fe56709 100644
  					  offset_size, objfile, include_hash);
  
  		htab_remove_elt (include_hash, mac_ptr);
-@@ -17553,7 +18053,8 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
+@@ -17571,6 +18072,8 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
+ 
+ 	case DW_MACRO_GNU_define_indirect:
+ 	case DW_MACRO_GNU_undef_indirect:
++	case DW_MACRO_GNU_define_indirect_alt:
++	case DW_MACRO_GNU_undef_indirect_alt:
+ 	  {
+ 	    unsigned int bytes_read;
+ 
+@@ -17581,6 +18084,7 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
+ 	  break;
+ 
+ 	case DW_MACRO_GNU_transparent_include:
++	case DW_MACRO_GNU_transparent_include_alt:
+ 	  /* Note that, according to the spec, a transparent include
+ 	     chain cannot call DW_MACRO_GNU_start_file.  So, we can just
+ 	     skip this opcode.  */
+@@ -17623,7 +18127,8 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
    slot = htab_find_slot (include_hash, mac_ptr, INSERT);
    *slot = mac_ptr;
    dwarf_decode_macro_bytes (abfd, mac_ptr, mac_end,
@@ -3415,7 +3504,7 @@ index 1d51db2..fe56709 100644
  			    offset_size, objfile, include_hash);
    do_cleanups (cleanup);
  }
-@@ -17651,62 +18152,100 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
+@@ -17721,62 +18226,100 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
    baton->from_dwo = cu->dwo_unit != NULL;
  }
  
@@ -3554,7 +3643,7 @@ index 1d51db2..fe56709 100644
      }
  }
  
-@@ -17808,28 +18347,35 @@ dwarf2_per_cu_text_offset (struct dwarf2_per_cu_data *per_cu)
+@@ -17878,28 +18421,35 @@ dwarf2_per_cu_text_offset (struct dwarf2_per_cu_data *per_cu)
  
  static struct dwarf2_per_cu_data *
  dwarf2_find_containing_comp_unit (sect_offset offset,
@@ -3595,7 +3684,7 @@ index 1d51db2..fe56709 100644
  	error (_("Dwarf Error: could not find partial DIE containing "
  	       "offset 0x%lx [in module %s]"),
  	       (long) offset.sect_off, bfd_get_filename (objfile->obfd));
-@@ -18070,6 +18616,25 @@ per_cu_offset_and_type_eq (const void *item_lhs, const void *item_rhs)
+@@ -18140,6 +18690,25 @@ per_cu_offset_and_type_eq (const void *item_lhs, const void *item_rhs)
  	  && ofs_lhs->offset.sect_off == ofs_rhs->offset.sect_off);
  }
  
@@ -3621,7 +3710,7 @@ index 1d51db2..fe56709 100644
  /* Set the type associated with DIE to TYPE.  Save it in CU's hash
     table if necessary.  For convenience, return TYPE.
  
-@@ -18094,6 +18659,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -18164,6 +18733,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    struct dwarf2_per_cu_offset_and_type **slot, ofs;
    struct objfile *objfile = cu->objfile;
  
@@ -3630,7 +3719,7 @@ index 1d51db2..fe56709 100644
    /* For Ada types, make sure that the gnat-specific data is always
       initialized (if not already set).  There are a few types where
       we should not be doing so, because the type-specific area is
-@@ -18271,53 +18838,13 @@ show_dwarf2_cmd (char *args, int from_tty)
+@@ -18341,53 +18912,13 @@ show_dwarf2_cmd (char *args, int from_tty)
    cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
  }
  
@@ -3685,7 +3774,7 @@ index 1d51db2..fe56709 100644
  
    for (ix = 0; ix < dwarf2_per_objfile->n_comp_units; ++ix)
      VEC_free (dwarf2_per_cu_ptr,
-@@ -18327,6 +18854,9 @@ dwarf2_per_objfile_free (struct objfile *objfile, void *d)
+@@ -18397,6 +18928,9 @@ dwarf2_per_objfile_free (struct objfile *objfile, void *d)
  
    if (data->dwo_files)
      free_dwo_files (data->dwo_files, objfile);
@@ -3696,7 +3785,7 @@ index 1d51db2..fe56709 100644
  
  
 diff --git a/gdb/elfread.c b/gdb/elfread.c
-index 1edfb27..d9109cf 100644
+index 1edfb27..0b54b8a 100644
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
 @@ -44,6 +44,7 @@
@@ -3707,6 +3796,15 @@ index 1edfb27..d9109cf 100644
  
  extern void _initialize_elfread (void);
  
+@@ -1108,7 +1109,7 @@ build_id_verify (const char *filename, struct build_id *check)
+   int retval = 0;
+ 
+   /* We expect to be silent on the non-existing files.  */
+-  abfd = bfd_open_maybe_remote (filename);
++  abfd = gdb_bfd_open_maybe_remote (filename);
+   if (abfd == NULL)
+     return 0;
+ 
 @@ -1123,7 +1124,7 @@ build_id_verify (const char *filename, struct build_id *check)
    else
      retval = 1;
@@ -3715,6 +3813,20 @@ index 1edfb27..d9109cf 100644
 +  gdb_bfd_unref (abfd);
  
    xfree (found);
+ 
+@@ -1444,10 +1445,12 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
+ 
+       if (debugfile)
+ 	{
++	  struct cleanup *cleanup = make_cleanup (xfree, debugfile);
+ 	  bfd *abfd = symfile_bfd_open (debugfile);
+ 
++	  make_cleanup_bfd_unref (abfd);
+ 	  symbol_file_add_separate (abfd, symfile_flags, objfile);
+-	  xfree (debugfile);
++	  do_cleanups (cleanup);
+ 	}
+     }
  
 diff --git a/gdb/eval.c b/gdb/eval.c
 index 7d3a8b9..f69dff0 100644
@@ -4206,7 +4318,7 @@ index 7d3a8b9..f69dff0 100644
 +
  }
 diff --git a/gdb/exec.c b/gdb/exec.c
-index 6ba1986..540c271 100644
+index 6ba1986..e076609 100644
 --- a/gdb/exec.c
 +++ b/gdb/exec.c
 @@ -33,6 +33,7 @@
@@ -4229,17 +4341,27 @@ index 6ba1986..540c271 100644
  
        /* Removing target sections may close the exec_ops target.
  	 Clear exec_bfd before doing so to prevent recursion.  */
-@@ -137,8 +136,7 @@ exec_close_1 (int quitting)
+@@ -128,17 +127,13 @@ exec_close_1 (int quitting)
+       vp = nxt;
+       nxt = vp->nxt;
+ 
+-      /* if there is an objfile associated with this bfd,
+-         free_objfile() will do proper cleanup of objfile *and* bfd.  */
+-
+       if (vp->objfile)
+ 	{
+ 	  free_objfile (vp->objfile);
  	  need_symtab_cleanup = 1;
  	}
-       else if (vp->bfd != exec_bfd)
+-      else if (vp->bfd != exec_bfd)
 -	/* FIXME-leak: We should be freeing vp->name too, I think.  */
 -	gdb_bfd_close_or_warn (vp->bfd);
-+	gdb_bfd_unref (vp->bfd);
++
++      gdb_bfd_unref (vp->bfd);
  
        xfree (vp);
      }
-@@ -230,11 +228,14 @@ exec_file_attach (char *filename, int from_tty)
+@@ -230,11 +225,14 @@ exec_file_attach (char *filename, int from_tty)
  	     &scratch_pathname);
  	}
  #endif
@@ -4251,13 +4373,13 @@ index 6ba1986..540c271 100644
 -      exec_bfd = bfd_fopen (scratch_pathname, gnutarget,
 -			    write_files ? FOPEN_RUB : FOPEN_RB,
 -			    scratch_chan);
-+      exec_bfd = gdb_bfd_ref (bfd_fopen (scratch_pathname, gnutarget,
-+					 write_files ? FOPEN_RUB : FOPEN_RB,
-+					 scratch_chan));
++      exec_bfd = gdb_bfd_fopen (scratch_pathname, gnutarget,
++				write_files ? FOPEN_RUB : FOPEN_RB,
++				scratch_chan);
  
        if (!exec_bfd)
  	{
-@@ -242,13 +243,6 @@ exec_file_attach (char *filename, int from_tty)
+@@ -242,13 +240,6 @@ exec_file_attach (char *filename, int from_tty)
  		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
  	}
  
@@ -4271,15 +4393,14 @@ index 6ba1986..540c271 100644
        if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
  	{
  	  /* Make sure to close exec_bfd, or else "run" might try to use
-@@ -259,6 +253,8 @@ exec_file_attach (char *filename, int from_tty)
- 		 gdb_bfd_errmsg (bfd_get_error (), matching));
- 	}
+@@ -554,6 +545,7 @@ map_vmap (bfd *abfd, bfd *arch)
+   memset ((char *) vp, '\0', sizeof (*vp));
+   vp->nxt = 0;
+   vp->bfd = abfd;
++  gdb_bfd_ref (abfd);
+   vp->name = bfd_get_filename (arch ? arch : abfd);
+   vp->member = arch ? bfd_get_filename (abfd) : "";
  
-+      gdb_bfd_stash_filename (exec_bfd);
-+
-       /* FIXME - This should only be run for RS6000, but the ifdef is a poor
-          way to accomplish.  */
- #ifdef DEPRECATED_IBM6000_TARGET
 diff --git a/gdb/f-exp.y b/gdb/f-exp.y
 index 33c7418..4db1bfa 100644
 --- a/gdb/f-exp.y
@@ -4379,7 +4500,7 @@ index a95ef84..830917d 100644
      {
      case TYPE_CODE_ARRAY:
 diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
-index 8b84b5a..4b240a3 100644
+index 4359f6f..8ff834b 100644
 --- a/gdb/f-valprint.c
 +++ b/gdb/f-valprint.c
 @@ -54,15 +54,17 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
@@ -4664,7 +4785,7 @@ index 66bcebe..e59e5f2 100644
  				      &unavail);
  
 diff --git a/gdb/gcore.c b/gdb/gcore.c
-index aedda41..f9a1389 100644
+index aedda41..a45e787 100644
 --- a/gdb/gcore.c
 +++ b/gdb/gcore.c
 @@ -33,6 +33,7 @@
@@ -4675,20 +4796,16 @@ index aedda41..f9a1389 100644
  
  /* The largest amount of memory to read from the target at once.  We
     must throttle it to limit the amount of memory used by GDB during
-@@ -50,10 +51,11 @@ static int gcore_memory_sections (bfd *);
+@@ -50,7 +51,7 @@ static int gcore_memory_sections (bfd *);
  bfd *
  create_gcore_bfd (char *filename)
  {
 -  bfd *obfd = bfd_openw (filename, default_gcore_target ());
-+  bfd *obfd = gdb_bfd_ref (bfd_openw (filename, default_gcore_target ()));
++  bfd *obfd = gdb_bfd_openw (filename, default_gcore_target ());
  
    if (!obfd)
      error (_("Failed to open '%s' for output."), filename);
-+  gdb_bfd_stash_filename (obfd);
-   bfd_set_format (obfd, bfd_core);
-   bfd_set_arch_mach (obfd, default_gcore_arch (), default_gcore_mach ());
-   return obfd;
-@@ -110,7 +112,7 @@ do_bfd_delete_cleanup (void *arg)
+@@ -110,7 +111,7 @@ do_bfd_delete_cleanup (void *arg)
    bfd *obfd = arg;
    const char *filename = obfd->filename;
  
@@ -4697,7 +4814,7 @@ index aedda41..f9a1389 100644
    unlink (filename);
  }
  
-@@ -154,7 +156,7 @@ gcore_command (char *args, int from_tty)
+@@ -154,7 +155,7 @@ gcore_command (char *args, int from_tty)
    fprintf_filtered (gdb_stdout, "Saved corefile %s\n", corefilename);
  
    discard_cleanups (old_chain);
@@ -4728,10 +4845,10 @@ index ffb7f53..a2e7e94 100644
  b internal_error
 diff --git a/gdb/gdb_bfd.c b/gdb/gdb_bfd.c
 new file mode 100644
-index 0000000..b43553f
+index 0000000..fac8776
 --- /dev/null
 +++ b/gdb/gdb_bfd.c
-@@ -0,0 +1,481 @@
+@@ -0,0 +1,670 @@
 +/* Definitions for BFD wrappers used by GDB.
 +
 +   Copyright (C) 2011, 2012
@@ -4756,6 +4873,8 @@ index 0000000..b43553f
 +#include "gdb_bfd.h"
 +#include "gdb_assert.h"
 +#include "gdb_string.h"
++#include "ui-out.h"
++#include "gdbcmd.h"
 +#include "hashtab.h"
 +#ifdef HAVE_ZLIB_H
 +#include <zlib.h>
@@ -4781,6 +4900,13 @@ index 0000000..b43553f
 +  /* If the data was mmapped, this is the map address.  */
 +  void *map_addr;
 +};
++
++/* A hash table holding every BFD that gdb knows about.  This is not
++   to be confused with 'gdb_bfd_cache', which is used for sharing
++   BFDs; in contrast, this hash is used just to implement
++   "maint info bfd".  */
++
++static htab_t all_bfds;
 +
 +/* See gdb_bfd.h.  */
 +
@@ -4849,6 +4975,8 @@ index 0000000..b43553f
 +	  && strcmp (bfd_get_filename (abfd), s->filename) == 0);
 +}
 +
++/* See gdb_bfd.h.  */
++
 +struct bfd *
 +gdb_bfd_open (const char *name, const char *target, int fd)
 +{
@@ -4890,7 +5018,8 @@ index 0000000..b43553f
 +  if (abfd != NULL)
 +    {
 +      close (fd);
-+      return gdb_bfd_ref (abfd);
++      gdb_bfd_ref (abfd);
++      return abfd;
 +    }
 +
 +  abfd = bfd_fopen (name, target, FOPEN_RB, fd);
@@ -4902,7 +5031,8 @@ index 0000000..b43553f
 +  *slot = abfd;
 +
 +  gdb_bfd_stash_filename (abfd);
-+  return gdb_bfd_ref (abfd);
++  gdb_bfd_ref (abfd);
++  return abfd;
 +}
 +
 +/* A helper function that releases any section data attached to the
@@ -4948,22 +5078,23 @@ index 0000000..b43553f
 +  return ret;
 +}
 +
-+/* Add reference to ABFD.  Returns ABFD.  */
++/* See gdb_bfd.h.  */
 +
-+struct bfd *
++void
 +gdb_bfd_ref (struct bfd *abfd)
 +{
 +  struct gdb_bfd_data *gdata;
++  void **slot;
 +
 +  if (abfd == NULL)
-+    return NULL;
++    return;
 +
 +  gdata = bfd_usrdata (abfd);
 +
 +  if (gdata != NULL)
 +    {
 +      gdata->refc += 1;
-+      return abfd;
++      return;
 +    }
 +
 +  gdata = bfd_zalloc (abfd, sizeof (struct gdb_bfd_data));
@@ -4971,16 +5102,20 @@ index 0000000..b43553f
 +  gdata->mtime = bfd_get_mtime (abfd);
 +  bfd_usrdata (abfd) = gdata;
 +
-+  return abfd;
++  /* This is the first we've seen it, so add it to the hash table.  */
++  slot = htab_find_slot (all_bfds, abfd, INSERT);
++  gdb_assert (slot && !*slot);
++  *slot = abfd;
 +}
 +
-+/* Unreference and possibly close ABFD.  */
++/* See gdb_bfd.h.  */
 +
 +void
 +gdb_bfd_unref (struct bfd *abfd)
 +{
 +  struct gdb_bfd_data *gdata;
 +  struct gdb_bfd_cache_search search;
++  void **slot;
 +
 +  if (abfd == NULL)
 +    return;
@@ -5008,6 +5143,8 @@ index 0000000..b43553f
 +    }
 +
 +  bfd_usrdata (abfd) = NULL;  /* Paranoia.  */
++
++  htab_remove_elt (all_bfds, abfd);
 +
 +  gdb_bfd_close_or_warn (abfd);
 +}
@@ -5213,12 +5350,181 @@ index 0000000..b43553f
 +  *size = descriptor->size;
 +  return descriptor->data;
 +}
++
++
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_fopen (const char *filename, const char *target, const char *mode,
++	       int fd)
++{
++  bfd *result = bfd_fopen (filename, target, mode, fd);
++
++  if (result)
++    {
++      gdb_bfd_stash_filename (result);
++      gdb_bfd_ref (result);
++    }
++
++  return result;
++}
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_openr (const char *filename, const char *target)
++{
++  bfd *result = bfd_openr (filename, target);
++
++  if (result)
++    {
++      gdb_bfd_stash_filename (result);
++      gdb_bfd_ref (result);
++    }
++
++  return result;
++}
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_openw (const char *filename, const char *target)
++{
++  bfd *result = bfd_openw (filename, target);
++
++  if (result)
++    {
++      gdb_bfd_stash_filename (result);
++      gdb_bfd_ref (result);
++    }
++
++  return result;
++}
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_openr_iovec (const char *filename, const char *target,
++		     void *(*open_func) (struct bfd *nbfd,
++					 void *open_closure),
++		     void *open_closure,
++		     file_ptr (*pread_func) (struct bfd *nbfd,
++					     void *stream,
++					     void *buf,
++					     file_ptr nbytes,
++					     file_ptr offset),
++		     int (*close_func) (struct bfd *nbfd,
++					void *stream),
++		     int (*stat_func) (struct bfd *abfd,
++				       void *stream,
++				       struct stat *sb))
++{
++  bfd *result = bfd_openr_iovec (filename, target,
++				 open_func, open_closure,
++				 pread_func, close_func, stat_func);
++
++  if (result)
++    {
++      gdb_bfd_ref (result);
++      gdb_bfd_stash_filename (result);
++    }
++
++  return result;
++}
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous)
++{
++  bfd *result = bfd_openr_next_archived_file (archive, previous);
++
++  if (result)
++    {
++      gdb_bfd_ref (result);
++      /* No need to stash the filename here.  */
++    }
++
++  return result;
++}
++
++/* See gdb_bfd.h.  */
++
++bfd *
++gdb_bfd_fdopenr (const char *filename, const char *target, int fd)
++{
++  bfd *result = bfd_fdopenr (filename, target, fd);
++
++  if (result)
++    {
++      gdb_bfd_ref (result);
++      gdb_bfd_stash_filename (result);
++    }
++
++  return result;
++}
++
++
++
++/* A callback for htab_traverse that prints a single BFD.  */
++
++static int
++print_one_bfd (void **slot, void *data)
++{
++  bfd *abfd = *slot;
++  struct gdb_bfd_data *gdata = bfd_usrdata (abfd);
++  struct ui_out *uiout = data;
++  struct cleanup *inner;
++
++  inner = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
++  ui_out_field_int (uiout, "refcount", gdata->refc);
++  ui_out_field_string (uiout, "addr", host_address_to_string (abfd));
++  ui_out_field_string (uiout, "filename", bfd_get_filename (abfd));
++  ui_out_text (uiout, "\n");
++  do_cleanups (inner);
++
++  return 1;
++}
++
++/* Implement the 'maint info bfd' command.  */
++
++static void
++maintenance_info_bfds (char *arg, int from_tty)
++{
++  struct cleanup *cleanup;
++  struct ui_out *uiout = current_uiout;
++
++  cleanup = make_cleanup_ui_out_table_begin_end (uiout, 3, -1, "bfds");
++  ui_out_table_header (uiout, 10, ui_left, "refcount", "Refcount");
++  ui_out_table_header (uiout, 18, ui_left, "addr", "Address");
++  ui_out_table_header (uiout, 40, ui_left, "filename", "Filename");
++
++  ui_out_table_body (uiout);
++  htab_traverse (all_bfds, print_one_bfd, uiout);
++
++  do_cleanups (cleanup);
++}
++
++/* -Wmissing-prototypes */
++extern initialize_file_ftype _initialize_gdb_bfd;
++
++void
++_initialize_gdb_bfd (void)
++{
++  all_bfds = htab_create_alloc (10, htab_hash_pointer, htab_eq_pointer,
++				NULL, xcalloc, xfree);
++
++  add_cmd ("bfds", class_maintenance, maintenance_info_bfds, _("\
++List the BFDs that are currently open."),
++	   &maintenanceinfolist);
++}
 diff --git a/gdb/gdb_bfd.h b/gdb/gdb_bfd.h
 new file mode 100644
-index 0000000..1dd82c3
+index 0000000..f131ba7
 --- /dev/null
 +++ b/gdb/gdb_bfd.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,106 @@
 +/* Definitions for BFD wrappers used by GDB.
 +
 +   Copyright (C) 2011, 2012
@@ -5256,14 +5562,14 @@ index 0000000..1dd82c3
 +
 +struct bfd *gdb_bfd_open (const char *name, const char *target, int fd);
 +
-+/* Acquire a new reference to ABFD.  Returns ABFD for convenience.
-+   It is fine for ABFD to be NULL; in this case the function does
-+   nothing and returns NULL.  */
++/* Increment the reference count of ABFD.  It is fine for ABFD to be
++   NULL; in this case the function does nothing.  */
 +
-+struct bfd *gdb_bfd_ref (struct bfd *abfd);
++void gdb_bfd_ref (struct bfd *abfd);
 +
-+/* Release a reference to ABFD.  If this is the last reference, ABFD
-+   will be freed.  If ABFD is NULL, this function does nothing.  */
++/* Decrement the reference count of ABFD.  If this is the last
++   reference, ABFD will be freed.  If ABFD is NULL, this function does
++   nothing.  */
 +
 +void gdb_bfd_unref (struct bfd *abfd);
 +
@@ -5278,6 +5584,51 @@ index 0000000..1dd82c3
 +   function will throw on error.  */
 +
 +const gdb_byte *gdb_bfd_map_section (asection *section, bfd_size_type *size);
++
++
++
++/* A wrapper for bfd_fopen that initializes the gdb-specific reference
++   count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_fopen (const char *, const char *, const char *, int);
++
++/* A wrapper for bfd_openr that initializes the gdb-specific reference
++   count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_openr (const char *, const char *);
++
++/* A wrapper for bfd_openw that initializes the gdb-specific reference
++   count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_openw (const char *, const char *);
++
++/* A wrapper for bfd_openr_iovec that initializes the gdb-specific
++   reference count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_openr_iovec (const char *filename, const char *target,
++			  void *(*open_func) (struct bfd *nbfd,
++					      void *open_closure),
++			  void *open_closure,
++			  file_ptr (*pread_func) (struct bfd *nbfd,
++						  void *stream,
++						  void *buf,
++						  file_ptr nbytes,
++						  file_ptr offset),
++			  int (*close_func) (struct bfd *nbfd,
++					     void *stream),
++			  int (*stat_func) (struct bfd *abfd,
++					    void *stream,
++					    struct stat *sb));
++
++/* A wrapper for bfd_openr_next_archived_file that initializes the
++   gdb-specific reference count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous);
++
++/* A wrapper for bfd_fdopenr that initializes the gdb-specific
++   reference count and calls gdb_bfd_stash_filename.  */
++
++bfd *gdb_bfd_fdopenr (const char *filename, const char *target, int fd);
 +
 +#endif /* GDB_BFD_H */
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
@@ -6433,7 +6784,7 @@ index 17bfbc5..72e9cc5 100644
 +
  #endif /* GDBTYPES_H */
 diff --git a/gdb/jit.c b/gdb/jit.c
-index 568d17b..6478397 100644
+index 568d17b..cdd9f49 100644
 --- a/gdb/jit.c
 +++ b/gdb/jit.c
 @@ -38,6 +38,7 @@
@@ -6444,7 +6795,7 @@ index 568d17b..6478397 100644
  
  static const char *jit_reader_dir = NULL;
  
-@@ -132,12 +133,11 @@ mem_bfd_iovec_stat (struct bfd *abfd, void *stream, struct stat *sb)
+@@ -132,17 +133,16 @@ mem_bfd_iovec_stat (struct bfd *abfd, void *stream, struct stat *sb)
  static struct bfd *
  bfd_open_from_target_memory (CORE_ADDR addr, ULONGEST size, char *target)
  {
@@ -6454,19 +6805,21 @@ index 568d17b..6478397 100644
    buffer->base = addr;
    buffer->size = size;
 -  return bfd_openr_iovec (filename, target,
-+  return bfd_openr_iovec ("<in-memory>", target,
-                           mem_bfd_iovec_open,
-                           buffer,
-                           mem_bfd_iovec_pread,
-@@ -861,6 +861,7 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
-       puts_unfiltered (_("Error opening JITed symbol file, ignoring it.\n"));
-       return;
-     }
-+  nbfd = gdb_bfd_ref (nbfd);
+-                          mem_bfd_iovec_open,
+-                          buffer,
+-                          mem_bfd_iovec_pread,
+-                          mem_bfd_iovec_close,
+-                          mem_bfd_iovec_stat);
++  return gdb_bfd_openr_iovec ("<in-memory>", target,
++			      mem_bfd_iovec_open,
++			      buffer,
++			      mem_bfd_iovec_pread,
++			      mem_bfd_iovec_close,
++			      mem_bfd_iovec_stat);
+ }
  
-   /* Check the format.  NOTE: This initializes important data that GDB uses!
-      We would segfault later without this line.  */
-@@ -868,7 +869,7 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
+ /* One reader that has been loaded successfully, and can potentially be used to
+@@ -868,7 +868,7 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
      {
        printf_unfiltered (_("\
  JITed symbol file is not an object file, ignoring it.\n"));
@@ -6475,8 +6828,18 @@ index 568d17b..6478397 100644
        return;
      }
  
+@@ -896,7 +896,8 @@ JITed symbol file is not an object file, ignoring it.\n"));
+         ++i;
+       }
+ 
+-  /* This call takes ownership of NBFD.  It does not take ownership of SAI.  */
++  /* This call does not take ownership of SAI.  */
++  make_cleanup_bfd_unref (nbfd);
+   objfile = symbol_file_add_from_bfd (nbfd, 0, sai, OBJF_SHARED, NULL);
+ 
+   do_cleanups (old_cleanups);
 diff --git a/gdb/m32r-rom.c b/gdb/m32r-rom.c
-index 76e4bf1..ffda6f9 100644
+index 76e4bf1..9a2f5aa 100644
 --- a/gdb/m32r-rom.c
 +++ b/gdb/m32r-rom.c
 @@ -40,6 +40,7 @@
@@ -6497,7 +6860,7 @@ index 76e4bf1..ffda6f9 100644
      filename = get_exec_file (1);
  
 -  abfd = bfd_openr (filename, 0);
-+  abfd = gdb_bfd_ref (bfd_openr (filename, 0));
++  abfd = gdb_bfd_openr (filename, 0);
    if (!abfd)
      error (_("Unable to open file %s."), filename);
 +  cleanup = make_cleanup_bfd_unref (abfd);
@@ -6525,7 +6888,7 @@ index 76e4bf1..ffda6f9 100644
  
    gettimeofday (&end_time, NULL);
 -  abfd = bfd_openr (args, 0);
-+  abfd = gdb_bfd_ref (bfd_openr (args, 0));
++  abfd = gdb_bfd_openr (args, 0);
 +  cleanup = make_cleanup_bfd_unref (abfd);
    if (abfd != NULL)
      {		/* Download is done -- print section statistics.  */
@@ -6539,10 +6902,18 @@ index 76e4bf1..ffda6f9 100644
  
  /* Provide a prototype to silence -Wmissing-prototypes.  */
 diff --git a/gdb/machoread.c b/gdb/machoread.c
-index 22530ab..6d309bb 100644
+index 22530ab..0d7578a 100644
 --- a/gdb/machoread.c
 +++ b/gdb/machoread.c
-@@ -466,14 +466,14 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
+@@ -454,6 +454,7 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
+   asymbol **symp;
+   struct bfd_hash_table table;
+   int nbr_sections;
++  struct cleanup *cleanup;
+ 
+   /* Per section flag to mark which section have been rebased.  */
+   unsigned char *sections_rebased;
+@@ -466,14 +467,14 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
      {
        warning (_("`%s': can't read symbols: %s."), oso->name,
                 bfd_errmsg (bfd_get_error ()));
@@ -6559,7 +6930,7 @@ index 22530ab..6d309bb 100644
        return;
      }
  
-@@ -482,7 +482,7 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
+@@ -482,7 +483,7 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
                                oso->nbr_syms))
      {
        warning (_("`%s': can't create hash table"), oso->name);
@@ -6568,7 +6939,7 @@ index 22530ab..6d309bb 100644
        return;
      }
  
-@@ -629,10 +629,10 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
+@@ -629,18 +630,15 @@ macho_add_oso_symfile (oso_el *oso, bfd *abfd,
  
    bfd_hash_table_free (&table);
  
@@ -6576,14 +6947,20 @@ index 22530ab..6d309bb 100644
 -     either from an OSO symbol name or from an archive name.  Memory for both
 -     is not managed by gdb.  */
 -  abfd->filename = xstrdup (abfd->filename);
-+  /* Make sure that the filename has the correct lifetime.  The
-+     current filename comes either from an OSO symbol name or from an
-+     archive name.  Memory for both is not managed by gdb.  */
-+  gdb_bfd_stash_filename (abfd);
- 
+-
    /* We need to clear SYMFILE_MAINLINE to avoid interractive question
       from symfile.c:symbol_file_add_with_addrs_or_offsets.  */
-@@ -651,6 +651,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
++  cleanup = make_cleanup_bfd_unref (abfd);
+   symbol_file_add_from_bfd
+     (abfd, symfile_flags & ~(SYMFILE_MAINLINE | SYMFILE_VERBOSE), NULL,
+      main_objfile->flags & (OBJF_REORDERED | OBJF_SHARED
+ 			    | OBJF_READNOW | OBJF_USERLOADED),
+      main_objfile);
++  do_cleanups (cleanup);
+ }
+ 
+ /* Read symbols from the vector of oso files.  */
+@@ -651,6 +649,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
    int ix;
    VEC (oso_el) *vec;
    oso_el *oso;
@@ -6591,7 +6968,7 @@ index 22530ab..6d309bb 100644
  
    vec = oso_vector;
    oso_vector = NULL;
-@@ -677,6 +678,8 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -677,6 +676,8 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
  	  memcpy (archive_name, oso->name, pfx_len);
  	  archive_name[pfx_len] = '\0';
  
@@ -6600,16 +6977,16 @@ index 22530ab..6d309bb 100644
            /* Compute number of oso for this archive.  */
            for (last_ix = ix;
                 VEC_iterate (oso_el, vec, last_ix, oso2); last_ix++)
-@@ -686,7 +689,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -686,7 +687,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
              }
  
  	  /* Open the archive and check the format.  */
 -	  archive_bfd = bfd_openr (archive_name, gnutarget);
-+	  archive_bfd = gdb_bfd_ref (bfd_openr (archive_name, gnutarget));
++	  archive_bfd = gdb_bfd_openr (archive_name, gnutarget);
  	  if (archive_bfd == NULL)
  	    {
  	      warning (_("Could not open OSO archive file \"%s\""),
-@@ -698,17 +701,21 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -698,17 +699,18 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
  	    {
  	      warning (_("OSO archive file \"%s\" not an archive."),
  		       archive_name);
@@ -6620,10 +6997,7 @@ index 22530ab..6d309bb 100644
  	    }
 -	  member_bfd = bfd_openr_next_archived_file (archive_bfd, NULL);
 +
-+	  gdb_bfd_stash_filename (archive_bfd);
-+
-+	  member_bfd = gdb_bfd_ref (bfd_openr_next_archived_file (archive_bfd,
-+								  NULL));
++	  member_bfd = gdb_bfd_openr_next_archived_file (archive_bfd, NULL);
  
  	  if (member_bfd == NULL)
  	    {
@@ -6634,15 +7008,14 @@ index 22530ab..6d309bb 100644
                ix = last_ix;
  	      continue;
  	    }
-@@ -738,12 +745,13 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -738,12 +740,12 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
                  }
  
                prev = member_bfd;
 -	      member_bfd = bfd_openr_next_archived_file
 -		(archive_bfd, member_bfd);
-+	      member_bfd
-+		= gdb_bfd_ref (bfd_openr_next_archived_file (archive_bfd,
-+							     member_bfd));
++	      member_bfd = gdb_bfd_openr_next_archived_file (archive_bfd,
++							     member_bfd);
  
                /* Free previous member if not referenced by an oso.  */
                if (ix2 >= last_ix)
@@ -6651,16 +7024,16 @@ index 22530ab..6d309bb 100644
  	    }
            for (ix2 = ix; ix2 < last_ix; ix2++)
              {
-@@ -759,7 +767,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -759,7 +761,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
  	{
            bfd *abfd;
  
 -	  abfd = bfd_openr (oso->name, gnutarget);
-+	  abfd = gdb_bfd_ref (bfd_openr (oso->name, gnutarget));
++	  abfd = gdb_bfd_openr (oso->name, gnutarget);
  	  if (!abfd)
              warning (_("`%s': can't open to read symbols: %s."), oso->name,
                       bfd_errmsg (bfd_get_error ()));
-@@ -771,6 +779,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
+@@ -771,6 +773,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
      }
  
    VEC_free (oso_el, vec);
@@ -6668,20 +7041,19 @@ index 22530ab..6d309bb 100644
  }
  
  /* DSYM (debug symbols) files contain the debug info of an executable.
-@@ -808,20 +817,18 @@ macho_check_dsym (struct objfile *objfile)
+@@ -808,20 +811,17 @@ macho_check_dsym (struct objfile *objfile)
        warning (_("can't find UUID in %s"), objfile->name);
        return NULL;
      }
 -  dsym_filename = xstrdup (dsym_filename);
 -  dsym_bfd = bfd_openr (dsym_filename, gnutarget);
-+  dsym_bfd = gdb_bfd_ref (bfd_openr (dsym_filename, gnutarget));
++  dsym_bfd = gdb_bfd_openr (dsym_filename, gnutarget);
    if (dsym_bfd == NULL)
      {
        warning (_("can't open dsym file %s"), dsym_filename);
 -      xfree (dsym_filename);
        return NULL;
      }
-+  gdb_bfd_stash_filename (dsym_filename);
  
    if (!bfd_check_format (dsym_bfd, bfd_object))
      {
@@ -6692,7 +7064,7 @@ index 22530ab..6d309bb 100644
        return NULL;
      }
  
-@@ -829,16 +836,14 @@ macho_check_dsym (struct objfile *objfile)
+@@ -829,16 +829,14 @@ macho_check_dsym (struct objfile *objfile)
                                   BFD_MACH_O_LC_UUID, &dsym_uuid) == 0)
      {
        warning (_("can't find UUID in %s"), dsym_filename);
@@ -6711,8 +7083,26 @@ index 22530ab..6d309bb 100644
        return NULL;
      }
    return dsym_bfd;
+@@ -902,6 +900,7 @@ macho_symfile_read (struct objfile *objfile, int symfile_flags)
+ 	  int ix;
+ 	  oso_el *oso;
+           struct bfd_section *asect, *dsect;
++	  struct cleanup *cleanup;
+ 
+ 	  if (mach_o_debug_level > 0)
+ 	    printf_unfiltered (_("dsym file found\n"));
+@@ -922,7 +921,9 @@ macho_symfile_read (struct objfile *objfile, int symfile_flags)
+             }
+ 
+ 	  /* Add the dsym file as a separate file.  */
++	  cleanup = make_cleanup_bfd_unref (dsym_bfd);
+           symbol_file_add_separate (dsym_bfd, symfile_flags, objfile);
++	  do_cleanups (cleanup);
+ 
+ 	  /* Don't try to read dwarf2 from main file or shared libraries.  */
+           return;
 diff --git a/gdb/main.c b/gdb/main.c
-index 025bbe0..a8c1a97 100644
+index d075694..e4da3f1 100644
 --- a/gdb/main.c
 +++ b/gdb/main.c
 @@ -37,6 +37,7 @@
@@ -6732,10 +7122,10 @@ index 025bbe0..a8c1a97 100644
    /* These are static so that we can take their address in an
       initializer.  */
    static int print_help;
-@@ -473,10 +476,14 @@ captured_main (void *data)
+@@ -471,10 +474,14 @@ captured_main (void *data)
+       {"args", no_argument, &set_args, 1},
+       {"l", required_argument, 0, 'l'},
        {"return-child-result", no_argument, &return_child_result, 1},
-       {"use-deprecated-index-sections", no_argument,
-        &use_deprecated_index_sections, 1},
 +#if HAVE_PYTHON
 +      {"python", no_argument, 0, 'P'},
 +      {"P", no_argument, 0, 'P'},
@@ -6748,7 +7138,7 @@ index 025bbe0..a8c1a97 100644
        {
  	int option_index;
  
-@@ -494,6 +501,9 @@ captured_main (void *data)
+@@ -492,6 +499,9 @@ captured_main (void *data)
  	  case 0:
  	    /* Long option that just sets a flag.  */
  	    break;
@@ -6758,7 +7148,7 @@ index 025bbe0..a8c1a97 100644
  	  case OPT_SE:
  	    symarg = optarg;
  	    execarg = optarg;
-@@ -701,7 +711,31 @@ captured_main (void *data)
+@@ -699,7 +709,31 @@ captured_main (void *data)
  
    /* Now that gdb_init has created the initial inferior, we're in
       position to set args for that inferior.  */
@@ -6791,7 +7181,7 @@ index 025bbe0..a8c1a97 100644
      {
        /* The remaining options are the command-line options for the
  	 inferior.  The first one is the sym/exec file, and the rest
-@@ -981,7 +1015,8 @@ captured_main (void *data)
+@@ -979,7 +1013,8 @@ captured_main (void *data)
  
    /* Read in the old history after all the command files have been
       read.  */
@@ -6801,7 +7191,7 @@ index 025bbe0..a8c1a97 100644
  
    if (batch_flag)
      {
-@@ -992,13 +1027,25 @@ captured_main (void *data)
+@@ -990,13 +1025,25 @@ captured_main (void *data)
    /* Show time and/or space usage.  */
    do_cleanups (pre_stat_chain);
  
@@ -6833,7 +7223,7 @@ index 025bbe0..a8c1a97 100644
      }
    /* No exit -- exit is through quit_command.  */
  }
-@@ -1030,7 +1077,12 @@ print_gdb_help (struct ui_file *stream)
+@@ -1028,7 +1075,12 @@ print_gdb_help (struct ui_file *stream)
    fputs_unfiltered (_("\
  This is the GNU debugger.  Usage:\n\n\
      gdb [options] [executable-file [core-file or process-id]]\n\
@@ -6847,7 +7237,7 @@ index 025bbe0..a8c1a97 100644
  Options:\n\n\
  "), stream);
    fputs_unfiltered (_("\
-@@ -1070,7 +1122,13 @@ Options:\n\n\
+@@ -1068,7 +1120,13 @@ Options:\n\n\
    --nw		     Do not use a window interface.\n\
    --nx               Do not read "), stream);
    fputs_unfiltered (gdbinit, stream);
@@ -6863,7 +7253,7 @@ index 025bbe0..a8c1a97 100644
    --readnow          Fully read symbol files on first access.\n\
  "), stream);
 diff --git a/gdb/objfiles.c b/gdb/objfiles.c
-index f5e5c75..5ff0eb2 100644
+index f5e5c75..411618f 100644
 --- a/gdb/objfiles.c
 +++ b/gdb/objfiles.c
 @@ -53,6 +53,7 @@
@@ -6874,19 +7264,17 @@ index f5e5c75..5ff0eb2 100644
  
  /* Prototypes for local functions */
  
-@@ -193,9 +194,9 @@ allocate_objfile (bfd *abfd, int flags)
- 
-   /* Update the per-objfile information that comes from the bfd, ensuring
+@@ -195,7 +196,8 @@ allocate_objfile (bfd *abfd, int flags)
       that any data that is reference is saved in the per-objfile data
--     region.  */
-+     region.  Note that we steal a reference to ABFD.  */
+      region.  */
  
 -  objfile->obfd = gdb_bfd_ref (abfd);
 +  objfile->obfd = abfd;
++  gdb_bfd_ref (abfd);
    if (abfd != NULL)
      {
        /* Look up the gdbarch associated with the BFD.  */
-@@ -1456,75 +1457,6 @@ objfiles_changed (void)
+@@ -1456,75 +1458,6 @@ objfiles_changed (void)
    get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
  }
  
@@ -7199,7 +7587,7 @@ index 86f3bdf..f908a61 100644
 +
  #endif /* PARSER_DEFS_H */
 diff --git a/gdb/printcmd.c b/gdb/printcmd.c
-index 2a0a886..c13a044 100644
+index d5b5b63..4bc2b5b 100644
 --- a/gdb/printcmd.c
 +++ b/gdb/printcmd.c
 @@ -50,6 +50,7 @@
@@ -7257,7 +7645,7 @@ index 2a0a886..c13a044 100644
  
  
  /* Add an expression to the auto-display chain.
-@@ -1980,6 +2007,10 @@ print_variable_and_value (const char *name, struct symbol *var,
+@@ -1982,6 +2009,10 @@ print_variable_and_value (const char *name, struct symbol *var,
        struct value_print_options opts;
  
        val = read_var_value (var, frame);
@@ -7268,7 +7656,7 @@ index 2a0a886..c13a044 100644
        get_user_print_options (&opts);
        opts.deref_ref = 1;
        common_val_print (val, stream, indent, &opts, current_language);
-@@ -2620,4 +2651,8 @@ Show printing of source filename and line number with <symbol>."), NULL,
+@@ -2626,4 +2657,8 @@ Show printing of source filename and line number with <symbol>."), NULL,
    add_com ("eval", no_class, eval_command, _("\
  Convert \"printf format string\", arg1, arg2, arg3, ..., argn to\n\
  a command line, and call it."));
@@ -7278,7 +7666,7 @@ index 2a0a886..c13a044 100644
 +#endif
  }
 diff --git a/gdb/procfs.c b/gdb/procfs.c
-index 774df2e..32cb468 100644
+index 774df2e..4409e5b 100644
 --- a/gdb/procfs.c
 +++ b/gdb/procfs.c
 @@ -3486,7 +3486,7 @@ insert_dbx_link_bpt_in_file (int fd, CORE_ADDR ignored)
@@ -7286,7 +7674,7 @@ index 774df2e..32cb468 100644
    CORE_ADDR sym_addr;
  
 -  abfd = bfd_fdopenr ("unamed", 0, fd);
-+  abfd = gdb_bfd_ref (bfd_fdopenr ("unamed", 0, fd));
++  abfd = gdb_bfd_fdopenr ("unamed", 0, fd);
    if (abfd == NULL)
      {
        warning (_("Failed to create a bfd: %s."), bfd_errmsg (bfd_get_error ()));
@@ -8445,7 +8833,7 @@ index bb0fe52..ec42aac 100644
  
    /* Succeeded.  */
 diff --git a/gdb/remote-m32r-sdi.c b/gdb/remote-m32r-sdi.c
-index 47f4405..b4b7324 100644
+index 47f4405..85268b6 100644
 --- a/gdb/remote-m32r-sdi.c
 +++ b/gdb/remote-m32r-sdi.c
 @@ -39,6 +39,7 @@
@@ -8461,7 +8849,7 @@ index 47f4405..b4b7324 100644
      filename = get_exec_file (1);
  
 -  pbfd = bfd_openr (filename, gnutarget);
-+  pbfd = gdb_bfd_ref (bfd_openr (filename, gnutarget));
++  pbfd = gdb_bfd_openr (filename, gnutarget);
    if (pbfd == NULL)
      {
        perror_with_name (filename);
@@ -8473,7 +8861,7 @@ index 47f4405..b4b7324 100644
    if (!bfd_check_format (pbfd, bfd_object))
      error (_("\"%s\" is not an object file: %s"), filename,
 diff --git a/gdb/remote-mips.c b/gdb/remote-mips.c
-index babbf19..b46325f 100644
+index babbf19..db4381b 100644
 --- a/gdb/remote-mips.c
 +++ b/gdb/remote-mips.c
 @@ -36,6 +36,7 @@
@@ -8494,7 +8882,7 @@ index babbf19..b46325f 100644
    buffer = alloca (srec_frame * 2 + 256);
  
 -  abfd = bfd_openr (args, 0);
-+  abfd = gdb_bfd_ref (bfd_openr (args, 0));
++  abfd = gdb_bfd_openr (args, 0);
    if (!abfd)
      {
        printf_filtered ("Unable to open file %s\n", args);
@@ -8527,7 +8915,7 @@ index babbf19..b46325f 100644
    binbuf = (unsigned char *) xmalloc (BINCHUNK);
  
 -  abfd = bfd_openr (file, 0);
-+  abfd = gdb_bfd_ref (bfd_openr (file, 0));
++  abfd = gdb_bfd_openr (file, 0);
    if (!abfd)
      {
        printf_filtered ("Unable to open file %s\n", file);
@@ -8551,7 +8939,7 @@ index babbf19..b46325f 100644
  }
  
 diff --git a/gdb/remote.c b/gdb/remote.c
-index 1c9367d..6ccab54 100644
+index 1c9367d..f2b5e7b 100644
 --- a/gdb/remote.c
 +++ b/gdb/remote.c
 @@ -42,6 +42,7 @@
@@ -8562,7 +8950,7 @@ index 1c9367d..6ccab54 100644
  
  #include <ctype.h>
  #include <sys/time.h>
-@@ -9823,11 +9824,15 @@ remote_filename_p (const char *filename)
+@@ -9823,11 +9824,13 @@ remote_filename_p (const char *filename)
  bfd *
  remote_bfd_open (const char *remote_file, const char *target)
  {
@@ -8571,20 +8959,18 @@ index 1c9367d..6ccab54 100644
 -			  remote_bfd_iovec_pread,
 -			  remote_bfd_iovec_close,
 -			  remote_bfd_iovec_stat);
-+  bfd *abfd = bfd_openr_iovec (remote_file, target,
-+			       remote_bfd_iovec_open, NULL,
-+			       remote_bfd_iovec_pread,
-+			       remote_bfd_iovec_close,
-+			       remote_bfd_iovec_stat);
++  bfd *abfd = gdb_bfd_openr_iovec (remote_file, target,
++				   remote_bfd_iovec_open, NULL,
++				   remote_bfd_iovec_pread,
++				   remote_bfd_iovec_close,
++				   remote_bfd_iovec_stat);
 +
-+  if (abfd != NULL)
-+    gdb_bfd_stash_filename (abfd);
 +  return abfd;
  }
  
  void
 diff --git a/gdb/rs6000-nat.c b/gdb/rs6000-nat.c
-index 0a2000a..017e997 100644
+index 0a2000a..9b8efd3 100644
 --- a/gdb/rs6000-nat.c
 +++ b/gdb/rs6000-nat.c
 @@ -730,7 +730,7 @@ static struct vmap *
@@ -8596,7 +8982,7 @@ index 0a2000a..017e997 100644
    struct objfile *obj;
    struct vmap *vp;
    int fd;
-@@ -743,21 +743,22 @@ add_vmap (LdInfo *ldi)
+@@ -743,19 +743,18 @@ add_vmap (LdInfo *ldi)
    filename = LDI_FILENAME (ldi, arch64);
    mem = filename + strlen (filename) + 1;
    mem = xstrdup (mem);
@@ -8607,11 +8993,10 @@ index 0a2000a..017e997 100644
      /* Note that this opens it once for every member; a possible
         enhancement would be to only open it once for every object.  */
 -    abfd = bfd_openr (objname, gnutarget);
-+    abfd = bfd_openr (filename, gnutarget);
++    abfd = gdb_bfd_openr (filename, gnutarget);
    else
 -    abfd = bfd_fdopenr (objname, gnutarget, fd);
-+    abfd = bfd_fdopenr (filename, gnutarget, fd);
-+  abfd = gdb_bfd_ref (abfd);
++    abfd = gdb_bfd_fdopenr (filename, gnutarget, fd);
    if (!abfd)
      {
        warning (_("Could not open `%s' as an executable file: %s"),
@@ -8619,18 +9004,27 @@ index 0a2000a..017e997 100644
 +	       filename, bfd_errmsg (bfd_get_error ()));
        return NULL;
      }
-+  gdb_bfd_stash_filename (abfd);
  
-   /* Make sure we have an object file.  */
+@@ -766,35 +765,44 @@ add_vmap (LdInfo *ldi)
  
-@@ -768,23 +769,23 @@ add_vmap (LdInfo *ldi)
+   else if (bfd_check_format (abfd, bfd_archive))
      {
-       last = 0;
-       /* FIXME??? am I tossing BFDs?  bfd?  */
+-      last = 0;
+-      /* FIXME??? am I tossing BFDs?  bfd?  */
 -      while ((last = bfd_openr_next_archived_file (abfd, last)))
-+      while ((last = gdb_bfd_ref (bfd_openr_next_archived_file (abfd, last))))
- 	if (strcmp (mem, last->filename) == 0)
- 	  break;
+-	if (strcmp (mem, last->filename) == 0)
+-	  break;
++      last = gdb_bfd_openr_next_archived_file (abfd, NULL);
++      while (last != NULL)
++	{
++	  bfd *next;
++
++	  if (strcmp (mem, last->filename) == 0)
++	    break;
++
++	  next = gdb_bfd_openr_next_archived_file (abfd, last);
++	  gdb_bfd_unref (last);
++	}
  
        if (!last)
  	{
@@ -8653,7 +9047,11 @@ index 0a2000a..017e997 100644
  	  return NULL;
  	}
  
-@@ -793,11 +794,11 @@ add_vmap (LdInfo *ldi)
+       vp = map_vmap (last, abfd);
++      /* map_vmap acquired a reference to LAST, so we can release
++	 ours.  */
++      gdb_bfd_unref (last);
+     }
    else
      {
        warning (_("\"%s\": not in executable format: %s."),
@@ -8663,13 +9061,21 @@ index 0a2000a..017e997 100644
 +      gdb_bfd_unref (abfd);
        return NULL;
      }
--  obj = allocate_objfile (vp->bfd, 0);
-+  obj = allocate_objfile (gdb_bfd_ref (vp->bfd), 0);
-   vp->objfile = obj;
- 
+   obj = allocate_objfile (vp->bfd, 0);
+@@ -803,6 +811,11 @@ add_vmap (LdInfo *ldi)
    /* Always add symbols for the main objfile.  */
+   if (vp == vmap || auto_solib_add)
+     vmap_add_symbols (vp);
++
++  /* Anything needing a reference to ABFD has already acquired it, so
++     release our local reference.  */
++  gdb_bfd_unref (abfd);
++
+   return vp;
+ }
+ 
 diff --git a/gdb/solib-darwin.c b/gdb/solib-darwin.c
-index d52fb46..7109ead 100644
+index d52fb46..db8f187 100644
 --- a/gdb/solib-darwin.c
 +++ b/gdb/solib-darwin.c
 @@ -28,6 +28,7 @@
@@ -8688,7 +9094,7 @@ index d52fb46..7109ead 100644
  
    /* This method doesn't work with an attached process.  */
    if (current_inferior ()->attach_flag)
-@@ -366,24 +368,30 @@ darwin_solib_get_all_image_info_addr_at_init (struct darwin_info *info)
+@@ -366,24 +368,31 @@ darwin_solib_get_all_image_info_addr_at_init (struct darwin_info *info)
    if (!interp_name)
      return;
  
@@ -8696,7 +9102,7 @@ index d52fb46..7109ead 100644
 +
    /* Create a bfd for the interpreter.  */
 -  dyld_bfd = bfd_openr (interp_name, gnutarget);
-+  dyld_bfd = gdb_bfd_ref (bfd_openr (interp_name, gnutarget));
++  dyld_bfd = gdb_bfd_openr (interp_name, gnutarget);
    if (dyld_bfd)
      {
        bfd *sub;
@@ -8710,7 +9116,8 @@ index d52fb46..7109ead 100644
  	{
 -	  bfd_close (dyld_bfd);
 -	  dyld_bfd = NULL;
-+	  dyld_bfd = gdb_bfd_ref (sub);
++	  dyld_bfd = sub;
++	  gdb_bfd_ref (sub);
 +	  make_cleanup_bfd_unref (sub);
  	}
 +      else
@@ -8725,7 +9132,7 @@ index d52fb46..7109ead 100644
  
    /* We find the dynamic linker's base address by examining
       the current pc (which should point at the entry point for the
-@@ -395,7 +403,7 @@ darwin_solib_get_all_image_info_addr_at_init (struct darwin_info *info)
+@@ -395,7 +404,7 @@ darwin_solib_get_all_image_info_addr_at_init (struct darwin_info *info)
    info->all_image_addr =
      lookup_symbol_from_bfd (dyld_bfd, "_dyld_all_image_infos");
  
@@ -8734,7 +9141,7 @@ index d52fb46..7109ead 100644
  
    if (info->all_image_addr == 0)
      return;
-@@ -509,17 +517,10 @@ darwin_bfd_open (char *pathname)
+@@ -509,17 +518,10 @@ darwin_bfd_open (char *pathname)
  				gdbarch_bfd_arch_info (target_gdbarch));
    if (!res)
      {
@@ -8856,7 +9263,7 @@ index 2f2c8b0..0f59535 100644
        /* We're also done with the loadmap.  */
        xfree (ldm);
 diff --git a/gdb/solib-pa64.c b/gdb/solib-pa64.c
-index 2b8d061..b55b67c 100644
+index 2b8d061..00ed8a5 100644
 --- a/gdb/solib-pa64.c
 +++ b/gdb/solib-pa64.c
 @@ -362,7 +362,7 @@ manpage for methods to privately map shared library text."));
@@ -8864,7 +9271,7 @@ index 2b8d061..b55b67c 100644
  	 be trivial on GNU/Linux).  Therefore, we have to try an alternate
  	 mechanism to find the dynamic linker's base address.  */
 -      tmp_bfd = bfd_openr (buf, gnutarget);
-+      tmp_bfd = gdb_bfd_ref (bfd_openr (buf, gnutarget));
++      tmp_bfd = gdb_bfd_openr (buf, gnutarget);
        if (tmp_bfd == NULL)
  	return;
  
@@ -8887,7 +9294,7 @@ index 2b8d061..b55b67c 100644
  }
  
 diff --git a/gdb/solib-spu.c b/gdb/solib-spu.c
-index b5454e7..5eeae62 100644
+index b5454e7..f62d96c 100644
 --- a/gdb/solib-spu.c
 +++ b/gdb/solib-spu.c
 @@ -36,6 +36,7 @@
@@ -8898,7 +9305,7 @@ index b5454e7..5eeae62 100644
  
  #include "spu-tdep.h"
  
-@@ -325,19 +326,20 @@ spu_bfd_fopen (char *name, CORE_ADDR addr)
+@@ -325,16 +326,16 @@ spu_bfd_fopen (char *name, CORE_ADDR addr)
    CORE_ADDR *open_closure = xmalloc (sizeof (CORE_ADDR));
    *open_closure = addr;
  
@@ -8906,10 +9313,10 @@ index b5454e7..5eeae62 100644
 -                          spu_bfd_iovec_open, open_closure,
 -                          spu_bfd_iovec_pread, spu_bfd_iovec_close,
 -			  spu_bfd_iovec_stat);
-+  nbfd = gdb_bfd_ref (bfd_openr_iovec (name, "elf32-spu",
-+				       spu_bfd_iovec_open, open_closure,
-+				       spu_bfd_iovec_pread, spu_bfd_iovec_close,
-+				       spu_bfd_iovec_stat));
++  nbfd = gdb_bfd_openr_iovec (name, "elf32-spu",
++			      spu_bfd_iovec_open, open_closure,
++			      spu_bfd_iovec_pread, spu_bfd_iovec_close,
++			      spu_bfd_iovec_stat);
    if (!nbfd)
      return NULL;
  
@@ -8920,12 +9327,46 @@ index b5454e7..5eeae62 100644
        return NULL;
      }
  
-+  gdb_bfd_stash_filename (nbfd);
-   return nbfd;
- }
+diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
+index 307e483..76bd872 100644
+--- a/gdb/solib-svr4.c
++++ b/gdb/solib-svr4.c
+@@ -46,6 +46,7 @@
+ #include "exec.h"
+ #include "auxv.h"
+ #include "exceptions.h"
++#include "gdb_bfd.h"
  
+ static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
+ static int svr4_have_link_map_offsets (void);
+@@ -1558,9 +1559,11 @@ enable_break (struct svr4_info *info, int from_tty)
+ 	goto bkpt_at_symbol;
+ 
+       /* Now convert the TMP_BFD into a target.  That way target, as
+-         well as BFD operations can be used.  Note that closing the
+-         target will also close the underlying bfd.  */
++         well as BFD operations can be used.  */
+       tmp_bfd_target = target_bfd_reopen (tmp_bfd);
++      /* target_bfd_reopen acquired its own reference, so we can
++         release ours now.  */
++      gdb_bfd_unref (tmp_bfd);
+ 
+       /* On a running target, we can get the dynamic linker's base
+          address from the shared library table.  */
+@@ -1670,8 +1673,9 @@ enable_break (struct svr4_info *info, int from_tty)
+ 						       sym_addr,
+ 						       tmp_bfd_target);
+ 
+-      /* We're done with both the temporary bfd and target.  Remember,
+-         closing the target closes the underlying bfd.  */
++      /* We're done with both the temporary bfd and target.  Closing
++         the target closes the underlying bfd, because it holds the
++         only remaining reference.  */
+       target_close (tmp_bfd_target, 0);
+ 
+       if (sym_addr != 0)
 diff --git a/gdb/solib.c b/gdb/solib.c
-index 90439ba..0fd955d 100644
+index 90439ba..73773f1 100644
 --- a/gdb/solib.c
 +++ b/gdb/solib.c
 @@ -46,6 +46,7 @@
@@ -8949,19 +9390,25 @@ index 90439ba..0fd955d 100644
  
  bfd *
  solib_bfd_fopen (char *pathname, int fd)
-@@ -389,7 +390,10 @@ solib_bfd_fopen (char *pathname, int fd)
+@@ -376,7 +377,7 @@ solib_bfd_fopen (char *pathname, int fd)
+     }
+   else
+     {
+-      abfd = bfd_fopen (pathname, gnutarget, FOPEN_RB, fd);
++      abfd = gdb_bfd_fopen (pathname, gnutarget, FOPEN_RB, fd);
+ 
+       if (abfd)
+ 	bfd_set_cacheable (abfd, 1);
+@@ -389,6 +390,8 @@ solib_bfd_fopen (char *pathname, int fd)
  	     pathname, bfd_errmsg (bfd_get_error ()));
      }
  
--  return abfd;
-+  gdb_bfd_stash_filename (abfd);
 +  xfree (pathname);
 +
-+  return gdb_bfd_ref (abfd);
+   return abfd;
  }
  
- /* Find shared library PATHNAME and open a BFD for it.  */
-@@ -420,17 +424,16 @@ solib_bfd_open (char *pathname)
+@@ -420,17 +423,16 @@ solib_bfd_open (char *pathname)
    /* Check bfd format.  */
    if (!bfd_check_format (abfd, bfd_object))
      {
@@ -8982,7 +9429,7 @@ index 90439ba..0fd955d 100644
               bfd_get_arch_info (abfd)->printable_name, b->printable_name);
  
    return abfd;
-@@ -466,7 +469,7 @@ solib_map_sections (struct so_list *so)
+@@ -466,7 +468,7 @@ solib_map_sections (struct so_list *so)
      return 0;
  
    /* Leave bfd open, core_xfer_memory and "info files" need it.  */
@@ -8991,16 +9438,7 @@ index 90439ba..0fd955d 100644
  
    /* copy full path name into so_name, so that later symbol_file_add
       can find it.  */
-@@ -608,7 +611,7 @@ solib_read_symbols (struct so_list *so, int flags)
- 
- 	  sap = build_section_addr_info_from_section_table (so->sections,
- 							    so->sections_end);
--	  so->objfile = symbol_file_add_from_bfd (so->abfd,
-+	  so->objfile = symbol_file_add_from_bfd (gdb_bfd_ref (so->abfd),
- 						  flags, sap, OBJF_SHARED,
- 						  NULL);
- 	  so->objfile->addr_low = so->addr_low;
-@@ -1233,7 +1236,7 @@ reload_shared_libraries_1 (int from_tty)
+@@ -1233,7 +1235,7 @@ reload_shared_libraries_1 (int from_tty)
  	{
  	  found_pathname = xstrdup (bfd_get_filename (abfd));
  	  make_cleanup (xfree, found_pathname);
@@ -9010,21 +9448,23 @@ index 90439ba..0fd955d 100644
  
        /* If this shared library is no longer associated with its previous
 diff --git a/gdb/spu-linux-nat.c b/gdb/spu-linux-nat.c
-index 2dfec8c..12f8211 100644
+index 2dfec8c..999f1ab 100644
 --- a/gdb/spu-linux-nat.c
 +++ b/gdb/spu-linux-nat.c
-@@ -315,16 +315,17 @@ spu_bfd_open (ULONGEST addr)
+@@ -315,16 +315,16 @@ spu_bfd_open (ULONGEST addr)
    ULONGEST *open_closure = xmalloc (sizeof (ULONGEST));
    *open_closure = addr;
  
 -  nbfd = bfd_openr_iovec (xstrdup ("<in-memory>"), "elf32-spu",
-+  nbfd = bfd_openr_iovec ("<in-memory>", "elf32-spu",
- 			  spu_bfd_iovec_open, open_closure,
- 			  spu_bfd_iovec_pread, spu_bfd_iovec_close,
- 			  spu_bfd_iovec_stat);
+-			  spu_bfd_iovec_open, open_closure,
+-			  spu_bfd_iovec_pread, spu_bfd_iovec_close,
+-			  spu_bfd_iovec_stat);
++  nbfd = gdb_bfd_openr_iovec ("<in-memory>", "elf32-spu",
++			      spu_bfd_iovec_open, open_closure,
++			      spu_bfd_iovec_pread, spu_bfd_iovec_close,
++			      spu_bfd_iovec_stat);
    if (!nbfd)
      return NULL;
-+  nbfd = gdb_bfd_ref (nbfd);
  
    if (!bfd_check_format (nbfd, bfd_object))
      {
@@ -9033,8 +9473,24 @@ index 2dfec8c..12f8211 100644
        return NULL;
      }
  
+@@ -374,8 +374,13 @@ spu_symbol_file_add_from_memory (int inferior_fd)
+   /* Open BFD representing SPE executable and read its symbols.  */
+   nbfd = spu_bfd_open (addr);
+   if (nbfd)
+-    symbol_file_add_from_bfd (nbfd, SYMFILE_VERBOSE | SYMFILE_MAINLINE,
+-                              NULL, 0, NULL);
++    {
++      struct cleanup *cleanup = make_cleanup_bfd_unref (nbfd);
++
++      symbol_file_add_from_bfd (nbfd, SYMFILE_VERBOSE | SYMFILE_MAINLINE,
++				NULL, 0, NULL);
++      do_cleanups (cleanup);
++    }
+ }
+ 
+ 
 diff --git a/gdb/stack.c b/gdb/stack.c
-index 2520e2c..0472475 100644
+index 35d379d..04aab5e 100644
 --- a/gdb/stack.c
 +++ b/gdb/stack.c
 @@ -509,6 +509,10 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
@@ -9049,7 +9505,7 @@ index 2520e2c..0472475 100644
      {
        struct block *b = SYMBOL_BLOCK_VALUE (func);
 diff --git a/gdb/symfile-mem.c b/gdb/symfile-mem.c
-index e80fd25..ad87abd 100644
+index e80fd25..2e53be0 100644
 --- a/gdb/symfile-mem.c
 +++ b/gdb/symfile-mem.c
 @@ -54,6 +54,7 @@
@@ -9060,7 +9516,7 @@ index e80fd25..ad87abd 100644
  
  /* Verify parameters of target_read_memory_bfd and target_read_memory are
     compatible.  */
-@@ -100,17 +101,19 @@ symbol_file_add_from_memory (struct bfd *templ, CORE_ADDR addr, char *name,
+@@ -100,23 +101,24 @@ symbol_file_add_from_memory (struct bfd *templ, CORE_ADDR addr, char *name,
    if (nbfd == NULL)
      error (_("Failed to read a valid object file image from memory."));
  
@@ -9070,24 +9526,34 @@ index e80fd25..ad87abd 100644
 +    nbfd->filename = "shared object read from target memory";
    else
 -    nbfd->filename = name;
-+    {
-+      nbfd->filename = name;
-+      gdb_bfd_stash_filename (nbfd);
-+      xfree (name);
-+    }
- 
-   if (!bfd_check_format (nbfd, bfd_object))
+-
+-  if (!bfd_check_format (nbfd, bfd_object))
      {
 -      /* FIXME: should be checking for errors from bfd_close (for one thing,
 -         on error it does not free all the storage associated with the
 -         bfd).  */
 -      bfd_close (nbfd);
-+      make_cleanup_bfd_unref (nbfd);
-       error (_("Got object file from memory but can't read symbols: %s."),
- 	     bfd_errmsg (bfd_get_error ()));
+-      error (_("Got object file from memory but can't read symbols: %s."),
+-	     bfd_errmsg (bfd_get_error ()));
++      nbfd->filename = name;
++      gdb_bfd_stash_filename (nbfd);
++      xfree (name);
      }
+ 
++  cleanup = make_cleanup_bfd_unref (nbfd);
++
++  if (!bfd_check_format (nbfd, bfd_object))
++    error (_("Got object file from memory but can't read symbols: %s."),
++	   bfd_errmsg (bfd_get_error ()));
++
+   sai = alloc_section_addr_info (bfd_count_sections (nbfd));
+-  cleanup = make_cleanup (xfree, sai);
++  make_cleanup (xfree, sai);
+   i = 0;
+   for (sec = nbfd->sections; sec != NULL; sec = sec->next)
+     if ((bfd_get_section_flags (nbfd, sec) & (SEC_ALLOC|SEC_LOAD)) != 0)
 diff --git a/gdb/symfile.c b/gdb/symfile.c
-index 01252e2..c904011 100644
+index 01252e2..95ed480 100644
 --- a/gdb/symfile.c
 +++ b/gdb/symfile.c
 @@ -55,6 +55,7 @@
@@ -9098,16 +9564,66 @@ index 01252e2..c904011 100644
  
  #include <sys/types.h>
  #include <fcntl.h>
-@@ -1074,7 +1075,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+@@ -1036,7 +1037,7 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
+    loaded file.
+ 
+    ABFD is a BFD already open on the file, as from symfile_bfd_open.
+-   This BFD will be closed on error, and is always consumed by this function.
++   A new reference is acquired by this function.
+ 
+    ADD_FLAGS encodes verbosity, whether this is main symbol file or
+    extra, such as dynamically loaded code, and what to do with breakpoins.
+@@ -1060,7 +1061,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+                                        int flags, struct objfile *parent)
+ {
+   struct objfile *objfile;
+-  struct cleanup *my_cleanups;
+   const char *name = bfd_get_filename (abfd);
+   const int from_tty = add_flags & SYMFILE_VERBOSE;
+   const int mainline = add_flags & SYMFILE_MAINLINE;
+@@ -1074,8 +1074,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
        add_flags &= ~SYMFILE_NO_READ;
      }
  
 -  my_cleanups = make_cleanup_bfd_close (abfd);
-+  my_cleanups = make_cleanup_bfd_unref (abfd);
- 
+-
    /* Give user a chance to burp if we'd be
       interactively wiping out any existing symbols.  */
-@@ -1372,7 +1373,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
+ 
+@@ -1086,7 +1084,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
+     error (_("Not confirmed."));
+ 
+   objfile = allocate_objfile (abfd, flags | (mainline ? OBJF_MAINLINE : 0));
+-  discard_cleanups (my_cleanups);
+ 
+   if (parent)
+     add_separate_debug_objfile (objfile, parent);
+@@ -1207,8 +1204,13 @@ struct objfile *
+ symbol_file_add (char *name, int add_flags, struct section_addr_info *addrs,
+ 		 int flags)
+ {
+-  return symbol_file_add_from_bfd (symfile_bfd_open (name), add_flags, addrs,
+-                                   flags, NULL);
++  bfd *bfd = symfile_bfd_open (name);
++  struct cleanup *cleanup = make_cleanup_bfd_unref (bfd);
++  struct objfile *objf;
++
++  objf = symbol_file_add_from_bfd (bfd, add_flags, addrs, flags, NULL);
++  do_cleanups (cleanup);
++  return objf;
+ }
+ 
+ 
+@@ -1350,7 +1352,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
+   if (filename_cmp (name, parent_objfile->name) == 0)
+     return 0;
+ 
+-  abfd = bfd_open_maybe_remote (name);
++  abfd = gdb_bfd_open_maybe_remote (name);
+ 
+   if (!abfd)
+     return 0;
+@@ -1372,7 +1374,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
        if (abfd_stat.st_dev == parent_stat.st_dev
  	  && abfd_stat.st_ino == parent_stat.st_ino)
  	{
@@ -9116,7 +9632,7 @@ index 01252e2..c904011 100644
  	  return 0;
  	}
        verified_as_different = 1;
-@@ -1382,7 +1383,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
+@@ -1382,7 +1384,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
  
    file_crc_p = get_file_crc (abfd, &file_crc);
  
@@ -9125,7 +9641,7 @@ index 01252e2..c904011 100644
  
    if (!file_crc_p)
      return 0;
-@@ -1690,15 +1691,22 @@ set_initial_language (void)
+@@ -1690,15 +1692,20 @@ set_initial_language (void)
  }
  
  /* If NAME is a remote name open the file using remote protocol, otherwise
@@ -9134,30 +9650,28 @@ index 01252e2..c904011 100644
 +   returns NULL with the BFD error set.  */
  
  bfd *
- bfd_open_maybe_remote (const char *name)
+-bfd_open_maybe_remote (const char *name)
++gdb_bfd_open_maybe_remote (const char *name)
  {
++  bfd *result;
++
    if (remote_filename_p (name))
 -    return remote_bfd_open (name, gnutarget);
-+    return gdb_bfd_ref (remote_bfd_open (name, gnutarget));
++    result = remote_bfd_open (name, gnutarget);
    else
 -    return bfd_openr (name, gnutarget);
-+    {
-+      bfd *result = gdb_bfd_ref (bfd_openr (name, gnutarget));
++    result = gdb_bfd_openr (name, gnutarget);
 +
-+      if (result != NULL)
-+	gdb_bfd_stash_filename (result);
-+      return result;
-+    }
++  return result;
  }
  
  
-@@ -1716,19 +1724,14 @@ symfile_bfd_open (char *name)
+@@ -1716,19 +1723,14 @@ symfile_bfd_open (char *name)
  
    if (remote_filename_p (name))
      {
 -      name = xstrdup (name);
--      sym_bfd = remote_bfd_open (name, gnutarget);
-+      sym_bfd = gdb_bfd_ref (remote_bfd_open (name, gnutarget));
+       sym_bfd = remote_bfd_open (name, gnutarget);
        if (!sym_bfd)
 -	{
 -	  make_cleanup (xfree, name);
@@ -9175,7 +9689,7 @@ index 01252e2..c904011 100644
  	  error (_("`%s': can't read symbols: %s."), name,
  		 bfd_errmsg (bfd_get_error ()));
  	}
-@@ -1757,12 +1760,11 @@ symfile_bfd_open (char *name)
+@@ -1757,12 +1759,11 @@ symfile_bfd_open (char *name)
        perror_with_name (name);
      }
  
@@ -9186,11 +9700,11 @@ index 01252e2..c904011 100644
 +  make_cleanup (xfree, name);
  
 -  sym_bfd = bfd_fopen (name, gnutarget, FOPEN_RB, desc);
-+  sym_bfd = gdb_bfd_ref (bfd_fopen (name, gnutarget, FOPEN_RB, desc));
++  sym_bfd = gdb_bfd_fopen (name, gnutarget, FOPEN_RB, desc);
    if (!sym_bfd)
      {
        make_cleanup (xfree, name);
-@@ -1773,17 +1775,12 @@ symfile_bfd_open (char *name)
+@@ -1773,18 +1774,11 @@ symfile_bfd_open (char *name)
  
    if (!bfd_check_format (sym_bfd, bfd_object))
      {
@@ -9206,16 +9720,16 @@ index 01252e2..c904011 100644
  
 -  /* bfd_usrdata exists for applications and libbfd must not touch it.  */
 -  gdb_assert (bfd_usrdata (sym_bfd) == NULL);
-+  gdb_bfd_stash_filename (sym_bfd);
- 
+-
    return sym_bfd;
  }
-@@ -2109,17 +2106,14 @@ generic_load (char *args, int from_tty)
+ 
+@@ -2109,17 +2103,14 @@ generic_load (char *args, int from_tty)
      }
  
    /* Open the file for loading.  */
 -  loadfile_bfd = bfd_openr (filename, gnutarget);
-+  loadfile_bfd = gdb_bfd_ref (bfd_openr (filename, gnutarget));
++  loadfile_bfd = gdb_bfd_openr (filename, gnutarget);
    if (loadfile_bfd == NULL)
      {
        perror_with_name (filename);
@@ -9230,7 +9744,7 @@ index 01252e2..c904011 100644
  
    if (!bfd_check_format (loadfile_bfd, bfd_object))
      {
-@@ -2518,15 +2512,18 @@ reread_symbols (void)
+@@ -2518,15 +2509,18 @@ reread_symbols (void)
  	  /* Clean up any state BFD has sitting around.  We don't need
  	     to close the descriptor but BFD lacks a way of closing the
  	     BFD without closing the descriptor.  */
@@ -9245,7 +9759,7 @@ index 01252e2..c904011 100644
 +	    obfd_filename = bfd_get_filename (objfile->obfd);
 +	    /* Open the new BFD before freeing the old one, so that
 +	       the filename remains live.  */
-+	    objfile->obfd = bfd_open_maybe_remote (obfd_filename);
++	    objfile->obfd = gdb_bfd_open_maybe_remote (obfd_filename);
 +	    gdb_bfd_unref (obfd);
 +	  }
 +
@@ -9256,6 +9770,19 @@ index 01252e2..c904011 100644
  	  /* bfd_openr sets cacheable to true, which is what we want.  */
  	  if (!bfd_check_format (objfile->obfd, bfd_object))
  	    error (_("Can't read symbols from %s: %s."), objfile->name,
+diff --git a/gdb/symfile.h b/gdb/symfile.h
+index aca7359..184a83e 100644
+--- a/gdb/symfile.h
++++ b/gdb/symfile.h
+@@ -553,7 +553,7 @@ extern void find_lowest_section (bfd *, asection *, void *);
+ 
+ extern bfd *symfile_bfd_open (char *);
+ 
+-extern bfd *bfd_open_maybe_remote (const char *);
++extern bfd *gdb_bfd_open_maybe_remote (const char *);
+ 
+ extern int get_section_index (struct objfile *, char *);
+ 
 diff --git a/gdb/testsuite/gdb.ada/packed_array.exp b/gdb/testsuite/gdb.ada/packed_array.exp
 index 678639c..47a2202 100644
 --- a/gdb/testsuite/gdb.ada/packed_array.exp
@@ -13420,7 +13947,7 @@ index d8b157f..f49e827 100644
  extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
  
 diff --git a/gdb/windows-nat.c b/gdb/windows-nat.c
-index f16588a..6ba92d9 100644
+index f16588a..afef615 100644
 --- a/gdb/windows-nat.c
 +++ b/gdb/windows-nat.c
 @@ -752,7 +752,7 @@ windows_make_so (const char *name, LPVOID load_addr)
@@ -13428,7 +13955,7 @@ index f16588a..6ba92d9 100644
        CORE_ADDR text_vma;
  
 -      abfd = bfd_openr (so->so_name, "pei-i386");
-+      abfd = gdb_bfd_ref (bfd_openr (so->so_name, "pei-i386"));
++      abfd = gdb_bfd_openr (so->so_name, "pei-i386");
  
        if (!abfd)
  	return so;
