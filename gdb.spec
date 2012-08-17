@@ -27,23 +27,20 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-# Set version to contents of gdb/version.in.
-# NOTE: the FSF gdb versions are numbered N.M for official releases, like 6.3
-# and, since January 2005, X.Y.Z.date for daily snapshots, like 6.3.50.20050112 # (daily snapshot from mailine), or 6.3.0.20040112 (head of the release branch).
-%global snap 20120801
+%global snap       20120801
+# See tempstamp of source gnulib installed into gdb/gnulib/ .
+%global snapgnulib 20120623
 Version: 7.4.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
-# ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
-# ftp://sourceware.org/pub/gdb/snapshots/branch/gdb-%{version}.tar.bz2
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/snapshots/current/gdb-%{version}.tar.bz2
+Source: gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -79,7 +76,7 @@ Conflicts: elfutils < 0.149
 
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
 Provides: bundled(libiberty) = %{snap}
-Provides: bundled(gnulib) = %{snap}
+Provides: bundled(gnulib) = %{snapgnulib}
 Provides: bundled(binutils) = %{snap}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snap}
@@ -109,7 +106,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%global libstdcxxpython libstdc++-v3-python-r155978
+%global libstdcxxpython gdb-libstdc++-v3-python-r155978
 Source5: %{libstdcxxpython}.tar.bz2
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -748,7 +745,7 @@ tar xjf %{SOURCE5}
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
-rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
+rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 
 # Apply patches defined above.
 
@@ -908,6 +905,7 @@ mv -f readline-doc readline/doc
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
 %build
+rm -rf %{buildroot}
 
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
@@ -921,6 +919,7 @@ mkdir %{gdb_build}$fprofile
 cd %{gdb_build}$fprofile
 
 export CFLAGS="$RPM_OPT_FLAGS"
+export LDFLAGS="%{?__global_ldflags}"
 
 ../configure							\
 	--prefix=%{_prefix}					\
@@ -1032,10 +1031,10 @@ else
 fi
 
 # Prepare gdb/config.h first.
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS" maybe-configure-gdb
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" maybe-configure-gdb
 perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
 
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$FPROFILE_CFLAGS"
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS"
 
 ! grep '_RELOCATABLE.*1' gdb/config.h
 grep '^#define HAVE_LIBSELINUX 1$' gdb/config.h
@@ -1356,6 +1355,14 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-18
+- Drop Source URL for snapshots.
+- Separate %%{snapgnulib} from %%{snap}.
+- Fix %%{libstdcxxpython} to be %%{name}-prefixed.
+- Fix debug info for go-exp.y and go-exp.c.
+- Include RHEL-5 compatible %%{buildroot} cleanup.
+- Use %%__global_ldflags.
+
 * Wed Aug  1 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-17
 - Rebase to FSF GDB 7.4.91.20120801.
 - [dwz] Rebase it from FSF GDB HEAD.
