@@ -27,20 +27,20 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20120801
-# See tempstamp of source gnulib installed into gdb/gnulib/ .
+%global snap       20120817
+# See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20120623
-Version: 7.4.91.%{snap}
+Version: 7.5
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -512,8 +512,15 @@ Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
 #=push
-Patch618: gdb-dlopen-stap-probe.patch
+Patch618: gdb-dlopen-stap-probe-1of7.patch
+Patch717: gdb-dlopen-stap-probe-2of7.patch
+Patch718: gdb-dlopen-stap-probe-3of7.patch
+Patch719: gdb-dlopen-stap-probe-4of7.patch
+Patch720: gdb-dlopen-stap-probe-5of7.patch
+Patch721: gdb-dlopen-stap-probe-6of7.patch
+Patch722: gdb-dlopen-stap-probe-7of7.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
+Patch723: gdb-dlopen-stap-probe-test2.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -848,6 +855,13 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 %patch548 -p1
 %patch579 -p1
 %patch618 -p1
+%patch717 -p1
+%patch718 -p1
+%patch719 -p1
+%patch720 -p1
+%patch721 -p1
+%patch722 -p1
+%patch723 -p1
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
@@ -1355,7 +1369,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
-* Fri Aug 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-18
+* Sat Aug 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-19.fc18
+- Rebase to FSF GDB 7.5.
+- Update dlopen to support two variants of glibc (Gary Benson, BZ 669432).
+
+* Fri Aug 17 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-18.fc18
 - Drop Source URL for snapshots.
 - Separate %%{snapgnulib} from %%{snap}.
 - Fix %%{libstdcxxpython} to be %%{name}-prefixed.
@@ -1363,11 +1381,11 @@ fi
 - Include RHEL-5 compatible %%{buildroot} cleanup.
 - Use %%__global_ldflags.
 
-* Wed Aug  1 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-17
+* Wed Aug  1 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.91.20120801-17.fc18
 - Rebase to FSF GDB 7.4.91.20120801.
 - [dwz] Rebase it from FSF GDB HEAD.
 
-* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.4.50.20120714-16
+* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.4.50.20120714-16.fc18
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
 
 * Mon Jul 16 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120714-15.fc18
