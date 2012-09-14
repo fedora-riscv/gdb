@@ -34,7 +34,7 @@ Version: 7.5
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1253,7 +1253,7 @@ rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
 # pstack obsoletion
 
 cp -p %{SOURCE3} $RPM_BUILD_ROOT%{_mandir}/man1/gstack.1
-ln -s gstack.1%{!?el5:.gz} $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1%{!?el5:.gz}
+ln -s gstack.1 $RPM_BUILD_ROOT%{_mandir}/man1/pstack.1
 ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 
 # Packaged GDB is not a cross-target one.
@@ -1369,6 +1369,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Sep 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-20.fc18
+- [RHEL-6] Disable no longer valid workaround of man pages .gz suffix.
+
 * Sat Aug 18 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-19.fc18
 - Rebase to FSF GDB 7.5.
 - Update dlopen to support two variants of glibc (Gary Benson, BZ 669432).
