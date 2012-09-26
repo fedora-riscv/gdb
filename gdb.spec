@@ -27,20 +27,20 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20120817
+%global snap       20120926
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20120623
-Version: 7.5
+Version: 7.5.0.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
+Source: gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -565,6 +565,9 @@ Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 #=fedora
 Patch716: gdb-minidebuginfo.patch
 
+# [ppc32] Fix stepping over symbol-less code crash regression (BZ 860696).
+Patch725: gdb-step-symless.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -873,6 +876,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 %patch698 -p1
 %patch703 -p1
 %patch716 -p1
+%patch725 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1369,6 +1373,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Sep 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-21.fc18
+- [ppc32] Fix stepping over symbol-less code crash regression (BZ 860696).
+- Rebase to FSF GDB 7.5.0.20120926 (7.5 stable branch).
+  - Remove the .spec Source keyword URL as not valid now.
+
 * Fri Sep 14 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-20.fc18
 - [RHEL-6] Disable no longer valid workaround of man pages .gz suffix.
 
