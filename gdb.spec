@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20120926
+%global snap       20120817
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20120623
-Version: 7.5.0.%{snap}
+Version: 7.5.0.20120926
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1373,6 +1373,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Sep 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-22.fc18
+- Fix .spec 'bundled' Provides for the stable branch rebase.
+
 * Wed Sep 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-21.fc18
 - [ppc32] Fix stepping over symbol-less code crash regression (BZ 860696).
 - Rebase to FSF GDB 7.5.0.20120926 (7.5 stable branch).
