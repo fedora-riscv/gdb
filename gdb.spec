@@ -34,7 +34,7 @@ Version: 7.5.0.20120926
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -568,6 +568,9 @@ Patch716: gdb-minidebuginfo.patch
 # [ppc32] Fix stepping over symbol-less code crash regression (BZ 860696).
 Patch725: gdb-step-symless.patch
 
+# Fix crash printing classes (BZ 849357, Tom Tromey).
+Patch726: gdb-print-class.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -877,6 +880,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 %patch703 -p1
 %patch716 -p1
 %patch725 -p1
+%patch726 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1373,6 +1377,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Sep 27 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-23.fc18
+- Fix crash printing classes (BZ 849357, Tom Tromey).
+
 * Wed Sep 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5-22.fc18
 - Fix .spec 'bundled' Provides for the stable branch rebase.
 
