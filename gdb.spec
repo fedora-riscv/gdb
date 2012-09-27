@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 50%{?dist}
+Release: 51%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -632,6 +632,12 @@ Patch697: gdb-parameterref-2of2.patch
 # Support constant DW_AT_high_pc produced by FSF GCC HEAD (Mark Wielaard).
 Patch724: gdb-highpc-const.patch
 
+# Fix "ambiguous linespec" regression: break lineno.
+Patch727: gdb-break-lineno.patch
+
+# Permit passing pointers as address number even for C++ methods (Keith Seitz).
+Patch728: gdb-check-type.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -955,6 +961,8 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch696 -p1
 %patch697 -p1
 %patch724 -p1
+%patch727 -p1
+%patch728 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1447,6 +1455,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Sep 27 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-51.fc17
+- Fix "ambiguous linespec" regression: break lineno.
+- Permit passing pointers as address number even for C++ methods (Keith Seitz).
+
 * Wed Aug 22 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-50.fc17
 - Support constant DW_AT_high_pc produced by FSF GCC HEAD (Mark Wielaard).
 

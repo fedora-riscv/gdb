@@ -1,0 +1,78 @@
+http://sourceware.org/ml/gdb-cvs/2012-06/msg00077.html
+
+### src/gdb/ChangeLog	2012/06/11 18:44:58	1.14345
+### src/gdb/ChangeLog	2012/06/11 19:16:21	1.14346
+## -1,3 +1,10 @@
++2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix regression by the "ambiguous linespec" series.
++	* breakpoint.c (parse_breakpoint_sals): New variable cursal.  Use
++	get_last_displayed_symtab and get_last_displayed_line and depending
++	on CURSAL.
++
+ 2012-06-11  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* dwarf2read.c (dw2_get_primary_filename_reader): New function.
+--- src/gdb/breakpoint.c	2012/06/05 19:50:50	1.679
++++ src/gdb/breakpoint.c	2012/06/11 19:16:23	1.680
+@@ -8802,19 +8802,26 @@
+     }
+   else
+     {
++      struct symtab_and_line cursal = get_current_source_symtab_and_line ();
++
+       /* Force almost all breakpoints to be in terms of the
+          current_source_symtab (which is decode_line_1's default).
+          This should produce the results we want almost all of the
+-         time while leaving default_breakpoint_* alone.  */
+-      if (last_displayed_sal_is_valid ())
++         time while leaving default_breakpoint_* alone.
++
++	 ObjC: However, don't match an Objective-C method name which
++	 may have a '+' or '-' succeeded by a '['.  */
++      if (last_displayed_sal_is_valid ()
++	  && (!cursal.symtab
++	      || ((strchr ("+-", (*address)[0]) != NULL)
++		  && ((*address)[1] != '['))))
+ 	decode_line_full (address, DECODE_LINE_FUNFIRSTLINE,
+ 			  get_last_displayed_symtab (),
+ 			  get_last_displayed_line (),
+ 			  canonical, NULL, NULL);
+       else
+ 	decode_line_full (address, DECODE_LINE_FUNFIRSTLINE,
+-			  (struct symtab *) NULL, 0,
+-			  canonical, NULL, NULL);
++			  cursal.symtab, cursal.line, canonical, NULL, NULL);
+     }
+ }
+ 
+### src/gdb/testsuite/ChangeLog	2012/06/11 17:44:06	1.3220
+### src/gdb/testsuite/ChangeLog	2012/06/11 19:16:24	1.3221
+## -1,5 +1,11 @@
+ 2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
++	Fix regression by the "ambiguous linespec" series.
++	* gdb.base/break.exp (list marker1, break lineno, delete $bpnum): New
++	tests.
++
++2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
+ 	* lib/future.exp: Set $use_gdb_compile even if only find_go_linker is
+ 	missing.
+ 
+--- src/gdb/testsuite/gdb.base/break.exp	2012/04/05 18:50:28	1.55
++++ src/gdb/testsuite/gdb.base/break.exp	2012/06/11 19:16:24	1.56
+@@ -371,6 +371,13 @@
+     }
+ }
+ 
++# Test the 'list' commands sets current file for the 'break LINENO' command.
++set bp_marker1 [gdb_get_line_number "set breakpoint 16 here" ${srcfile1}]
++gdb_test "list marker1" ".*"
++gdb_test "break $bp_marker1" "Breakpoint \[0-9\]+ at 0x\[0-9a-f\]+: file .*${srcfile1}, line ${bp_marker1}\\." \
++         "break lineno"
++gdb_test_no_output {delete $bpnum}
++
+ #
+ # run until the breakpoint at a line number
+ #
