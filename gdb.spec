@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 51%{?dist}
+Release: 52%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -638,6 +638,9 @@ Patch727: gdb-break-lineno.patch
 # Permit passing pointers as address number even for C++ methods (Keith Seitz).
 Patch728: gdb-check-type.patch
 
+# entry values: Fix resolving in inlined frames.
+Patch729: gdb-entryval-inlined.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -963,6 +966,7 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c
 %patch724 -p1
 %patch727 -p1
 %patch728 -p1
+%patch729 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1455,6 +1459,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Oct  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-52.fc17
+- entry values: Fix resolving in inlined frames.
+
 * Thu Sep 27 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-51.fc17
 - Fix "ambiguous linespec" regression: break lineno.
 - Permit passing pointers as address number even for C++ methods (Keith Seitz).
