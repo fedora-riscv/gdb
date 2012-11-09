@@ -34,7 +34,7 @@ Version: 7.5.0.20120926
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -577,6 +577,31 @@ Patch728: gdb-check-type.patch
 # entry values: Fix resolving in inlined frames.
 Patch729: gdb-entryval-inlined.patch
 
+# Fix `GDB cannot access struct member whose offset is larger than 256MB'
+# (RH BZ 795424).
+Patch797: gdb-rhbz795424-bitpos-06of25.patch
+Patch798: gdb-rhbz795424-bitpos-07of25.patch
+Patch799: gdb-rhbz795424-bitpos-08of25.patch
+Patch800: gdb-rhbz795424-bitpos-09of25.patch
+Patch801: gdb-rhbz795424-bitpos-10of25.patch
+Patch802: gdb-rhbz795424-bitpos-11of25.patch
+Patch803: gdb-rhbz795424-bitpos-12of25.patch
+Patch804: gdb-rhbz795424-bitpos-13of25.patch
+Patch805: gdb-rhbz795424-bitpos-14of25.patch
+Patch806: gdb-rhbz795424-bitpos-15of25.patch
+Patch807: gdb-rhbz795424-bitpos-16of25.patch
+Patch808: gdb-rhbz795424-bitpos-17of25.patch
+Patch809: gdb-rhbz795424-bitpos-18of25.patch
+Patch810: gdb-rhbz795424-bitpos-19of25.patch
+Patch811: gdb-rhbz795424-bitpos-20of25.patch
+Patch812: gdb-rhbz795424-bitpos-21of25.patch
+Patch813: gdb-rhbz795424-bitpos-22of25.patch
+Patch814: gdb-rhbz795424-bitpos-23of25.patch
+Patch815: gdb-rhbz795424-bitpos-24of25.patch
+Patch816: gdb-rhbz795424-bitpos-25of25.patch
+Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
+Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -889,6 +914,28 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 %patch726 -p1
 %patch728 -p1
 %patch729 -p1
+%patch797 -p1
+%patch798 -p1
+%patch799 -p1
+%patch800 -p1
+%patch801 -p1
+%patch802 -p1
+%patch803 -p1
+%patch804 -p1
+%patch805 -p1
+%patch806 -p1
+%patch807 -p1
+%patch808 -p1
+%patch809 -p1
+%patch810 -p1
+%patch811 -p1
+%patch812 -p1
+%patch813 -p1
+%patch814 -p1
+%patch815 -p1
+%patch816 -p1
+%patch817 -p1
+%patch818 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1385,6 +1432,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Nov  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.0.20120926-26.fc18
+- Fix `GDB cannot access struct member whose offset is larger than 256MB'
+  (RH BZ 871066).
+
 * Fri Oct  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.0.20120926-25.fc18
 - entry values: Fix resolving in inlined frames.
 
