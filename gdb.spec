@@ -30,11 +30,11 @@ Name: %{?scl_prefix}gdb
 %global snap       20120817
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20120623
-Version: 7.5.0.20120926
+Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -565,9 +565,6 @@ Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 #=fedora
 Patch716: gdb-minidebuginfo.patch
 
-# [ppc32] Fix stepping over symbol-less code crash regression (BZ 860696).
-Patch725: gdb-step-symless.patch
-
 # Fix crash printing classes (BZ 849357, Tom Tromey).
 Patch726: gdb-print-class.patch
 
@@ -910,7 +907,6 @@ rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 %patch698 -p1
 %patch703 -p1
 %patch716 -p1
-%patch725 -p1
 %patch726 -p1
 %patch728 -p1
 %patch729 -p1
@@ -1432,6 +1428,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Nov 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-27.fc18
+- Rebase to FSF GDB 7.5.1 (7.5 stable branch).
+
 * Fri Nov  9 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.0.20120926-26.fc18
 - Fix `GDB cannot access struct member whose offset is larger than 256MB'
   (RH BZ 871066).
