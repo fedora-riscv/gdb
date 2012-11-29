@@ -34,13 +34,13 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-%{version}.tar.bz2
+Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -1432,6 +1432,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Nov 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-29.fc18
+- Provide Source URL when it is a release.
+
 * Thu Nov 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-28.fc18
 - Fix (unsplit) split info doc.
 
