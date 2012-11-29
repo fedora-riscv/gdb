@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -788,6 +788,10 @@ tar xjf %{SOURCE5}
 rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
 rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
 
+# *.info* is needlessly split in the distro tar; also it would not get used as
+# we build in %{gdb_build}, just to be sure.
+find -name "*.info*"|xargs rm -f
+
 # Apply patches defined above.
 
 # Match the Fedora's version info.
@@ -1137,7 +1141,7 @@ $(: fmtutil: format directory '/builddir/.texmf-var/web2c' does not exist. ) \
 %else
      %{?_smp_mflags} \
 %endif
-     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split
+     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1428,6 +1432,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Nov 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-28.fc18
+- Fix (unsplit) split info doc.
+
 * Thu Nov 29 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-27.fc18
 - Rebase to FSF GDB 7.5.1 (7.5 stable branch).
 
