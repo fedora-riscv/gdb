@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -599,6 +599,9 @@ Patch816: gdb-rhbz795424-bitpos-25of25.patch
 Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 
+# Fix DW_OP_GNU_implicit_pointer offset bug (Tom Tromey).
+Patch819: gdb-implicitpointer-offset.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -936,6 +939,7 @@ find -name "*.info*"|xargs rm -f
 %patch816 -p1
 %patch817 -p1
 %patch818 -p1
+%patch819 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1434,6 +1438,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Dec  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-31.fc18
+- Fix DW_OP_GNU_implicit_pointer offset bug (Tom Tromey).
+
 * Sun Dec  2 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-30.fc18
 - Temporarily disable PDF in gdb-doc before texinfo RH BZ 876710 gets fixed.
 
