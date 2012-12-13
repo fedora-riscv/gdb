@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -261,7 +261,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -800,8 +800,8 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
 %patch349 -p1
+%patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1438,6 +1438,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Dec 13 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-32.fc18
+- 'dwz -m' parsing fix (Tom Tromey).
+
 * Mon Dec  3 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-31.fc18
 - Fix DW_OP_GNU_implicit_pointer offset bug (Tom Tromey).
 
