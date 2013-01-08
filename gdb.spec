@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -521,6 +521,7 @@ Patch721: gdb-dlopen-stap-probe-6of7.patch
 Patch722: gdb-dlopen-stap-probe-7of7.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 Patch723: gdb-dlopen-stap-probe-test2.patch
+Patch822: gdb-dlopen-stap-probe-mapfailed.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -907,6 +908,7 @@ find -name "*.info*"|xargs rm -f
 %patch721 -p1
 %patch722 -p1
 %patch723 -p1
+%patch822 -p1
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
@@ -1444,6 +1446,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Jan  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-34.fc18
+- Update dlopen to support map_failed probe of glibc (Gary Benson, BZ 886516).
+
 * Thu Jan  3 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-33.fc18
 - [ppc*] Fix PowerPC disassembly regression (Alan Modra, Edjunior Machado).
 
