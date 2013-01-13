@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1446,6 +1446,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jan 13 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-35.fc18
+- [testsuite] Fix gdb-orphanripper.c lockup on F-17 (/dev/pts/* glibc chown).
+
 * Tue Jan  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-34.fc18
 - Update dlopen to support map_failed probe of glibc (Gary Benson, BZ 886516).
 

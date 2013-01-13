@@ -48,10 +48,12 @@
 static const char *progname;
 
 static volatile int signal_chld_hit = 0;
+static volatile pid_t child;
 
 static void signal_chld (int signo)
 {
-  signal_chld_hit = 1;
+  if (child && kill (child, 0) != 0)
+    signal_chld_hit = 1;
 }
 
 static volatile int signal_alrm_hit = 0;
@@ -62,7 +64,6 @@ static void signal_alrm (int signo)
 }
 
 static char childptyname[LINE_MAX];
-static pid_t child;
 
 static void print_child_error (const char *reason, char **argv)
 {
@@ -203,8 +204,13 @@ static int spawn (char **argv, int timeout)
       pollfd.fd = amaster;
       pollfd.events = POLLIN;
       i = ppoll (&pollfd, 1, NULL, &set);
-      if (i == -1 && errno == EINTR && signal_chld_hit)
-	break;
+      if (i == -1 && errno == EINTR)
+	{
+	  if (signal_chld_hit)
+	    break;
+	  /* Non-CHILD child may have exited.  */
+	  continue;
+	}
       assert (i == 1);
       /* Data available?  Process it first.  */
       if (pollfd.revents & POLLIN)
