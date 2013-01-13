@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 53%{?dist}
+Release: 54%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1459,6 +1459,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jan 13 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-54.fc17
+- Fix internal error on finish with inlined frame (BZ 894678).
+
 * Sun Jan 13 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-53.fc17
 - [testsuite] Fix gdb-orphanripper.c lockup on F-17 (/dev/pts/* glibc chown).
 
