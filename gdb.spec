@@ -35,7 +35,7 @@ Version: 7.4.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 52%{?dist}
+Release: 53%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1459,6 +1459,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jan 13 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-53.fc17
+- [testsuite] Fix gdb-orphanripper.c lockup on F-17 (/dev/pts/* glibc chown).
+
 * Fri Oct  5 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-52.fc17
 - entry values: Fix resolving in inlined frames.
 
