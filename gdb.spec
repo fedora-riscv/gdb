@@ -30,11 +30,11 @@ Name: %{?scl_prefix}gdb
 %global snap       20120817
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20120623
-Version: 7.5.1
+Version: 7.5.50.20130118
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -261,7 +261,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -374,10 +374,6 @@ Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
 #=push+work: This fix is incorrect.
 Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 
-# Make the GDB quit processing non-abortable to cleanup everything properly.
-#=push: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
-Patch331: gdb-6.8-quit-never-aborts.patch
-
 # [RHEL5] Workaround kernel for detaching SIGSTOPped processes (BZ 809382).
 #=fedora
 Patch335: gdb-rhel5-compat.patch
@@ -433,12 +429,6 @@ Patch397: gdb-follow-child-stale-parent.patch
 #=fedoratest: ccache is rarely used and it is even fixed now.
 Patch403: gdb-ccache-workaround.patch
 
-# Implement `info common' for Fortran.
-#=push
-Patch404: gdb-fortran-common-reduce.patch
-#=push
-Patch405: gdb-fortran-common.patch
-
 # Testcase for "Do not make up line information" fix by Daniel Jacobowitz.
 #=fedoratest
 Patch407: gdb-lineno-makeup-test.patch
@@ -476,10 +466,6 @@ Patch491: gdb-gdb-add-index-script.patch
 #=drop+work: Inferior objects should be read in parts, then this patch gets obsoleted.
 Patch496: gdb-bz568248-oom-is-error.patch
 
-# Fix gcore writer for -Wl,-z,relro (PR corefiles/11804).
-#=push: There is different patch on gdb-patches, waiting now for resolution in kernel.
-Patch504: gdb-bz623749-gcore-relro.patch
-
 # Verify GDB Python built-in function gdb.solib_address exists (BZ # 634108).
 #=fedoratest
 Patch526: gdb-bz634108-solib_address.patch
@@ -512,8 +498,6 @@ Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
 #=push
-Patch618: gdb-dlopen-stap-probe-1of7.patch
-Patch717: gdb-dlopen-stap-probe-2of7.patch
 Patch718: gdb-dlopen-stap-probe-3of7.patch
 Patch719: gdb-dlopen-stap-probe-4of7.patch
 Patch720: gdb-dlopen-stap-probe-5of7.patch
@@ -550,7 +534,7 @@ Patch657: gdb-attach-fail-reasons-5of5configure.patch
 Patch661: gdb-stale-frame_info.patch
 
 # Workaround PR libc/14166 for inferior calls of strstr.
-#=push+work: But push it to glibc.
+#=fedora: Compatibility with RHELs (unchecked which ones).
 Patch690: gdb-glibc-strstr-workaround.patch
 
 # Include testcase for `Unable to see a variable inside a module (XLF)' (BZ 823789).
@@ -562,50 +546,18 @@ Patch698: gdb-rhel5.9-testcase-xlf-var-inside-mod.patch
 #=fedoratest
 Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 
-# Implement MiniDebugInfo F-18 Feature consumer (Alexander Larsson, BZ 834068).
-#=fedora
-Patch716: gdb-minidebuginfo.patch
-
-# Fix crash printing classes (BZ 849357, Tom Tromey).
-Patch726: gdb-print-class.patch
-
-# Permit passing pointers as address number even for C++ methods (Keith Seitz).
-Patch728: gdb-check-type.patch
-
-# entry values: Fix resolving in inlined frames.
-Patch729: gdb-entryval-inlined.patch
-
 # Fix `GDB cannot access struct member whose offset is larger than 256MB'
 # (RH BZ 795424).
-Patch797: gdb-rhbz795424-bitpos-06of25.patch
-Patch798: gdb-rhbz795424-bitpos-07of25.patch
-Patch799: gdb-rhbz795424-bitpos-08of25.patch
-Patch800: gdb-rhbz795424-bitpos-09of25.patch
-Patch801: gdb-rhbz795424-bitpos-10of25.patch
-Patch802: gdb-rhbz795424-bitpos-11of25.patch
-Patch803: gdb-rhbz795424-bitpos-12of25.patch
-Patch804: gdb-rhbz795424-bitpos-13of25.patch
-Patch805: gdb-rhbz795424-bitpos-14of25.patch
-Patch806: gdb-rhbz795424-bitpos-15of25.patch
-Patch807: gdb-rhbz795424-bitpos-16of25.patch
-Patch808: gdb-rhbz795424-bitpos-17of25.patch
-Patch809: gdb-rhbz795424-bitpos-18of25.patch
-Patch810: gdb-rhbz795424-bitpos-19of25.patch
 Patch811: gdb-rhbz795424-bitpos-20of25.patch
 Patch812: gdb-rhbz795424-bitpos-21of25.patch
 Patch813: gdb-rhbz795424-bitpos-22of25.patch
 Patch814: gdb-rhbz795424-bitpos-23of25.patch
-Patch815: gdb-rhbz795424-bitpos-24of25.patch
 Patch816: gdb-rhbz795424-bitpos-25of25.patch
 Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 
-# Fix DW_OP_GNU_implicit_pointer offset bug (Tom Tromey).
-Patch819: gdb-implicitpointer-offset.patch
-
-# [ppc*] Fix PowerPC disassembly regression (Alan Modra, Edjunior Machado).
-Patch820: gdb-rhbz890900-ppc-dis-1of2.patch
-Patch821: gdb-rhbz890900-ppc-dis-2of2.patch
+# Fix gdb.fortran/common-block.exp in PIE mode.
+Patch823: gdb-commonblock-pie.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -806,7 +758,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-%patch232 -p1
+#patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -869,7 +821,6 @@ find -name "*.info*"|xargs rm -f
 %patch320 -p1
 %patch329 -p1
 %patch330 -p1
-%patch331 -p1
 %patch343 -p1
 %patch348 -p1
 %patch360 -p1
@@ -879,8 +830,6 @@ find -name "*.info*"|xargs rm -f
 %patch392 -p1
 %patch397 -p1
 %patch403 -p1
-%patch404 -p1
-%patch405 -p1
 %patch389 -p1
 %patch394 -p1
 %patch407 -p1
@@ -894,14 +843,11 @@ find -name "*.info*"|xargs rm -f
 %patch490 -p1
 %patch491 -p1
 %patch496 -p1
-%patch504 -p1
 %patch526 -p1
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
 %patch579 -p1
-%patch618 -p1
-%patch717 -p1
 %patch718 -p1
 %patch719 -p1
 %patch720 -p1
@@ -919,35 +865,14 @@ find -name "*.info*"|xargs rm -f
 %patch690 -p1
 %patch698 -p1
 %patch703 -p1
-%patch716 -p1
-%patch726 -p1
-%patch728 -p1
-%patch729 -p1
-%patch797 -p1
-%patch798 -p1
-%patch799 -p1
-%patch800 -p1
-%patch801 -p1
-%patch802 -p1
-%patch803 -p1
-%patch804 -p1
-%patch805 -p1
-%patch806 -p1
-%patch807 -p1
-%patch808 -p1
-%patch809 -p1
-%patch810 -p1
 %patch811 -p1
 %patch812 -p1
 %patch813 -p1
 %patch814 -p1
-%patch815 -p1
 %patch816 -p1
 %patch817 -p1
 %patch818 -p1
-%patch819 -p1
-%patch820 -p1
-%patch821 -p1
+%patch823 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1446,6 +1371,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Jan 19 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-1.fc19
+- Rebase to FSF GDB 7.5.50.20130118 (pre-7.6 snapshot).
+
 * Sun Jan 13 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-35.fc18
 - [testsuite] Fix gdb-orphanripper.c lockup on F-17 (/dev/pts/* glibc chown).
 
@@ -3014,7 +2942,7 @@ fi
 * Sun Oct 14 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-36
 - Fix hardware watchpoints after inferior forks-off some process.
 
-* Fri Oct 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-35
+* Sat Oct 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-35
 - Fix non-threaded watchpoints CTRL-C regression on `set follow child'.
 
 * Fri Oct 12 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.6-34
@@ -3161,7 +3089,7 @@ fi
 * Mon Jan 15 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-27
 - Fix the testsuite results broken in 6.5-26, stop invalid testsuite runs.
 
-* Fri Jan 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-26
+* Sat Jan 13 2007 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-26
 - Fix unwinding of non-debug (.eh_frame) PPC code, Andreas Schwab (BZ 140532).
 - Fix unwinding of debug (.debug_frame) PPC code, workaround GCC (BZ 140532).
 - Fix missing testsuite .log output of testcases using get_compiler_info().
@@ -3195,16 +3123,16 @@ fi
 * Sat Nov 25 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-18
 - Fix readline history for input mode commands like `command' (BZ 215816).
 
-* Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-17
+* Thu Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-17
 - Bugfix testcase typo of gdb-6.5-16.
 
-* Wed Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-16
+* Thu Nov 16 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-16
 - Provide testcase for accessing the last address space byte.
 
-* Wed Nov  9 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-15
+* Thu Nov  9 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-15
 - Fix readline segfault on excessively long hand-typed lines.
 
-* Sat Nov  2 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-14
+* Thu Nov  2 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-14
 - Fix "??" resolving of symbols from (non-prelinked) debuginfo packages.
 - Fix "??" resolving of symbols from overlapping functions (nanosleep(3)).
 - Also disable testcase "checkpoint.exp" for a possible kernel Bug 207002.
@@ -3227,7 +3155,7 @@ fi
 - Support IPv6 for gdbserver (BZ 198365).
 - Temporarily disable testcase "chng-syms.exp" for a possible kernel Bug 207002.
 
-* Wed Sep 21 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-9
+* Thu Sep 21 2006 Jan Kratochvil <jan.kratochvil@redhat.com> - 6.5-9
 - Fix crash on C++ symbol failing to be demangled (BZ 206813).
 - Fix attach to stopped process, supersede `gdb-6.3-attach-stop-20051011.patch'.
 - Fix TLS symbols resolving for objects with separate .debug file (-debuginfo).
@@ -3762,11 +3690,11 @@ Bugzilla 135633
 - For 64-bit PPC, convert _dl_debug_state descriptor into a code address.
 - Fix --ignore option.
 
-* Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com> - 1.200400607.40
+* Sun Oct 10 2004 Andrew Cagney <cagney@redhat.com> - 1.200400607.40
 - Disable attach-pie.exp test, hangs on amd64 without auxv.
 - Move pie tests to pie.
 
-* Mon Oct 10 2004 Andrew Cagney <cagney@redhat.com> - 1.200400607.39
+* Sun Oct 10 2004 Andrew Cagney <cagney@redhat.com> - 1.200400607.39
 - Fix comment bug in sigstep.exp.
 
 * Thu Oct 07 2004 Jeff Johnston <jjohnstn@redhat.com> - 1.200400607.38
@@ -3939,17 +3867,17 @@ Bugzilla 135633
 * Tue Mar 30 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.13
 - Fix testsuite glitches.
 
-* Thu Mar 24 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.12
+* Wed Mar 24 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.12
 - Fix typo.
 
-* Thu Mar 24 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.11
+* Wed Mar 24 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.11
 - Make gdb compile w/o warnings with gcc-3.4.
 - Reenable PIE support code.
 
-* Wed Mar 23 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.10
+* Tue Mar 23 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.10
 - Bump version number
 
-* Wed Mar 23 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.9
+* Tue Mar 23 2004 Elena Zannoni <ezannoni@redhat.com> - 0.20040223.9
 - temporarily disable PIE support.
 - Add section to obsolete gdb64 package.
 
@@ -4138,7 +4066,7 @@ to pointers when the address is in the ".opd" section.
 * Wed Aug 06 2003 Andrew Cagney <cagney@redhat.com> - 0.20030710.10
 - Sync to gdb-5.3.90-sync-20030806.patch.
 
-* Wed Jul 29 2003 Andrew Cagney <cagney@redhat.com> - 0.20030710.9
+* Tue Jul 29 2003 Andrew Cagney <cagney@redhat.com> - 0.20030710.9
 - add x86-64 i386 fixes
 
 * Tue Jul 29 2003 Elena Zannoni <ezannoni@redhat.com> - 0.20030710.8
@@ -4525,7 +4453,7 @@ General revamp.
 * Fri Mar 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - build with old headers, new compiler
 
-* Wed Mar 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
+* Fri Mar 16 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
 * Mon Feb 26 2001 Trond Eivind Glomsrod <teg@redhat.com>
@@ -4548,7 +4476,7 @@ General revamp.
 * Fri Jan 19 2001 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
-* Thu Dec 20 2000 Trond Eivind Glomsrod <teg@redhat.com>
+* Wed Dec 20 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - new snapshot
 
 * Mon Dec 04 2000 Trond Eivind Glomsrod <teg@redhat.com>
@@ -4568,7 +4496,7 @@ General revamp.
 * Wed Aug 09 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - added patch from GDB team for C++ symbol handling
 
-* Mon Jul 25 2000 Trond Eivind Glomsrod <teg@redhat.com>
+* Tue Jul 25 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - upgrade to CVS snapshot
 - excludearch SPARC, build on IA61
 
@@ -4581,7 +4509,7 @@ General revamp.
 * Sun Jul 02 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - rebuild
 
-* Fri Jun 08 2000 Trond Eivind Glomsrod <teg@redhat.com>
+* Thu Jun 08 2000 Trond Eivind Glomsrod <teg@redhat.com>
 - use %%configure, %%makeinstall, %%{_infodir}, %%{_mandir},
   and %%{_tmppath}
 - the install scripts  for info are broken(they don't care about
@@ -4620,7 +4548,7 @@ sigtramp, sparc, xref, and threads patches.  Update sparcmin patch.
 * Mon Aug 23 1999 Jim Kingdon
 - Omit readline manpage.
 
-* Tue Aug 7 1999 Jim Kingdon
+* Sat Aug  7 1999 Jim Kingdon
 - Remove H.J. Lu's patches (they had been commented out).
 - Add sigtramp patch (from gdb.cygnus.com) and threads patch (adapted
 from code fusion CD-ROM).
