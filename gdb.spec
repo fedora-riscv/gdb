@@ -34,7 +34,7 @@ Version: 7.5.50.20130118
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -374,6 +374,10 @@ Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
 #=push+work: This fix is incorrect.
 Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
 
+# Make the GDB quit processing non-abortable to cleanup everything properly.
+#=fedora: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
+Patch331: gdb-6.8-quit-never-aborts.patch
+
 # [RHEL5] Workaround kernel for detaching SIGSTOPped processes (BZ 809382).
 #=fedora
 Patch335: gdb-rhel5-compat.patch
@@ -548,6 +552,7 @@ Patch703: gdb-rhbz-818343-set-solib-absolute-prefix-testcase.patch
 
 # Fix `GDB cannot access struct member whose offset is larger than 256MB'
 # (RH BZ 795424).
+#=push+work
 Patch811: gdb-rhbz795424-bitpos-20of25.patch
 Patch812: gdb-rhbz795424-bitpos-21of25.patch
 Patch813: gdb-rhbz795424-bitpos-22of25.patch
@@ -557,6 +562,7 @@ Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 
 # Fix gdb.fortran/common-block.exp in PIE mode.
+#=push
 Patch823: gdb-commonblock-pie.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
@@ -883,9 +889,11 @@ find -name "*.info*"|xargs rm -f
 %patch642 -p1 -R
 %endif
 %patch337 -p1
+%patch331 -p1
 %patch335 -p1
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 %patch335 -p1 -R
+%patch331 -p1 -R
 %patch337 -p1 -R
 %endif
 
@@ -1371,6 +1379,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Jan 21 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-2.fc19
+- [RHEL] Reintroduce gdb-6.8-quit-never-aborts.patch.
+
 * Sat Jan 19 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-1.fc19
 - Rebase to FSF GDB 7.5.50.20130118 (pre-7.6 snapshot).
 
