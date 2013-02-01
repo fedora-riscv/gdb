@@ -34,7 +34,7 @@ Version: 7.5.50.20130118
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -565,6 +565,10 @@ Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 #=push
 Patch823: gdb-commonblock-pie.patch
 
+#=push
+# Fix assert crashes with minidebuginfo (BZ 903522).
+Patch824: gdb-minidebuginfo-crash.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -879,6 +883,7 @@ find -name "*.info*"|xargs rm -f
 %patch817 -p1
 %patch818 -p1
 %patch823 -p1
+%patch824 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1379,6 +1384,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Feb  1 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-4.fc19
+- Fix assert crashes with minidebuginfo (BZ 903522).
+
 * Fri Jan 25 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-3.fc19
 - Release bump only.
 
