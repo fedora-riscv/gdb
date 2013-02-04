@@ -34,7 +34,7 @@ Version: 7.5.50.20130118
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1384,6 +1384,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Feb  4 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-5.fc19
+- Release bump only.
+
 * Fri Feb  1 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-4.fc19
 - Fix assert crashes with minidebuginfo (BZ 903522).
 
