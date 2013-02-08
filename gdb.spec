@@ -1091,8 +1091,7 @@ $(: fmtutil: format directory '/builddir/.texmf-var/web2c' does not exist. ) \
 %else
      %{?_smp_mflags} \
 %endif
-     -C gdb/doc {gdb,annotate}{.info,/index.html} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
-     # -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
+     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1222,6 +1221,7 @@ for pyo in "" "-O";do
 done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
+mkdir $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
 # Temporarily now:
@@ -1353,8 +1353,7 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %files doc
-%doc %{gdb_build}/gdb/doc/{gdb,annotate}.html
-#doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
+%doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
 %defattr(-,root,root)
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
@@ -1384,6 +1383,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Feb  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-6.fc19
+- Re-enable PDF in gdb-doc after texinfo RH BZ 876710 has been fixed.
+
 * Mon Feb  4 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-5.fc19
 - Release bump only.
 
