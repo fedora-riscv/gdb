@@ -81,24 +81,24 @@ gdb/testsuite
 	* gdb.base/break-dlmopen.c: Likewise.
 	* gdb.base/break-dlmopen-solib.c: Likewise.
 
-Index: gdb-7.5.50.20130118/gdb/breakpoint.h
+Index: gdb-7.5.50.20130215/gdb/breakpoint.h
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/breakpoint.h	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/breakpoint.h	2013-01-18 23:57:50.511792890 +0100
-@@ -1548,8 +1548,6 @@ extern int user_breakpoint_p (struct bre
+--- gdb-7.5.50.20130215.orig/gdb/breakpoint.h	2013-02-15 22:37:19.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/breakpoint.h	2013-02-15 22:37:47.185432296 +0100
+@@ -1552,8 +1552,6 @@ extern int user_breakpoint_p (struct bre
  /* Attempt to determine architecture of location identified by SAL.  */
  extern struct gdbarch *get_sal_arch (struct symtab_and_line sal);
  
 -extern void handle_solib_event (void);
 -
- extern void breakpoints_relocate (struct objfile *objfile,
- 				  struct section_offsets *delta);
+ extern void breakpoint_free_objfile (struct objfile *objfile);
  
-Index: gdb-7.5.50.20130118/gdb/breakpoint.c
+ extern void breakpoints_relocate (struct objfile *objfile,
+Index: gdb-7.5.50.20130215/gdb/breakpoint.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/breakpoint.c	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/breakpoint.c	2013-01-18 23:57:50.514792879 +0100
-@@ -5254,7 +5254,7 @@ bpstat_stop_status (struct address_space
+--- gdb-7.5.50.20130215.orig/gdb/breakpoint.c	2013-02-15 22:37:30.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/breakpoint.c	2013-02-15 22:37:35.755417584 +0100
+@@ -5250,7 +5250,7 @@ bpstat_stop_status (struct address_space
      {
        if (bs->breakpoint_at && bs->breakpoint_at->type == bp_shlib_event)
  	{
@@ -107,7 +107,7 @@ Index: gdb-7.5.50.20130118/gdb/breakpoint.c
  	  break;
  	}
      }
-@@ -5350,25 +5350,6 @@ handle_jit_event (void)
+@@ -5346,25 +5346,6 @@ handle_jit_event (void)
    target_terminal_inferior ();
  }
  
@@ -133,10 +133,10 @@ Index: gdb-7.5.50.20130118/gdb/breakpoint.c
  /* Prepare WHAT final decision for infrun.  */
  
  /* Decide what infrun needs to do with this bpstat.  */
-Index: gdb-7.5.50.20130118/gdb/solib.h
+Index: gdb-7.5.50.20130215/gdb/solib.h
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solib.h	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/solib.h	2013-01-18 23:57:50.515792875 +0100
+--- gdb-7.5.50.20130215.orig/gdb/solib.h	2013-01-01 07:32:51.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/solib.h	2013-02-15 22:37:35.757417588 +0100
 @@ -20,6 +20,9 @@
  #ifndef SOLIB_H
  #define SOLIB_H
@@ -163,10 +163,10 @@ Index: gdb-7.5.50.20130118/gdb/solib.h
 +extern void update_solib_breakpoints (void);
 +
  #endif /* SOLIB_H */
-Index: gdb-7.5.50.20130118/gdb/solib.c
+Index: gdb-7.5.50.20130215/gdb/solib.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solib.c	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/solib.c	2013-01-18 23:58:09.144716601 +0100
+--- gdb-7.5.50.20130215.orig/gdb/solib.c	2013-02-15 22:37:04.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/solib.c	2013-02-15 22:37:35.757417588 +0100
 @@ -1221,6 +1221,42 @@ no_shared_libraries (char *ignored, int
    objfile_purge_solibs ();
  }
@@ -210,10 +210,10 @@ Index: gdb-7.5.50.20130118/gdb/solib.c
  /* Reload shared libraries, but avoid reloading the same symbol file
     we already have loaded.  */
  
-Index: gdb-7.5.50.20130118/gdb/solist.h
+Index: gdb-7.5.50.20130215/gdb/solist.h
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solist.h	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/solist.h	2013-01-18 23:57:50.515792875 +0100
+--- gdb-7.5.50.20130215.orig/gdb/solist.h	2013-01-01 07:32:51.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/solist.h	2013-02-15 22:37:35.758417590 +0100
 @@ -22,6 +22,8 @@
  #define SO_NAME_MAX_PATH_SIZE 512	/* FIXME: Should be dynamic */
  /* For domain_enum domain.  */
@@ -244,10 +244,10 @@ Index: gdb-7.5.50.20130118/gdb/solist.h
    };
  
  /* Free the memory associated with a (so_list *).  */
-Index: gdb-7.5.50.20130118/gdb/infrun.c
+Index: gdb-7.5.50.20130215/gdb/infrun.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/infrun.c	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/infrun.c	2013-01-18 23:57:50.517792865 +0100
+--- gdb-7.5.50.20130215.orig/gdb/infrun.c	2013-02-15 22:37:04.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/infrun.c	2013-02-15 22:37:35.760417594 +0100
 @@ -369,6 +369,16 @@ static struct symbol *step_start_functio
  /* Nonzero if we want to give control to the user when we're notified
     of shared library events by the dynamic linker.  */
@@ -265,7 +265,7 @@ Index: gdb-7.5.50.20130118/gdb/infrun.c
  static void
  show_stop_on_solib_events (struct ui_file *file, int from_tty,
  			   struct cmd_list_element *c, const char *value)
-@@ -3347,7 +3357,7 @@ handle_inferior_event (struct execution_
+@@ -3346,7 +3356,7 @@ handle_inferior_event (struct execution_
  	    context_switch (ecs->ptid);
  	  regcache = get_thread_regcache (ecs->ptid);
  
@@ -274,7 +274,7 @@ Index: gdb-7.5.50.20130118/gdb/infrun.c
  
  	  ecs->event_thread->control.stop_bpstat
  	    = bpstat_stop_status (get_regcache_aspace (regcache),
-@@ -7327,7 +7337,7 @@ Show stopping for shared library events.
+@@ -7334,7 +7344,7 @@ Show stopping for shared library events.
  If nonzero, gdb will give control to the user when the dynamic linker\n\
  notifies gdb of shared library events.  The most common event of interest\n\
  to the user would be loading/unloading of a new library."),
@@ -283,10 +283,10 @@ Index: gdb-7.5.50.20130118/gdb/infrun.c
  			    show_stop_on_solib_events,
  			    &setlist, &showlist);
  
-Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
+Index: gdb-7.5.50.20130215/gdb/solib-svr4.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solib-svr4.c	2013-01-18 23:57:45.430815943 +0100
-+++ gdb-7.5.50.20130118/gdb/solib-svr4.c	2013-01-18 23:57:50.519792858 +0100
+--- gdb-7.5.50.20130215.orig/gdb/solib-svr4.c	2013-02-15 22:37:30.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/solib-svr4.c	2013-02-15 22:37:35.761417596 +0100
 @@ -46,10 +46,12 @@
  #include "auxv.h"
  #include "exceptions.h"
@@ -540,7 +540,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  /* Find r_brk from the inferior's debug base.  */
  
  static CORE_ADDR
-@@ -1163,15 +1290,17 @@ svr4_default_sos (void)
+@@ -1161,15 +1288,17 @@ svr4_default_sos (void)
    return new;
  }
  
@@ -565,7 +565,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  
    for (; lm != 0; prev_lm = lm, lm = next_lm)
      {
-@@ -1188,7 +1317,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1185,7 +1314,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
        if (new->lm_info == NULL)
  	{
  	  do_cleanups (old_chain);
@@ -574,7 +574,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	}
  
        next_lm = new->lm_info->l_next;
-@@ -1199,7 +1328,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1196,7 +1325,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
  		   paddress (target_gdbarch (), prev_lm),
  		   paddress (target_gdbarch (), new->lm_info->l_prev));
  	  do_cleanups (old_chain);
@@ -583,7 +583,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	}
  
        /* For SVR4 versions, the first entry in the link map is for the
-@@ -1294,20 +1423,61 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1291,20 +1420,61 @@ svr4_read_so_list (CORE_ADDR lm, struct
        **link_ptr_ptr = new;
        *link_ptr_ptr = &new->next;
      }
@@ -648,7 +648,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  
    /* Fall back to manual examination of the target if the packet is not
       supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
-@@ -1330,6 +1500,10 @@ svr4_current_sos (void)
+@@ -1327,6 +1497,10 @@ svr4_current_sos (void)
  
    info = get_svr4_info ();
  
@@ -659,7 +659,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
    /* Always locate the debug struct, in case it has moved.  */
    info->debug_base = 0;
    locate_base (info);
-@@ -1339,35 +1513,12 @@ svr4_current_sos (void)
+@@ -1336,35 +1510,12 @@ svr4_current_sos (void)
    if (! info->debug_base)
      return svr4_default_sos ();
  
@@ -698,7 +698,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  }
  
  /* Get the address of the link_map for a given OBJFILE.  */
-@@ -1452,6 +1603,498 @@ exec_entry_point (struct bfd *abfd, stru
+@@ -1449,6 +1600,498 @@ exec_entry_point (struct bfd *abfd, stru
    return gdbarch_addr_bits_remove (target_gdbarch (), addr);
  }
  
@@ -1197,7 +1197,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  /* Helper function for gdb_bfd_lookup_symbol.  */
  
  static int
-@@ -1504,6 +2147,9 @@ enable_break (struct svr4_info *info, in
+@@ -1501,6 +2144,9 @@ enable_break (struct svr4_info *info, in
    info->interp_text_sect_low = info->interp_text_sect_high = 0;
    info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
  
@@ -1207,7 +1207,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
    /* If we already have a shared library list in the target, and
       r_debug contains r_brk, set the breakpoint there - this should
       mean r_brk has already been relocated.  Assume the dynamic linker
-@@ -1535,7 +2181,7 @@ enable_break (struct svr4_info *info, in
+@@ -1532,7 +2178,7 @@ enable_break (struct svr4_info *info, in
  	 That knowledge is encoded in the address, if it's Thumb the low bit
  	 is 1.  However, we've stripped that info above and it's not clear
  	 what all the consequences are of passing a non-addr_bits_remove'd
@@ -1216,7 +1216,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	 find_pc_section verifies we know about the address and have some
  	 hope of computing the right kind of breakpoint to use (via
  	 symbol info).  It does mean that GDB needs to be pointed at a
-@@ -1573,7 +2219,7 @@ enable_break (struct svr4_info *info, in
+@@ -1570,7 +2216,7 @@ enable_break (struct svr4_info *info, in
  		+ bfd_section_size (tmp_bfd, interp_sect);
  	    }
  
@@ -1225,7 +1225,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	  return 1;
  	}
      }
-@@ -1731,7 +2377,8 @@ enable_break (struct svr4_info *info, in
+@@ -1728,7 +2374,8 @@ enable_break (struct svr4_info *info, in
  
        if (sym_addr != 0)
  	{
@@ -1235,7 +1235,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	  xfree (interp_name);
  	  return 1;
  	}
-@@ -1757,7 +2404,7 @@ enable_break (struct svr4_info *info, in
+@@ -1754,7 +2401,7 @@ enable_break (struct svr4_info *info, in
  	  sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch (),
  							 sym_addr,
  							 &current_target);
@@ -1244,7 +1244,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	  return 1;
  	}
      }
-@@ -1773,7 +2420,7 @@ enable_break (struct svr4_info *info, in
+@@ -1770,7 +2417,7 @@ enable_break (struct svr4_info *info, in
  	      sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch (),
  							     sym_addr,
  							     &current_target);
@@ -1253,7 +1253,7 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	      return 1;
  	    }
  	}
-@@ -2269,6 +2916,9 @@ svr4_solib_create_inferior_hook (int fro
+@@ -2266,6 +2913,9 @@ svr4_solib_create_inferior_hook (int fro
  
    info = get_svr4_info ();
  
@@ -1263,17 +1263,17 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
    /* Relocate the main executable if necessary.  */
    svr4_relocate_main_executable ();
  
-@@ -2510,4 +3160,6 @@ _initialize_svr4_solib (void)
+@@ -2507,4 +3157,6 @@ _initialize_svr4_solib (void)
    svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
    svr4_so_ops.same = svr4_same;
    svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
 +  svr4_so_ops.handle_solib_event = svr4_handle_solib_event;
 +  svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
  }
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen-solib.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen-solib.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen-solib.c	2013-01-18 23:57:50.519792858 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen-solib.c	2013-02-15 22:37:35.761417596 +0100
 @@ -0,0 +1,24 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1299,10 +1299,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen-solib.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.c	2013-01-18 23:57:50.519792858 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen.c	2013-02-15 22:37:35.762417598 +0100
 @@ -0,0 +1,58 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1362,10 +1362,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.exp
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.exp	2013-01-18 23:57:50.519792858 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-dlmopen.exp	2013-02-15 22:37:35.762417598 +0100
 @@ -0,0 +1,125 @@
 +# Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1492,10 +1492,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-dlmopen.exp
 +    gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
 +    check_info_shared "info sharedlibrary #7" 0
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-interp.exp
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-interp.exp
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/testsuite/gdb.base/break-interp.exp	2013-01-18 23:57:14.782978485 +0100
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-interp.exp	2013-01-18 23:57:50.520792854 +0100
+--- gdb-7.5.50.20130215.orig/gdb/testsuite/gdb.base/break-interp.exp	2013-01-01 07:33:25.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-interp.exp	2013-02-15 22:37:35.762417598 +0100
 @@ -109,12 +109,19 @@ proc strip_debug {dest} {
      }
  }
@@ -1591,10 +1591,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-interp.exp
  
  	    # Use two separate gdb_test_multiple statements to avoid timeouts due
  	    # to slow processing of wildcard capturing long output
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes-solib.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes-solib.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes-solib.c	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes-solib.c	2013-02-15 22:37:35.762417598 +0100
 @@ -0,0 +1,24 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1620,10 +1620,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes-solib.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.c	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes.c	2013-02-15 22:37:35.763417600 +0100
 @@ -0,0 +1,26 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1651,10 +1651,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.exp
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.exp	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/break-probes.exp	2013-02-15 22:37:35.763417600 +0100
 @@ -0,0 +1,76 @@
 +# Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1732,10 +1732,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/break-probes.exp
 +    # Call something to ensure that relocation occurred
 +    gdb_test "call foo(23)" "foo 23.*\\\$.* = .*"
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib1.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared-solib1.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib1.c	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared-solib1.c	2013-02-15 22:37:35.763417600 +0100
 @@ -0,0 +1,24 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1761,10 +1761,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib1.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib2.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared-solib2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib2.c	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared-solib2.c	2013-02-15 22:37:35.763417600 +0100
 @@ -0,0 +1,24 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1790,10 +1790,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared-solib2.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared.c
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared.c	2013-01-18 23:57:50.520792854 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared.c	2013-02-15 22:37:35.763417600 +0100
 @@ -0,0 +1,48 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -1843,10 +1843,10 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared.c
 +
 +  return 0;
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared.exp
+Index: gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/info-shared.exp	2013-01-18 23:57:50.521792850 +0100
++++ gdb-7.5.50.20130215/gdb/testsuite/gdb.base/info-shared.exp	2013-02-15 22:37:35.764417602 +0100
 @@ -0,0 +1,139 @@
 +# Copyright 2012 Free Software Foundation, Inc.
 +

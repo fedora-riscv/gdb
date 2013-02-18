@@ -37,10 +37,10 @@ gdb/gdbserver/
 	(linux_create_inferior, linux_tracefork_child): Call it instead of
 	direct ptrace.
 
-Index: gdb-7.5.50.20130118/gdb/common/linux-ptrace.c
+Index: gdb-7.5.50.20130215/gdb/common/linux-ptrace.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/common/linux-ptrace.c	2013-01-18 23:18:47.313360065 +0100
-+++ gdb-7.5.50.20130118/gdb/common/linux-ptrace.c	2013-01-18 23:19:27.269417051 +0100
+--- gdb-7.5.50.20130215.orig/gdb/common/linux-ptrace.c	2013-01-08 20:38:51.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/common/linux-ptrace.c	2013-02-15 22:38:05.782456279 +0100
 @@ -29,6 +29,10 @@
  #include "gdb_assert.h"
  #include "gdb_wait.h"
@@ -81,10 +81,10 @@ Index: gdb-7.5.50.20130118/gdb/common/linux-ptrace.c
 +			 "(gdb) shell sudo setsebool deny_ptrace=0"));
 +#endif /* HAVE_LIBSELINUX */
 +}
-Index: gdb-7.5.50.20130118/gdb/common/linux-ptrace.h
+Index: gdb-7.5.50.20130215/gdb/common/linux-ptrace.h
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/common/linux-ptrace.h	2013-01-18 23:18:47.313360065 +0100
-+++ gdb-7.5.50.20130118/gdb/common/linux-ptrace.h	2013-01-18 23:19:04.990385360 +0100
+--- gdb-7.5.50.20130215.orig/gdb/common/linux-ptrace.h	2013-01-01 07:32:54.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/common/linux-ptrace.h	2013-02-15 22:38:05.782456279 +0100
 @@ -69,5 +69,6 @@ struct buffer;
  
  extern void linux_ptrace_attach_warnings (pid_t pid, struct buffer *buffer);
@@ -92,10 +92,10 @@ Index: gdb-7.5.50.20130118/gdb/common/linux-ptrace.h
 +extern void linux_ptrace_create_warnings (struct buffer *buffer);
  
  #endif /* COMMON_LINUX_PTRACE_H */
-Index: gdb-7.5.50.20130118/gdb/configure.ac
+Index: gdb-7.5.50.20130215/gdb/configure.ac
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/configure.ac	2013-01-18 23:18:47.315360069 +0100
-+++ gdb-7.5.50.20130118/gdb/configure.ac	2013-01-18 23:19:04.991385362 +0100
+--- gdb-7.5.50.20130215.orig/gdb/configure.ac	2013-02-15 22:37:57.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/configure.ac	2013-02-15 22:38:05.783456281 +0100
 @@ -2068,6 +2068,10 @@ then
  	      [Define if you support the personality syscall.])
  fi
@@ -107,10 +107,10 @@ Index: gdb-7.5.50.20130118/gdb/configure.ac
  dnl Handle optional features that can be enabled.
  
  # Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,
-Index: gdb-7.5.50.20130118/gdb/gdbserver/configure.ac
+Index: gdb-7.5.50.20130215/gdb/gdbserver/configure.ac
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/gdbserver/configure.ac	2013-01-18 23:18:47.315360069 +0100
-+++ gdb-7.5.50.20130118/gdb/gdbserver/configure.ac	2013-01-18 23:19:04.991385362 +0100
+--- gdb-7.5.50.20130215.orig/gdb/gdbserver/configure.ac	2013-01-01 07:33:00.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/gdbserver/configure.ac	2013-02-15 22:38:05.783456281 +0100
 @@ -451,6 +451,10 @@ if $want_ipa ; then
     fi
  fi
@@ -122,11 +122,11 @@ Index: gdb-7.5.50.20130118/gdb/gdbserver/configure.ac
  AC_SUBST(GDBSERVER_DEPFILES)
  AC_SUBST(GDBSERVER_LIBS)
  AC_SUBST(USE_THREAD_DB)
-Index: gdb-7.5.50.20130118/gdb/gdbserver/linux-low.c
+Index: gdb-7.5.50.20130215/gdb/gdbserver/linux-low.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/gdbserver/linux-low.c	2013-01-18 23:18:47.317360073 +0100
-+++ gdb-7.5.50.20130118/gdb/gdbserver/linux-low.c	2013-01-18 23:19:04.993385366 +0100
-@@ -601,6 +601,28 @@ add_lwp (ptid_t ptid)
+--- gdb-7.5.50.20130215.orig/gdb/gdbserver/linux-low.c	2013-02-04 18:47:00.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/gdbserver/linux-low.c	2013-02-15 22:39:54.256591069 +0100
+@@ -602,6 +602,29 @@ add_lwp (ptid_t ptid)
    return lwp;
  }
  
@@ -139,7 +139,8 @@ Index: gdb-7.5.50.20130118/gdb/gdbserver/linux-low.c
 +  struct buffer buffer;
 +
 +  errno = 0;
-+  if (ptrace (PTRACE_TRACEME, 0, NULL, NULL) == 0)
++  if (ptrace (PTRACE_TRACEME, 0,
++	      (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0) == 0)
 +    return;
 +
 +  save_errno = errno;
@@ -155,28 +156,28 @@ Index: gdb-7.5.50.20130118/gdb/gdbserver/linux-low.c
  /* Start an inferior process and returns its pid.
     ALLARGS is a vector of program-name and args. */
  
-@@ -641,7 +663,7 @@ linux_create_inferior (char *program, ch
+@@ -642,7 +665,7 @@ linux_create_inferior (char *program, ch
  
    if (pid == 0)
      {
--      ptrace (PTRACE_TRACEME, 0, 0, 0);
+-      ptrace (PTRACE_TRACEME, 0, (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0);
 +      linux_traceme (program);
  
  #ifndef __ANDROID__ /* Bionic doesn't use SIGRTMIN the way glibc does.  */
        signal (__SIGRTMIN + 1, SIG_DFL);
-@@ -4574,7 +4596,7 @@ linux_tracefork_grandchild (void *arg)
+@@ -4587,7 +4610,7 @@ linux_tracefork_grandchild (void *arg)
  static int
  linux_tracefork_child (void *arg)
  {
--  ptrace (PTRACE_TRACEME, 0, 0, 0);
+-  ptrace (PTRACE_TRACEME, 0, (PTRACE_ARG3_TYPE) 0, (PTRACE_ARG4_TYPE) 0);
 +  linux_traceme ("PTRACE_O_TRACEFORK test");
    kill (getpid (), SIGSTOP);
  
  #if !(defined(__UCLIBC__) && defined(HAS_NOMMU))
-Index: gdb-7.5.50.20130118/gdb/inf-ptrace.c
+Index: gdb-7.5.50.20130215/gdb/inf-ptrace.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/inf-ptrace.c	2013-01-18 23:18:47.318360076 +0100
-+++ gdb-7.5.50.20130118/gdb/inf-ptrace.c	2013-01-18 23:19:04.993385366 +0100
+--- gdb-7.5.50.20130215.orig/gdb/inf-ptrace.c	2013-01-01 07:32:45.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/inf-ptrace.c	2013-02-15 22:38:05.786456289 +0100
 @@ -104,7 +104,15 @@ static void
  inf_ptrace_me (void)
  {
@@ -193,11 +194,11 @@ Index: gdb-7.5.50.20130118/gdb/inf-ptrace.c
  }
  
  /* Start a new inferior Unix child process.  EXEC_FILE is the file to
-Index: gdb-7.5.50.20130118/gdb/linux-nat.c
+Index: gdb-7.5.50.20130215/gdb/linux-nat.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/linux-nat.c	2013-01-18 23:18:47.320360083 +0100
-+++ gdb-7.5.50.20130118/gdb/linux-nat.c	2013-01-18 23:19:04.994385369 +0100
-@@ -1578,6 +1578,7 @@ linux_nat_create_inferior (struct target
+--- gdb-7.5.50.20130215.orig/gdb/linux-nat.c	2013-02-15 22:34:44.000000000 +0100
++++ gdb-7.5.50.20130215/gdb/linux-nat.c	2013-02-15 22:38:05.787456291 +0100
+@@ -1557,6 +1557,7 @@ linux_nat_create_inferior (struct target
  #ifdef HAVE_PERSONALITY
    int personality_orig = 0, personality_set = 0;
  #endif /* HAVE_PERSONALITY */
@@ -205,7 +206,7 @@ Index: gdb-7.5.50.20130118/gdb/linux-nat.c
  
    /* The fork_child mechanism is synchronous and calls target_wait, so
       we have to mask the async mode.  */
-@@ -1602,7 +1603,10 @@ linux_nat_create_inferior (struct target
+@@ -1581,7 +1582,10 @@ linux_nat_create_inferior (struct target
    /* Make sure we report all signals during startup.  */
    linux_nat_pass_signals (0, NULL);
  
@@ -217,7 +218,7 @@ Index: gdb-7.5.50.20130118/gdb/linux-nat.c
  
  #ifdef HAVE_PERSONALITY
    if (personality_set)
-@@ -1614,6 +1618,24 @@ linux_nat_create_inferior (struct target
+@@ -1593,6 +1597,24 @@ linux_nat_create_inferior (struct target
  		 safe_strerror (errno));
      }
  #endif /* HAVE_PERSONALITY */

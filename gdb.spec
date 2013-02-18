@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20120817
+%global snap       20130215
 # See timestamp of source gnulib installed into gdb/gnulib/ .
-%global snapgnulib 20120623
-Version: 7.5.50.20130118
+%global snapgnulib 20121213
+Version: 7.5.50.20130215
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -366,10 +366,6 @@ Patch317: gdb-6.8-sparc64-silence-memcpy-check.patch
 #=fedoratest
 Patch320: gdb-6.5-section-num-fixup-test.patch
 
-# Fix PRPSINFO in the core files dumped by gcore (BZ 254229).
-#=push
-Patch329: gdb-6.8-bz254229-gcore-prpsinfo.patch
-
 # Fix register assignments with no GDB stack frames (BZ 436037).
 #=push+work: This fix is incorrect.
 Patch330: gdb-6.8-bz436037-reg-no-longer-active.patch
@@ -560,14 +556,6 @@ Patch814: gdb-rhbz795424-bitpos-23of25.patch
 Patch816: gdb-rhbz795424-bitpos-25of25.patch
 Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
-
-# Fix gdb.fortran/common-block.exp in PIE mode.
-#=push
-Patch823: gdb-commonblock-pie.patch
-
-#=push
-# Fix assert crashes with minidebuginfo (BZ 903522).
-Patch824: gdb-minidebuginfo-crash.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -829,7 +817,6 @@ find -name "*.info*"|xargs rm -f
 %patch315 -p1
 %patch317 -p1
 %patch320 -p1
-%patch329 -p1
 %patch330 -p1
 %patch343 -p1
 %patch348 -p1
@@ -882,8 +869,6 @@ find -name "*.info*"|xargs rm -f
 %patch816 -p1
 %patch817 -p1
 %patch818 -p1
-%patch823 -p1
-%patch824 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1383,6 +1368,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Feb 18 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130215-7.fc19
+- Rebase to FSF GDB 7.5.50.20130215 (pre-7.6 snapshot).
+
 * Fri Feb  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130118-6.fc19
 - Re-enable PDF in gdb-doc after texinfo RH BZ 876710 has been fixed.
 
