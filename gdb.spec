@@ -34,7 +34,7 @@ Version: 7.5.50.20130215
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1076,7 +1076,8 @@ $(: fmtutil: format directory '/builddir/.texmf-var/web2c' does not exist. ) \
 %else
      %{?_smp_mflags} \
 %endif
-     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
+     -C gdb/doc {gdb,annotate}{.info,/index.html} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
+     # -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
@@ -1338,7 +1339,8 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %files doc
-%doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
+%doc %{gdb_build}/gdb/doc/{gdb,annotate}.html
+#doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
 %defattr(-,root,root)
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
@@ -1368,6 +1370,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Feb 19 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130215-8.fc19
+- Temporarily disable PDF in gdb-doc for still unavailable texinfo RH BZ 876710.
+
 * Mon Feb 18 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130215-7.fc19
 - Rebase to FSF GDB 7.5.50.20130215 (pre-7.6 snapshot).
 
