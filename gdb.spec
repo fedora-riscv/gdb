@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20130215
+%global snap       20130310
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.5.50.20130215
+Version: 7.5.50.20130310
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -557,6 +557,11 @@ Patch816: gdb-rhbz795424-bitpos-25of25.patch
 Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 
+# Fix various entry-values sub-optimal results.
+# =push
+Patch825: gdb-entryval-1of2.patch
+Patch826: gdb-entryval-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -869,6 +874,8 @@ find -name "*.info*"|xargs rm -f
 %patch816 -p1
 %patch817 -p1
 %patch818 -p1
+%patch825 -p1
+%patch826 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1370,6 +1377,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Mar 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-10.fc19
+- Rebase to FSF GDB 7.5.50.20130310 (pre-7.6 snapshot).
+- Fix various entry-values sub-optimal results.
+
 * Mon Feb 25 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130215-9.fc19
 - testsuite: Fix gdb.arch/powerpc-power6.exp testcase (IBM, RH BZ 890900).
 
