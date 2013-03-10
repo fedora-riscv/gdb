@@ -34,7 +34,7 @@ Version: 7.5.50.20130310
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -595,6 +595,10 @@ BuildRequires: libstdc++%{?_isa}
 %endif # 0%{!?_without_python:1}
 # gdb-doc in PDF:
 BuildRequires: texinfo-tex
+# PDF doc workaround, see: # https://bugzilla.redhat.com/show_bug.cgi?id=919891
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+BuildRequires: texlive-ec texlive-cm-super
+%endif
 
 # BuildArch would break RHEL-5 by overriding arch and not building noarch.
 %if 0%{?el5:1}
@@ -1375,6 +1379,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Mar 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-12.fc19
+- Add workaround of PDF gdb-doc build (filed as RH BZ 919891).
+
 * Sun Mar 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-11.fc19
 - Re-enable (again) PDF in gdb-doc after texinfo RH BZ 876710 has been fixed.
 
