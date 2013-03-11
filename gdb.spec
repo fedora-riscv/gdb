@@ -34,7 +34,7 @@ Version: 7.5.50.20130310
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -261,7 +261,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -765,7 +765,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-#patch232 -p1
+%patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1379,6 +1379,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Mar 11 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-13.fc19
+- [RHEL-5] Import build regression fix.
+
 * Sun Mar 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-12.fc19
 - Add workaround of PDF gdb-doc build (filed as RH BZ 919891).
 
