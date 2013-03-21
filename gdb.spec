@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -511,6 +511,7 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
+# Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
 #=push
 Patch618: gdb-dlopen-stap-probe-1of7.patch
 Patch717: gdb-dlopen-stap-probe-2of7.patch
@@ -522,6 +523,7 @@ Patch722: gdb-dlopen-stap-probe-7of7.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 Patch723: gdb-dlopen-stap-probe-test2.patch
 Patch822: gdb-dlopen-stap-probe-mapfailed.patch
+Patch826: gdb-dlopen-stap-probe-inhibit.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -909,6 +911,7 @@ find -name "*.info*"|xargs rm -f
 %patch722 -p1
 %patch723 -p1
 %patch822 -p1
+%patch826 -p1
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
@@ -1444,6 +1447,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Mar 21 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-37.fc18
+- Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
+
 * Fri Feb  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-36.fc18
 - Re-enable PDF in gdb-doc after texinfo RH BZ 876710 has been fixed.
 
