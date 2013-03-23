@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20130310
+%global snap       20130323
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.5.50.20130310
+Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -261,7 +261,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -497,6 +497,7 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
+# Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
 #=push
 Patch718: gdb-dlopen-stap-probe-3of7.patch
 Patch719: gdb-dlopen-stap-probe-4of7.patch
@@ -506,6 +507,7 @@ Patch722: gdb-dlopen-stap-probe-7of7.patch
 Patch619: gdb-dlopen-stap-probe-test.patch
 Patch723: gdb-dlopen-stap-probe-test2.patch
 Patch822: gdb-dlopen-stap-probe-mapfailed.patch
+Patch827: gdb-dlopen-stap-probe-inhibit.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -518,10 +520,6 @@ Patch634: gdb-runtest-pie-override.patch
 # Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
 #=fedora
 Patch642: gdb-readline62-ask-more-rh.patch
-
-# Enable smaller %{_bindir}/gdb in future by no longer using -rdynamic.
-#=push
-Patch643: gdb-python-rdynamic.patch
 
 # Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
 #=push
@@ -556,11 +554,6 @@ Patch814: gdb-rhbz795424-bitpos-23of25.patch
 Patch816: gdb-rhbz795424-bitpos-25of25.patch
 Patch817: gdb-rhbz795424-bitpos-25of25-test.patch
 Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
-
-# Fix various entry-values sub-optimal results.
-# =push
-Patch825: gdb-entryval-1of2.patch
-Patch826: gdb-entryval-2of2.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -765,7 +758,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-%patch232 -p1
+#patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -861,10 +854,10 @@ find -name "*.info*"|xargs rm -f
 %patch722 -p1
 %patch723 -p1
 %patch822 -p1
+%patch827 -p1
 %patch619 -p1
 %patch627 -p1
 %patch634 -p1
-%patch643 -p1
 %patch653 -p1
 %patch657 -p1
 %patch661 -p1
@@ -878,8 +871,6 @@ find -name "*.info*"|xargs rm -f
 %patch816 -p1
 %patch817 -p1
 %patch818 -p1
-%patch825 -p1
-%patch826 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1379,6 +1370,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Mar 23 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130323-14.fc19
+- Rebase to FSF GDB 7.5.91.20130310 (pre-7.6 snapshot).
+- Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
+
 * Mon Mar 11 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.50.20130310-13.fc19
 - [RHEL-5] Import build regression fix.
 

@@ -47,13 +47,10 @@
 
 static const char *progname;
 
-static volatile int signal_chld_hit = 0;
 static volatile pid_t child;
 
 static void signal_chld (int signo)
 {
-  if (child && kill (child, 0) != 0)
-    signal_chld_hit = 1;
 }
 
 static volatile int signal_alrm_hit = 0;
@@ -102,6 +99,44 @@ static int read_out (int amaster)
       exit (EXIT_FAILURE);
     }
   return 1;
+}
+
+/* kill (child, 0) == 0 sometimes even when CHILD's state is already "Z".  */
+
+static int child_exited (void)
+{
+  char buf[200];
+  int fd, i, retval;
+  ssize_t got;
+  char *state;
+
+  snprintf (buf, sizeof (buf), "/proc/%ld/stat", (long) child);
+  fd = open (buf, O_RDONLY);
+  if (fd == -1)
+    {
+      perror ("open (/proc/CHILD/stat)");
+      exit (EXIT_FAILURE);
+    }
+  got = read (fd, buf, sizeof(buf));
+  if (got <= 0)
+    {
+      perror ("read (/proc/CHILD/stat)");
+      exit (EXIT_FAILURE);
+    }
+  if (close (fd) != 0)
+    {
+      perror ("close (/proc/CHILD/stat)");
+      exit (EXIT_FAILURE);
+    }
+  i = sscanf (buf, "%*d%*s%ms", &state);
+  if (i != 1)
+    {
+      perror ("sscanf (/proc/CHILD/stat)");
+      exit (EXIT_FAILURE);
+    }
+  retval = strcmp (state, "Z") == 0;
+  free (state);
+  return retval;
 }
 
 static int spawn (char **argv, int timeout)
@@ -157,6 +192,11 @@ static int spawn (char **argv, int timeout)
 	assert (i == STDIN_FILENO);
 #endif
 
+	i = sigemptyset (&set);
+	assert (i == 0);
+	i = sigprocmask (SIG_SETMASK, &set, NULL);
+	assert (i == 0);
+
 	/* Do not setpgrp(2) in the parent process as the process-group
 	   is shared for the whole sh(1) pipeline we could be a part
 	   of.  The process-group is set according to PID of the first
@@ -206,7 +246,7 @@ static int spawn (char **argv, int timeout)
       i = ppoll (&pollfd, 1, NULL, &set);
       if (i == -1 && errno == EINTR)
 	{
-	  if (signal_chld_hit)
+	  if (child_exited ())
 	    break;
 	  /* Non-CHILD child may have exited.  */
 	  continue;
@@ -230,7 +270,7 @@ static int spawn (char **argv, int timeout)
 	  exit (EXIT_FAILURE);
 	}
       /* Child exited?  */
-      if (signal_chld_hit)
+      if (child_exited ())
 	break;
     }
 
@@ -279,11 +319,9 @@ static int spawn (char **argv, int timeout)
       exit (EXIT_FAILURE);
     }
 
-  /* In the POLLHUP case we may not have seen SIGCHLD so far.  */
+  /* Not used in fact.  */
   i = sigprocmask (SIG_SETMASK, &set, NULL);
   assert (i == 0);
-
-  assert (signal_chld_hit != 0);
 
   /* Do not unset O_NONBLOCK as a stale child (the whole purpose of this
      program) having open its output pty would block us in read_out.  */
