@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20130323
+%global snap       20130402
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1370,6 +1370,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Apr  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130402-15.fc19
+- Rebase to FSF GDB 7.5.91.20130402 (pre-7.6 snapshot).
+
 * Sat Mar 23 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130323-14.fc19
 - Rebase to FSF GDB 7.5.91.20130310 (pre-7.6 snapshot).
 - Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
