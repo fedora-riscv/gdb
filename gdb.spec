@@ -27,14 +27,14 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20130402
+%global snap       20130407
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -261,7 +261,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -620,7 +620,7 @@ ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
-%if 0%{!?rhel:1} || 0%{?scl:1} || 0%{?rhel} > 6
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: gcc-go
 %endif
 # archer-sergiodj-stap-patch-split
@@ -651,7 +651,7 @@ BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 BuildRequires: libgcj%{bits_local} libgcj%{bits_other}
-%if 0%{!?rhel:1} || 0%{?scl:1} || 0%{?rhel} > 6
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 %if 0%{!?el5:1}
@@ -758,7 +758,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-#patch232 -p1
+%patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1307,6 +1307,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/gdb
 %config(noreplace) %{_sysconfdir}/gdbinit
 %{_sysconfdir}/gdbinit.d
+%{_mandir}/*/gdbinit.5*
 %{_mandir}/*/gdb.1*
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
@@ -1370,6 +1371,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Apr  7 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-16.fc19
+- Rebase to FSF GDB 7.5.91.20130407 (pre-7.6 snapshot).
+- [SCL] Remove BuildRequires of gcc-go on SCL (Miroslav Franc, BZ 948982).
+- Provide man page for gdbinit.5 (BZ 881892), document gdb -p in man (BZ 659000).
+
 * Tue Apr  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130402-15.fc19
 - Rebase to FSF GDB 7.5.91.20130402 (pre-7.6 snapshot).
 
