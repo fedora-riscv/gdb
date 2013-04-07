@@ -34,7 +34,7 @@ Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1283,6 +1283,7 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/gdb.info*
 # -j1: There is some race resulting in:
 # /usr/bin/texi2dvi: texinfo.tex appears to be broken, quitting.
 make -j1 -C gdb/doc install DESTDIR=$RPM_BUILD_ROOT
+rm -rf $RPM_BUILD_ROOT%{_mandir}
 %endif # noarch
 
 # Documentation only for development; keep 'rm's here after "noarch" above.
@@ -1371,6 +1372,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Apr  7 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-17.fc19
+- [RHEL-5] Fix noarch doc build.
+
 * Sun Apr  7 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-16.fc19
 - Rebase to FSF GDB 7.5.91.20130407 (pre-7.6 snapshot).
 - [SCL] Remove BuildRequires of gcc-go on SCL (Miroslav Franc, BZ 948982).
