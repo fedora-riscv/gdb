@@ -34,7 +34,7 @@ Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -262,6 +262,8 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
 Patch232: gdb-upstream.patch
+Patch828: gdb-upstream-man-gcore-1of2.patch
+Patch829: gdb-upstream-man-gcore-2of2.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -759,6 +761,8 @@ find -name "*.info*"|xargs rm -f
 
 %patch349 -p1
 %patch232 -p1
+%patch828 -p1
+%patch829 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1177,10 +1181,6 @@ rm -rf $RPM_BUILD_ROOT
 
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
-# install the gcore script in /usr/bin
-cp $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb_gcore.sh $RPM_BUILD_ROOT%{_bindir}/gcore
-chmod 755 $RPM_BUILD_ROOT%{_bindir}/gcore
-
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 test ! -e $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
@@ -1310,6 +1310,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdbinit.5*
 %{_mandir}/*/gdb.1*
+%{_mandir}/*/gcore.1*
+%{_mandir}/*/gdb-add-index.1*
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -1372,6 +1374,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Apr 11 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-18.fc19
+- Provide man page for gcore.1 and gdb-add-index.1 (BZ 881892).
+
 * Sun Apr  7 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-17.fc19
 - [RHEL-5] Fix noarch doc build.
 
