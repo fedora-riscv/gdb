@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?dist}
+Release: 38%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -609,6 +609,9 @@ Patch819: gdb-implicitpointer-offset.patch
 Patch820: gdb-rhbz890900-ppc-dis-1of2.patch
 Patch821: gdb-rhbz890900-ppc-dis-2of2.patch
 
+# Fix crash on 'gdb ""' (BZ 951251)..
+Patch830: gdb-f18-open-emptyname.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -951,6 +954,7 @@ find -name "*.info*"|xargs rm -f
 %patch819 -p1
 %patch820 -p1
 %patch821 -p1
+%patch830 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1447,6 +1451,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Apr 12 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-38.fc18
+- Fix crash on 'gdb ""' (BZ 951251)..
+
 * Thu Mar 21 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-37.fc18
 - Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
 
