@@ -34,7 +34,7 @@ Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -310,6 +310,8 @@ Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 # Workaround librpm BZ 643031 due to its unexpected exit() calls (BZ 642879).
 #=push
 Patch519: gdb-6.6-buildid-locate-rpm-librpm-workaround.patch
+# [SCL] Skip deprecated .gdb_index warning for Red Hat built files (BZ 953585).
+Patch833: gdb-6.6-buildid-locate-rpm-scl.patch
 
 # Add kernel vDSO workaround (`no loadable ...') on RHEL-5 (kernel BZ 765875).
 #=push
@@ -886,6 +888,10 @@ find -name "*.info*"|xargs rm -f
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
 %endif
+%patch833 -p1
+%if 0%{!?el6:1} || 0%{!?scl:1}
+%patch833 -p1 -R
+%endif
 %patch642 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %patch642 -p1 -R
@@ -1380,6 +1386,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Apr 22 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130407-20.fc19
+- [SCL] Skip deprecated .gdb_index warning for Red Hat built files (BZ 953585).
+
 * Mon Apr 22 2013 Sergio Durigan Junior <sergiodj@redhat.com> - 7.5.91.20130407-19.fc19
 - [RHEL-6] Regression test for RH BZ 947564.
 
