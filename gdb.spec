@@ -28,13 +28,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 %global snap       20130423
+# Freeze it when GDB gets branched
+%global snapsrc    20130312
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -75,11 +77,11 @@ Conflicts: elfutils < 0.149
 %endif
 
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
-Provides: bundled(libiberty) = %{snap}
+Provides: bundled(libiberty) = %{snapsrc}
 Provides: bundled(gnulib) = %{snapgnulib}
-Provides: bundled(binutils) = %{snap}
+Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
-Provides: bundled(md5-gcc) = %{snap}
+Provides: bundled(md5-gcc) = %{snapsrc}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -1386,6 +1388,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Apr 23 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130423-22.fc19
+- [spec] Fix virtual bundles after GDB has been branched.
+
 * Tue Apr 23 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130423-21.fc19
 - Rebase to FSF GDB 7.5.91.20130423 (pre-7.6 snapshot).
 
