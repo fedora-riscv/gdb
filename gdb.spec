@@ -36,7 +36,7 @@ Version: 7.5.91.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -599,6 +599,8 @@ BuildRequires: libstdc++%{?_isa}
 %endif # 0%{!?_without_python:1}
 # gdb-doc in PDF:
 BuildRequires: texinfo-tex
+# Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
+BuildRequires: /usr/bin/pod2man
 # PDF doc workaround, see: # https://bugzilla.redhat.com/show_bug.cgi?id=919891
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: texlive-ec texlive-cm-super
@@ -1388,6 +1390,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Apr 24 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130423-23.fc19
+- Fix man page BuildRequires (for BZ 881892).
+
 * Tue Apr 23 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130423-22.fc19
 - [spec] Fix virtual bundles after GDB has been branched.
 
