@@ -27,16 +27,16 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-%global snap       20130423
+#global snap       20130423
 # Freeze it when GDB gets branched
 %global snapsrc    20130312
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.5.91.%{snap}
+Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1390,6 +1390,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Apr 26 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-24.fc19
+- Rebase to FSF GDB 7.6.
+
 * Wed Apr 24 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.91.20130423-23.fc19
 - Fix man page BuildRequires (for BZ 881892).
 
