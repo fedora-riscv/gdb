@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1451,6 +1451,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Apr 27 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-39.fc18
+- Fix false "Unknown error 512" on x32 (H.J. Lu, BZ 956883).
+
 * Fri Apr 12 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-38.fc18
 - Fix crash on 'gdb ""' (BZ 951251)..
 
