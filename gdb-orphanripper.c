@@ -108,7 +108,7 @@ static int child_exited (void)
   char buf[200];
   int fd, i, retval;
   ssize_t got;
-  char *state;
+  char state[3];
 
   snprintf (buf, sizeof (buf), "/proc/%ld/stat", (long) child);
   fd = open (buf, O_RDONLY);
@@ -128,14 +128,14 @@ static int child_exited (void)
       perror ("close (/proc/CHILD/stat)");
       exit (EXIT_FAILURE);
     }
-  i = sscanf (buf, "%*d%*s%ms", &state);
+  /* RHEL-5 does not support %ms.  */
+  i = sscanf (buf, "%*d%*s%2s", state);
   if (i != 1)
     {
       perror ("sscanf (/proc/CHILD/stat)");
       exit (EXIT_FAILURE);
     }
   retval = strcmp (state, "Z") == 0;
-  free (state);
   return retval;
 }
 
