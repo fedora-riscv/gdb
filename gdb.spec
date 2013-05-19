@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -504,16 +504,16 @@ Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
 # Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
+# Fix performance regression when inferior opens many libraries (Gary Benson).
 #=push
-Patch718: gdb-dlopen-stap-probe-3of7.patch
-Patch719: gdb-dlopen-stap-probe-4of7.patch
-Patch720: gdb-dlopen-stap-probe-5of7.patch
-Patch721: gdb-dlopen-stap-probe-6of7.patch
-Patch722: gdb-dlopen-stap-probe-7of7.patch
-Patch619: gdb-dlopen-stap-probe-test.patch
-Patch723: gdb-dlopen-stap-probe-test2.patch
-Patch822: gdb-dlopen-stap-probe-mapfailed.patch
-Patch827: gdb-dlopen-stap-probe-inhibit.patch
+Patch718: gdb-dlopen-stap-probe-1of7.patch
+Patch719: gdb-dlopen-stap-probe-2of7.patch
+Patch720: gdb-dlopen-stap-probe-3of7.patch
+Patch721: gdb-dlopen-stap-probe-4of7.patch
+Patch722: gdb-dlopen-stap-probe-5of7.patch
+Patch723: gdb-dlopen-stap-probe-6of7.patch
+Patch822: gdb-dlopen-stap-probe-7of7.patch
+Patch827: gdb-dlopen-stap-probe-fixup.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -876,7 +876,6 @@ find -name "*.info*"|xargs rm -f
 %patch723 -p1
 %patch822 -p1
 %patch827 -p1
-%patch619 -p1
 %patch627 -p1
 %patch634 -p1
 %patch653 -p1
@@ -1398,6 +1397,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun May 19 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-29.fc19
+- Fix performance regression when inferior opens many libraries (Gary Benson).
+
 * Thu May  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-28.fc19
 - Fix needless expansion of non-gdbindex symtabs (Doug Evans).
 

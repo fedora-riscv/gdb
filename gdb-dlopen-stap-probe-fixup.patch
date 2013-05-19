@@ -1,0 +1,62 @@
+--- gdb-7.6-x/gdb/solib-svr4.c	2013-05-19 16:04:36.838874595 +0200
++++ gdb-7.6/gdb/solib-svr4.c	2013-05-19 16:12:35.112514978 +0200
+@@ -1078,7 +1078,6 @@ svr4_free_library_list (void *p_list)
+ static struct so_list *
+ svr4_copy_library_list (struct so_list *src)
+ {
+-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+   struct so_list *dst = NULL;
+   struct so_list **link = &dst;
+ 
+@@ -1090,8 +1089,8 @@ svr4_copy_library_list (struct so_list *
+ 
+       memcpy (new, src, sizeof (struct so_list));
+ 
+-      new->lm_info = xmalloc (lmo->link_map_size);
+-      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
++      new->lm_info = xmalloc (sizeof (*new->lm_info));
++      memcpy (new->lm_info, src->lm_info, sizeof (*new->lm_info));
+ 
+       new->next = NULL;
+       *link = new;
+@@ -1747,7 +1746,7 @@ solist_update_incremental (struct svr4_i
+       struct svr4_library_list library_list;
+       char annex[64];
+ 
+-      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", lm, prev_lm);
++      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", (unsigned long) lm, (unsigned long) prev_lm);
+       if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
+ 	return 0;
+ 
+@@ -1813,7 +1812,10 @@ svr4_handle_solib_event (void)
+     goto error;
+ 
+   if (action == DO_NOTHING)
++{
++do_cleanups (old_chain);
+     return;
++}
+ 
+   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
+      using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
+--- gdb-7.6-x/gdb/testsuite/gdb.base/break-probes.exp	2013-05-19 16:06:19.452818090 +0200
++++ gdb-7.6/gdb/testsuite/gdb.base/break-probes.exp	2013-05-19 16:07:49.730770135 +0200
+@@ -60,14 +60,15 @@ gdb_test_multiple "bt" $test {
+ if { $using_probes } {
+     # Run til it loads our library
+     set test "run til our library loads"
+-    set loaded_library 0
+-    while { !$loaded_library } {
++    set not_loaded_library 1
++    while { $not_loaded_library } {
++	set not_loaded_library 0
+ 	gdb_test_multiple "c" $test {
+ 	    -re "Inferior loaded $binfile_lib\\M.*$gdb_prompt $" {
+ 		pass $test
+-		set loaded_library 1
+ 	    }
+ 	    -re "Stopped due to shared library event\\M.*$gdb_prompt $" {
++		set not_loaded_library 1
+ 	    }
+ 	}
+     }
