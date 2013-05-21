@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -266,6 +266,9 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 Patch232: gdb-upstream.patch
 Patch828: gdb-upstream-man-gcore-1of2.patch
 Patch829: gdb-upstream-man-gcore-2of2.patch
+# Backported Python frame filters (Phil Muldoon).
+Patch836: gdb-upstream-framefilters-1of2.patch
+Patch837: gdb-upstream-framefilters-2of2.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -780,6 +783,8 @@ find -name "*.info*"|xargs rm -f
 %patch232 -p1
 %patch828 -p1
 %patch829 -p1
+%patch836 -p1
+%patch837 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -1397,8 +1402,12 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue May 21 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-30.fc19
+- Backported Python frame filters (Phil Muldoon).
+- Backported breakpoint conditions crash fix (Sergio Durigan Junior).
+
 * Sun May 19 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-29.fc19
-- Fix performance regression when inferior opens many libraries (Gary Benson).
+- Fix performance regression opening many libraries (Gary Benson, BZ 965106).
 
 * Thu May  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-28.fc19
 - Fix needless expansion of non-gdbindex symtabs (Doug Evans).
