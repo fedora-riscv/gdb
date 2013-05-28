@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1402,6 +1402,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue May 28 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-31.fc19
+- [ppc] Backport hardware watchpoints fix (Edjunior Machado, BZ 967915).
+
 * Tue May 21 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-30.fc19
 - Backported Python frame filters (Phil Muldoon).
 - Backported breakpoint conditions crash fix (Sergio Durigan Junior).
