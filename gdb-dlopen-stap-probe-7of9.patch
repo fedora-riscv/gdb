@@ -1,92 +1,70 @@
-http://sourceware.org/ml/gdb-patches/2013-05/msg00632.html
-Subject: [RFA 5/7] Improved linker-debugger interface
+http://sourceware.org/ml/gdb-cvs/2013-06/msg00018.html
 
-
---qse+WBH4guesipZ+
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-
-This patch implements the probes-based runtime linker interface.
-It works as follows:
-
- - On inferior startup, GDB searches the dynamic linker for a
-   number of named probes.
-
- - If all probes are found, GDB sets a breakpoint on each one.
-   Otherwise, the standard function _dl_debug_state is used.
-
- - When using probes, a per-pspace list is maintained of all
-   libraries currently loaded by the inferior.  It's updated
-   as necessary every time a solib event stop occurs.
-
- - When using probes, svr4_current_sos will return a copy of
-   the cached list.  When not using probes the entire list
-   will be fetched from the inferior as before.
-
- - If any error occurs, GDB will print a warning and revert to
-   the standard interface.
-
---qse+WBH4guesipZ+
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: attachment; filename="rtld-probes-5-main-changes.patch"
-
-2013-05-16  Gary Benson  <gbenson@redhat.com>
-
-	* breakpoint.h (handle_solib_event): Moved function declaration
-	to solib.h.
-	* breakpoint.c (handle_solib_event): Moved function to solib.c.
-	(bpstat_stop_status): Pass new argument to handle_solib_event.
-	* solib.h (update_solib_breakpoints): New function declaration.
-	(handle_solib_event): Moved function declaration from
-	breakpoint.h.
-	* solib.c (update_solib_breakpoints): New function.
-	(handle_solib_event): Moved function from breakpoint.c.
-	Updated to call solib_ops->handle_event if not NULL.
-	* solist.h (target_so_ops): New fields "update_breakpoints" and
-	"handle_event".
-	* infrun.c (set_stop_on_solib_events): New function.
-	(_initialize_infrun): Use the above for "set
-	stop-on-solib-events".
-	(handle_inferior_event): Pass new argument to handle_solib_event.
-	* solib-svr4.c (probe.h): New include.
-	(svr4_free_library_list): New forward declaration.
-	(probe_action): New enum.
-	(probe_info): New struct.
-	(probe_info): New static variable.
-	(NUM_PROBES): New definition.
-	(svr4_info): New fields "using_xfer", "probes_table" and
-	"solib_list".
-	(free_probes_table): New function.
-	(free_solib_list): New function.
-	(svr4_pspace_data_cleanup): Free probes table and solib list.
-	(svr4_copy_library_list): New function.
-	(svr4_current_sos_via_xfer_libraries): New parameter "annex".
-	(svr4_read_so_list): New parameter "prev_lm".
-	(svr4_current_sos_direct): Renamed from "svr4_current_sos".
-	(svr4_current_sos): New function.
-	(probe_and_action): New struct.
-	(hash_probe_and_action): New function.
-	(equal_probe_and_action): Likewise.
-	(register_solib_event_probe): Likewise.
-	(solib_event_probe_at): Likewise.
-	(solib_event_probe_action): Likewise.
-	(solist_update_full): Likewise.
-	(solist_update_incremental): Likewise.
-	(disable_probes_interface_cleanup): Likewise.
-	(svr4_handle_solib_event): Likewise.
-	(svr4_update_solib_event_breakpoint): Likewise.
-	(svr4_update_solib_event_breakpoints): Likewise.
-	(svr4_create_solib_event_breakpoints): Likewise.
-	(enable_break): Free probes table before creating breakpoints.
-	Use svr4_create_solib_event_breakpoints to create breakpoints.
-	(svr4_solib_create_inferior_hook): Free the solib list.
-	(_initialize_svr4_solib): Initialise
-	svr4_so_ops.handle_solib_event and svr4_so_ops.update_breakpoints.
-
+### src/gdb/ChangeLog	2013/06/04 13:10:53	1.15684
+### src/gdb/ChangeLog	2013/06/04 13:17:05	1.15685
+## -1,5 +1,58 @@
+ 2013-06-04  Gary Benson  <gbenson@redhat.com>
+ 
++	* breakpoint.h (handle_solib_event): Moved function declaration
++	to solib.h.
++	* breakpoint.c (handle_solib_event): Moved function to solib.c.
++	(bpstat_stop_status): Pass new argument to handle_solib_event.
++	* solib.h (update_solib_breakpoints): New function declaration.
++	(handle_solib_event): Moved function declaration from
++	breakpoint.h.
++	* solib.c (update_solib_breakpoints): New function.
++	(handle_solib_event): Moved function from breakpoint.c.
++	Updated to call solib_ops->handle_event if not NULL.
++	* solist.h (target_so_ops): New fields "update_breakpoints" and
++	"handle_event".
++	* infrun.c (set_stop_on_solib_events): New function.
++	(_initialize_infrun): Use the above for "set
++	stop-on-solib-events".
++	(handle_inferior_event): Pass new argument to handle_solib_event.
++	* solib-svr4.c (probe.h): New include.
++	(svr4_free_library_list): New forward declaration.
++	(probe_action): New enum.
++	(probe_info): New struct.
++	(probe_info): New static variable.
++	(NUM_PROBES): New definition.
++	(svr4_info): New fields "using_xfer", "probes_table" and
++	"solib_list".
++	(free_probes_table): New function.
++	(free_solib_list): New function.
++	(svr4_pspace_data_cleanup): Free probes table and solib list.
++	(svr4_copy_library_list): New function.
++	(svr4_current_sos_via_xfer_libraries): New parameter "annex".
++	(svr4_read_so_list): New parameter "prev_lm".
++	(svr4_current_sos_direct): Renamed from "svr4_current_sos".
++	(svr4_current_sos): New function.
++	(probe_and_action): New struct.
++	(hash_probe_and_action): New function.
++	(equal_probe_and_action): Likewise.
++	(register_solib_event_probe): Likewise.
++	(solib_event_probe_at): Likewise.
++	(solib_event_probe_action): Likewise.
++	(solist_update_full): Likewise.
++	(solist_update_incremental): Likewise.
++	(disable_probes_interface_cleanup): Likewise.
++	(svr4_handle_solib_event): Likewise.
++	(svr4_update_solib_event_breakpoint): Likewise.
++	(svr4_update_solib_event_breakpoints): Likewise.
++	(svr4_create_solib_event_breakpoints): Likewise.
++	(enable_break): Free probes table before creating breakpoints.
++	Use svr4_create_solib_event_breakpoints to create breakpoints.
++	(svr4_solib_create_inferior_hook): Free the solib list.
++	(_initialize_svr4_solib): Initialise
++	svr4_so_ops.handle_solib_event and svr4_so_ops.update_breakpoints.
++
++2013-06-04  Gary Benson  <gbenson@redhat.com>
++
+ 	* target.h (target_ops): New field
+ 	"to_augmented_libraries_svr4_read".
+ 	(target_augmented_libraries_svr4_read): New macro.
 Index: gdb-7.6/gdb/breakpoint.h
 ===================================================================
---- gdb-7.6.orig/gdb/breakpoint.h	2013-05-19 16:16:20.551087270 +0200
-+++ gdb-7.6/gdb/breakpoint.h	2013-05-19 16:16:20.837086948 +0200
+--- gdb-7.6.orig/gdb/breakpoint.h	2013-06-10 14:44:37.455812656 +0200
++++ gdb-7.6/gdb/breakpoint.h	2013-06-10 14:44:37.709812579 +0200
 @@ -1552,8 +1552,6 @@ extern int user_breakpoint_p (struct bre
  /* Attempt to determine architecture of location identified by SAL.  */
  extern struct gdbarch *get_sal_arch (struct symtab_and_line sal);
@@ -96,94 +74,10 @@ Index: gdb-7.6/gdb/breakpoint.h
  extern void breakpoint_free_objfile (struct objfile *objfile);
  
  extern void breakpoints_relocate (struct objfile *objfile,
-Index: gdb-7.6/gdb/solib.h
-===================================================================
---- gdb-7.6.orig/gdb/solib.h	2013-01-01 07:32:51.000000000 +0100
-+++ gdb-7.6/gdb/solib.h	2013-05-19 16:16:20.838086946 +0200
-@@ -90,4 +90,12 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_f
- 								      void *),
- 						    void *data);
- 
-+/* Enable or disable optional solib event breakpoints as appropriate.  */
-+
-+extern void update_solib_breakpoints (void);
-+
-+/* Handle an solib event by calling solib_add.  */
-+
-+extern void handle_solib_event (void);
-+
- #endif /* SOLIB_H */
-Index: gdb-7.6/gdb/solib.c
-===================================================================
---- gdb-7.6.orig/gdb/solib.c	2013-05-19 16:16:20.468087363 +0200
-+++ gdb-7.6/gdb/solib.c	2013-05-19 16:16:20.838086946 +0200
-@@ -1221,6 +1221,38 @@ no_shared_libraries (char *ignored, int
-   objfile_purge_solibs ();
- }
- 
-+/* See solib.h.  */
-+
-+void
-+update_solib_breakpoints (void)
-+{
-+  struct target_so_ops *ops = solib_ops (target_gdbarch ());
-+
-+  if (ops->update_breakpoints != NULL)
-+    ops->update_breakpoints ();
-+}
-+
-+/* See solib.h.  */
-+
-+void
-+handle_solib_event (void)
-+{
-+  struct target_so_ops *ops = solib_ops (target_gdbarch ());
-+
-+  if (ops->handle_event != NULL)
-+    ops->handle_event ();
-+
-+  clear_program_space_solib_cache (current_inferior ()->pspace);
-+
-+  /* Check for any newly added shared libraries if we're supposed to
-+     be adding them automatically.  Switch terminal for any messages
-+     produced by breakpoint_re_set.  */
-+  target_terminal_ours_for_output ();
-+  solib_add (NULL, 0, &current_target, auto_solib_add);
-+  target_terminal_inferior ();
-+}
-+
-+
- /* Reload shared libraries, but avoid reloading the same symbol file
-    we already have loaded.  */
- 
-Index: gdb-7.6/gdb/solist.h
-===================================================================
---- gdb-7.6.orig/gdb/solist.h	2013-01-01 07:32:51.000000000 +0100
-+++ gdb-7.6/gdb/solist.h	2013-05-19 16:16:20.838086946 +0200
-@@ -148,6 +148,19 @@ struct target_so_ops
-        core file (in particular, for readonly sections).  */
-     int (*keep_data_in_core) (CORE_ADDR vaddr,
- 			      unsigned long size);
-+
-+    /* Enable or disable optional solib event breakpoints as
-+       appropriate.  This should be called whenever
-+       stop_on_solib_events is changed.  This pointer can be
-+       NULL, in which case no enabling or disabling is necessary
-+       for this target.  */
-+    void (*update_breakpoints) (void);
-+
-+    /* Target-specific processing of solib events that will be
-+       performed before solib_add is called.  This pointer can be
-+       NULL, in which case no specific preprocessing is necessary
-+       for this target.  */
-+    void (*handle_event) (void);
-   };
- 
- /* Free the memory associated with a (so_list *).  */
 Index: gdb-7.6/gdb/infrun.c
 ===================================================================
---- gdb-7.6.orig/gdb/infrun.c	2013-05-19 16:16:20.508087318 +0200
-+++ gdb-7.6/gdb/infrun.c	2013-05-19 16:16:20.840086944 +0200
+--- gdb-7.6.orig/gdb/infrun.c	2013-06-10 14:44:37.427812664 +0200
++++ gdb-7.6/gdb/infrun.c	2013-06-10 14:44:37.711812579 +0200
 @@ -370,6 +370,16 @@ static struct symbol *step_start_functio
  /* Nonzero if we want to give control to the user when we're notified
     of shared library events by the dynamic linker.  */
@@ -212,14 +106,14 @@ Index: gdb-7.6/gdb/infrun.c
  
 Index: gdb-7.6/gdb/solib-svr4.c
 ===================================================================
---- gdb-7.6.orig/gdb/solib-svr4.c	2013-05-19 16:16:20.468087363 +0200
-+++ gdb-7.6/gdb/solib-svr4.c	2013-05-19 16:21:40.285816084 +0200
-@@ -47,9 +47,12 @@
+--- gdb-7.6.orig/gdb/solib-svr4.c	2013-06-10 14:44:37.392812675 +0200
++++ gdb-7.6/gdb/solib-svr4.c	2013-06-10 14:44:37.712812578 +0200
+@@ -46,10 +46,12 @@
+ #include "auxv.h"
  #include "exceptions.h"
  #include "gdb_bfd.h"
- 
 +#include "probe.h"
-+
+ 
  static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
  static int svr4_have_link_map_offsets (void);
  static void svr4_relocate_main_executable (void);
@@ -227,30 +121,30 @@ Index: gdb-7.6/gdb/solib-svr4.c
  
  /* Link map info to include in an allocated so_list entry.  */
  
-@@ -106,6 +109,55 @@ static const  char * const main_name_lis
+@@ -106,6 +108,55 @@ static const  char * const main_name_lis
    NULL
  };
  
 +/* What to do when a probe stop occurs.  */
 +
 +enum probe_action
-+  {
-+    /* Something went seriously wrong.  Stop using probes and
-+       revert to using the older interface.  */
-+    PROBES_INTERFACE_FAILED,
++{
++  /* Something went seriously wrong.  Stop using probes and
++     revert to using the older interface.  */
++  PROBES_INTERFACE_FAILED,
 +
-+    /* No action is required.  The shared object list is still
-+       valid.  */
-+    DO_NOTHING,
++  /* No action is required.  The shared object list is still
++     valid.  */
++  DO_NOTHING,
 +
-+    /* The shared object list should be reloaded entirely.  */
-+    FULL_RELOAD,
++  /* The shared object list should be reloaded entirely.  */
++  FULL_RELOAD,
 +
-+    /* Attempt to incrementally update the shared object list. If
-+       the update fails or is not possible, fall back to reloading
-+       the list in full.  */
-+    UPDATE_OR_RELOAD,
-+  };
++  /* Attempt to incrementally update the shared object list. If
++     the update fails or is not possible, fall back to reloading
++     the list in full.  */
++  UPDATE_OR_RELOAD,
++};
 +
 +/* A probe's name and its associated action.  */
 +
@@ -283,7 +177,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  /* Return non-zero if GDB_SO_NAME and INFERIOR_SO_NAME represent
     the same shared library.  */
  
-@@ -313,17 +365,56 @@ struct svr4_info
+@@ -313,17 +364,58 @@ struct svr4_info
    CORE_ADDR interp_text_sect_high;
    CORE_ADDR interp_plt_sect_low;
    CORE_ADDR interp_plt_sect_high;
@@ -292,8 +186,10 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +     via qXfer:libraries-svr4:read.  */
 +  int using_xfer;
 +
-+  /* Table mapping breakpoint addresses to probes and actions, used
-+     by the probes-based interface.  */
++  /* Table of struct probe_and_action instances, used by the
++     probes-based interface to map breakpoint addresses to probes
++     and their associated actions.  Lookup is performed using
++     probe_and_action->probe->address.  */
 +  htab_t probes_table;
 +
 +  /* List of objects loaded into the inferior, used by the probes-
@@ -340,7 +236,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
    xfree (info);
  }
  
-@@ -982,6 +1073,36 @@ svr4_free_library_list (void *p_list)
+@@ -982,6 +1074,34 @@ svr4_free_library_list (void *p_list)
      }
  }
  
@@ -349,7 +245,6 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +static struct so_list *
 +svr4_copy_library_list (struct so_list *src)
 +{
-+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
 +  struct so_list *dst = NULL;
 +  struct so_list **link = &dst;
 +
@@ -357,12 +252,11 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +    {
 +      struct so_list *new;
 +
-+      new = XZALLOC (struct so_list);
-+
++      new = xmalloc (sizeof (struct so_list));
 +      memcpy (new, src, sizeof (struct so_list));
 +
-+      new->lm_info = xmalloc (lmo->link_map_size);
-+      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
++      new->lm_info = xmalloc (sizeof (struct lm_info));
++      memcpy (new->lm_info, src->lm_info, sizeof (struct lm_info));
 +
 +      new->next = NULL;
 +      *link = new;
@@ -377,7 +271,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  #ifdef HAVE_LIBEXPAT
  
  #include "xml-support.h"
-@@ -1097,14 +1218,19 @@ svr4_parse_libraries (const char *docume
+@@ -1097,23 +1217,30 @@ svr4_parse_libraries (const char *docume
    return 0;
  }
  
@@ -400,7 +294,10 @@ Index: gdb-7.6/gdb/solib-svr4.c
  {
    char *svr4_library_document;
    int result;
-@@ -1113,7 +1239,7 @@ svr4_current_sos_via_xfer_libraries (str
+   struct cleanup *back_to;
+ 
++  gdb_assert (annex == NULL || target_augmented_libraries_svr4_read ());
++
    /* Fetch the list of shared libraries.  */
    svr4_library_document = target_read_stralloc (&current_target,
  						TARGET_OBJECT_LIBRARIES_SVR4,
@@ -409,7 +306,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
    if (svr4_library_document == NULL)
      return 0;
  
-@@ -1127,7 +1253,8 @@ svr4_current_sos_via_xfer_libraries (str
+@@ -1127,7 +1254,8 @@ svr4_current_sos_via_xfer_libraries (str
  #else
  
  static int
@@ -419,7 +316,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  {
    return 0;
  }
-@@ -1161,15 +1288,17 @@ svr4_default_sos (void)
+@@ -1161,15 +1289,19 @@ svr4_default_sos (void)
    return new;
  }
  
@@ -430,7 +327,9 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +   Expect the first entry in the chain's previous entry to be PREV_LM.
 +   Add the entries to the tail referenced by LINK_PTR_PTR.  Ignore the
 +   first entry if IGNORE_FIRST and set global MAIN_LM_ADDR according
-+   to it.  Returns nonzero upon success.  */
++   to it.  Returns nonzero upon success.  If zero is returned the
++   entries stored to LINK_PTR_PTR are still valid although they may
++   represent only part of the inferior library list.  */
  
 -static void
 -svr4_read_so_list (CORE_ADDR lm, struct so_list ***link_ptr_ptr,
@@ -444,7 +343,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  
    for (; lm != 0; prev_lm = lm, lm = next_lm)
      {
-@@ -1185,7 +1314,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1185,7 +1317,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
        if (new->lm_info == NULL)
  	{
  	  do_cleanups (old_chain);
@@ -453,7 +352,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	}
  
        next_lm = new->lm_info->l_next;
-@@ -1196,7 +1325,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1196,7 +1328,7 @@ svr4_read_so_list (CORE_ADDR lm, struct
  		   paddress (target_gdbarch (), prev_lm),
  		   paddress (target_gdbarch (), new->lm_info->l_prev));
  	  do_cleanups (old_chain);
@@ -462,7 +361,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	}
  
        /* For SVR4 versions, the first entry in the link map is for the
-@@ -1291,17 +1420,19 @@ svr4_read_so_list (CORE_ADDR lm, struct
+@@ -1291,17 +1423,21 @@ svr4_read_so_list (CORE_ADDR lm, struct
        **link_ptr_ptr = new;
        *link_ptr_ptr = &new->next;
      }
@@ -471,8 +370,10 @@ Index: gdb-7.6/gdb/solib-svr4.c
  }
  
 -/* Implement the "current_sos" target_so_ops method.  */
-+/* Read the full list of currently loaded shared objects directly from
-+   the inferior.  */
++/* Read the full list of currently loaded shared objects directly
++   from the inferior, without referring to any libraries read and
++   stored by the probes interface.  Handle special cases relating
++   to the first elements of the list.  */
  
  static struct so_list *
 -svr4_current_sos (void)
@@ -485,7 +386,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
    struct cleanup *back_to;
    int ignore_first;
    struct svr4_library_list library_list;
-@@ -1314,19 +1445,16 @@ svr4_current_sos (void)
+@@ -1314,19 +1450,16 @@ svr4_current_sos (void)
       Unfortunately statically linked inferiors will also fall back through this
       suboptimal code path.  */
  
@@ -509,7 +410,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
    /* Always locate the debug struct, in case it has moved.  */
    info->debug_base = 0;
    locate_base (info);
-@@ -1349,7 +1477,7 @@ svr4_current_sos (void)
+@@ -1349,7 +1482,7 @@ svr4_current_sos (void)
       `struct so_list' nodes.  */
    lm = solib_svr4_r_map (info);
    if (lm)
@@ -518,7 +419,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  
    /* On Solaris, the dynamic linker is not in the normal list of
       shared objects, so make sure we pick it up too.  Having
-@@ -1357,7 +1485,7 @@ svr4_current_sos (void)
+@@ -1357,7 +1490,7 @@ svr4_current_sos (void)
       for skipping dynamic linker resolver code.  */
    lm = solib_svr4_r_ldsomap (info);
    if (lm)
@@ -527,7 +428,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  
    discard_cleanups (back_to);
  
-@@ -1367,6 +1495,22 @@ svr4_current_sos (void)
+@@ -1367,6 +1500,22 @@ svr4_current_sos (void)
    return head;
  }
  
@@ -538,8 +439,8 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +{
 +  struct svr4_info *info = get_svr4_info ();
 +
-+  /* If we are using the probes interface and the solib list has
-+     been cached then we simply return that.  */
++  /* If the solib list has been read and stored by the probes
++     interface then we return a copy of the stored list.  */
 +  if (info->solib_list != NULL)
 +    return svr4_copy_library_list (info->solib_list);
 +
@@ -550,7 +451,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  /* Get the address of the link_map for a given OBJFILE.  */
  
  CORE_ADDR
-@@ -1449,6 +1593,434 @@ exec_entry_point (struct bfd *abfd, stru
+@@ -1449,6 +1598,476 @@ exec_entry_point (struct bfd *abfd, stru
    return gdbarch_addr_bits_remove (target_gdbarch (), addr);
  }
  
@@ -599,11 +500,9 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +
 +  /* Create the probes table, if necessary.  */
 +  if (info->probes_table == NULL)
-+    {
-+      info->probes_table = htab_create_alloc (1, hash_probe_and_action,
-+					      equal_probe_and_action,
-+					      xfree, xcalloc, xfree);
-+    }
++    info->probes_table = htab_create_alloc (1, hash_probe_and_action,
++					    equal_probe_and_action,
++					    xfree, xcalloc, xfree);
 +
 +  lookup.probe = probe;
 +  slot = htab_find_slot (info->probes_table, &lookup, INSERT);
@@ -667,12 +566,13 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +}
 +
 +/* Populate the shared object list by reading the entire list of
-+   shared objects from the inferior.  Returns nonzero on success.  */
++   shared objects from the inferior.  Handle special cases relating
++   to the first elements of the list.  Returns nonzero on success.  */
 +
 +static int
 +solist_update_full (struct svr4_info *info)
 +{
-+  svr4_free_library_list (&info->solib_list);
++  free_solib_list (info);
 +  info->solib_list = svr4_current_sos_direct (info);
 +
 +  return 1;
@@ -689,17 +589,21 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +  struct so_list *tail;
 +  CORE_ADDR prev_lm;
 +
-+  /* Fall back to a full update if we haven't read anything yet.  */
++  /* svr4_current_sos_direct contains logic to handle a number of
++     special cases relating to the first elements of the list.  To
++     avoid duplicating this logic we defer to solist_update_full
++     if the list is empty.  */
 +  if (info->solib_list == NULL)
 +    return 0;
 +
 +  /* Fall back to a full update if we are using a remote target
 +     that does not support incremental transfers.  */
-+  if (info->using_xfer && !target_augmented_libraries_svr4_read())
++  if (info->using_xfer && !target_augmented_libraries_svr4_read ())
 +    return 0;
 +
 +  /* Walk to the end of the list.  */
-+  for (tail = info->solib_list; tail->next; tail = tail->next);
++  for (tail = info->solib_list; tail->next != NULL; tail = tail->next)
++    /* Nothing.  */;
 +  prev_lm = tail->lm_info->lm_addr;
 +
 +  /* Read the new objects.  */
@@ -708,7 +612,9 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +      struct svr4_library_list library_list;
 +      char annex[64];
 +
-+      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", lm, prev_lm);
++      xsnprintf (annex, sizeof (annex), "start=%s;prev=%s",
++		 phex_nz (lm, sizeof (lm)),
++		 phex_nz (prev_lm, sizeof (prev_lm)));
 +      if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
 +	return 0;
 +
@@ -718,6 +624,10 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +    {
 +      struct so_list **link = &tail->next;
 +
++      /* IGNORE_FIRST may safely be set to zero here because the
++	 above check and deferral to solist_update_full ensures
++	 that this call to svr4_read_so_list will never see the
++	 first element.  */
 +      if (!svr4_read_so_list (lm, prev_lm, &link, 0))
 +	return 0;
 +    }
@@ -767,42 +677,64 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +  pc = regcache_read_pc (get_current_regcache ());
 +  pa = solib_event_probe_at (info, pc);
 +  if (pa == NULL)
-+    goto error;
++    {
++      do_cleanups (old_chain);
++      return;
++    }
 +
 +  action = solib_event_probe_action (pa);
 +  if (action == PROBES_INTERFACE_FAILED)
-+    goto error;
++    {
++      do_cleanups (old_chain);
++      return;
++    }
 +
 +  if (action == DO_NOTHING)
-+    return;
++    {
++      discard_cleanups (old_chain);
++      return;
++    }
 +
-+  /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
-+     using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
++  /* evaluate_probe_argument looks up symbols in the dynamic linker
++     using find_pc_section.  find_pc_section is accelerated by a cache
 +     called the section map.  The section map is invalidated every
 +     time a shared library is loaded or unloaded, and if the inferior
 +     is generating a lot of shared library events then the section map
-+     will be updated every time SVR4_HANDLE_SOLIB_EVENT is called.
-+     We called FIND_PC_SECTION in SVR4_CREATE_SOLIB_EVENT_BREAKPOINTS,
++     will be updated every time svr4_handle_solib_event is called.
++     We called find_pc_section in svr4_create_solib_event_breakpoints,
 +     so we can guarantee that the dynamic linker's sections are in the
 +     section map.  We can therefore inhibit section map updates across
-+     these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
-+  inhibit_section_map_updates ();
-+  usm_chain = make_cleanup (resume_section_map_updates_cleanup, NULL);
++     these calls to evaluate_probe_argument and save a lot of time.  */
++  inhibit_section_map_updates (current_program_space);
++  usm_chain = make_cleanup (resume_section_map_updates_cleanup,
++			    current_program_space);
 +
 +  val = evaluate_probe_argument (pa->probe, 1);
 +  if (val == NULL)
-+    goto error;
++    {
++      do_cleanups (old_chain);
++      return;
++    }
 +
 +  debug_base = value_as_address (val);
 +  if (debug_base == 0)
-+    goto error;
++    {
++      do_cleanups (old_chain);
++      return;
++    }
 +
 +  /* Always locate the debug struct, in case it moved.  */
 +  info->debug_base = 0;
 +  if (locate_base (info) == 0)
-+    goto error;
++    {
++      do_cleanups (old_chain);
++      return;
++    }
 +
-+  /* Do not process namespaces other than the initial one.  */
++  /* GDB does not currently support libraries loaded via dlmopen
++     into namespaces other than the initial one.  We must ignore
++     any namespace other than the initial namespace here until
++     support for this is added to GDB.  */
 +  if (debug_base != info->debug_base)
 +    action = DO_NOTHING;
 +
@@ -828,17 +760,13 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +  if (action == FULL_RELOAD)
 +    {
 +      if (!solist_update_full (info))
-+	goto error;
++	{
++	  do_cleanups (old_chain);
++	  return;
++	}
 +    }
 +
 +  discard_cleanups (old_chain);
-+  return;
-+
-+ error:
-+  /* We should never reach here, but if we do we disable the
-+     probes interface and revert to the original interface.  */
-+
-+  do_cleanups (old_chain);
 +}
 +
 +/* Helper function for svr4_update_solib_event_breakpoints.  */
@@ -846,27 +774,40 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +static int
 +svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 +{
-+  struct svr4_info *info = get_svr4_info ();
 +  struct bp_location *loc;
 +
 +  if (b->type != bp_shlib_event)
-+    return 0; /* Continue iterating.  */
-+
-+  for (loc = b->loc; loc; loc = loc->next)
 +    {
-+      struct probe_and_action *pa = solib_event_probe_at (info, loc->address);
-+
-+      if (pa != NULL)
-+	{
-+	  if (pa->action == DO_NOTHING)
-+	    b->enable_state = (stop_on_solib_events
-+			       ? bp_enabled : bp_disabled);
-+
-+	  return 0; /* Continue iterating.  */
-+	}
++      /* Continue iterating.  */
++      return 0;
 +    }
 +
-+  return 0; /* Continue iterating.  */
++  for (loc = b->loc; loc != NULL; loc = loc->next)
++    {
++      struct svr4_info *info;
++      struct probe_and_action *pa;
++
++      info = program_space_data (loc->pspace, solib_svr4_pspace_data);
++      if (info == NULL || info->probes_table == NULL)
++	continue;
++
++      pa = solib_event_probe_at (info, loc->address);
++      if (pa == NULL)
++	continue;
++
++      if (pa->action == DO_NOTHING)
++	{
++	  if (b->enable_state == bp_disabled && stop_on_solib_events)
++	    enable_breakpoint (b);
++	  else if (b->enable_state == bp_enabled && !stop_on_solib_events)
++	    disable_breakpoint (b);
++	}
++
++      break;
++    }
++
++  /* Continue iterating.  */
++  return 0;
 +}
 +
 +/* Enable or disable optional solib event breakpoints as appropriate.
@@ -875,13 +816,13 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +static void
 +svr4_update_solib_event_breakpoints (void)
 +{
-+  struct svr4_info *info = get_svr4_info ();
-+
-+  if (info->probes_table)
-+    iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
++  iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
 +}
 +
-+/* Create and register solib event breakpoints.  */
++/* Create and register solib event breakpoints.  PROBES is an array
++   of NUM_PROBES elements, each of which is vector of probes.  A
++   solib event breakpoint will be created and registered for each
++   probe.  */
 +
 +static void
 +svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
@@ -923,7 +864,6 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 +				     CORE_ADDR address)
 +{
-+  struct svr4_info *info = get_svr4_info ();
 +  struct obj_section *os;
 +
 +  os = find_pc_section (address);
@@ -940,28 +880,31 @@ Index: gdb-7.6/gdb/solib-svr4.c
 +	  memset (probes, 0, sizeof (probes));
 +	  for (i = 0; i < NUM_PROBES; i++)
 +	    {
-+	      char name[32] = { '\0' };
++	      const char *name = probe_info[i].name;
++	      char buf[32];
 +
-+	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
-+		 early version of the probes code in which the probes'
-+		 names were prefixed with "rtld_" and the "map_failed"
-+		 probe did not exist.  The locations of the probes are
-+		 otherwise the same, so we check for probes with
-+		 prefixed names if probes with unprefixed names are
-+		 not present.  */
-+
++	      /* Fedora 17 and Red Hat Enterprise Linux 6.2-6.4
++		 shipped with an early version of the probes code in
++		 which the probes' names were prefixed with "rtld_"
++		 and the "map_failed" probe did not exist.  The
++		 locations of the probes are otherwise the same, so
++		 we check for probes with prefixed names if probes
++		 with unprefixed names are not present.  */
 +	      if (with_prefix)
-+		strncat (name, "rtld_", sizeof (name) - strlen (name) - 1);
-+
-+	      strncat (name, probe_info[i].name,
-+		       sizeof (name) - strlen (name) - 1);
++		{
++		  xsnprintf (buf, sizeof (buf), "rtld_%s", name);
++		  name = buf;
++		}
 +
 +	      probes[i] = find_probes_in_objfile (os->objfile, "rtld", name);
 +
-+	      if (!strcmp (name, "rtld_map_failed"))
++	      /* The "map_failed" probe did not exist in early
++		 versions of the probes code in which the probes'
++		 names were prefixed with "rtld_".  */
++	      if (strcmp (name, "rtld_map_failed") == 0)
 +		continue;
 +
-+	      if (!VEC_length (probe_p, probes[i]))
++	      if (VEC_empty (probe_p, probes[i]))
 +		{
 +		  all_probes_found = 0;
 +		  break;
@@ -985,16 +928,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  /* Helper function for gdb_bfd_lookup_symbol.  */
  
  static int
-@@ -1501,6 +2073,8 @@ enable_break (struct svr4_info *info, in
-   info->interp_text_sect_low = info->interp_text_sect_high = 0;
-   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
- 
-+  free_probes_table (info);
-+
-   /* If we already have a shared library list in the target, and
-      r_debug contains r_brk, set the breakpoint there - this should
-      mean r_brk has already been relocated.  Assume the dynamic linker
-@@ -1532,7 +2106,7 @@ enable_break (struct svr4_info *info, in
+@@ -1532,7 +2151,7 @@ enable_break (struct svr4_info *info, in
  	 That knowledge is encoded in the address, if it's Thumb the low bit
  	 is 1.  However, we've stripped that info above and it's not clear
  	 what all the consequences are of passing a non-addr_bits_remove'd
@@ -1003,7 +937,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	 find_pc_section verifies we know about the address and have some
  	 hope of computing the right kind of breakpoint to use (via
  	 symbol info).  It does mean that GDB needs to be pointed at a
-@@ -1570,7 +2144,7 @@ enable_break (struct svr4_info *info, in
+@@ -1570,7 +2189,7 @@ enable_break (struct svr4_info *info, in
  		+ bfd_section_size (tmp_bfd, interp_sect);
  	    }
  
@@ -1012,7 +946,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	  return 1;
  	}
      }
-@@ -1728,7 +2302,8 @@ enable_break (struct svr4_info *info, in
+@@ -1728,7 +2347,8 @@ enable_break (struct svr4_info *info, in
  
        if (sym_addr != 0)
  	{
@@ -1022,7 +956,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	  xfree (interp_name);
  	  return 1;
  	}
-@@ -1754,7 +2329,7 @@ enable_break (struct svr4_info *info, in
+@@ -1754,7 +2374,7 @@ enable_break (struct svr4_info *info, in
  	  sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch (),
  							 sym_addr,
  							 &current_target);
@@ -1031,7 +965,7 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	  return 1;
  	}
      }
-@@ -1770,7 +2345,7 @@ enable_break (struct svr4_info *info, in
+@@ -1770,7 +2390,7 @@ enable_break (struct svr4_info *info, in
  	      sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch (),
  							     sym_addr,
  							     &current_target);
@@ -1040,28 +974,112 @@ Index: gdb-7.6/gdb/solib-svr4.c
  	      return 1;
  	    }
  	}
-@@ -2266,6 +2841,9 @@ svr4_solib_create_inferior_hook (int fro
+@@ -2266,6 +2886,10 @@ svr4_solib_create_inferior_hook (int fro
  
    info = get_svr4_info ();
  
-+  /* Free the probes-based interface's solib list.  */
++  /* Clear the probes-based interface's state.  */
++  free_probes_table (info);
 +  free_solib_list (info);
 +
    /* Relocate the main executable if necessary.  */
    svr4_relocate_main_executable ();
  
-@@ -2507,4 +3085,6 @@ _initialize_svr4_solib (void)
+@@ -2507,4 +3131,6 @@ _initialize_svr4_solib (void)
    svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
    svr4_so_ops.same = svr4_same;
    svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
 +  svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
 +  svr4_so_ops.handle_event = svr4_handle_solib_event;
  }
+Index: gdb-7.6/gdb/solib.c
+===================================================================
+--- gdb-7.6.orig/gdb/solib.c	2013-06-10 14:44:37.392812675 +0200
++++ gdb-7.6/gdb/solib.c	2013-06-10 14:44:37.713812578 +0200
+@@ -1221,6 +1221,37 @@ no_shared_libraries (char *ignored, int
+   objfile_purge_solibs ();
+ }
+ 
++/* See solib.h.  */
++
++void
++update_solib_breakpoints (void)
++{
++  const struct target_so_ops *ops = solib_ops (target_gdbarch ());
++
++  if (ops->update_breakpoints != NULL)
++    ops->update_breakpoints ();
++}
++
++/* See solib.h.  */
++
++void
++handle_solib_event (void)
++{
++  const struct target_so_ops *ops = solib_ops (target_gdbarch ());
++
++  if (ops->handle_event != NULL)
++    ops->handle_event ();
++
++  clear_program_space_solib_cache (current_inferior ()->pspace);
++
++  /* Check for any newly added shared libraries if we're supposed to
++     be adding them automatically.  Switch terminal for any messages
++     produced by breakpoint_re_set.  */
++  target_terminal_ours_for_output ();
++  solib_add (NULL, 0, &current_target, auto_solib_add);
++  target_terminal_inferior ();
++}
++
+ /* Reload shared libraries, but avoid reloading the same symbol file
+    we already have loaded.  */
+ 
+Index: gdb-7.6/gdb/solib.h
+===================================================================
+--- gdb-7.6.orig/gdb/solib.h	2013-01-01 07:32:51.000000000 +0100
++++ gdb-7.6/gdb/solib.h	2013-06-10 14:44:37.713812578 +0200
+@@ -90,4 +90,12 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_f
+ 								      void *),
+ 						    void *data);
+ 
++/* Enable or disable optional solib event breakpoints as appropriate.  */
++
++extern void update_solib_breakpoints (void);
++
++/* Handle an solib event by calling solib_add.  */
++
++extern void handle_solib_event (void);
++
+ #endif /* SOLIB_H */
+Index: gdb-7.6/gdb/solist.h
+===================================================================
+--- gdb-7.6.orig/gdb/solist.h	2013-01-01 07:32:51.000000000 +0100
++++ gdb-7.6/gdb/solist.h	2013-06-10 14:44:37.713812578 +0200
+@@ -148,6 +148,19 @@ struct target_so_ops
+        core file (in particular, for readonly sections).  */
+     int (*keep_data_in_core) (CORE_ADDR vaddr,
+ 			      unsigned long size);
++
++    /* Enable or disable optional solib event breakpoints as
++       appropriate.  This should be called whenever
++       stop_on_solib_events is changed.  This pointer can be
++       NULL, in which case no enabling or disabling is necessary
++       for this target.  */
++    void (*update_breakpoints) (void);
++
++    /* Target-specific processing of solib events that will be
++       performed before solib_add is called.  This pointer can be
++       NULL, in which case no specific preprocessing is necessary
++       for this target.  */
++    void (*handle_event) (void);
+   };
+ 
+ /* Free the memory associated with a (so_list *).  */
 Index: gdb-7.6/gdb/breakpoint.c
 ===================================================================
---- gdb-7.6.orig/gdb/breakpoint.c	2013-05-19 16:16:20.606087208 +0200
-+++ gdb-7.6/gdb/breakpoint.c	2013-05-19 16:21:55.288805269 +0200
-@@ -5361,25 +5361,6 @@ handle_jit_event (void)
+--- gdb-7.6.orig/gdb/breakpoint.c	2013-06-10 14:44:37.500812642 +0200
++++ gdb-7.6/gdb/breakpoint.c	2013-06-10 14:44:57.301806708 +0200
+@@ -5348,25 +5348,6 @@ handle_jit_event (void)
    target_terminal_inferior ();
  }
  

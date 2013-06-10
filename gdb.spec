@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -508,15 +508,16 @@ Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 # Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
 # Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
 # Fix performance regression when inferior opens many libraries (Gary Benson).
-#=push
-Patch718: gdb-dlopen-stap-probe-1of7.patch
-Patch719: gdb-dlopen-stap-probe-2of7.patch
-Patch720: gdb-dlopen-stap-probe-3of7.patch
-Patch721: gdb-dlopen-stap-probe-4of7.patch
-Patch722: gdb-dlopen-stap-probe-5of7.patch
-Patch723: gdb-dlopen-stap-probe-6of7.patch
-Patch822: gdb-dlopen-stap-probe-7of7.patch
-Patch827: gdb-dlopen-stap-probe-fixup.patch
+#=drop
+Patch718: gdb-dlopen-stap-probe-1of9.patch
+Patch719: gdb-dlopen-stap-probe-2of9.patch
+Patch720: gdb-dlopen-stap-probe-3of9.patch
+Patch721: gdb-dlopen-stap-probe-4of9.patch
+Patch722: gdb-dlopen-stap-probe-5of9.patch
+Patch723: gdb-dlopen-stap-probe-6of9.patch
+Patch822: gdb-dlopen-stap-probe-7of9.patch
+Patch827: gdb-dlopen-stap-probe-8of9.patch
+Patch619: gdb-dlopen-stap-probe-9of9.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -570,10 +571,17 @@ Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
 
 # Fix gcore for vDSO (on ppc64).
+#=drop
 Patch834: gdb-vdso-gcore.patch
 
 # Fix needless expansion of non-gdbindex symtabs (Doug Evans).
+#=drop
 Patch835: gdb-psymtab-expand.patch
+
+# Fix C++ lookups performance regression (Doug Evans, BZ 972677).
+#=drop
+Patch838: gdb-cxx-performance-1of2.patch
+Patch839: gdb-cxx-performance-2of2.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -783,8 +791,6 @@ find -name "*.info*"|xargs rm -f
 %patch232 -p1
 %patch828 -p1
 %patch829 -p1
-%patch836 -p1
-%patch837 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -881,6 +887,7 @@ find -name "*.info*"|xargs rm -f
 %patch723 -p1
 %patch822 -p1
 %patch827 -p1
+%patch619 -p1
 %patch627 -p1
 %patch634 -p1
 %patch653 -p1
@@ -899,7 +906,15 @@ find -name "*.info*"|xargs rm -f
 %patch832 -p1
 %patch834 -p1
 %patch835 -p1
+%patch838 -p1
+%patch839 -p1
 
+%patch836 -p1
+%patch837 -p1
+%if 0%{?scl:1}
+%patch836 -p1 -R
+%patch837 -p1 -R
+%endif
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
@@ -1402,6 +1417,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Jun 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-32.fc19
+- [scl] Disable Python frame filters on scl.
+- Update libraries opening performance fix from upstream.
+- Fix C++ lookups performance regression (Doug Evans, BZ 972677).
+
 * Tue May 28 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-31.fc19
 - [ppc] Backport hardware watchpoints fix (Edjunior Machado, BZ 967915).
 
