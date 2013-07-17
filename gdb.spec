@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1417,6 +1417,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Jul 17 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-34.fc20
+- Remove --disablerepo='*' from BZ 554152 as it conflicts with BZ 981154.
+
 * Wed Jul 17 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-33.fc20
 - Fix yum install command output when the binary RPM is missing (BZ 981154).
 - Fix the changlog entry formatting for 6.3.0.0-0.1.
