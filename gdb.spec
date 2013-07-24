@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -583,6 +583,11 @@ Patch835: gdb-psymtab-expand.patch
 Patch838: gdb-cxx-performance-1of2.patch
 Patch839: gdb-cxx-performance-2of2.patch
 
+# [ppc] Support Power8 CPU (IBM, BZ 731875).
+#=drop
+Patch840: gdb-power8-1of2.patch
+Patch841: gdb-power8-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -908,6 +913,8 @@ find -name "*.info*"|xargs rm -f
 %patch835 -p1
 %patch838 -p1
 %patch839 -p1
+%patch840 -p1
+%patch841 -p1
 
 %patch836 -p1
 %patch837 -p1
@@ -1417,6 +1424,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Jul 24 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-35.fc20
+- [ppc] Support Power8 CPU (IBM, BZ 731875).
+
 * Wed Jul 17 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-34.fc20
 - Remove --disablerepo='*' from BZ 554152 as it conflicts with BZ 981154.
 
