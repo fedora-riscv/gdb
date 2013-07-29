@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -53,7 +53,6 @@ Obsoletes: devtoolset-1.0-%{pkg_name}
 # For our convenience
 %global gdb_src %{pkg_name}-%{version}
 %global gdb_build build-%{_target_platform}
-%global gdb_docdir %{_docdir}/%{name}-doc-%{version}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -989,14 +988,13 @@ cd %{gdb_build}$fprofile
 export CFLAGS="$RPM_OPT_FLAGS"
 export LDFLAGS="%{?__global_ldflags}"
 
+# --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
 	--prefix=%{_prefix}					\
 	--libdir=%{_libdir}					\
 	--sysconfdir=%{_sysconfdir}				\
 	--mandir=%{_mandir}					\
 	--infodir=%{_infodir}					\
-	--htmldir=%{gdb_docdir}					\
-	--pdfdir=%{gdb_docdir}					\
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
@@ -1424,6 +1422,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Jul 29 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-36.fc20
+- Remove %%{gdb_docdir}, rebuild for unversioned docdirs (for BZ 986871).
+
 * Wed Jul 24 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-35.fc20
 - [ppc] Support Power8 CPU (IBM, BZ 731875).
 
