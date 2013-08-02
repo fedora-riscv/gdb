@@ -27,22 +27,23 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-#global snap       20130423
+# 6e5c95e6cf1e3c37bd3a822ca9e6721caab97a85
+%global snap       20130731
 # Freeze it when GDB gets branched
-%global snapsrc    20130312
+%global snapsrc    20130731
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.6
+Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
+Source: gdb-%{version}-cvs.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -51,7 +52,7 @@ Obsoletes: devtoolset-1.0-%{pkg_name}
 %endif
 
 # For our convenience
-%global gdb_src %{pkg_name}-%{version}
+%global gdb_src %{pkg_name}-%{version}-cvs
 %global gdb_build build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -262,12 +263,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
-Patch828: gdb-upstream-man-gcore-1of2.patch
-Patch829: gdb-upstream-man-gcore-2of2.patch
-# Backported Python frame filters (Phil Muldoon).
-Patch836: gdb-upstream-framefilters-1of2.patch
-Patch837: gdb-upstream-framefilters-2of2.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -504,20 +500,6 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 #=push+work
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
-# Fix dlopen of libpthread.so, patched glibc required (Gary Benson, BZ 669432).
-# Fix crash regression from the dlopen of libpthread.so fix (BZ 911712).
-# Fix performance regression when inferior opens many libraries (Gary Benson).
-#=drop
-Patch718: gdb-dlopen-stap-probe-1of9.patch
-Patch719: gdb-dlopen-stap-probe-2of9.patch
-Patch720: gdb-dlopen-stap-probe-3of9.patch
-Patch721: gdb-dlopen-stap-probe-4of9.patch
-Patch722: gdb-dlopen-stap-probe-5of9.patch
-Patch723: gdb-dlopen-stap-probe-6of9.patch
-Patch822: gdb-dlopen-stap-probe-7of9.patch
-Patch827: gdb-dlopen-stap-probe-8of9.patch
-Patch619: gdb-dlopen-stap-probe-9of9.patch
-
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
 Patch627: gdb-glibc-vdso-workaround.patch
@@ -533,8 +515,6 @@ Patch642: gdb-readline62-ask-more-rh.patch
 # Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
 #=push
 Patch653: gdb-attach-fail-reasons-5of5.patch
-#=fedora
-Patch657: gdb-attach-fail-reasons-5of5configure.patch
 
 # Workaround crashes from stale frame_info pointer (BZ 804256).
 #=fedora
@@ -568,24 +548,6 @@ Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 # read_var_value: Assertion `frame' failed.' (RH BZ 947564) from RHEL 6.5.
 #=fedoratest
 Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
-
-# Fix gcore for vDSO (on ppc64).
-#=drop
-Patch834: gdb-vdso-gcore.patch
-
-# Fix needless expansion of non-gdbindex symtabs (Doug Evans).
-#=drop
-Patch835: gdb-psymtab-expand.patch
-
-# Fix C++ lookups performance regression (Doug Evans, BZ 972677).
-#=drop
-Patch838: gdb-cxx-performance-1of2.patch
-Patch839: gdb-cxx-performance-2of2.patch
-
-# [ppc] Support Power8 CPU (IBM, BZ 731875).
-#=drop
-Patch840: gdb-power8-1of2.patch
-Patch841: gdb-power8-2of2.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -792,9 +754,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-%patch232 -p1
-%patch828 -p1
-%patch829 -p1
+#patch232 -p1
 %patch1 -p1
 %patch3 -p1
 
@@ -883,19 +843,9 @@ find -name "*.info*"|xargs rm -f
 %patch547 -p1
 %patch548 -p1
 %patch579 -p1
-%patch718 -p1
-%patch719 -p1
-%patch720 -p1
-%patch721 -p1
-%patch722 -p1
-%patch723 -p1
-%patch822 -p1
-%patch827 -p1
-%patch619 -p1
 %patch627 -p1
 %patch634 -p1
 %patch653 -p1
-%patch657 -p1
 %patch661 -p1
 %patch690 -p1
 %patch698 -p1
@@ -908,19 +858,7 @@ find -name "*.info*"|xargs rm -f
 %patch817 -p1
 %patch818 -p1
 %patch832 -p1
-%patch834 -p1
-%patch835 -p1
-%patch838 -p1
-%patch839 -p1
-%patch840 -p1
-%patch841 -p1
 
-%patch836 -p1
-%patch837 -p1
-%if 0%{?scl:1}
-%patch836 -p1 -R
-%patch837 -p1 -R
-%endif
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
@@ -1422,6 +1360,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-1.fc20
+- Rebase to FSF GDB 7.6.50.20130731 (pre-7.6 snapshot).
+
 * Mon Jul 29 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-36.fc20
 - Remove %%{gdb_docdir}, rebuild for unversioned docdirs (for BZ 986871).
 

@@ -3,11 +3,11 @@ Subject: [patch] Fix GNU/Linux core open: Can't read pathname for load map:  Inp
 
 [ New patch variant.  ]
 
-Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
+Index: gdb-7.6.50.20130731-cvs/gdb/solib-svr4.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solib-svr4.c	2013-01-18 23:05:19.414210015 +0100
-+++ gdb-7.5.50.20130118/gdb/solib-svr4.c	2013-01-18 23:05:34.813231664 +0100
-@@ -1221,8 +1221,17 @@ svr4_read_so_list (CORE_ADDR lm, struct
+--- gdb-7.6.50.20130731-cvs.orig/gdb/solib-svr4.c	2013-08-02 16:27:28.831259468 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/solib-svr4.c	2013-08-02 16:27:47.871284813 +0200
+@@ -1359,8 +1359,17 @@ svr4_read_so_list (CORE_ADDR lm, CORE_AD
  			  SO_NAME_MAX_PATH_SIZE - 1, &errcode);
        if (errcode != 0)
  	{
@@ -27,20 +27,20 @@ Index: gdb-7.5.50.20130118/gdb/solib-svr4.c
  	  do_cleanups (old_chain);
  	  continue;
  	}
-Index: gdb-7.5.50.20130118/gdb/solib.c
+Index: gdb-7.6.50.20130731-cvs/gdb/solib.c
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/solib.c	2013-01-18 23:05:19.415210017 +0100
-+++ gdb-7.5.50.20130118/gdb/solib.c	2013-01-18 23:05:57.421263173 +0100
-@@ -666,7 +666,7 @@ solib_used (const struct so_list *const
+--- gdb-7.6.50.20130731-cvs.orig/gdb/solib.c	2013-08-02 16:27:28.832259470 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/solib.c	2013-08-02 16:28:50.421367694 +0200
+@@ -669,7 +669,7 @@ solib_used (const struct so_list *const
     processes we've just attached to, so that's okay.  */
  
  static void
 -update_solib_list (int from_tty, struct target_ops *target)
 +update_solib_list_1 (int from_tty, struct target_ops *target)
  {
-   struct target_so_ops *ops = solib_ops (target_gdbarch ());
+   const struct target_so_ops *ops = solib_ops (target_gdbarch ());
    struct so_list *inferior = ops->current_sos();
-@@ -837,6 +837,21 @@ Do you need \"set solib-search-path\" or
+@@ -840,6 +840,21 @@ Do you need \"set solib-search-path\" or
      }
  }
  
@@ -62,11 +62,11 @@ Index: gdb-7.5.50.20130118/gdb/solib.c
  
  /* Return non-zero if NAME is the libpthread shared library.
  
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/corefile.exp
+Index: gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/corefile.exp
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/testsuite/gdb.base/corefile.exp	2013-01-18 23:05:19.416210020 +0100
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/corefile.exp	2013-01-18 23:05:34.814231667 +0100
-@@ -286,3 +286,19 @@ if {$buildid == ""} {
+--- gdb-7.6.50.20130731-cvs.orig/gdb/testsuite/gdb.base/corefile.exp	2013-08-02 16:27:28.833259471 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/corefile.exp	2013-08-02 16:27:47.872284814 +0200
+@@ -285,3 +285,19 @@ if {$buildid == ""} {
      gdb_test "info files" "Local exec file:\r\n\[ \t\]*`[string_to_regexp $debugdir/$buildid]', file type .*"
      pass $wholetest
  }
@@ -86,20 +86,18 @@ Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/corefile.exp
 +	pass $test
 +    }
 +}
-Index: gdb-7.5.50.20130118/gdb/testsuite/gdb.base/solib-symbol.exp
+Index: gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/solib-symbol.exp
 ===================================================================
---- gdb-7.5.50.20130118.orig/gdb/testsuite/gdb.base/solib-symbol.exp	2013-01-18 23:05:19.416210020 +0100
-+++ gdb-7.5.50.20130118/gdb/testsuite/gdb.base/solib-symbol.exp	2013-01-18 23:05:34.814231667 +0100
-@@ -27,7 +27,8 @@ set lib_flags [list debug ldflags=-Wl,-B
- # Binary file.
- set testfile "solib-symbol-main"
+--- gdb-7.6.50.20130731-cvs.orig/gdb/testsuite/gdb.base/solib-symbol.exp	2013-08-02 16:27:28.833259471 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/solib-symbol.exp	2013-08-02 16:28:22.549330973 +0200
+@@ -29,6 +29,7 @@ set testfile "solib-symbol-main"
  set srcfile ${srcdir}/${subdir}/${testfile}.c
--set binfile ${objdir}/${subdir}/${testfile}
-+set executable ${testfile}
-+set binfile ${objdir}/${subdir}/${executable}
+ set binfile [standard_output_file ${testfile}]
  set bin_flags [list debug shlib=${binfile_lib}]
++set executable ${testfile}
  
  if [get_compiler_info] {
+     return -1
 @@ -72,8 +73,26 @@ gdb_test "br foo2" \
  	 "Breakpoint.*: foo2. .2 locations..*" \
  	 "foo2 in mdlib"
