@@ -37,7 +37,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -90,7 +90,6 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 #push=Should be pushed upstream.
 #maybepush=Should be pushed upstream unless it got obsoleted there.
 #fedora=Should stay as a Fedora patch.
-#ia64=Drop after RHEL-5 rebases and rebuilds are no longer meaningful.
 #fedoratest=Keep it in Fedora only as a regression test safety.
 #+ppc=Specific for ppc32/ppc64/ppc*
 #+work=Requires some nontrivial work.
@@ -121,10 +120,6 @@ Patch1: gdb-6.3-rh-dummykfail-20041202.patch
 # Match the Fedora's version info.
 #=fedora
 Patch2: gdb-6.3-rh-testversion-20041202.patch
-
-# Check that libunwind works - new test then fix
-#=ia64
-Patch3: gdb-6.3-rh-testlibunwind-20041202.patch
 
 # Better parse 64-bit PPC system call prologues.
 #=maybepush+ppc: Write new testcase.
@@ -167,33 +162,13 @@ Patch133: gdb-6.3-test-dtorfix-20050121.patch
 #=fedoratest
 Patch136: gdb-6.3-test-movedir-20050125.patch
 
-# Fix gcore for threads
-#=ia64
-Patch140: gdb-6.3-gcore-thread-20050204.patch
-
 # Test sibling threads to set threaded watchpoints for x86 and x86-64
 #=fedoratest
 Patch145: gdb-6.3-threaded-watchpoints2-20050225.patch
 
-# Do not issue warning message about first page of storage for ia64 gcore
-#=ia64
-Patch153: gdb-6.3-ia64-gcore-page0-20050421.patch
-
-# IA64 sigtramp prev register patch
-#=ia64
-Patch158: gdb-6.3-ia64-sigtramp-frame-20050708.patch
-
-# IA64 gcore speed-up patch
-#=ia64
-Patch160: gdb-6.3-ia64-gcore-speedup-20050714.patch
-
 # Notify observers that the inferior has been created
 #=fedoratest
 Patch161: gdb-6.3-inferior-notification-20050721.patch
-
-# Fix ia64 info frame bug
-#=ia64
-Patch162: gdb-6.3-ia64-info-frame-fix-20050725.patch
 
 # Verify printing of inherited members test
 #=fedoratest
@@ -202,10 +177,6 @@ Patch163: gdb-6.3-inheritancetest-20050726.patch
 # Add readnever option
 #=push
 Patch164: gdb-6.3-readnever-20050907.patch
-
-# Fix ia64 gdb problem with user-specified SIGILL handling
-#=ia64
-Patch169: gdb-6.3-ia64-sigill-20051115.patch
 
 # Fix debuginfo addresses resolving for --emit-relocs Linux kernels (BZ 203661).
 #=push+work: There was some mail thread about it, this patch may be a hack.
@@ -591,7 +562,7 @@ BuildRequires: texlive-ec texlive-cm-super
 
 # BuildArch would break RHEL-5 by overriding arch and not building noarch.
 %if 0%{?el5:1}
-ExclusiveArch: noarch i386 x86_64 ppc ppc64 ia64 s390 s390x
+ExclusiveArch: noarch i386 x86_64 ppc ppc64 s390 s390x
 %endif # 0%{?el5:1}
 
 %if 0%{?_with_testsuite:1}
@@ -638,7 +609,7 @@ BuildRequires: fpc
 BuildRequires: gcc44 gcc44-gfortran
 %endif
 # Copied from gcc-4.1.2-32.
-%ifarch %{ix86} x86_64 ia64 ppc alpha
+%ifarch %{ix86} x86_64 ppc alpha
 BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
 %endif
@@ -666,16 +637,6 @@ BuildRequires: xz
 %endif
 
 %endif # 0%{?_with_testsuite:1}
-
-%ifarch ia64
-%if 0%{!?el5:1}
-BuildRequires: libunwind-devel >= 0.99-0.1.frysk20070405cvs
-Requires: libunwind >= 0.99-0.1.frysk20070405cvs
-%else
-BuildRequires: libunwind >= 0.96-3
-Requires: libunwind >= 0.96-3
-%endif
-%endif
 
 %{?scl:Requires:%scl_runtime}
 
@@ -756,7 +717,6 @@ find -name "*.info*"|xargs rm -f
 %patch349 -p1
 #patch232 -p1
 %patch1 -p1
-%patch3 -p1
 
 %patch105 -p1
 %patch111 -p1
@@ -766,16 +726,10 @@ find -name "*.info*"|xargs rm -f
 %patch125 -p1
 %patch133 -p1
 %patch136 -p1
-%patch140 -p1
 %patch145 -p1
-%patch153 -p1
-%patch158 -p1
-%patch160 -p1
 %patch161 -p1
-%patch162 -p1
 %patch163 -p1
 %patch164 -p1
-%patch169 -p1
 %patch188 -p1
 %patch194 -p1
 %patch196 -p1
@@ -936,7 +890,7 @@ export LDFLAGS="%{?__global_ldflags}"
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
-%ifnarch %{ix86} alpha ia64 ppc s390 s390x x86_64 ppc64 sparc sparcv9 sparc64
+%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 sparc sparcv9 sparc64
 	--disable-werror					\
 %else
 	--enable-werror						\
@@ -974,11 +928,7 @@ $(: RHEL-5 librpm has incompatible API. )			\
 %else
 	--without-lzma						\
 %endif
-%ifarch ia64
-	--with-libunwind					\
-%else
 	--without-libunwind					\
-%endif
 %ifarch sparc sparcv9 sparc64
 	--without-mmap						\
 %endif
@@ -1360,8 +1310,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-2.fc20
+- Drop ia64 patches and .spec support.
+
 * Fri Aug  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-1.fc20
-- Rebase to FSF GDB 7.6.50.20130731 (pre-7.6 snapshot).
+- Rebase to FSF GDB 7.6.50.20130731 (snapshot between 7.6 and future 7.7).
 
 * Mon Jul 29 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-36.fc20
 - Remove %%{gdb_docdir}, rebuild for unversioned docdirs (for BZ 986871).
