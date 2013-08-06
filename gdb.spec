@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -583,6 +583,9 @@ Patch835: gdb-psymtab-expand.patch
 Patch838: gdb-cxx-performance-1of2.patch
 Patch839: gdb-cxx-performance-2of2.patch
 
+# Fix crash on 'enable count' (Simon Marchi, BZ 993118).
+Patch843: gdb-enable-count-crash.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -908,6 +911,7 @@ find -name "*.info*"|xargs rm -f
 %patch835 -p1
 %patch838 -p1
 %patch839 -p1
+%patch843 -p1
 
 %patch836 -p1
 %patch837 -p1
@@ -1417,6 +1421,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Aug  6 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-33.fc19
+- Fix yum install command when the binary RPM is missing (BZ 981154).
+- Fix crash on 'enable count' (Simon Marchi, BZ 993118).
+- Fix the changlog entry formatting for 6.3.0.0-0.1.
+
 * Mon Jun 10 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-32.fc19
 - [scl] Disable Python frame filters on scl.
 - Update libraries opening performance fix from upstream.
@@ -3744,8 +3753,8 @@ prelink base addresses.  Fixes BZ 175075, BZ 190545.
 - Enable PPC CFI, remove merged ppc patches.
 
 * Wed Jan 12 2005 Elena Zannoni <ezannoni@redhat.com> - 6.3.0.0-0.1
-		  Andrew Cagney <cagney@redhat.com>
-		  Jeff Johnston <jjohnstn@redhat.com>
+- commit co-authors Andrew Cagney <cagney@redhat.com> and
+  Jeff Johnston <jjohnstn@redhat.com>.
 - Various fixes to complete the import and merge.
 
 * Wed Dec 01 2004 Andrew Cagney <cagney@redhat.com> - 6.3.0.0
