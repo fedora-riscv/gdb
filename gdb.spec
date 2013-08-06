@@ -37,7 +37,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -520,6 +520,9 @@ Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 #=fedoratest
 Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
 
+# Fix crash on 'enable count' (Simon Marchi, BZ 993118).
+Patch843: gdb-enable-count-crash.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -551,14 +554,13 @@ BuildRequires: python-devel%{?_isa}
 BuildRequires: libstdc++%{?_isa}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 %endif # 0%{!?_without_python:1}
-# gdb-doc in PDF:
+# gdb-doc in PDF, see: https://bugzilla.redhat.com/show_bug.cgi?id=919891#c10
 BuildRequires: texinfo-tex
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+BuildRequires: texlive-collection-latexrecommended
+%endif
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
-# PDF doc workaround, see: # https://bugzilla.redhat.com/show_bug.cgi?id=919891
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-BuildRequires: texlive-ec texlive-cm-super
-%endif
 
 # BuildArch would break RHEL-5 by overriding arch and not building noarch.
 %if 0%{?el5:1}
@@ -812,6 +814,7 @@ find -name "*.info*"|xargs rm -f
 %patch817 -p1
 %patch818 -p1
 %patch832 -p1
+%patch843 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1310,6 +1313,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Aug  6 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-3.fc20
+- Simplify BuildRequires by texlive-collection-latexrecommended (see BZ 919891).
+- Fix crash on 'enable count' (Simon Marchi, BZ 993118).
+
 * Fri Aug  2 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-2.fc20
 - Drop ia64 patches and .spec support.
 
