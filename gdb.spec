@@ -37,7 +37,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -557,8 +557,7 @@ BuildRequires: libstdc++%{?_isa}
 # gdb-doc in PDF, see: https://bugzilla.redhat.com/show_bug.cgi?id=919891#c10
 BuildRequires: texinfo-tex
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-#BuildRequires: texlive-collection-latexrecommended
-BuildRequires: texlive-ec texlive-cm-super
+BuildRequires: texlive-collection-latexrecommended
 %endif
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
@@ -1314,6 +1313,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Aug  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-5.fc20
+- Simplify BuildRequires by texlive-collection-latexrecommended (see BZ 919891).
+
 * Tue Aug  6 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-4.fc20
 - Revert the texlive-collection-latexrecommended change (see BZ 919891).
 
