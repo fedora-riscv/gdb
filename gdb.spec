@@ -11,8 +11,9 @@
 %global dist .el5
 %global el5 1
 %endif
-# RHEL-5 Brew does not set %{el5}.
+# RHEL-5 Brew does not set %{el5}, BZ 1002198 tps-srpmtest does not set %{rhel}.
 %if "%{?dist}" == ".el5"
+%global rhel 5
 %global el5 1
 %endif
 
@@ -37,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1313,6 +1314,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Aug  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-6.fc20
+- [rhel5] tps-srpmtest does not set %%{rhel} (BZ 1002198, Miroslav Franc).
+
 * Thu Aug  8 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-5.fc20
 - Simplify BuildRequires by texlive-collection-latexrecommended (see BZ 919891).
 
