@@ -34,7 +34,7 @@ Version: 7.5.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?dist}
+Release: 40%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1290,8 +1290,8 @@ for pyo in "" "-O";do
 done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
 %if 0%{!?_without_python:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily now:
 for LIB in lib lib64;do
   LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_root_prefix}/$LIB"
@@ -1313,8 +1313,15 @@ for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python -name "*.py"` \
   # Files come from gdb-archer.patch and can be also further patched.
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
 done
+%else # 0%{!?rhel:1} || 0%{?rhel} > 6
+# BZ 999645: /usr/share/gdb/auto-load/ needs filesystem symlinks
+mkdir -p $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
+for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
+  ln -s $(echo %{_root_prefix}|sed 's#^/*##')/$i \
+        $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/$i
+done
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 %endif # 0%{!?_without_python:1}
-%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 # gdb-add-index cannot be run even for SCL package on RHEL<=6.
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
@@ -1451,6 +1458,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Aug 28 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-40.fc18
+- Fix /usr/share/gdb/auto-load/ need of filesystem symlinks (BZ 999645).
+  It needs: yum remove gdb-heap; yum reinstall gdb; yum install gdb-heap
+
 * Sat Apr 27 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.5.1-39.fc18
 - Fix false "Unknown error 512" on x32 (H.J. Lu, BZ 956883).
 
