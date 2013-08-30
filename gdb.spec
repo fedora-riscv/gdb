@@ -36,7 +36,7 @@ Version: 7.6
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1397,7 +1397,7 @@ rm -rf $RPM_BUILD_ROOT
 for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
   src="%{_datadir}/gdb/auto-load/$i"
   dst="%{_datadir}/gdb/auto-load/%{_root_prefix}/$i"
-  if test -d $src;then
+  if test -d $src -a ! -L $src;then
     if ! rmdir 2>/dev/null $src;then
       mv -n $src/* $dst/
       rmdir $src
@@ -1440,6 +1440,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-37.fc19
+- Fix false warnings of new %%pre during future upgrades (BZ 999645).
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-36.fc19
 - New %%pre to fix failed upgrade of the previous commit (BZ 999645).
 
