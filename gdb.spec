@@ -32,11 +32,11 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20130312
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.6
+Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?dist}
+Release: 38%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -578,11 +578,6 @@ Patch834: gdb-vdso-gcore.patch
 #=drop
 Patch835: gdb-psymtab-expand.patch
 
-# Fix C++ lookups performance regression (Doug Evans, BZ 972677).
-#=drop
-Patch838: gdb-cxx-performance-1of2.patch
-Patch839: gdb-cxx-performance-2of2.patch
-
 # Fix crash on 'enable count' (Simon Marchi, BZ 993118).
 Patch843: gdb-enable-count-crash.patch
 
@@ -909,8 +904,6 @@ find -name "*.info*"|xargs rm -f
 %patch832 -p1
 %patch834 -p1
 %patch835 -p1
-%patch838 -p1
-%patch839 -p1
 %patch843 -p1
 
 %patch836 -p1
@@ -1440,6 +1433,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-38.fc19
+- Rebase to FSF GDB 7.6.1.
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6-37.fc19
 - Fix false warnings of new %%pre during future upgrades (BZ 999645).
 
