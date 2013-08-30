@@ -36,7 +36,7 @@ Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1433,6 +1433,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-39.fc19
+- Load /etc/gdbinit.d/*.{gdb,py} files automatically (BZ 981520).
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-38.fc19
 - Rebase to FSF GDB 7.6.1.
 
