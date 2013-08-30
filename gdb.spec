@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1286,6 +1286,18 @@ rm -rf $RPM_BUILD_ROOT
 %endif # %{have_inproctrace}
 %endif
 
+%pre
+for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
+  src="%{_datadir}/gdb/auto-load/$i"
+  dst="%{_datadir}/gdb/auto-load/%{_root_prefix}/$i"
+  if test -d $src -a ! -L $src;then
+    if ! rmdir 2>/dev/null $src;then
+      mv -n $src/* $dst/
+      rmdir $src
+    fi
+  fi
+done
+
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
 %endif # !noarch
 %if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
@@ -1321,6 +1333,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-8.fc20
+- New %%pre to fix failed upgrade of the previous commit (BZ 999645).
+- Fix false warnings of new %%pre during future upgrades (BZ 999645).
+
 * Wed Aug 28 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-7.fc20
 - Fix /usr/share/gdb/auto-load/ need of filesystem symlinks (BZ 999645).
   It needs: yum remove gdb-heap; yum reinstall gdb; yum install gdb-heap
