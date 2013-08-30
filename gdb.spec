@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1333,6 +1333,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-9.fc20
+- Load /etc/gdbinit.d/*.{gdb,py} files automatically (BZ 981520).
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-8.fc20
 - New %%pre to fix failed upgrade of the previous commit (BZ 999645).
 - Fix false warnings of new %%pre during future upgrades (BZ 999645).
