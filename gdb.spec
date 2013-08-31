@@ -11,8 +11,9 @@
 %global dist .el5
 %global el5 1
 %endif
-# RHEL-5 Brew does not set %{el5}.
+# RHEL-5 Brew does not set %{el5}, BZ 1002198 tps-srpmtest does not set %{rhel}.
 %if "%{?dist}" == ".el5"
+%global rhel 5
 %global el5 1
 %endif
 
@@ -36,7 +37,7 @@ Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 39%{?dist}
+Release: 40%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -578,6 +579,11 @@ Patch834: gdb-vdso-gcore.patch
 #=drop
 Patch835: gdb-psymtab-expand.patch
 
+# [ppc] Support Power8 CPU (IBM, BZ 731875).
+#=drop
+Patch840: gdb-power8-1of2.patch
+Patch841: gdb-power8-2of2.patch
+
 # Fix crash on 'enable count' (Simon Marchi, BZ 993118).
 Patch843: gdb-enable-count-crash.patch
 
@@ -904,6 +910,8 @@ find -name "*.info*"|xargs rm -f
 %patch832 -p1
 %patch834 -p1
 %patch835 -p1
+%patch840 -p1
+%patch841 -p1
 %patch843 -p1
 
 %patch836 -p1
@@ -1433,6 +1441,11 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Aug 31 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-40.fc19
+- Remove --disablerepo='*' from BZ 554152 as it conflicts with BZ 981154.
+- [ppc] Support Power8 CPU (IBM, BZ 731875).
+- [rhel5] tps-srpmtest does not set %%{rhel} (BZ 1002198, Miroslav Franc).
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-39.fc19
 - Load /etc/gdbinit.d/*.{gdb,py} files automatically (BZ 981520).
 
