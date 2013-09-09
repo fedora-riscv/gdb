@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -844,9 +844,9 @@ find -name "*.orig" | xargs rm -f
 # Change the version that gets printed at GDB startup, so it is RH specific.
 cat > gdb/version.in << _FOO
 %if 0%{!?rhel:1}
-Fedora (%{version}-%{release})
+Fedora %{version}-%{release}
 %else # !0%{!?rhel:1} 
-Red Hat Enterprise Linux (%{version}-%{release})
+Red Hat Enterprise Linux %{version}-%{release}
 %endif # !0%{!?rhel:1} 
 _FOO
 
@@ -1333,6 +1333,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Sep  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-10.fc20
+- Fix the version string to be GNU standards compliant (BZ 1004949).
+
 * Fri Aug 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-9.fc20
 - Load /etc/gdbinit.d/*.{gdb,py} files automatically (BZ 981520).
 
