@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -952,6 +952,7 @@ $(: It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu ) \
 %ifarch noarch
 	$(:)
 %else
+	--enable-targets=arm-linux-gnu,aarch64-linux-gnu	\
 	%{_target_platform}
 %endif
 %endif
@@ -1333,6 +1334,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Sep 25 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-11.fc20
+- Enable arm-linux-gnu and aarch64-linux-gnu targets on all archs (BZ 1011647).
+
 * Mon Sep  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-10.fc20
 - Fix the version string to be GNU standards compliant (BZ 1004949).
 
