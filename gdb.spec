@@ -37,7 +37,7 @@ Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?dist}
+Release: 42%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -587,6 +587,11 @@ Patch841: gdb-power8-2of2.patch
 # Fix crash on 'enable count' (Simon Marchi, BZ 993118).
 Patch843: gdb-enable-count-crash.patch
 
+# Fix the case when GDB leaks memory because value_struct_elt
+# does not call check_typedef.  (Doug Evans, BZ 15695, filed as
+# RH BZ 1013453).
+Patch844: gdb-rhbz1013453-value-struct-elt-memory-leak.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -913,6 +918,7 @@ find -name "*.info*"|xargs rm -f
 %patch840 -p1
 %patch841 -p1
 %patch843 -p1
+%patch844 -p1
 
 %patch836 -p1
 %patch837 -p1
@@ -1441,6 +1447,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Sep 30 2013 Sergio Durigan Junior <sergiodj@redhat.com> - 7.6.1-41.fc19
+- Fix the case when GDB leaks memory because value_struct_elt does not call
+  check_typedef.  (Doug Evans, BZ 15695, filed as RH BZ 1013453).
+
 * Mon Sep  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-41.fc19
 - Fix the version string to be GNU standards compliant (BZ 1004949).
 
