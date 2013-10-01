@@ -1,0 +1,136 @@
+https://sourceware.org/ml/gdb-patches/2013-07/msg00469.html
+
+Hi.
+This patch adds the missing calls to check_typedef
+and adds a testcase to show the issue.
+
+The PR is not closeable yet, but the remaining issues are more cleanups
+than actual bug fixes.
+
+Regression tested on amd64-linux.
+
+I will check this in in a few days if there are no objections.
+
+[The multiple calls to check_typedef (value_type (*argp)) are
+bothersome, but the code is simpler this way, and I expect
+resolving the rest of the issues in 15695 to potentially change this
+code significantly.]
+
+---
+
+commit cbb25189b69e501ddca64917d810b54bb1466c93
+Author: Doug Evans <dje@google.com>
+Date:   Thu Aug 1 23:59:47 2013 +0000
+
+    	PR symtab/15695
+    	* valops.c (value_struct_elt): Add missing call to check_typedef.
+    	(value_find_oload_method_list): Ditto.
+    
+    	testsuite/
+    	* gdb.base/func-ptr.exp: New file.
+    	* gdb.base/func-ptr.c: New file.
+
+2013-08-01  Doug Evans  <dje@google.com>
+ 
+	PR symtab/15695
+	* valops.c (value_struct_elt): Add missing call to check_typedef.
+	(value_find_oload_method_list): Ditto.
+
+2013-08-01  Doug Evans  <dje@google.com>
+
+	PR symtab/15695
+	* gdb.base/func-ptr.exp: New file.
+	* gdb.base/func-ptr.c: New file.
+
+Index: gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/func-ptr.c
+===================================================================
+--- /dev/null
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/func-ptr.c
+@@ -0,0 +1,30 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2013 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++void
++bar ()
++{
++}
++
++typedef void foo (void);
++foo *pbar = bar;
++
++int
++main ()
++{
++  return 0;
++}
+Index: gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/func-ptr.exp
+===================================================================
+--- /dev/null
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/func-ptr.exp
+@@ -0,0 +1,30 @@
++# Copyright 2013 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This testcase exercises bug 15695.
++# Trying to print foo->bar if foo is a pointer to a typedef of a pointer
++# to a function will put gdb into an infinite loop.
++
++if { [prepare_for_testing func-ptr.exp "func-ptr" {func-ptr.c} {debug}] } {
++    return -1
++}
++
++if ![runto_main] {
++    fail "Can't run to main"
++    return 0
++}
++
++# This would put gdb into an infinite loop.
++gdb_test "print pbar->baz" "Attempt to extract .*"
+Index: gdb-7.6.50.20130731-cvs/gdb/valops.c
+===================================================================
+--- gdb-7.6.50.20130731-cvs.orig/gdb/valops.c
++++ gdb-7.6.50.20130731-cvs/gdb/valops.c
+@@ -2275,7 +2275,7 @@ value_struct_elt (struct value **argp, s
+     {
+       *argp = value_ind (*argp);
+       /* Don't coerce fn pointer to fn and then back again!  */
+-      if (TYPE_CODE (value_type (*argp)) != TYPE_CODE_FUNC)
++      if (TYPE_CODE (check_typedef (value_type (*argp))) != TYPE_CODE_FUNC)
+ 	*argp = coerce_array (*argp);
+       t = check_typedef (value_type (*argp));
+     }
+@@ -2439,7 +2439,7 @@ value_find_oload_method_list (struct val
+     {
+       *argp = value_ind (*argp);
+       /* Don't coerce fn pointer to fn and then back again!  */
+-      if (TYPE_CODE (value_type (*argp)) != TYPE_CODE_FUNC)
++      if (TYPE_CODE (check_typedef (value_type (*argp))) != TYPE_CODE_FUNC)
+ 	*argp = coerce_array (*argp);
+       t = check_typedef (value_type (*argp));
+     }
