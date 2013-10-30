@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1340,6 +1340,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed Oct 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-13.fc20
+- [rhel5] Fix /etc/gdbinit compatibility with python-2.4.
+
 * Mon Sep 30 2013 Sergio Durigan Junior <sergiodj@redhat.com> - 7.6.50.20130731-12.fc20
 - Fix the case when GDB leaks memory because value_struct_elt does not call
   check_typedef.  (Doug Evans, BZ 15695, filed as RH BZ 1013453).
