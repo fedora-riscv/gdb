@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1340,6 +1340,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Nov  3 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-14.fc20
+- Fix %{_bindir}gdb-add-index to also use -iex 'set auto-load no'.
+
 * Wed Oct 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-13.fc20
 - [rhel5] Fix /etc/gdbinit compatibility with python-2.4.
 
