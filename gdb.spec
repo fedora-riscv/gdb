@@ -37,7 +37,7 @@ Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?dist}
+Release: 45%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1447,6 +1447,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue Nov  5 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-45.fc19
+- [aarch64] Backport two fixes (BZ 1026484).
+
 * Sun Nov  3 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-44.fc19
 - Fix %{_bindir}gdb-add-index to also use -iex 'set auto-load no'.
 
