@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -529,6 +529,9 @@ Patch843: gdb-enable-count-crash.patch
 # RH BZ 1013453).
 Patch844: gdb-rhbz1013453-value-struct-elt-memory-leak.patch
 
+# Fix explicit Class:: inside class scope (BZ 874817, Keith Seitz).
+Patch845: gdb-implicit-this.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -822,6 +825,7 @@ find -name "*.info*"|xargs rm -f
 %patch832 -p1
 %patch843 -p1
 %patch844 -p1
+%patch845 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1340,6 +1344,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sat Nov  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-16.fc20
+- Fix explicit Class:: inside class scope (BZ 874817, Keith Seitz).
+
 * Tue Nov  5 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-15.fc20
 - [aarch64] Backport two fixes (BZ 1026484).
 
