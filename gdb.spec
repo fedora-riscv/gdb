@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -597,7 +597,10 @@ ExclusiveArch: noarch i386 x86_64 ppc ppc64 s390 s390x
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-java gcc-objc
+BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
+%if 0%{!?rhel:1} || 0%{?rhel} < 7
+BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
+%endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: gcc-go
 %endif
@@ -628,7 +631,6 @@ BuildRequires: glibc-devel%{bits_local} glibc-devel%{bits_other}
 BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
-BuildRequires: libgcj%{bits_local} libgcj%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
@@ -1344,6 +1346,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Nov 18 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-17.fc20
+- [rhel7] [--with testsuite] Remove gcc-java&co. BuildRequires.
+
 * Sat Nov  9 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-16.fc20
 - Fix explicit Class:: inside class scope (BZ 874817, Keith Seitz).
 
