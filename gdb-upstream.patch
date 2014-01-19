@@ -201,3 +201,861 @@ index 93246b3..c2d271a 100644
  
    for (i = 0; i < count; i++)
      {
+
+
+
+commit 9a95e75ee9944cbe6fe3021b92a7c4de87be6fe1
+Author: Yao Qi <yao@codesourcery.com>
+Date:   Wed Aug 14 11:53:11 2013 +0000
+
+    gdb/
+    
+    	PR gdb/15837:
+    	* frame.h (read_frame_local): Declare.
+    	* mi/mi-cmd-stack.c (list_args_or_locals): Call
+    	read_frame_local.
+    	* stack.c (read_frame_local): New.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,11 @@
++2013-08-14  Yao Qi  <yao@codesourcery.com>
++
++	PR gdb/15837:
++	* frame.h (read_frame_local): Declare.
++	* mi/mi-cmd-stack.c (list_args_or_locals): Call
++	read_frame_local.
++	* stack.c (read_frame_local): New.
++
+ 2013-06-28  Pedro Alves  <palves@redhat.com>
+ 
+ 	PR tui/14880
+--- a/gdb/frame.h
++++ b/gdb/frame.h
+@@ -714,6 +714,8 @@ struct frame_arg
+ extern void read_frame_arg (struct symbol *sym, struct frame_info *frame,
+ 			    struct frame_arg *argp,
+ 			    struct frame_arg *entryargp);
++extern void read_frame_local (struct symbol *sym, struct frame_info *frame,
++			      struct frame_arg *argp);
+ 
+ extern void args_info (char *, int);
+ 
+--- a/gdb/mi/mi-cmd-stack.c
++++ b/gdb/mi/mi-cmd-stack.c
+@@ -417,7 +417,10 @@ list_args_or_locals (enum what_to_list what, enum print_values values,
+ 		      && TYPE_CODE (type) != TYPE_CODE_UNION)
+ 		    {
+ 		case PRINT_ALL_VALUES:
+-		      read_frame_arg (sym2, fi, &arg, &entryarg);
++		  if (SYMBOL_IS_ARGUMENT (sym))
++		    read_frame_arg (sym2, fi, &arg, &entryarg);
++		  else
++		    read_frame_local (sym2, fi, &arg);
+ 		    }
+ 		  break;
+ 		}
+--- a/gdb/stack.c
++++ b/gdb/stack.c
+@@ -296,6 +296,27 @@ print_frame_arg (const struct frame_arg *arg)
+   annotate_arg_end ();
+ }
+ 
++/* Read in inferior function local SYM at FRAME into ARGP.  Caller is
++   responsible for xfree of ARGP->ERROR.  This function never throws an
++   exception.  */
++
++void
++read_frame_local (struct symbol *sym, struct frame_info *frame,
++		  struct frame_arg *argp)
++{
++  volatile struct gdb_exception except;
++  struct value *val = NULL;
++
++  TRY_CATCH (except, RETURN_MASK_ERROR)
++    {
++      val = read_var_value (sym, frame);
++    }
++
++  argp->error = (val == NULL) ? xstrdup (except.message) : NULL;
++  argp->sym = sym;
++  argp->val = val;
++}
++
+ /* Read in inferior function parameter SYM at FRAME into ARGP.  Caller is
+    responsible for xfree of ARGP->ERROR.  This function never throws an
+    exception.  */
+
+
+
+commit 4b0f5fbb253fbbe9c2f4578ebd7dd94204a46477
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Thu Aug 29 14:24:16 2013 +0000
+
+    PR server/15604
+    
+    gdb/gdbserver/
+    2013-08-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR server/15604
+    	* linux-low.c
+    	(linux_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
+    	Close LISTEN_DESC and optionally REMOTE_DESC.
+    	(lynx_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
+    	Close LISTEN_DESC and optionally REMOTE_DESC.
+    	* remote-utils.c (remote_desc, listen_desc): Remove static qualifier.
+    	* server.h (remote_desc, listen_desc): New declaration.
+    	* spu-low.c
+    	(spu_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
+    	Close LISTEN_DESC and optionally REMOTE_DESC.
+
+### a/gdb/gdbserver/ChangeLog
+### b/gdb/gdbserver/ChangeLog
+## -1,3 +1,17 @@
++2013-08-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	PR server/15604
++	* linux-low.c
++	(linux_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
++	Close LISTEN_DESC and optionally REMOTE_DESC.
++	(lynx_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
++	Close LISTEN_DESC and optionally REMOTE_DESC.
++	* remote-utils.c (remote_desc, listen_desc): Remove static qualifier.
++	* server.h (remote_desc, listen_desc): New declaration.
++	* spu-low.c
++	(spu_create_inferior) <pid == 0 && !remote_connection_is_stdio ()>:
++	Close LISTEN_DESC and optionally REMOTE_DESC.
++
+ 2013-05-31  Doug Evans  <dje@google.com>
+ 
+ 	PR server/15594
+--- a/gdb/gdbserver/linux-low.c
++++ b/gdb/gdbserver/linux-low.c
+@@ -668,6 +668,12 @@ linux_create_inferior (char *program, char **allargs)
+ 	      /* Errors ignored.  */;
+ 	    }
+ 	}
++      else
++	{
++	  close (listen_desc);
++	  if (gdb_connected ())
++	    close (remote_desc);
++	}
+ 
+       execv (program, allargs);
+       if (errno == ENOENT)
+--- a/gdb/gdbserver/lynx-low.c
++++ b/gdb/gdbserver/lynx-low.c
+@@ -218,6 +218,12 @@ lynx_create_inferior (char *program, char **allargs)
+       pgrp = getpid();
+       setpgid (0, pgrp);
+       ioctl (0, TIOCSPGRP, &pgrp);
++      if (!remote_connection_is_stdio ())
++	{
++	  close (listen_desc);
++	  if (gdb_connected ())
++	    close (remote_desc);
++	}
+       lynx_ptrace (PTRACE_TRACEME, null_ptid, 0, 0, 0);
+       execv (program, allargs);
+       fprintf (stderr, "Cannot exec %s: %s.\n", program, strerror (errno));
+--- a/gdb/gdbserver/remote-utils.c
++++ b/gdb/gdbserver/remote-utils.c
+@@ -108,8 +108,8 @@ struct ui_file *gdb_stdlog;
+ 
+ static int remote_is_stdio = 0;
+ 
+-static gdb_fildes_t remote_desc = INVALID_DESCRIPTOR;
+-static gdb_fildes_t listen_desc = INVALID_DESCRIPTOR;
++gdb_fildes_t remote_desc = INVALID_DESCRIPTOR;
++gdb_fildes_t listen_desc = INVALID_DESCRIPTOR;
+ 
+ /* FIXME headerize? */
+ extern int using_threads;
+--- a/gdb/gdbserver/server.h
++++ b/gdb/gdbserver/server.h
+@@ -274,6 +274,8 @@ extern void hostio_last_error_from_errno (char *own_buf);
+ /* From remote-utils.c */
+ 
+ extern int remote_debug;
++extern gdb_fildes_t remote_desc;
++extern gdb_fildes_t listen_desc;
+ extern int noack_mode;
+ extern int transport_is_reliable;
+ 
+--- a/gdb/gdbserver/spu-low.c
++++ b/gdb/gdbserver/spu-low.c
+@@ -273,6 +273,12 @@ spu_create_inferior (char *program, char **allargs)
+ 
+   if (pid == 0)
+     {
++      if (!remote_connection_is_stdio ())
++	{
++	  close (listen_desc);
++	  if (gdb_connected ())
++	    close (remote_desc);
++	}
+       ptrace (PTRACE_TRACEME, 0, 0, 0);
+ 
+       setpgid (0, 0);
+
+
+
+commit 510604eee7892c54d98eefa2893afb823c721406
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Wed Aug 28 17:55:56 2013 +0000
+
+    PR gdb/15415
+    
+    gdb/
+    2013-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR gdb/15415
+    	* corefile.c (get_exec_file): Use exec_filename.
+    	* defs.h (OPF_DISABLE_REALPATH): New definition.  Add new comment.
+    	* exec.c (exec_close): Free EXEC_FILENAME.
+    	(exec_file_attach): New variable canonical_pathname.  Use
+    	OPF_DISABLE_REALPATH.  Call gdb_realpath explicitly.  Set
+    	EXEC_FILENAME.
+    	* exec.h (exec_filename): New.
+    	* inferior.c (print_inferior, inferior_command): Use
+    	PSPACE_EXEC_FILENAME.
+    	* mi/mi-main.c (print_one_inferior): Likewise.
+    	* progspace.c (clone_program_space, print_program_space): Likewise.
+    	* progspace.h (struct program_space): New field pspace_exec_filename.
+    	* source.c (openp): Describe OPF_DISABLE_REALPATH.  New variable
+    	realpath_fptr, initialize it from OPF_DISABLE_REALPATH, use it.
+    
+    gdb/testsuite/
+    2013-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR gdb/15415
+    	* gdb.base/argv0-symlink.c: New file.
+    	* gdb.base/argv0-symlink.exp: New file.
+
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/corefile.c gdb-7.6.50.20130731-cvs/gdb/corefile.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/corefile.c	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/corefile.c	2014-01-19 16:24:46.238323054 +0100
+@@ -182,8 +182,8 @@ validate_files (void)
+ char *
+ get_exec_file (int err)
+ {
+-  if (exec_bfd)
+-    return bfd_get_filename (exec_bfd);
++  if (exec_filename)
++    return exec_filename;
+   if (!err)
+     return NULL;
+ 
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/defs.h gdb-7.6.50.20130731-cvs/gdb/defs.h
+--- gdb-7.6.50.20130731-cvs-orig/gdb/defs.h	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/defs.h	2014-01-19 16:24:46.239323054 +0100
+@@ -346,8 +346,10 @@ extern const char *pc_prefix (CORE_ADDR)
+ 
+ /* From source.c */
+ 
++/* See openp function definition for their description.  */
+ #define OPF_TRY_CWD_FIRST     0x01
+ #define OPF_SEARCH_IN_PATH    0x02
++#define OPF_DISABLE_REALPATH  0x04
+ 
+ extern int openp (const char *, int, const char *, int, char **);
+ 
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/exec.c gdb-7.6.50.20130731-cvs/gdb/exec.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/exec.c	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/exec.c	2014-01-19 16:25:18.616315354 +0100
+@@ -102,6 +102,9 @@ exec_close (void)
+       exec_bfd_mtime = 0;
+ 
+       remove_target_sections (&exec_bfd);
++
++      xfree (exec_filename);
++      exec_filename = NULL;
+     }
+ }
+ 
+@@ -179,12 +182,13 @@ exec_file_attach (char *filename, int fr
+   else
+     {
+       struct cleanup *cleanups;
+-      char *scratch_pathname;
++      char *scratch_pathname, *canonical_pathname;
+       int scratch_chan;
+       struct target_section *sections = NULL, *sections_end = NULL;
+       char **matching;
+ 
+-      scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, filename,
++      scratch_chan = openp (getenv ("PATH"),
++			    OPF_TRY_CWD_FIRST | OPF_DISABLE_REALPATH, filename,
+ 		   write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
+ 			    &scratch_pathname);
+ #if defined(__GO32__) || defined(_WIN32) || defined(__CYGWIN__)
+@@ -193,7 +197,9 @@ exec_file_attach (char *filename, int fr
+ 	  char *exename = alloca (strlen (filename) + 5);
+ 
+ 	  strcat (strcpy (exename, filename), ".exe");
+-	  scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
++	  scratch_chan = openp (getenv ("PATH"),
++				OPF_TRY_CWD_FIRST | OPF_DISABLE_REALPATH,
++				exename,
+ 	     write_files ? O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
+ 	     &scratch_pathname);
+ 	}
+@@ -203,11 +209,16 @@ exec_file_attach (char *filename, int fr
+ 
+       cleanups = make_cleanup (xfree, scratch_pathname);
+ 
++      /* gdb_bfd_open (and its variants) prefers canonicalized pathname for
++	 better BFD caching.  */
++      canonical_pathname = gdb_realpath (scratch_pathname);
++      make_cleanup (xfree, canonical_pathname);
++
+       if (write_files)
+-	exec_bfd = gdb_bfd_fopen (scratch_pathname, gnutarget,
++	exec_bfd = gdb_bfd_fopen (canonical_pathname, gnutarget,
+ 				  FOPEN_RUB, scratch_chan);
+       else
+-	exec_bfd = gdb_bfd_open (scratch_pathname, gnutarget, scratch_chan);
++	exec_bfd = gdb_bfd_open (canonical_pathname, gnutarget, scratch_chan);
+ 
+       if (!exec_bfd)
+ 	{
+@@ -215,6 +226,9 @@ exec_file_attach (char *filename, int fr
+ 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+ 	}
+ 
++      gdb_assert (exec_filename == NULL);
++      exec_filename = xstrdup (scratch_pathname);
++
+       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
+ 	{
+ 	  /* Make sure to close exec_bfd, or else "run" might try to use
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/exec.h gdb-7.6.50.20130731-cvs/gdb/exec.h
+--- gdb-7.6.50.20130731-cvs-orig/gdb/exec.h	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/exec.h	2014-01-19 16:24:46.262323049 +0100
+@@ -32,6 +32,7 @@ extern struct target_ops exec_ops;
+ 
+ #define exec_bfd current_program_space->ebfd
+ #define exec_bfd_mtime current_program_space->ebfd_mtime
++#define exec_filename current_program_space->pspace_exec_filename
+ 
+ /* Builds a section table, given args BFD, SECTABLE_PTR, SECEND_PTR.
+    Returns 0 if OK, 1 on error.  */
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/inferior.c gdb-7.6.50.20130731-cvs/gdb/inferior.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/inferior.c	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/inferior.c	2014-01-19 16:24:46.264323048 +0100
+@@ -588,9 +588,8 @@ print_inferior (struct ui_out *uiout, ch
+       ui_out_field_string (uiout, "target-id",
+ 			   inferior_pid_to_str (inf->pid));
+ 
+-      if (inf->pspace->ebfd)
+-	ui_out_field_string (uiout, "exec",
+-			     bfd_get_filename (inf->pspace->ebfd));
++      if (inf->pspace->pspace_exec_filename != NULL)
++	ui_out_field_string (uiout, "exec", inf->pspace->pspace_exec_filename);
+       else
+ 	ui_out_field_skip (uiout, "exec");
+ 
+@@ -704,8 +703,8 @@ inferior_command (char *args, int from_t
+   printf_filtered (_("[Switching to inferior %d [%s] (%s)]\n"),
+ 		   inf->num,
+ 		   inferior_pid_to_str (inf->pid),
+-		   (inf->pspace->ebfd
+-		    ? bfd_get_filename (inf->pspace->ebfd)
++		   (inf->pspace->pspace_exec_filename != NULL
++		    ? inf->pspace->pspace_exec_filename
+ 		    : _("<noexec>")));
+ 
+   if (inf->pid != 0)
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/mi/mi-main.c gdb-7.6.50.20130731-cvs/gdb/mi/mi-main.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/mi/mi-main.c	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/mi/mi-main.c	2014-01-19 16:24:46.273323046 +0100
+@@ -573,10 +573,10 @@ print_one_inferior (struct inferior *inf
+       if (inferior->pid != 0)
+ 	ui_out_field_int (uiout, "pid", inferior->pid);
+ 
+-      if (inferior->pspace->ebfd)
++      if (inferior->pspace->pspace_exec_filename != NULL)
+ 	{
+ 	  ui_out_field_string (uiout, "executable",
+-			       bfd_get_filename (inferior->pspace->ebfd));
++			       inferior->pspace->pspace_exec_filename);
+ 	}
+ 
+       data.cores = 0;
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/progspace.c gdb-7.6.50.20130731-cvs/gdb/progspace.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/progspace.c	2013-01-02 02:54:56.000000000 +0100
++++ gdb-7.6.50.20130731-cvs/gdb/progspace.c	2014-01-19 16:24:46.275323045 +0100
+@@ -196,8 +196,8 @@ clone_program_space (struct program_spac
+ 
+   set_current_program_space (dest);
+ 
+-  if (src->ebfd != NULL)
+-    exec_file_attach (bfd_get_filename (src->ebfd), 0);
++  if (src->pspace_exec_filename != NULL)
++    exec_file_attach (src->pspace_exec_filename, 0);
+ 
+   if (src->symfile_object_file != NULL)
+     symbol_file_add_main (src->symfile_object_file->name, 0);
+@@ -336,9 +336,8 @@ print_program_space (struct ui_out *uiou
+ 
+       ui_out_field_int (uiout, "id", pspace->num);
+ 
+-      if (pspace->ebfd)
+-	ui_out_field_string (uiout, "exec",
+-			     bfd_get_filename (pspace->ebfd));
++      if (pspace->pspace_exec_filename)
++	ui_out_field_string (uiout, "exec", pspace->pspace_exec_filename);
+       else
+ 	ui_out_field_skip (uiout, "exec");
+ 
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/progspace.h gdb-7.6.50.20130731-cvs/gdb/progspace.h
+--- gdb-7.6.50.20130731-cvs-orig/gdb/progspace.h	2013-01-02 02:54:56.000000000 +0100
++++ gdb-7.6.50.20130731-cvs/gdb/progspace.h	2014-01-19 16:24:46.276323045 +0100
+@@ -148,6 +148,10 @@ struct program_space
+     bfd *ebfd;
+     /* The last-modified time, from when the exec was brought in.  */
+     long ebfd_mtime;
++    /* Similar to bfd_get_filename (exec_bfd) but in original form given
++       by user, without symbolic links and pathname resolved.
++       It needs to be freed by xfree.  It is not NULL iff EBFD is not NULL.  */
++    char *pspace_exec_filename;
+ 
+     /* The address space attached to this program space.  More than one
+        program space may be bound to the same address space.  In the
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/source.c gdb-7.6.50.20130731-cvs/gdb/source.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/source.c	2013-07-31 21:41:54.000000000 +0200
++++ gdb-7.6.50.20130731-cvs/gdb/source.c	2014-01-19 16:24:46.278323045 +0100
+@@ -692,6 +692,11 @@ is_regular_file (const char *name)
+    and the file, sigh!  Emacs gets confuzzed by this when we print the
+    source file name!!! 
+ 
++   If OPTS does not have OPF_DISABLE_REALPATH set return FILENAME_OPENED
++   resolved by gdb_realpath.  Even with OPF_DISABLE_REALPATH this function
++   still returns filename starting with "/".  If FILENAME_OPENED is NULL
++   this option has no effect.
++
+    If a file is found, return the descriptor.
+    Otherwise, return -1, with errno set for the last name we tried to open.  */
+ 
+@@ -851,19 +856,27 @@ done:
+       /* If a file was opened, canonicalize its filename.  */
+       if (fd < 0)
+ 	*filename_opened = NULL;
+-      else if (IS_ABSOLUTE_PATH (filename))
+-	*filename_opened = gdb_realpath (filename);
+       else
+ 	{
+-	  /* Beware the // my son, the Emacs barfs, the botch that catch...  */
++	  char *(*realpath_fptr) (const char *);
+ 
+-	  char *f = concat (current_directory,
+-			    IS_DIR_SEPARATOR (current_directory[strlen (current_directory) - 1])
+-			    ? "" : SLASH_STRING,
+-			    filename, (char *)NULL);
++	  realpath_fptr = ((opts & OPF_DISABLE_REALPATH) != 0
++			   ? xstrdup : gdb_realpath);
+ 
+-	  *filename_opened = gdb_realpath (f);
+-	  xfree (f);
++	  if (IS_ABSOLUTE_PATH (filename))
++	    *filename_opened = realpath_fptr (filename);
++	  else
++	    {
++	      /* Beware the // my son, the Emacs barfs, the botch that catch...  */
++
++	      char *f = concat (current_directory,
++				IS_DIR_SEPARATOR (current_directory[strlen (current_directory) - 1])
++				? "" : SLASH_STRING,
++				filename, (char *)NULL);
++
++	      *filename_opened = realpath_fptr (f);
++	      xfree (f);
++	    }
+ 	}
+     }
+ 
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/testsuite/gdb.base/argv0-symlink.c gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/argv0-symlink.c
+--- gdb-7.6.50.20130731-cvs-orig/gdb/testsuite/gdb.base/argv0-symlink.c	1970-01-01 01:00:00.000000000 +0100
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/argv0-symlink.c	2014-01-19 16:24:46.286323043 +0100
+@@ -0,0 +1,22 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2013 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int
++main (int argc, char **argv)
++{
++  return 0;
++}
+diff -dup -ruNp gdb-7.6.50.20130731-cvs-orig/gdb/testsuite/gdb.base/argv0-symlink.exp gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/argv0-symlink.exp
+--- gdb-7.6.50.20130731-cvs-orig/gdb/testsuite/gdb.base/argv0-symlink.exp	1970-01-01 01:00:00.000000000 +0100
++++ gdb-7.6.50.20130731-cvs/gdb/testsuite/gdb.base/argv0-symlink.exp	2014-01-19 16:24:46.287323043 +0100
+@@ -0,0 +1,62 @@
++# Copyright 2013 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile
++
++if { [build_executable ${testfile}.exp ${testfile} ${srcfile}] == -1 } {
++    return -1
++}
++
++set test "kept file symbolic link name"
++set filelink "${testfile}-filelink"
++
++remote_file host delete [standard_output_file $filelink]
++set status [remote_exec host "ln -sf ${testfile} [standard_output_file $filelink]"]
++if {[lindex $status 0] != 0} {
++    unsupported "$test (host does not support symbolic links)"
++    return 0
++}
++
++clean_restart "$filelink"
++
++if ![runto_main] {
++    untested "could not run to main"
++    return -1
++}
++
++gdb_test {print argv[0]} "/$filelink\"" $test
++
++
++set test "kept directory symbolic link name"
++set dirlink "${testfile}-dirlink"
++
++# 'ln -sf' does not overwrite symbol link to a directory.
++# 'remote_file host delete' uses stat (not lstat), therefore it refuses to
++# delete a directory.
++remote_exec host "rm -f [standard_output_file $dirlink]"
++set status [remote_exec host "ln -sf . [standard_output_file $dirlink]"]
++if {[lindex $status 0] != 0} {
++    unsupported "$test (host does not support symbolic links)"
++    return 0
++}
++
++clean_restart "$dirlink/$filelink"
++
++if ![runto_main] {
++    untested "could not run to main"
++    return -1
++}
++
++gdb_test {print argv[0]} "/$dirlink/$filelink\"" $test
+
+
+
+commit 4856b6bc835e25ab0f48462104152701c864858c
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Sun Oct 13 16:11:08 2013 +0000
+
+    Improve Executable displayed path (PR 15415 regression kind #2)
+    
+    gdb/
+    2013-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	Canonicalize directories for EXEC_FILENAME.
+    	* exec.c (exec_file_attach): Use gdb_realpath_keepfile for
+    	exec_filename.
+    	* utils.c (gdb_realpath_keepfile): New function.
+    	* utils.h (gdb_realpath_keepfile): New declaration.
+    
+    gdb/testsuite/
+    2013-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	Canonicalize directories for EXEC_FILENAME.
+    	* gdb.base/argv0-symlink.exp
+    	(kept file symbolic link name for info inferiors): New.
+    	(kept directory symbolic link name): Setup kfail.
+    	(kept directory symbolic link name for info inferiors): New.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,11 @@
++2013-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Canonicalize directories for EXEC_FILENAME.
++	* exec.c (exec_file_attach): Use gdb_realpath_keepfile for
++	exec_filename.
++	* utils.c (gdb_realpath_keepfile): New function.
++	* utils.h (gdb_realpath_keepfile): New declaration.
++
+ 2013-10-11  Doug Evans  <dje@google.com>
+ 
+ 	* Makefile.in (GDBFLAGS): New variable.
+--- a/gdb/exec.c
++++ b/gdb/exec.c
+@@ -224,7 +224,7 @@ exec_file_attach (char *filename, int from_tty)
+ 	}
+ 
+       gdb_assert (exec_filename == NULL);
+-      exec_filename = xstrdup (scratch_pathname);
++      exec_filename = gdb_realpath_keepfile (scratch_pathname);
+ 
+       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
+ 	{
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,11 @@
++2013-10-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Canonicalize directories for EXEC_FILENAME.
++	* gdb.base/argv0-symlink.exp
++	(kept file symbolic link name for info inferiors): New.
++	(kept directory symbolic link name): Setup kfail.
++	(kept directory symbolic link name for info inferiors): New.
++
+ 2013-10-11  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+ 
+ 	* gdb.arch/s390-multiarch.exp: New file.
+--- a/gdb/testsuite/gdb.base/argv0-symlink.exp
++++ b/gdb/testsuite/gdb.base/argv0-symlink.exp
+@@ -37,6 +37,7 @@ if ![runto_main] {
+ }
+ 
+ gdb_test {print argv[0]} "/$filelink\"" $test
++gdb_test "info inferiors" "/$subdir/$filelink *" "$test for info inferiors"
+ 
+ 
+ set test "kept directory symbolic link name"
+@@ -59,4 +60,9 @@ if ![runto_main] {
+     return -1
+ }
+ 
++# gdbserver does not have this issue.
++if ![is_remote target] {
++    setup_kfail "*-*-*" gdb/15934
++}
+ gdb_test {print argv[0]} "/$dirlink/$filelink\"" $test
++gdb_test "info inferiors" "/$subdir/$filelink *" "$test for info inferiors"
+--- a/gdb/utils.c
++++ b/gdb/utils.c
+@@ -3233,6 +3233,52 @@ gdb_realpath (const char *filename)
+   return xstrdup (filename);
+ }
+ 
++/* Return a copy of FILENAME, with its directory prefix canonicalized
++   by gdb_realpath.  */
++
++char *
++gdb_realpath_keepfile (const char *filename)
++{
++  const char *base_name = lbasename (filename);
++  char *dir_name;
++  char *real_path;
++  char *result;
++
++  /* Extract the basename of filename, and return immediately 
++     a copy of filename if it does not contain any directory prefix.  */
++  if (base_name == filename)
++    return xstrdup (filename);
++
++  dir_name = alloca ((size_t) (base_name - filename + 2));
++  /* Allocate enough space to store the dir_name + plus one extra
++     character sometimes needed under Windows (see below), and
++     then the closing \000 character.  */
++  strncpy (dir_name, filename, base_name - filename);
++  dir_name[base_name - filename] = '\000';
++
++#ifdef HAVE_DOS_BASED_FILE_SYSTEM
++  /* We need to be careful when filename is of the form 'd:foo', which
++     is equivalent of d:./foo, which is totally different from d:/foo.  */
++  if (strlen (dir_name) == 2 && isalpha (dir_name[0]) && dir_name[1] == ':')
++    {
++      dir_name[2] = '.';
++      dir_name[3] = '\000';
++    }
++#endif
++
++  /* Canonicalize the directory prefix, and build the resulting
++     filename.  If the dirname realpath already contains an ending
++     directory separator, avoid doubling it.  */
++  real_path = gdb_realpath (dir_name);
++  if (IS_DIR_SEPARATOR (real_path[strlen (real_path) - 1]))
++    result = concat (real_path, base_name, (char *) NULL);
++  else
++    result = concat (real_path, SLASH_STRING, base_name, (char *) NULL);
++
++  xfree (real_path);
++  return result;
++}
++
+ ULONGEST
+ align_up (ULONGEST v, int n)
+ {
+--- a/gdb/utils.h
++++ b/gdb/utils.h
+@@ -128,6 +128,8 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
+ 
+ extern char *gdb_realpath (const char *);
+ 
++extern char *gdb_realpath_keepfile (const char *);
++
+ extern int gdb_filename_fnmatch (const char *pattern, const char *string,
+ 				 int flags);
+ 
+
+
+
+commit 24890efdabbd9d827cdd2088b022f070da04b14f
+Author: Tom Tromey <tromey@redhat.com>
+Date:   Fri Oct 18 13:12:32 2013 -0600
+
+    fix argv0-symlink.exp for parallel mode
+    
+    argv0-symlink.exp doesn't work properly if standard_output_file puts
+    files into a per-test subdirectory.  That's because it assumes that
+    files appear in $subdir, which is no longer true.
+    
+    This patch fixes the problem by computing the correct directory at
+    runtime.
+    
+    Tested both with and without GDB_PARALLEL on x86-64 Fedora 18.
+    
+    2013-11-04  Tom Tromey  <tromey@redhat.com>
+    
+    	* gdb.base/argv0-symlink.exp: Compute executable's directory
+    	dynamically.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,5 +1,10 @@
+ 2013-11-04  Tom Tromey  <tromey@redhat.com>
+ 
++	* gdb.base/argv0-symlink.exp: Compute executable's directory
++	dynamically.
++
++2013-11-04  Tom Tromey  <tromey@redhat.com>
++
+ 	* gdb.asm/asm-source.exp: Use standard_output_file.
+ 
+ 2013-11-04  Tom Tromey  <tromey@redhat.com>
+--- a/gdb/testsuite/gdb.base/argv0-symlink.exp
++++ b/gdb/testsuite/gdb.base/argv0-symlink.exp
+@@ -37,7 +37,14 @@ if ![runto_main] {
+ }
+ 
+ gdb_test {print argv[0]} "/$filelink\"" $test
+-gdb_test "info inferiors" "/$subdir/$filelink *" "$test for info inferiors"
++
++# For a link named /PATH/TO/DIR/LINK, we want to check the output
++# against "/DIR/LINK", but computed in a way that doesn't make
++# assumptions about the test directory layout.
++set full_filelink [standard_output_file $filelink]
++set lastdir [file tail [file dirname $full_filelink]]
++
++gdb_test "info inferiors" "/$lastdir/$filelink *" "$test for info inferiors"
+ 
+ 
+ set test "kept directory symbolic link name"
+@@ -65,4 +72,4 @@ if ![is_remote target] {
+     setup_kfail "*-*-*" gdb/15934
+ }
+ gdb_test {print argv[0]} "/$dirlink/$filelink\"" $test
+-gdb_test "info inferiors" "/$subdir/$filelink *" "$test for info inferiors"
++gdb_test "info inferiors" "/$lastdir/$filelink *" "$test for info inferiors"
+
+
+
+http://sourceware.org/ml/gdb-patches/2014-01/msg00722.html
+Subject: [patch] Fix gdb.base/argv0-symlink.exp FAIL in long dirpath
+
+
+--VbJkn9YxBvnuCH5J
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+Hi,
+
+when you build GDB in a very long directory pathname it will:
+
+(gdb) print argv[0]
+$1 = 0x7fffffffdb07 "/home/jkratoch/redhat/", 'x' <repeats 178 times>...
+(gdb) FAIL: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+With the fix:
+
+(gdb) print argv[0]
+$1 = 0x7fffffffdb07 "/home/jkratoch/redhat/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/gdb-test/gdb/testsuite/gdb.base/argv0-symlink-filelink"
+(gdb) PASS: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+The "set print repeats unlimited" part is there to prevent the following
+output, it would still PASS (as only its tail is matched) but it is not much
+correct.
+
+(gdb) print argv[0]
+$1 = 0x7fffffffdb07 "/home/jkratoch/redhat/", 'x' <repeats 195 times>, "/gdb-test/gdb/testsuite/gdb.base/argv0-symlink-filelink"
+(gdb) PASS: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+I will check it in.
+
+Tested on x86_64-fedora20-linux-gnu.
+
+
+Jan
+
+--VbJkn9YxBvnuCH5J
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename="argv0.patch"
+
+gdb/testsuite/
+2014-01-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gdb.base/argv0-symlink.exp FAIL in long dirpath.
+	* gdb.base/argv0-symlink.exp (elements first, repeats first)
+	(elements second, repeats second): New.
+
+diff --git a/gdb/testsuite/gdb.base/argv0-symlink.exp b/gdb/testsuite/gdb.base/argv0-symlink.exp
+index 0e0202d..7bf5c2f 100644
+--- a/gdb/testsuite/gdb.base/argv0-symlink.exp
++++ b/gdb/testsuite/gdb.base/argv0-symlink.exp
+@@ -36,6 +36,10 @@ if ![runto_main] {
+     return -1
+ }
+ 
++# Very long directory paths could be cut below.
++gdb_test_no_output "set print elements unlimited" "elements first"
++gdb_test_no_output "set print repeats unlimited" "repeats first"
++
+ gdb_test {print argv[0]} "/$filelink\"" $test
+ 
+ # For a link named /PATH/TO/DIR/LINK, we want to check the output
+@@ -67,6 +71,10 @@ if ![runto_main] {
+     return -1
+ }
+ 
++# Very long directory paths could be cut below.
++gdb_test_no_output "set print elements unlimited" "elements second"
++gdb_test_no_output "set print repeats unlimited" "repeats second"
++
+ # gdbserver does not have this issue.
+ if ![is_remote target] {
+     setup_kfail "*-*-*" gdb/15934
+
+--VbJkn9YxBvnuCH5J--
+
