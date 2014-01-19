@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1346,6 +1346,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Jan 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-19.fc20
+- Backport several gdb-7.6.x stable branch fixes (BZ 1055155).
+
 * Wed Dec 25 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-18.fc20
 - [aarch64] Backport two breakpoint/watchpoint fixes.
 
