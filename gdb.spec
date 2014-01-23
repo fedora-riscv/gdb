@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -964,7 +964,7 @@ $(: It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu ) \
 %ifarch noarch
 	$(:)
 %else
-	--enable-targets=arm-linux-gnu,aarch64-linux-gnu	\
+	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu	\
 	%{_target_platform}
 %endif
 %endif
@@ -1346,6 +1346,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jan 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-20.fc20
+- [s390*,ppc*] Enable secondary targets s390* and ppc* (BZ 1056259).
+
 * Sun Jan 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-19.fc20
 - Backport several gdb-7.6.x stable branch fixes (BZ 1055155).
 
