@@ -37,7 +37,7 @@ Version: 7.6.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?dist}
+Release: 49%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -1072,6 +1072,7 @@ $(: It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu ) \
 %ifarch noarch
 	$(:)
 %else
+	--enable-targets=s390-linux-gnu,powerpc-linux-gnu	\
 	%{_target_platform}
 %endif
 %endif
@@ -1453,6 +1454,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Jan 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-49.fc19
+- [s390*,ppc*] Enable secondary targets s390* and ppc* (BZ 1056259).
+
 * Wed Dec 25 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.1-48.fc19
 - [aarch64] Backport two breakpoint/watchpoint fixes.
 
