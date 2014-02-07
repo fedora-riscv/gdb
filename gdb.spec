@@ -1,5 +1,6 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
+# --with asan: gcc -fsanitize=address
 # --without python: No python support.
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
 #                 workload gets run it decreases the general performance now.
@@ -29,22 +30,22 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # 6e5c95e6cf1e3c37bd3a822ca9e6721caab97a85
-%global snap       20130731
+#global snap       20140127
 # Freeze it when GDB gets branched
-%global snapsrc    20130731
+%global snapsrc    20140108
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.6.50.%{snap}
+Version: 7.7
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-%{version}-cvs.tar.bz2
+Source: gdb-%{version}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -53,7 +54,7 @@ Obsoletes: devtoolset-1.0-%{pkg_name}
 %endif
 
 # For our convenience
-%global gdb_src %{pkg_name}-%{version}-cvs
+%global gdb_src %{pkg_name}-%{version}
 %global gdb_build build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -297,10 +298,6 @@ Patch282: gdb-6.7-charsign-test.patch
 #=fedoratest+ppc
 Patch284: gdb-6.7-ppc-clobbered-registers-O2-test.patch
 
-# Testsuite fixes for more stable/comparable results.
-#=fedoratest
-Patch287: gdb-6.7-testsuite-stable-results.patch
-
 # Test ia64 memory leaks of the code using libunwind.
 #=fedoratest
 Patch289: gdb-6.5-ia64-libunwind-leak-test.patch
@@ -524,13 +521,11 @@ Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
 # Fix crash on 'enable count' (Simon Marchi, BZ 993118).
 Patch843: gdb-enable-count-crash.patch
 
-# Fix the case when GDB leaks memory because value_struct_elt
-# does not call check_typedef.  (Doug Evans, BZ 15695, filed as
-# RH BZ 1013453).
-Patch844: gdb-rhbz1013453-value-struct-elt-memory-leak.patch
+# Fix testsuite "ERROR: no fileid for".
+Patch846: gdb-testsuite-nohostid.patch
 
-# Fix explicit Class:: inside class scope (BZ 874817, Keith Seitz).
-Patch845: gdb-implicit-this.patch
+# Fix Python stack corruption.
+Patch847: gdb-python-stacksmash.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -771,7 +766,6 @@ find -name "*.info*"|xargs rm -f
 %patch276 -p1
 %patch282 -p1
 %patch284 -p1
-%patch287 -p1
 %patch289 -p1
 %patch290 -p1
 %patch294 -p1
@@ -826,8 +820,8 @@ find -name "*.info*"|xargs rm -f
 %patch818 -p1
 %patch832 -p1
 %patch843 -p1
-%patch844 -p1
-%patch845 -p1
+%patch846 -p1
+%patch847 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -893,8 +887,8 @@ do
 mkdir %{gdb_build}$fprofile
 cd %{gdb_build}$fprofile
 
-export CFLAGS="$RPM_OPT_FLAGS"
-export LDFLAGS="%{?__global_ldflags}"
+export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
+export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
@@ -1346,6 +1340,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Fri Feb  7 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-1.fc21
+- Rebase to FSF GDB 7.7.
+- New rpmbuild option: --with asan
+
 * Thu Jan 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-20.fc20
 - [s390*,ppc*] Enable secondary targets s390* and ppc* (BZ 1056259).
 
