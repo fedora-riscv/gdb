@@ -39,7 +39,7 @@ Version: 7.7
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -527,6 +527,12 @@ Patch846: gdb-testsuite-nohostid.patch
 # Fix Python stack corruption.
 Patch847: gdb-python-stacksmash.patch
 
+# [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
+Patch848: gdb-dts-rhel6-python-compat.patch
+
+# Fix gdb-7.7 auto-load from /usr/share/gdb/auto-load/ regression.
+Patch849: gdb-auto-load-lost-path-7.7.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -822,7 +828,12 @@ find -name "*.info*"|xargs rm -f
 %patch843 -p1
 %patch846 -p1
 %patch847 -p1
+%patch849 -p1
 
+%patch848 -p1
+%if 0%{!?el6:1}
+%patch848 -p1 -R
+%endif
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
 %patch393 -p1 -R
@@ -1155,8 +1166,8 @@ for pyo in "" "-O";do
 done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
-mkdir $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
 %if 0%{!?_without_python:1}
+mkdir $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily now:
 for LIB in lib lib64;do
@@ -1192,6 +1203,7 @@ done
 # gdb-add-index cannot be run even for SCL package on RHEL<=6.
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 rm -f $RPM_BUILD_ROOT%{_bindir}/gdb-add-index
+rm -f $RPM_BUILD_ROOT%{_mandir}/*/gdb-add-index.1*
 %endif
 
 # Remove the files that are part of a gdb build but that are owned and
@@ -1265,7 +1277,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/*/gdbinit.5*
 %{_mandir}/*/gdb.1*
 %{_mandir}/*/gcore.1*
+# gdb-add-index cannot be run even for SCL package on RHEL<=6.
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 %{_mandir}/*/gdb-add-index.1*
+%endif
 %{_bindir}/gstack
 %{_mandir}/*/gstack.1*
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -1293,6 +1308,9 @@ rm -rf $RPM_BUILD_ROOT
 %endif # %{have_inproctrace}
 %endif
 
+%if 0%{!?_without_python:1}
+# [rhel] Do not migrate /usr/share/gdb/auto-load/ with symlinks on RHELs.
+%if 0%{!?rhel:1}
 %pre
 for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
   src="%{_datadir}/gdb/auto-load/$i"
@@ -1304,6 +1322,8 @@ for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
     fi
   fi
 done
+%endif # 0%{!?rhel:1}
+%endif # 0%{!?_without_python:1}
 
 # It would break RHEL-5 by leaving excessive files for the doc subpackage.
 %endif # !noarch
@@ -1340,6 +1360,12 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Sun Feb 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-3.fc21
+- [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
+- [rhel6] Do not install its man page if gdb-add-index is not installed.
+- [rhel] Do not migrate /usr/share/gdb/auto-load/ with symlinks on RHELs.
+- Fix gdb-7.7 auto-load from /usr/share/gdb/auto-load/ regression.
+
 * Sun Feb  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-2.fc21
 - [rhel] Fix rebase build regression on RHEL systems (Tobias Burnus).
 
