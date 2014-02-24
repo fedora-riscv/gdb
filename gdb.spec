@@ -38,7 +38,7 @@ Version: 7.6.50.%{snap}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -532,6 +532,11 @@ Patch844: gdb-rhbz1013453-value-struct-elt-memory-leak.patch
 # Fix explicit Class:: inside class scope (BZ 874817, Keith Seitz).
 Patch845: gdb-implicit-this.patch
 
+# Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
+Patch850: gdb-gnat-dwarf-crash-1of3.patch
+Patch851: gdb-gnat-dwarf-crash-2of3.patch
+Patch852: gdb-gnat-dwarf-crash-3of3.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -828,6 +833,9 @@ find -name "*.info*"|xargs rm -f
 %patch843 -p1
 %patch844 -p1
 %patch845 -p1
+%patch850 -p1
+%patch851 -p1
+%patch852 -p1
 
 %patch393 -p1
 %if 0%{!?el5:1} || 0%{?scl:1}
@@ -1346,6 +1354,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Feb 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-21.fc20
+- Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
+
 * Thu Jan 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20140119-20.fc20
 - [s390*,ppc*] Enable secondary targets s390* and ppc* (BZ 1056259).
 
