@@ -39,7 +39,7 @@ Version: 7.7
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -533,6 +533,11 @@ Patch848: gdb-dts-rhel6-python-compat.patch
 # Fix gdb-7.7 auto-load from /usr/share/gdb/auto-load/ regression.
 Patch849: gdb-auto-load-lost-path-7.7.patch
 
+# Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
+Patch850: gdb-gnat-dwarf-crash-1of3.patch
+Patch851: gdb-gnat-dwarf-crash-2of3.patch
+Patch852: gdb-gnat-dwarf-crash-3of3.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -829,6 +834,9 @@ find -name "*.info*"|xargs rm -f
 %patch846 -p1
 %patch847 -p1
 %patch849 -p1
+%patch850 -p1
+%patch851 -p1
+%patch852 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1360,6 +1368,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Feb 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-4.fc21
+- Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
+
 * Sun Feb 23 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-3.fc21
 - [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
 - [rhel6] Do not install its man page if gdb-add-index is not installed.
