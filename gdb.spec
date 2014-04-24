@@ -39,7 +39,7 @@ Version: 7.7
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -541,6 +541,9 @@ Patch850: gdb-gnat-dwarf-crash-1of3.patch
 Patch851: gdb-gnat-dwarf-crash-2of3.patch
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
+# Fix build failures for GCC 4.9 (Nick Clifton).
+Patch864: gcc-4.9-compat.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -841,6 +844,7 @@ find -name "*.info*"|xargs rm -f
 %patch851 -p1
 %patch852 -p1
 %patch863 -p1
+%patch864 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1372,6 +1376,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Apr 24 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-6.fc21
+- Fix build failures for GCC 4.9 (Nick Clifton).
+
 * Thu Apr 24 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-5.fc21
 - Fix 'gdb gives highly misleading error when debuginfo pkg is present,
   but not corresponding binary pkg' (RH BZ 981154).
