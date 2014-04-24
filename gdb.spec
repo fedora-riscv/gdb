@@ -39,7 +39,7 @@ Version: 7.7
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
 Group: Development/Debuggers
@@ -285,6 +285,9 @@ Patch415: gdb-6.6-buildid-locate-core-as-arg.patch
 Patch519: gdb-6.6-buildid-locate-rpm-librpm-workaround.patch
 # [SCL] Skip deprecated .gdb_index warning for Red Hat built files (BZ 953585).
 Patch833: gdb-6.6-buildid-locate-rpm-scl.patch
+# Fix 'gdb gives highly misleading error when debuginfo pkg is present,
+# but not corresponding binary pkg' (RH BZ 981154).
+Patch863: gdb-6.6-buildid-locate-misleading-warning-missing-debuginfo-rhbz981154.patch
 
 # Add kernel vDSO workaround (`no loadable ...') on RHEL-5 (kernel BZ 765875).
 #=push
@@ -837,6 +840,7 @@ find -name "*.info*"|xargs rm -f
 %patch850 -p1
 %patch851 -p1
 %patch852 -p1
+%patch863 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1368,6 +1372,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Apr 24 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-5.fc21
+- Fix 'gdb gives highly misleading error when debuginfo pkg is present,
+  but not corresponding binary pkg' (RH BZ 981154).
+
 * Mon Feb 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-4.fc21
 - Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
 
