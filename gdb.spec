@@ -41,7 +41,7 @@ Version: 7.7
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
 Release: 6%{?dist}
 
-License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain
+License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
@@ -1376,6 +1376,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon May  5 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-7.fc21
+- Add GFDL License to the main package (man pages are generated from .texinfo).
+
 * Thu Apr 24 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-6.fc21
 - Fix build failures for GCC 4.9 (Nick Clifton).
 
