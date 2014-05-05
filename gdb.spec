@@ -544,6 +544,10 @@ Patch852: gdb-gnat-dwarf-crash-3of3.patch
 # Fix build failures for GCC 4.9 (Nick Clifton).
 Patch864: gcc-4.9-compat.patch
 
+# Fix TLS access for -static -pthread (BZ 1080660).
+Patch865: gdb-static-tls-1of2.patch
+Patch866: gdb-static-tls-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -845,6 +849,8 @@ find -name "*.info*"|xargs rm -f
 %patch852 -p1
 %patch863 -p1
 %patch864 -p1
+%patch865 -p1
+%patch866 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1376,6 +1382,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon May  5 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-8.fc21
+- Fix TLS access for -static -pthread (BZ 1080660).
+
 * Mon May  5 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7-7.fc21
 - Add GFDL License to the main package (man pages are generated from .texinfo).
 
