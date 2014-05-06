@@ -35,11 +35,11 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20140108
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.7
+Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -527,22 +527,13 @@ Patch843: gdb-enable-count-crash.patch
 # Fix testsuite "ERROR: no fileid for".
 Patch846: gdb-testsuite-nohostid.patch
 
-# Fix Python stack corruption.
-Patch847: gdb-python-stacksmash.patch
-
 # [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
 Patch848: gdb-dts-rhel6-python-compat.patch
-
-# Fix gdb-7.7 auto-load from /usr/share/gdb/auto-load/ regression.
-Patch849: gdb-auto-load-lost-path-7.7.patch
 
 # Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
 Patch850: gdb-gnat-dwarf-crash-1of3.patch
 Patch851: gdb-gnat-dwarf-crash-2of3.patch
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
-
-# Fix build failures for GCC 4.9 (Nick Clifton).
-Patch864: gcc-4.9-compat.patch
 
 # Fix TLS access for -static -pthread (BZ 1080660).
 Patch865: gdb-static-tls-1of2.patch
@@ -842,13 +833,10 @@ find -name "*.info*"|xargs rm -f
 %patch832 -p1
 %patch843 -p1
 %patch846 -p1
-%patch847 -p1
-%patch849 -p1
 %patch850 -p1
 %patch851 -p1
 %patch852 -p1
 %patch863 -p1
-%patch864 -p1
 %patch865 -p1
 %patch866 -p1
 
@@ -1382,6 +1370,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Tue May  6 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7.1-10.fc21
+- Rebase to FSF GDB 7.7.1.
+
 * Mon May  5 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-9.fc21
 - Improve testcase message for RH BZ 981154.
 
