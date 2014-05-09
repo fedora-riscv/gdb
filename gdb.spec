@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -237,6 +237,20 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
 Patch232: gdb-upstream.patch
+Patch868: gdb-upstream-ppc64le02of15.patch
+Patch869: gdb-upstream-ppc64le03of15.patch
+Patch870: gdb-upstream-ppc64le04of15.patch
+Patch871: gdb-upstream-ppc64le05of15.patch
+Patch872: gdb-upstream-ppc64le06of15.patch
+Patch873: gdb-upstream-ppc64le07of15.patch
+Patch874: gdb-upstream-ppc64le08of15.patch
+Patch875: gdb-upstream-ppc64le09of15.patch
+Patch876: gdb-upstream-ppc64le10of15.patch
+Patch877: gdb-upstream-ppc64le11of15.patch
+Patch878: gdb-upstream-ppc64le12of15.patch
+Patch879: gdb-upstream-ppc64le13of15.patch
+Patch880: gdb-upstream-ppc64le14of15.patch
+Patch881: gdb-upstream-ppc64le15of15.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -609,7 +623,10 @@ BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
 BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+# Fedora ppc64le does not yet have gcc-go built.
+%ifnarch ppc64le
 BuildRequires: gcc-go
+%endif
 %endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
@@ -621,8 +638,8 @@ BuildRequires: prelink
 %endif
 %endif
 %if 0%{!?rhel:1}
-# Fedora arm does not yet have fpc built.
-%ifnarch %{arm}
+# Fedora arm+ppc64le do not yet have fpc built.
+%ifnarch %{arm} ppc64le
 BuildRequires: fpc
 %endif
 %endif
@@ -639,7 +656,10 @@ BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+# Fedora ppc64le does not yet have gcc-go built.
+%ifnarch ppc64le
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
+%endif
 %endif
 %if 0%{!?el5:1}
 BuildRequires: glibc-static%{bits_local}
@@ -736,6 +756,20 @@ find -name "*.info*"|xargs rm -f
 
 %patch349 -p1
 %patch232 -p1
+%patch868 -p1
+%patch869 -p1
+%patch870 -p1
+%patch871 -p1
+%patch872 -p1
+%patch873 -p1
+%patch874 -p1
+%patch875 -p1
+%patch876 -p1
+%patch877 -p1
+%patch878 -p1
+%patch879 -p1
+%patch880 -p1
+%patch881 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -921,7 +955,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
-%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 sparc sparcv9 sparc64
+%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64
 	--disable-werror					\
 %else
 	--enable-werror						\
@@ -1370,7 +1404,10 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
-* Tue May  6 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7.1-10.fc21
+* Fri May  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-11.fc21
+- [ppc*] Import ppc64le support (BZ 1096303, Ulrich Weigand).
+
+* Tue May  6 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-10.fc21
 - Rebase to FSF GDB 7.7.1.
 
 * Mon May  5 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7-9.fc21

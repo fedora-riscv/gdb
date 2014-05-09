@@ -1,0 +1,140 @@
+commit 0ff3e01fdc67a3842ee54224cf197e9a55f0a750
+Author: Ulrich Weigand <ulrich.weigand@de.ibm.com>
+Date:   Tue Feb 4 18:34:19 2014 +0100
+
+    PowerPC64 little-endian fixes: 128-bit DFP parameters / registers
+    
+    The powerpc64le-linux ABI specifies that when a 128-bit DFP value is
+    passed in a pair of floating-point registers, the first register holds
+    the most-significant part of the value.  This is as opposed to the
+    usual rule on little-endian systems, where the first register would
+    hold the least-significant part.
+    
+    This affects two places in GDB, the read/write routines for the
+    128-bit DFP pseudo-registers, and the function call / return
+    sequence.  For the former, current code already distinguishes
+    between big- and little-endian targets, but gets the latter
+    wrong.  This is presumably because *GCC* also got it wrong,
+    and GDB matches the old GCC behavior.  But GCC is now fixed:
+    http://gcc.gnu.org/ml/gcc-patches/2013-11/msg02145.html
+    so GDB needs to be fixed too.  (Old code shouldn't really be
+    an issue since there is no code "out there" so far that uses
+    dfp128 on little-endian ...)
+    
+    gdb/ChangeLog:
+    
+    	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_freg): Use correct order
+    	within a register pair holding a DFP 128-bit value on little-endian.
+    	(ppc64_sysv_abi_return_value_base): Likewise.
+    	* rs6000-tdep.c (dfp_pseudo_register_read): Likewise.
+    	(dfp_pseudo_register_write): Likewise.
+    
+    gdb/testsuite/ChangeLog:
+    
+    	* gdb.arch/powerpc-d128-regs.exp: Enable on powerpc64*-*.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,5 +1,13 @@
+ 2014-02-04  Ulrich Weigand  <uweigand@de.ibm.com>
+ 
++	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_freg): Use correct order
++	within a register pair holding a DFP 128-bit value on little-endian.
++	(ppc64_sysv_abi_return_value_base): Likewise.
++	* rs6000-tdep.c (dfp_pseudo_register_read): Likewise.
++	(dfp_pseudo_register_write): Likewise.
++
++2014-02-04  Ulrich Weigand  <uweigand@de.ibm.com>
++
+ 	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_freg): Use correct
+ 	offset on little-endian when passing _Decimal32.
+ 	(ppc64_sysv_abi_return_value_base): Likewise for return values.
+--- a/gdb/ppc-sysv-tdep.c
++++ b/gdb/ppc-sysv-tdep.c
+@@ -1270,9 +1270,11 @@ ppc64_sysv_abi_push_freg (struct gdbarch *gdbarch,
+       if (argpos->regcache && argpos->freg <= 12)
+ 	{
+ 	  int regnum = tdep->ppc_fp0_regnum + argpos->freg;
++	  int lopart = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG ? 8 : 0;
++	  int hipart = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG ? 0 : 8;
+ 
+-	  regcache_cooked_write (argpos->regcache, regnum, val);
+-	  regcache_cooked_write (argpos->regcache, regnum + 1, val + 8);
++	  regcache_cooked_write (argpos->regcache, regnum, val + hipart);
++	  regcache_cooked_write (argpos->regcache, regnum + 1, val + lopart);
+ 	}
+ 
+       argpos->freg += 2;
+@@ -1685,16 +1687,18 @@ ppc64_sysv_abi_return_value_base (struct gdbarch *gdbarch, struct type *valtype,
+       && TYPE_CODE (valtype) == TYPE_CODE_DECFLOAT)
+     {
+       int regnum = tdep->ppc_fp0_regnum + 2 + 2 * index;
++      int lopart = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG ? 8 : 0;
++      int hipart = gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG ? 0 : 8;
+ 
+       if (writebuf != NULL)
+ 	{
+-	  regcache_cooked_write (regcache, regnum, writebuf);
+-	  regcache_cooked_write (regcache, regnum + 1, writebuf + 8);
++	  regcache_cooked_write (regcache, regnum, writebuf + hipart);
++	  regcache_cooked_write (regcache, regnum + 1, writebuf + lopart);
+ 	}
+       if (readbuf != NULL)
+ 	{
+-	  regcache_cooked_read (regcache, regnum, readbuf);
+-	  regcache_cooked_read (regcache, regnum + 1, readbuf + 8);
++	  regcache_cooked_read (regcache, regnum, readbuf + hipart);
++	  regcache_cooked_read (regcache, regnum + 1, readbuf + lopart);
+ 	}
+       return 1;
+     }
+--- a/gdb/rs6000-tdep.c
++++ b/gdb/rs6000-tdep.c
+@@ -2672,10 +2672,10 @@ dfp_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
+   else
+     {
+       status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+-				  2 * reg_index + 1, buffer + 8);
++				  2 * reg_index + 1, buffer);
+       if (status == REG_VALID)
+ 	status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+-				    2 * reg_index, buffer);
++				    2 * reg_index, buffer + 8);
+     }
+ 
+   return status;
+@@ -2701,9 +2701,9 @@ dfp_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
+   else
+     {
+       regcache_raw_write (regcache, tdep->ppc_fp0_regnum +
+-			  2 * reg_index + 1, buffer + 8);
++			  2 * reg_index + 1, buffer);
+       regcache_raw_write (regcache, tdep->ppc_fp0_regnum +
+-			  2 * reg_index, buffer);
++			  2 * reg_index, buffer + 8);
+     }
+ }
+ 
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,5 +1,9 @@
+ 2014-02-04  Ulrich Weigand  <uweigand@de.ibm.com>
+ 
++	* gdb.arch/powerpc-d128-regs.exp: Enable on powerpc64*-*.
++
++2014-02-04  Ulrich Weigand  <uweigand@de.ibm.com>
++
+ 	* gdb.arch/vsx-regs.exp: Check target endianness.  Provide variants
+ 	of the test patterns for use on little-endian systems.
+ 
+--- a/gdb/testsuite/gdb.arch/powerpc-d128-regs.exp
++++ b/gdb/testsuite/gdb.arch/powerpc-d128-regs.exp
+@@ -20,7 +20,7 @@
+ 
+ # Testcase for ppc decimal128 pseudo-registers.
+ 
+-if ![istarget "powerpc64-*"] then {
++if ![istarget "powerpc64*-*"] then {
+     verbose "Skipping powerpc Decimal128 pseudo-registers testcase."
+     return
+ }

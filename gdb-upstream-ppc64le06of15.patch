@@ -1,0 +1,67 @@
+commit 6ed14ff33979bc48367c35b1b235fef8c5e2229b
+Author: Ulrich Weigand <ulrich.weigand@de.ibm.com>
+Date:   Tue Feb 4 18:28:24 2014 +0100
+
+    PowerPC64 little-endian fixes: AltiVec tests
+    
+    A couple of AltiVec tests fail spuriously on powerpc64le-linux, because
+    they compare against an incorrect pattern.  Note that those tests already
+    contain little-endian variants of the patterns, but those seem to have
+    bit-rotted a bit: when outputting a vector, GDB no longer omits trailing
+    zero elements (as it used to do in the past).
+    
+    This patch updates the pattern to the new GDB output behavior.
+    
+    In addition, the patch updates the endian test to use the new
+    gdb_test_multiple logic instead of gdb_expect.
+    
+    gdb/testsuite/ChangeLog:
+    
+    	* gdb.arch/altivec-regs.exp: Use gdb_test_multiple for endian test.
+    	(decimal_vector): Fix for little-endian.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,8 @@
++2014-02-04  Ulrich Weigand  <uweigand@de.ibm.com>
++
++	* gdb.arch/altivec-regs.exp: Use gdb_test_multiple for endian test.
++	(decimal_vector): Fix for little-endian.
++
+ 2014-01-29  Jose E. Marchesi  <jose.marchesi@oracle.com>
+ 
+ 	* gdb.arch/sparc-sysstep.exp: New file.
+--- a/gdb/testsuite/gdb.arch/altivec-regs.exp
++++ b/gdb/testsuite/gdb.arch/altivec-regs.exp
+@@ -79,17 +79,16 @@ gdb_test "set \$vrsave = 1" "" ""
+ 
+ gdb_test "next" "" ""
+ 
+-send_gdb "show endian\n"
+ set endianness ""
+-gdb_expect {
++set msg "detect endianness"
++gdb_test_multiple "show endian" "$msg" {
+     -re "(The target endianness is set automatically .currently )(big|little)( endian.*)$gdb_prompt $" {
+-        pass "endianness"
+-	set endianness $expect_out(2,string)
++        pass "$msg"
++        set endianness $expect_out(2,string)
+     }
+     -re ".*$gdb_prompt $" {
+-	fail "couldn't get endianness"
++        fail "$msg"
+     }
+-    timeout		{ fail "(timeout) endianness" }
+ }
+ 
+ # And then read the AltiVec registers back, to see that
+@@ -118,7 +117,7 @@ gdb_test "info reg vscr" "vscr.*0x1\t1" "info reg vscr"
+ if {$endianness == "big"} {
+      set decimal_vector ".uint128 = 0x00000001000000010000000100000001, v4_float = .1.*e-45, 1.*e-45, 1.*e-45, 1.*e-45., v4_int32 = .1, 1, 1, 1., v8_int16 = .0, 1, 0, 1, 0, 1, 0, 1., v16_int8 = .0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1.."
+ } else {
+-     set decimal_vector ".uint128 = 0x00000001000000010000000100000001, v4_float = .1.*e-45, 1.*e-45, 1.*e-45, 1.*e-45., v4_int32 = .1, 1, 1, 1., v8_int16 = .1, 0, 1, 0, 1, 0, 1, 0., v16_int8 = .1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.."
++     set decimal_vector ".uint128 = 0x00000001000000010000000100000001, v4_float = .1.*e-45, 1.*e-45, 1.*e-45, 1.*e-45., v4_int32 = .1, 1, 1, 1., v8_int16 = .1, 0, 1, 0, 1, 0, 1, 0., v16_int8 = .1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.."
+ }
+ 
+ for {set i 0} {$i < 32} {incr i 1} {
