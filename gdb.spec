@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1404,6 +1404,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Wed May 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-13.fc21
+- [s390*] Import upstream fix for 64->32 debugging.
+
 * Mon May 12 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-12.fc21
 - [s390*] Fix compilation error.
 
