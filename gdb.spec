@@ -6,18 +6,6 @@
 #                 workload gets run it decreases the general performance now.
 # --define 'scl somepkgname': Independent packages by scl-utils-build.
 
-# RHEL-5 was the last not providing `/etc/rpm/macros.dist'.
-%if 0%{!?dist:1}
-%global rhel 5
-%global dist .el5
-%global el5 1
-%endif
-# RHEL-5 Brew does not set %{el5}, BZ 1002198 tps-srpmtest does not set %{rhel}.
-%if "%{?dist}" == ".el5"
-%global rhel 5
-%global el5 1
-%endif
-
 %{?scl:%scl_package gdb}
 %{!?scl:
  %global pkg_name %{name}
@@ -39,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -65,11 +53,7 @@ Obsoletes: gdb64 < 5.3.91
 
 %global have_inproctrace 0
 %ifarch %{ix86} x86_64
-# RHEL-5.i386: [int foo, bar; bar = __sync_val_compare_and_swap(&foo, 0, 1);]
-#              undefined reference to `__sync_val_compare_and_swap_4'
-%if 0%{!?el5:1}
 %global have_inproctrace 1
-%endif # 0%{!?el5:1}
 %endif # %{ix86} x86_64
 
 # gdb-add-index cannot be run even for SCL package on RHEL<=6.
@@ -407,10 +391,6 @@ Patch391: gdb-x86_64-i386-syscall-restart.patch
 #=push+work: It requires some better DWARF annotations.
 Patch392: gdb-bz533176-fortran-omp-step.patch
 
-# Use gfortran44 when running the testsuite on RHEL-5.
-#=fedoratest
-Patch393: gdb-rhel5-gcc44.patch
-
 # Fix regression by python on ia64 due to stale current frame.
 #=push
 Patch397: gdb-follow-child-stale-parent.patch
@@ -565,17 +545,10 @@ BuildRequires: expat-devel%{?_isa}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz-devel%{?_isa}
 %endif
-%if 0%{!?el5:1}
 # dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
-%endif # 0%{!?el5:1}
 BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
 %if 0%{!?_without_python:1}
-%if 0%{?el5:1}
-# This RHEL-5.6 python version got split out python-libs for ppc64.
-# RHEL-5 rpm does not support .%{_arch} dependencies.
-Requires: python-libs-%{_arch} >= 2.4.3-32.el5
-%endif
 BuildRequires: python-devel%{?_isa}
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily before python files get moved to libstdc++.rpm
@@ -592,17 +565,11 @@ BuildRequires: texlive-collection-latexrecommended
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
 
-# BuildArch would break RHEL-5 by overriding arch and not building noarch.
-%if 0%{?el5:1}
-ExclusiveArch: noarch i386 x86_64 ppc ppc64 s390 s390x
-%endif # 0%{?el5:1}
-
 %if 0%{?_with_testsuite:1}
 
 # Ensure the devel libraries are installed for both multilib arches.
 %global bits_local %{?_isa}
 %global bits_other %{?_isa}
-%if 0%{!?el5:1}
 %ifarch s390x
 %global bits_other (%{__isa_name}-32)
 %else #!s390x
@@ -614,7 +581,6 @@ ExclusiveArch: noarch i386 x86_64 ppc ppc64 s390 s390x
 %endif #sparc64 ppc64 s390x x86_64
 %endif #!ppc
 %endif #!s390x
-%endif #!el5
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
@@ -643,9 +609,6 @@ BuildRequires: prelink
 BuildRequires: fpc
 %endif
 %endif
-%if 0%{?el5:1}
-BuildRequires: gcc44 gcc44-gfortran
-%endif
 # Copied from gcc-4.1.2-32.
 %ifarch %{ix86} x86_64 ppc alpha
 BuildRequires: gcc-gnat
@@ -661,9 +624,7 @@ BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 %endif
-%if 0%{!?el5:1}
 BuildRequires: glibc-static%{bits_local}
-%endif
 # multilib glibc-static is open Bug 488472:
 #BuildRequires: glibc-static%{bits_other}
 # for gcc-java linkage:
@@ -685,9 +646,6 @@ GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%ifnarch noarch
-
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
 Group: Development/Debuggers
@@ -704,18 +662,11 @@ and printing their data.
 This package provides a program that allows you to run GDB on a different
 machine than the one which is running the program being debugged.
 
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%endif # !noarch
-%if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
-
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
-# It would break RHEL-5 by overriding arch and not building noarch separately.
-%if 0%{!?el5:1}
 BuildArch: noarch
-%endif # 0%{!?el5:1}
 
 %if "%{scl}" == "devtoolset-1.1"
 Obsoletes: devtoolset-1.0-%{pkg_name}-doc
@@ -730,8 +681,6 @@ This package provides INFO, HTML and PDF user manual for GDB.
 
 Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
-
-%endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %prep
 %setup -q -n %{gdb_src}
@@ -878,10 +827,6 @@ find -name "*.info*"|xargs rm -f
 %if 0%{!?el6:1}
 %patch848 -p1 -R
 %endif
-%patch393 -p1
-%if 0%{!?el5:1} || 0%{?scl:1}
-%patch393 -p1 -R
-%endif
 %patch833 -p1
 %if 0%{!?el6:1} || 0%{!?scl:1}
 %patch833 -p1 -R
@@ -977,16 +922,10 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-python					\
 %endif
-$(: Workaround rpm.org#76, BZ 508193 on recent OSes. )		\
-$(: RHEL-5 librpm has incompatible API. )			\
-%if 0%{?el5:1}
-	--without-rpm						\
-%else
 %if 0%{?el6:1}
 	--with-rpm=librpm.so.1					\
 %else
 	--with-rpm=librpm.so.3					\
-%endif
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-lzma						\
@@ -1009,13 +948,8 @@ $(: %{_bindir}/mono-gdb.py is workaround for mono BZ 815501. )										\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
-$(: It breaks RHEL-5 by %{_target_platform} being noarch-redhat-linux-gnu ) \
-%ifarch noarch
-	$(:)
-%else
 	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu	\
 	%{_target_platform}
-%endif
 %endif
 
 if [ -z "%{!?_with_profile:no}" ]
@@ -1076,14 +1010,7 @@ done	# fprofile
 
 cd %{gdb_build}
 
-make \
-$(: There was a race on RHEL-5: ) \
-$(: fmtutil: format directory '/builddir/.texmf-var/web2c' does not exist. ) \
-%if 0%{?el5:1}
-     -j1 \
-%else
-     %{?_smp_mflags} \
-%endif
+make %{?_smp_mflags} \
      -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
 
 grep '#define HAVE_ZLIB_H 1' gdb/config.h
@@ -1177,9 +1104,6 @@ echo ====================TESTING END=====================
 # Initially we're in the %{gdb_src} directory.
 cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
-
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%ifnarch noarch
 
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
@@ -1284,19 +1208,7 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 %endif
 )
 
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%if 0%{?el5:1}
-rm -f $RPM_BUILD_ROOT%{_infodir}/annotate.info*
-rm -f $RPM_BUILD_ROOT%{_infodir}/gdb.info*
-%endif # 0%{?el5:1} 
-%else # noarch
-# -j1: There is some race resulting in:
-# /usr/bin/texi2dvi: texinfo.tex appears to be broken, quitting.
-make -j1 -C gdb/doc install DESTDIR=$RPM_BUILD_ROOT
-rm -rf $RPM_BUILD_ROOT%{_mandir}
-%endif # noarch
-
-# Documentation only for development; keep 'rm's here after "noarch" above.
+# Documentation only for development.
 rm -f $RPM_BUILD_ROOT%{_infodir}/gdbint*
 rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 
@@ -1307,9 +1219,6 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
 %clean
 rm -rf $RPM_BUILD_ROOT
-
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%ifnarch noarch
 
 %files
 %defattr(-,root,root)
@@ -1369,10 +1278,6 @@ done
 %endif # 0%{!?rhel:1}
 %endif # 0%{!?_without_python:1}
 
-# It would break RHEL-5 by leaving excessive files for the doc subpackage.
-%endif # !noarch
-%if 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
-
 %files doc
 %doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
 %defattr(-,root,root)
@@ -1401,9 +1306,10 @@ then
   fi
 fi
 
-%endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
-
 %changelog
+* Fri May 16 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-14.fc21
+- [rhel5] Drop the RHEL-5 support - simplify this .spec file.
+
 * Wed May 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-13.fc21
 - [s390*] Import upstream fix for 64->32 debugging.
 
