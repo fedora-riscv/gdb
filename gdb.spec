@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -585,8 +585,10 @@ BuildRequires: /usr/bin/pod2man
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
-%if 0%{!?rhel:1} || 0%{?rhel} < 7
+%if 0%{?rhel:1} && 0%{?rhel} < 7
 BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
+# for gcc-java linkage:
+BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # Fedora ppc64le does not yet have gcc-go built.
@@ -627,8 +629,6 @@ BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 BuildRequires: glibc-static%{bits_local}
 # multilib glibc-static is open Bug 488472:
 #BuildRequires: glibc-static%{bits_other}
-# for gcc-java linkage:
-BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 # Copied from valgrind-3.5.0-1.
 %ifarch %{ix86} x86_64 ppc ppc64
 BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
@@ -1307,6 +1307,9 @@ then
 fi
 
 %changelog
+* Mon May 26 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-15.fc21
+- [testsuite] Drop BuildRequires: gcc-java+libgcj on Fedora (no longer in F21+).
+
 * Fri May 16 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-14.fc21
 - [rhel5] Drop the RHEL-5 support - simplify this .spec file.
 
