@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1307,6 +1307,9 @@ then
 fi
 
 %changelog
+* Fri May 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-16.fc21
+- [aarch64] Fix signal frame unwinding (BZ 1086894, upstream).
+
 * Mon May 26 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-15.fc21
 - [testsuite] Drop BuildRequires: gcc-java+libgcj on Fedora (no longer in F21+).
 

@@ -102,3 +102,268 @@ Date:   Tue May 13 14:55:53 2014 +0200
  	    }
  	}
  
+
+
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1086894
+commit f2205de0080d999c9b67872c9db471c31b53e378
+Author: Hui Zhu <teawater@gmail.com>
+Date:   Tue May 20 13:19:06 2014 +0800
+
+    Fix issue #15778: GDB Aarch64 signal frame unwinder issue
+    
+    The root cause of this issue is unwinder of "#3  <signal handler called>"
+    doesn't supply right values of registers.
+    When GDB want to get the previous frame of "#3  <signal handler called>",
+    it will call cache init function of unwinder "aarch64_linux_sigframe_init".
+    The address or the value of the registers is get from this function.
+    So the bug is inside thie function.
+    
+    I check the asm code of "#3  <signal handler called>":
+    (gdb) frame 3
+    (gdb) p $pc
+    $1 = (void (*)()) 0x7f931fa4d0
+    (gdb) disassemble $pc, +10
+    Dump of assembler code from 0x7f931fa4d0 to 0x7f931fa4da:
+    => 0x0000007f931fa4d0:	mov	x8, #0x8b                  	// #139
+       0x0000007f931fa4d4:	svc	#0x0
+       0x0000007f931fa4d8:	nop
+    
+    This is the syscall sys_rt_sigreturn, Linux kernel function "restore_sigframe"
+    will set the frame:
+    	for (i = 0; i < 31; i++)
+    		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
+    				 err);
+    	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
+    	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
+    The struct of uc_mcontext is:
+    struct sigcontext {
+    	__u64 fault_address;
+    	/* AArch64 registers */
+    	__u64 regs[31];
+    	__u64 sp;
+    	__u64 pc;
+    	__u64 pstate;
+    	/* 4K reserved for FP/SIMD state and future expansion */
+    	__u8 __reserved[4096] __attribute__((__aligned__(16)));
+    };
+    
+    But in GDB function "aarch64_linux_sigframe_init", the code the get address
+    of registers is:
+      for (i = 0; i < 31; i++)
+        {
+          trad_frame_set_reg_addr (this_cache,
+    			       AARCH64_X0_REGNUM + i,
+    			       sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
+    			       + i * AARCH64_SIGCONTEXT_REG_SIZE);
+        }
+    
+      trad_frame_set_reg_addr (this_cache, AARCH64_FP_REGNUM, fp);
+      trad_frame_set_reg_addr (this_cache, AARCH64_LR_REGNUM, fp + 8);
+      trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM, fp + 8);
+    
+    The code that get pc and sp is not right, so I change the code according
+    to Linux kernel code:
+      trad_frame_set_reg_addr (this_cache, AARCH64_SP_REGNUM,
+    			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
+    			     + 31 * AARCH64_SIGCONTEXT_REG_SIZE);
+      trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM,
+    			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
+    			     + 32 * AARCH64_SIGCONTEXT_REG_SIZE);
+    
+    The issue was fixed by this change, and I did the regression test.  It
+    also fixed a lot of other XFAIL and FAIL.
+    
+    2014-05-20  Hui Zhu  <hui@codesourcery.com>
+    	    Yao Qi  <yao@codesourcery.com>
+    
+    	PR backtrace/16558
+    	* aarch64-linux-tdep.c (aarch64_linux_sigframe_init): Update comments
+    	and change address of sp and pc.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,10 @@
++2014-05-20  Hui Zhu  <hui@codesourcery.com>
++	    Yao Qi  <yao@codesourcery.com>
++
++	PR backtrace/16558
++	* aarch64-linux-tdep.c (aarch64_linux_sigframe_init): Update comments
++	and change address of sp and pc.
++
+ 2014-05-19  Tom Tromey  <tromey@redhat.com>
+ 
+ 	* gdbtypes.c (rank_function): Use XNEWVEC.
+--- a/gdb/aarch64-linux-tdep.c
++++ b/gdb/aarch64-linux-tdep.c
+@@ -53,28 +53,30 @@
+ 
+ /* Signal frame handling.
+ 
+-      +----------+  ^
+-      | saved lr |  |
+-   +->| saved fp |--+
+-   |  |          |
+-   |  |          |
+-   |  +----------+
+-   |  | saved lr |
+-   +--| saved fp |
+-   ^  |          |
+-   |  |          |
+-   |  +----------+
+-   ^  |          |
+-   |  | signal   |
+-   |  |          |
+-   |  | saved lr |-->interrupted_function_pc
+-   +--| saved fp |
+-   |  +----------+
+-   |  | saved lr |--> default_restorer (movz x8, NR_sys_rt_sigreturn; svc 0)
+-   +--| saved fp |<- FP
+-      |          |
+-      |          |<- SP
+-      +----------+
++      +------------+  ^
++      | saved lr   |  |
++   +->| saved fp   |--+
++   |  |            |
++   |  |            |
++   |  +------------+
++   |  | saved lr   |
++   +--| saved fp   |
++   ^  |            |
++   |  |            |
++   |  +------------+
++   ^  |            |
++   |  | signal     |
++   |  |            |        SIGTRAMP_FRAME (struct rt_sigframe)
++   |  | saved regs |
++   +--| saved sp   |--> interrupted_sp
++   |  | saved pc   |--> interrupted_pc
++   |  |            |
++   |  +------------+
++   |  | saved lr   |--> default_restorer (movz x8, NR_sys_rt_sigreturn; svc 0)
++   +--| saved fp   |<- FP
++      |            |         NORMAL_FRAME
++      |            |<- SP
++      +------------+
+ 
+   On signal delivery, the kernel will create a signal handler stack
+   frame and setup the return address in LR to point at restorer stub.
+@@ -123,6 +125,8 @@
+   d28015a8        movz    x8, #0xad
+   d4000001        svc     #0x0
+ 
++  This is a system call sys_rt_sigreturn.
++
+   We detect signal frames by snooping the return code for the restorer
+   instruction sequence.
+ 
+@@ -146,7 +150,6 @@ aarch64_linux_sigframe_init (const struct tramp_frame *self,
+ {
+   struct gdbarch *gdbarch = get_frame_arch (this_frame);
+   CORE_ADDR sp = get_frame_register_unsigned (this_frame, AARCH64_SP_REGNUM);
+-  CORE_ADDR fp = get_frame_register_unsigned (this_frame, AARCH64_FP_REGNUM);
+   CORE_ADDR sigcontext_addr =
+     sp
+     + AARCH64_RT_SIGFRAME_UCONTEXT_OFFSET
+@@ -160,12 +163,14 @@ aarch64_linux_sigframe_init (const struct tramp_frame *self,
+ 			       sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
+ 			       + i * AARCH64_SIGCONTEXT_REG_SIZE);
+     }
+-
+-  trad_frame_set_reg_addr (this_cache, AARCH64_FP_REGNUM, fp);
+-  trad_frame_set_reg_addr (this_cache, AARCH64_LR_REGNUM, fp + 8);
+-  trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM, fp + 8);
+-
+-  trad_frame_set_id (this_cache, frame_id_build (fp, func));
++  trad_frame_set_reg_addr (this_cache, AARCH64_SP_REGNUM,
++			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
++			     + 31 * AARCH64_SIGCONTEXT_REG_SIZE);
++  trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM,
++			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
++			     + 32 * AARCH64_SIGCONTEXT_REG_SIZE);
++
++  trad_frame_set_id (this_cache, frame_id_build (sp, func));
+ }
+ 
+ static const struct tramp_frame aarch64_linux_rt_sigframe =
+
+
+
+Bug 1102624 - latest gdb -15 build is FTBFS on aarch64
+https://bugzilla.redhat.com/show_bug.cgi?id=1102624
+commit 036cd38182bde32d8297b630cd5c861d53b8949e
+Author: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+Date:   Thu May 22 16:07:20 2014 +0100
+
+    Include asm/ptrace.h in aarch64-linux-nat.c
+    
+    A recent change to glibc removed asm/ptrace.h from user.h for
+    AArch64. This meant that cross-native builds of gdb using trunk
+    glibc broke because aarch64-linux-nat.c because user_hwdebug_state
+    couldn't be found.
+    
+    Fixed by including asm/ptrace.h like other ports.
+    
+    2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+    
+           * aarch64-linux-nat.c (asm/ptrace.h): Include.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,5 +1,9 @@
+ 2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+ 
++	* aarch64-linux-nat.c (asm/ptrace.h): Include.
++
++2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
++
+ 	* MAINTAINERS (Write After Approval): Move self back from
+ 	paper trail.
+ 
+--- a/gdb/aarch64-linux-nat.c
++++ b/gdb/aarch64-linux-nat.c
+@@ -33,6 +33,7 @@
+ 
+ #include <sys/ptrace.h>
+ #include <sys/utsname.h>
++#include <asm/ptrace.h>
+ 
+ #include "gregset.h"
+ 
+commit e9dae05e9c32efda9724330c6d5ade3ca848591d
+Author: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+Date:   Fri May 23 09:01:14 2014 +0100
+
+    Include asm/ptrace.h for linux-aarch64-low.c
+    
+    A recent change to glibc removed asm/ptrace.h from user.h for AArch64.
+    This meant that cross-native builds of gdbserver using trunk glibc broke
+    because linux-aarch64-low.c because user_hwdebug_state couldn't be found.
+    
+    This is like commit #036cd38182bde32d8297b630cd5c861d53b8949e
+    
+    2014-05-23  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+    
+            * linux-aarch64-low.c (asm/ptrace.h): Include.
+
+### a/gdb/gdbserver/ChangeLog
+### b/gdb/gdbserver/ChangeLog
+## -1,3 +1,7 @@
++2014-05-23  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
++
++	* linux-aarch64-low.c (asm/ptrace.h): Include.
++
+ 2014-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	Fix TLS access for -static -pthread.
+--- a/gdb/gdbserver/linux-aarch64-low.c
++++ b/gdb/gdbserver/linux-aarch64-low.c
+@@ -26,6 +26,7 @@
+ #include <signal.h>
+ #include <sys/user.h>
+ #include <sys/ptrace.h>
++#include <asm/ptrace.h>
+ #include <sys/uio.h>
+ 
+ #include "gdb_proc_service.h"
