@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -900,7 +900,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
-%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64
+%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
 %else
 	--enable-werror						\
@@ -1307,6 +1307,9 @@ then
 fi
 
 %changelog
+* Fri May 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-17.fc21
+- [arm*,aarch64] Turn on --enable-werror, fix aarch64 for it.
+
 * Fri May 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-16.fc21
 - [aarch64] Fix signal frame unwinding (BZ 1086894, upstream).
 
