@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1154,14 +1154,8 @@ done
 test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
       $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb -name "*.py"`; do
-  # Files come from gdb-archer.patch and can be also further patched.
-  # They are also installed by install(1) not preserving the timestamps.
-  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
-done
 %else # 0%{!?rhel:1} || 0%{?rhel} > 6
 # BZ 999645: /usr/share/gdb/auto-load/ needs filesystem symlinks
-mkdir -p $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
 for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
   # mkdir to satisfy dangling symlinks build check.
   mkdir -p $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/%{_root_prefix}/$i
@@ -1169,6 +1163,10 @@ for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
         $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/$i
 done
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb -name "*.py"`; do
+  # Files are installed by install(1) not preserving the timestamps.
+  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
+done
 %endif # 0%{!?_without_python:1}
 
 # gdb-add-index cannot be run even for SCL package on RHEL<=6.
@@ -1310,6 +1308,9 @@ then
 fi
 
 %changelog
+* Tue Jun  3 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-20.fc21
+- Fix#2 /usr/share/gdb/system-gdbinit/ timestamps causing non-matching *.py[oc].
+
 * Tue Jun  3 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-19.fc21
 - Fix /usr/share/gdb/auto-load/ (safely) dangling symlinks.
 - Fix /usr/share/gdb/system-gdbinit/ timestamps causing non-matching *.py[oc].
