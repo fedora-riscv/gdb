@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -599,6 +599,7 @@ BuildRequires: gcc-go
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
 # Copied from prelink-0.4.2-3.fc13.
+# Prelink is not yet ported to ppc64le.
 %ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
 # Prelink is broken on sparcv9/sparc64.
 %ifnarch sparc sparcv9 sparc64
@@ -630,6 +631,7 @@ BuildRequires: glibc-static%{bits_local}
 # multilib glibc-static is open Bug 488472:
 #BuildRequires: glibc-static%{bits_other}
 # Copied from valgrind-3.5.0-1.
+# Valgrind is not yet ported to ppc64le.
 %ifarch %{ix86} x86_64 ppc ppc64
 BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
 %endif
@@ -1307,6 +1309,9 @@ then
 fi
 
 %changelog
+* Tue Jun  3 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-18.fc21
+- [ppc64le testsuite] Add comments about prelink+valgrind not yet ported.
+
 * Fri May 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-17.fc21
 - [arm*,aarch64] Turn on --enable-werror, fix aarch64 for it.
 
