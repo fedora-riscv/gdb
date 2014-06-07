@@ -27,7 +27,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1308,6 +1308,9 @@ then
 fi
 
 %changelog
+* Sat Jun 07 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.7.1-21
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_Mass_Rebuild
+
 * Tue Jun  3 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-20.fc21
 - Fix#2 /usr/share/gdb/system-gdbinit/ timestamps causing non-matching *.py[oc].
 
