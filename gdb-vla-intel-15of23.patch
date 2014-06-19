@@ -1,0 +1,409 @@
+Subject: [PATCH 15/23] test: dynamic arrays passed to subroutines.
+Message-Id: <1401861266-6240-16-git-send-email-keven.boell@intel.com>
+
+Tests dynamic arrays passed to subroutines and handled
+in different ways inside the routine.
+
+2014-05-28  Keven Boell  <keven.boell@intel.com>
+            Sanimir Agovic  <sanimir.agovic@intel.com>
+
+testsuite/gdb.fortran/:
+
+	* vla-sub.f90: New file.
+	* vla-ptype-sub.exp: New file.
+	* vla-value-sub-arbitrary.exp: New file.
+	* vla-value-sub-finish.exp: New file.
+	* vla-value-sub.exp: New file.
+
+Change-Id: I76db950fbacbf15b1f5e887bfd164eb8f85c55d1
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/testsuite/gdb.fortran/vla-ptype-sub.exp        |   87 +++++++++++++++++++
+ gdb/testsuite/gdb.fortran/vla-sub.f90              |   82 ++++++++++++++++++
+ .../gdb.fortran/vla-value-sub-arbitrary.exp        |   35 ++++++++
+ gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp |   49 +++++++++++
+ gdb/testsuite/gdb.fortran/vla-value-sub.exp        |   90 ++++++++++++++++++++
+ 5 files changed, 343 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-sub.f90
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-value-sub.exp
+
+diff --git a/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp b/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
+new file mode 100644
+index 0000000..2ee2914
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
+@@ -0,0 +1,87 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile "vla-sub.f90"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} \
++    {debug f90 quiet}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++# Pass fixed array to function and handle them as vla in function.
++gdb_breakpoint [gdb_get_line_number "not-filled"]
++gdb_continue_to_breakpoint "not-filled (1st)"
++gdb_test "ptype array1" "type = integer\\\(kind=4\\\) \\\(42,42\\\)" \
++  "ptype array1 (passed fixed)"
++gdb_test "ptype array2" "type = real\\\(kind=4\\\) \\\(42,42,42\\\)" \
++  "ptype array2 (passed fixed)"
++gdb_test "ptype array1(40, 10)" "type = integer\\\(kind=4\\\)" \
++  "ptype array1(40, 10) (passed fixed)"
++gdb_test "ptype array2(13, 11, 5)" "type = real\\\(kind=4\\\)" \
++  "ptype array2(13, 11, 5) (passed fixed)"
++
++# Pass sub arrays to function and handle them as vla in function.
++gdb_continue_to_breakpoint "not-filled (2nd)"
++gdb_test "ptype array1" "type = integer\\\(kind=4\\\) \\\(6,6\\\)" \
++  "ptype array1 (passed sub-array)"
++gdb_test "ptype array2" "type = real\\\(kind=4\\\) \\\(6,6,6\\\)" \
++  "ptype array2 (passed sub-array)"
++gdb_test "ptype array1(3, 3)" "type = integer\\\(kind=4\\\)" \
++  "ptype array1(3, 3) (passed sub-array)"
++gdb_test "ptype array2(4, 4, 4)" "type = real\\\(kind=4\\\)" \
++  "ptype array2(4, 4, 4) (passed sub-array)"
++
++# Check ptype outside of bounds. This should not crash GDB.
++gdb_test "ptype array1(100, 100)" "no such vector element" \
++  "ptype array1(100, 100) subarray do not crash (passed sub-array)"
++gdb_test "ptype array2(100, 100, 100)" "no such vector element" \
++  "ptype array2(100, 100, 100) subarray do not crash (passed sub-array)"
++
++# Pass vla to function.
++gdb_continue_to_breakpoint "not-filled (3rd)"
++gdb_test "ptype array1" "type = integer\\\(kind=4\\\) \\\(20,20\\\)" \
++  "ptype array1 (passed vla)"
++gdb_test "ptype array2" "type = real\\\(kind=4\\\) \\\(10,10,10\\\)" \
++  "ptype array2 (passed vla)"
++gdb_test "ptype array1(3, 3)" "type = integer\\\(kind=4\\\)" \
++  "ptype array1(3, 3) (passed vla)"
++gdb_test "ptype array2(4, 4, 4)" "type = real\\\(kind=4\\\)" \
++  "ptype array2(4, 4, 4) (passed vla)"
++
++# Check ptype outside of bounds. This should not crash GDB.
++gdb_test "ptype array1(100, 100)" "no such vector element" \
++  "ptype array1(100, 100) VLA do not crash (passed vla)"
++gdb_test "ptype array2(100, 100, 100)" "no such vector element" \
++  "ptype array2(100, 100, 100) VLA do not crash (passed vla)"
++
++# Pass fixed array to function and handle it as VLA of arbitrary length in
++# function.
++gdb_breakpoint [gdb_get_line_number "end-of-bar"]
++gdb_continue_to_breakpoint "end-of-bar"
++gdb_test "ptype array1" \
++  "type = (PTR TO -> \\( )?integer(\\(kind=4\\)|\\*4) \\(\\*\\)\\)?" \
++  "ptype array1 (arbitrary length)"
++gdb_test "ptype array2" \
++  "type = (PTR TO -> \\( )?integer(\\(kind=4\\)|\\*4) \\(4:9,10:\\*\\)\\)?" \
++  "ptype array2 (arbitrary length)"
++gdb_test "ptype array1(100)" "type = integer\\\(kind=4\\\)" \
++  "ptype array1(100) (arbitrary length)"
++gdb_test "ptype array2(4,100)" "type = integer\\\(kind=4\\\)" \
++  "ptype array2(4,100) (arbitrary length)"
+diff --git a/gdb/testsuite/gdb.fortran/vla-sub.f90 b/gdb/testsuite/gdb.fortran/vla-sub.f90
+new file mode 100644
+index 0000000..8c2c9ff
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-sub.f90
+@@ -0,0 +1,82 @@
++! Copyright 2014 Free Software Foundation, Inc.
++!
++! This program is free software; you can redistribute it and/or modify
++! it under the terms of the GNU General Public License as published by
++! the Free Software Foundation; either version 2 of the License, or
++! (at your option) any later version.
++!
++! This program is distributed in the hope that it will be useful,
++! but WITHOUT ANY WARRANTY; without even the implied warranty of
++! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++! GNU General Public License for more details.
++!
++! You should have received a copy of the GNU General Public License
++! along with this program; if not, write to the Free Software
++! Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++!
++! Original file written by Jakub Jelinek <jakub@redhat.com> and
++! Jan Kratochvil <jan.kratochvil@redhat.com>.
++! Modified for the GDB testcases by Keven Boell <keven.boell@intel.com>.
++
++subroutine foo (array1, array2)
++  integer :: array1 (:, :)
++  real    :: array2 (:, :, :)
++
++  array1(:,:) = 5                       ! not-filled
++  array1(1, 1) = 30
++
++  array2(:,:,:) = 6                     ! array1-filled
++  array2(:,:,:) = 3
++  array2(1,1,1) = 30
++  array2(3,3,3) = 90                    ! array2-almost-filled
++end subroutine
++
++subroutine bar (array1, array2)
++  integer :: array1 (*)
++  integer :: array2 (4:9, 10:*)
++
++  array1(5:10) = 1311
++  array1(7) = 1
++  array1(100) = 100
++  array2(4,10) = array1(7)
++  array2(4,100) = array1(7)
++  return                                ! end-of-bar
++end subroutine
++
++program vla_sub
++  interface
++    subroutine foo (array1, array2)
++      integer :: array1 (:, :)
++      real :: array2 (:, :, :)
++    end subroutine
++  end interface
++  interface
++    subroutine bar (array1, array2)
++      integer :: array1 (*)
++      integer :: array2 (4:9, 10:*)
++    end subroutine
++  end interface
++
++  real, allocatable :: vla1 (:, :, :)
++  integer, allocatable :: vla2 (:, :)
++
++  ! used for subroutine
++  integer :: sub_arr1(42, 42)
++  real    :: sub_arr2(42, 42, 42)
++  integer :: sub_arr3(42)
++
++  sub_arr1(:,:) = 1                   ! vla2-deallocated
++  sub_arr2(:,:,:) = 2
++  sub_arr3(:) = 3
++
++  call foo(sub_arr1, sub_arr2)
++  call foo(sub_arr1(5:10, 5:10), sub_arr2(10:15,10:15,10:15))
++
++  allocate (vla1 (10,10,10))
++  allocate (vla2 (20,20))
++  vla1(:,:,:) = 1311
++  vla2(:,:) = 42
++  call foo(vla2, vla1)
++
++  call bar(sub_arr3, sub_arr1)
++end program vla_sub
+diff --git a/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp b/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
+new file mode 100644
+index 0000000..fd11adb
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
+@@ -0,0 +1,35 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile "vla-sub.f90"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} \
++    {debug f90 quiet}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++# Check VLA with arbitary length and check that elements outside of
++# bounds of the passed VLA can be accessed correctly.
++gdb_breakpoint [gdb_get_line_number "end-of-bar"]
++gdb_continue_to_breakpoint "end-of-bar"
++gdb_test "p array1(42)" " = 3" "print arbitary array1(42)"
++gdb_test "p array1(100)" " = 100" "print arbitary array1(100)"
++gdb_test "p array2(4,10)" " = 1" "print arbitary array2(4,10)"
++gdb_test "p array2(4,100)" " = 1" "print arbitary array2(4,100)"
+diff --git a/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp b/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
+new file mode 100644
+index 0000000..a163617
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
+@@ -0,0 +1,49 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile "vla-sub.f90"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} \
++    {debug f90 quiet}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++# "up" works with GCC but other Fortran compilers may copy the values into the
++# outer function only on the exit of the inner function.
++# We need both variants as depending on the arch we optionally may still be
++# executing the caller line or not after `finish'.
++
++gdb_breakpoint [gdb_get_line_number "array2-almost-filled"]
++gdb_continue_to_breakpoint "array2-almost-filled"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *3, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was filled"
++gdb_test "print array2(2,1,1)=20" " = 20" \
++  "set array(2,2,2) to 20 in subroutine"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *20, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was mofified in debugger"
++
++gdb_test "finish" \
++  ".*foo\\\(sub_arr1\\\(5:10, 5:10\\\), sub_arr2\\\(10:15,10:15,10:15\\\)\\\)" \
++  "finish function"
++gdb_test "p sub_arr1(5, 7)" " = 5" "sub_arr1(5, 7) after finish"
++gdb_test "p sub_arr1(1, 1)" " = 30" "sub_arr1(1, 1) after finish"
++gdb_test "p sub_arr2(1, 1, 1)" " = 30" "sub_arr2(1, 1, 1) after finish"
++gdb_test "p sub_arr2(2, 1, 1)" " = 20" "sub_arr2(2, 1, 1) after finish"
++
+diff --git a/gdb/testsuite/gdb.fortran/vla-value-sub.exp b/gdb/testsuite/gdb.fortran/vla-value-sub.exp
+new file mode 100644
+index 0000000..848f9d7
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-value-sub.exp
+@@ -0,0 +1,90 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile "vla-sub.f90"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} \
++    {debug f90 quiet}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++# Check the values of VLA's in subroutine can be evaluated correctly
++
++# Try to access values from a fixed array handled as VLA in subroutine.
++gdb_breakpoint [gdb_get_line_number "not-filled"]
++gdb_continue_to_breakpoint "not-filled (1st)"
++gdb_test "print array1" " = \\(\[()1, .\]*\\)" \
++  "print passed array1 in foo (passed fixed array)"
++
++gdb_breakpoint [gdb_get_line_number "array1-filled"]
++gdb_continue_to_breakpoint "array1-filled (1st)"
++gdb_test "print array1(5, 7)" " = 5" \
++  "print array1(5, 7) after filled in foo (passed fixed array)"
++gdb_test "print array1(1, 1)" " = 30" \
++  "print array1(1, 1) after filled in foo (passed fixed array)"
++
++gdb_breakpoint [gdb_get_line_number "array2-almost-filled"]
++gdb_continue_to_breakpoint "array2-almost-filled (1st)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *3, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was filled (passed fixed array)"
++gdb_test "print array2(2,1,1)=20" " = 20" \
++  "set array(2,2,2) to 20 in subroutine (passed fixed array)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *20, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was mofified in debugger (passed fixed array)"
++
++
++# Try to access values from a fixed sub-array handled as VLA in subroutine.
++gdb_continue_to_breakpoint "not-filled (2nd)"
++gdb_test "print array1" " = \\(\[()5, .\]*\\)" \
++  "print passed array1 in foo (passed sub-array)"
++
++gdb_continue_to_breakpoint "array1-filled (2nd)"
++gdb_test "print array1(5, 5)" " = 5" \
++  "print array1(5, 5) after filled in foo (passed sub-array)"
++gdb_test "print array1(1, 1)" " = 30" \
++  "print array1(1, 1) after filled in foo (passed sub-array)"
++
++gdb_continue_to_breakpoint "array2-almost-filled (2nd)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *3, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was filled (passed sub-array)"
++gdb_test "print array2(2,1,1)=20" " = 20" \
++  "set array(2,2,2) to 20 in subroutine (passed sub-array)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *20, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was mofified in debugger (passed sub-array)"
++
++
++# Try to access values from a VLA passed to subroutine.
++gdb_continue_to_breakpoint "not-filled (3rd)"
++gdb_test "print array1" " = \\(\[()42, .\]*\\)" \
++  "print passed array1 in foo (passed vla)"
++
++gdb_continue_to_breakpoint "array1-filled (3rd)"
++gdb_test "print array1(5, 5)" " = 5" \
++  "print array1(5, 5) after filled in foo (passed vla)"
++gdb_test "print array1(1, 1)" " = 30" \
++  "print array1(1, 1) after filled in foo (passed vla)"
++
++gdb_continue_to_breakpoint "array2-almost-filled (3rd)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *3, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was filled (passed vla)"
++gdb_test "print array2(2,1,1)=20" " = 20" \
++  "set array(2,2,2) to 20 in subroutine (passed vla)"
++gdb_test "print array2" " = \\( *\\( *\\( *30, *20, *3,\[()3, .\]*\\)" \
++  "print array2 in foo after it was mofified in debugger (passed vla)"
+-- 
+1.7.9.5
+

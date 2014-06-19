@@ -1,0 +1,75 @@
+Subject: [PATCH 22/23] test: test sizeof for dynamic fortran arrays.
+Message-Id: <1401861266-6240-23-git-send-email-keven.boell@intel.com>
+
+Tests sizeof output of dynamic arrays in various states.
+
+2014-05-28  Keven Boell  <keven.boell@intel.com>
+            Sanimir Agovic  <sanimir.agovic@intel.com>
+
+testsuite/gdb.fortran/:
+
+	* vla-sizeof.exp: New file.
+
+Change-Id: I68d81d03ff2daa32ab87d2750873652d684e7389
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/testsuite/gdb.fortran/vla-sizeof.exp |   46 ++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.fortran/vla-sizeof.exp
+
+diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
+new file mode 100644
+index 0000000..6053c17
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
+@@ -0,0 +1,46 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile "vla.f90"
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} \
++    {debug f90 quiet}] } {
++    return -1
++}
++
++if ![runto MAIN__] then {
++    perror "couldn't run to breakpoint MAIN__"
++    continue
++}
++
++# Try to access values in non allocated VLA
++gdb_breakpoint [gdb_get_line_number "vla1-init"]
++gdb_continue_to_breakpoint "vla1-init"
++gdb_test "print sizeof(vla1)" " = 0" "print sizeof non-allocated vla1"
++
++# Try to access value in allocated VLA
++gdb_breakpoint [gdb_get_line_number "vla2-allocated"]
++gdb_continue_to_breakpoint "vla2-allocated"
++gdb_test "print sizeof(vla1)" " = 4000" "print sizeof allocated vla1"
++
++# Try to access values in undefined pointer to VLA (dangling)
++gdb_breakpoint [gdb_get_line_number "vla1-filled"]
++gdb_continue_to_breakpoint "vla1-filled"
++gdb_test "print sizeof(pvla)" " = 0" "print sizeof non-associated pvla"
++
++# Try to access values in pointer to VLA and compare them
++gdb_breakpoint [gdb_get_line_number "pvla-associated"]
++gdb_continue_to_breakpoint "pvla-associated"
++gdb_test "print sizeof(pvla)" " = 4000" "print sizeof associated pvla"
+-- 
+1.7.9.5
+

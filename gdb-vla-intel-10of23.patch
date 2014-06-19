@@ -1,0 +1,94 @@
+Subject: [PATCH 10/23] vla: get Fortran dynamic strings working.
+Message-Id: <1401861266-6240-11-git-send-email-keven.boell@intel.com>
+
+This patch enables the correct calculation of dynamic
+string length.
+
+Old:
+(gdb) p my_dyn_string
+$1 = (PTR TO -> ( character*23959136 )) 0x605fc0
+
+(gdb) p *my_dyn_string
+Cannot access memory at address 0x605fc0
+
+New:
+(gdb) p my_dyn_string
+$1 = (PTR TO -> ( character*10 )) 0x605fc0
+
+(gdb) p *my_dyn_string
+$2 = 'foo'
+
+2014-05-28  Keven Boell  <keven.boell@intel.com>
+            Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* gdbtypes.c (resolve_dynamic_type): Add
+	conditions to support string types.
+	(resolve_dynamic_array): Add conditions for dynamic
+	strings and create a new string type.
+	(is_dynamic_type): Follow pointer if a string type
+	was detected, as Fortran strings are represented
+	as pointers to strings internally.
+
+Change-Id: I7d54d762a081ce034be37ac3e368bac8111dc4e6
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/gdbtypes.c |   24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
+
+Index: gdb-7.7.90.20140613/gdb/gdbtypes.c
+===================================================================
+--- gdb-7.7.90.20140613.orig/gdb/gdbtypes.c	2014-06-14 15:14:48.623115597 +0200
++++ gdb-7.7.90.20140613/gdb/gdbtypes.c	2014-06-14 15:15:26.876151187 +0200
+@@ -1662,6 +1662,15 @@ is_dynamic_type (struct type *type)
+     return is_dynamic_type (TYPE_TARGET_TYPE (type));
+       }
+ 
++    case TYPE_CODE_PTR:
++      {
++        if (TYPE_TARGET_TYPE (type)
++            && TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_STRING)
++          return is_dynamic_type (check_typedef (TYPE_TARGET_TYPE (type)));
++
++        return 0;
++        break;
++      }
+     case TYPE_CODE_STRUCT:
+     case TYPE_CODE_UNION:
+       {
+@@ -1742,7 +1751,8 @@ resolve_dynamic_array (struct type *type
+   struct dynamic_prop *prop;
+   struct type *copy = copy_type (type);
+ 
+-  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY);
++  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY
++              || TYPE_CODE (type) == TYPE_CODE_STRING);
+ 
+   elt_type = type;
+   range_type = check_typedef (TYPE_INDEX_TYPE (elt_type));
+@@ -1769,9 +1779,14 @@ resolve_dynamic_array (struct type *type
+   else
+     elt_type = TYPE_TARGET_TYPE (type);
+ 
+-  return create_array_type (copy,
+-			    elt_type,
+-			    range_type);
++  if (TYPE_CODE (type) == TYPE_CODE_STRING)
++    return create_string_type (copy,
++            elt_type,
++            range_type);
++  else
++    return create_array_type (copy,
++            elt_type,
++            range_type);
+ }
+ 
+ /* Resolves dynamic compound types, e.g. STRUCTS's to static ones.
+@@ -1958,6 +1973,7 @@ resolve_dynamic_type (struct type *type,
+ 	}
+ 
+       case TYPE_CODE_ARRAY:
++      case TYPE_CODE_STRING:
+ 	resolved_type = resolve_dynamic_array (type, addr);
+ 	break;
+ 

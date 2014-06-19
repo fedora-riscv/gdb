@@ -1,0 +1,49 @@
+Subject: [PATCH 08/23] vla: get dynamic array corner cases to work
+Message-Id: <1401861266-6240-9-git-send-email-keven.boell@intel.com>
+
+This patch does not overwrite the value type in
+case it is a dynamic type. For dynamic types GDB
+resolved its dynamic values in a copy of the type.
+The call to deprecated_set_value_type overwrites the
+resolved type with the original type, which breaks
+e.g. pointer to a Fortran type, which contains a dynamic
+array.
+
+Old:
+(gdb) print &vla1
+(PTR TO -> ( real(kind=4) (23959136:23959184))) 0x7fffffffd490
+
+New:
+(gdb) print &vla1
+(PTR TO -> ( real(kind=4) (5))) 0x7fffffffd490
+
+2014-05-28  Keven Boell  <keven.boell@intel.com>
+            Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* value.c (readjust_indirect_value_type): Add
+	check for dynamic types.
+
+Change-Id: If1c6fb0bd3c1d04619e89a1b58850edb69bbfde0
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/value.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gdb/value.c b/gdb/value.c
+index 1f0d9a4..7abb20a 100644
+--- a/gdb/value.c
++++ b/gdb/value.c
+@@ -3504,7 +3504,8 @@ readjust_indirect_value_type (struct value *value, struct type *enc_type,
+ 			      struct value *original_value)
+ {
+   /* Re-adjust type.  */
+-  deprecated_set_value_type (value, TYPE_TARGET_TYPE (original_type));
++  if (!is_dynamic_type (TYPE_TARGET_TYPE (original_type)))
++    deprecated_set_value_type (value, TYPE_TARGET_TYPE (original_type));
+ 
+   /* Add embedding info.  */
+   set_value_enclosing_type (value, enc_type);
+-- 
+1.7.9.5
+

@@ -1,0 +1,67 @@
+Subject: [PATCH 06/23] vla: reconstruct value to compute bounds of target type
+Message-Id: <1401861266-6240-7-git-send-email-keven.boell@intel.com>
+
+Printing a pointer to an array, gdb tries to print the
+target type including its bounds. To follow this
+semantic with vla, this patch re-constructs the value to
+resolve the bounds of the target type.
+
+2014-05-28  Sanimir Agovic  <sanimir.agovic@intel.com>
+            Keven Boell  <keven.boell@intel.com>
+
+	* typeprint.c (whatis_exp): Re-construct value to
+	compute bounds of target type.
+	* c-valprint.c (c_value_print): Re-construct value
+	to compute bounds of target type.
+
+Change-Id: Ia8a25021c7cc206711ca6f359ae5566a367e3b3d
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/c-valprint.c |   11 ++++++++++-
+ gdb/typeprint.c  |    7 +++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
+index f4694b0..8c45276 100644
+--- a/gdb/c-valprint.c
++++ b/gdb/c-valprint.c
+@@ -538,7 +538,16 @@ c_value_print (struct value *val, struct ui_file *stream,
+ 	{
+ 	  /* normal case */
+ 	  fprintf_filtered (stream, "(");
+-	  type_print (value_type (val), "", stream, -1);
++	  if (is_dynamic_type (TYPE_TARGET_TYPE (type)))
++	    {
++	      struct value *v;
++
++	      v = value_ind (val);
++	      v = value_addr (v);
++	      type_print (value_type (v), "", stream, -1);
++	    }
++	  else
++	    type_print (value_type (val), "", stream, -1);
+ 	  fprintf_filtered (stream, ") ");
+ 	}
+     }
+diff --git a/gdb/typeprint.c b/gdb/typeprint.c
+index b4ad431..b3c73a8 100644
+--- a/gdb/typeprint.c
++++ b/gdb/typeprint.c
+@@ -459,6 +459,13 @@ whatis_exp (char *exp, int show)
+ 
+   type = value_type (val);
+ 
++  if (TYPE_CODE (type) == TYPE_CODE_PTR)
++    if (is_dynamic_type (TYPE_TARGET_TYPE (type)))
++      {
++	val = value_addr (value_ind (val));
++	type = value_type (val);
++      }
++
+   get_user_print_options (&opts);
+   if (opts.objectprint)
+     {
+-- 
+1.7.9.5
+

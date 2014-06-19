@@ -1,0 +1,38 @@
+http://sourceware.org/ml/gdb-patches/2014-06/msg00710.html
+Subject: Re: Regression for watchpoint-fork.exp  [Re: [PATCH v3 2/5] PR breakpoints/7143 - Watchpoint does not trigger when first set]
+
+On 06/19/2014 04:02 PM, Pedro Alves wrote:
+
+>> Attaching gzipped gdb.threads/watchpoint-fork-parent-st
+>> from gcc-4.9.0-9.fc21.x86_64.
+> 
+> Thanks, I can reproduce it.
+
+Hmm, I suspect this might be related to kernel-side validation
+of DR_CONTROL vs DR0-3, like what we already handle in amd64_linux_prepare_to_resume.
+And indeed this below makes the error go away.  Not exactly sure why yet.
+
+[ patch extended by Jan Kratochvil ]
+
+--- gdb-7.7.90.20140613/gdb/i386-linux-nat.c.orig	2014-06-19 21:42:00.788611544 +0200
++++ gdb-7.7.90.20140613/gdb/i386-linux-nat.c	2014-06-19 21:42:04.556614401 +0200
+@@ -778,6 +778,8 @@ i386_linux_prepare_to_resume (struct lwp
+       /* See amd64_linux_prepare_to_resume for Linux kernel note on
+ 	 i386_linux_dr_set calls ordering.  */
+ 
++      i386_linux_dr_set (lwp->ptid, DR_CONTROL, 0);
++
+       for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
+ 	if (state->dr_ref_count[i] > 0)
+ 	  {
+--- gdb-7.7.90.20140613/gdb/amd64-linux-nat.c.orig	2014-06-19 21:40:37.582534392 +0200
++++ gdb-7.7.90.20140613/gdb/amd64-linux-nat.c	2014-06-19 21:41:17.192570902 +0200
+@@ -415,6 +415,8 @@ amd64_linux_prepare_to_resume (struct lw
+ 
+ 	 Ensure DR_CONTROL gets written as the very last register here.  */
+ 
++      amd64_linux_dr_set (lwp->ptid, DR_CONTROL, 0);
++
+       for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
+ 	if (state->dr_ref_count[i] > 0)
+ 	  {

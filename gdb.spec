@@ -17,17 +17,15 @@
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
-# 6e5c95e6cf1e3c37bd3a822ca9e6721caab97a85
-#global snap       20140127
 # Freeze it when GDB gets branched
-%global snapsrc    20140108
+%global snapsrc    20140613
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.7.1
+Version: 7.7.90.20140613
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -221,20 +219,6 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
 Patch232: gdb-upstream.patch
-Patch868: gdb-upstream-ppc64le02of15.patch
-Patch869: gdb-upstream-ppc64le03of15.patch
-Patch870: gdb-upstream-ppc64le04of15.patch
-Patch871: gdb-upstream-ppc64le05of15.patch
-Patch872: gdb-upstream-ppc64le06of15.patch
-Patch873: gdb-upstream-ppc64le07of15.patch
-Patch874: gdb-upstream-ppc64le08of15.patch
-Patch875: gdb-upstream-ppc64le09of15.patch
-Patch876: gdb-upstream-ppc64le10of15.patch
-Patch877: gdb-upstream-ppc64le11of15.patch
-Patch878: gdb-upstream-ppc64le12of15.patch
-Patch879: gdb-upstream-ppc64le13of15.patch
-Patch880: gdb-upstream-ppc64le14of15.patch
-Patch881: gdb-upstream-ppc64le15of15.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -286,10 +270,6 @@ Patch833: gdb-6.6-buildid-locate-rpm-scl.patch
 # Fix 'gdb gives highly misleading error when debuginfo pkg is present,
 # but not corresponding binary pkg' (RH BZ 981154).
 Patch863: gdb-6.6-buildid-locate-misleading-warning-missing-debuginfo-rhbz981154.patch
-
-# Add kernel vDSO workaround (`no loadable ...') on RHEL-5 (kernel BZ 765875).
-#=push
-Patch276: gdb-6.6-bfd-vdso8k.patch
 
 # Fix displaying of numeric char arrays as strings (BZ 224128).
 #=fedoratest: But it is failing anyway, one should check the behavior more.
@@ -518,20 +498,44 @@ Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
 # Fix crash on 'enable count' (Simon Marchi, BZ 993118).
 Patch843: gdb-enable-count-crash.patch
 
-# Fix testsuite "ERROR: no fileid for".
-Patch846: gdb-testsuite-nohostid.patch
-
 # [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
 Patch848: gdb-dts-rhel6-python-compat.patch
 
 # Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
-Patch850: gdb-gnat-dwarf-crash-1of3.patch
-Patch851: gdb-gnat-dwarf-crash-2of3.patch
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
-# Fix TLS access for -static -pthread (BZ 1080660).
-Patch865: gdb-static-tls-1of2.patch
-Patch866: gdb-static-tls-2of2.patch
+# VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
+Patch887: gdb-archer-vla-tests.patch
+Patch888: gdb-vla-intel-01of23.patch
+Patch889: gdb-vla-intel-02of23.patch
+Patch890: gdb-vla-intel-03of23.patch
+Patch891: gdb-vla-intel-04of23.patch
+Patch912: gdb-vla-intel-04of23-fix.patch
+Patch892: gdb-vla-intel-05of23.patch
+Patch893: gdb-vla-intel-06of23.patch
+Patch894: gdb-vla-intel-07of23.patch
+Patch895: gdb-vla-intel-08of23.patch
+Patch896: gdb-vla-intel-09of23.patch
+Patch897: gdb-vla-intel-10of23.patch
+Patch898: gdb-vla-intel-11of23.patch
+Patch899: gdb-vla-intel-12of23.patch
+Patch900: gdb-vla-intel-13of23.patch
+Patch901: gdb-vla-intel-14of23.patch
+Patch902: gdb-vla-intel-15of23.patch
+Patch903: gdb-vla-intel-16of23.patch
+Patch904: gdb-vla-intel-17of23.patch
+Patch905: gdb-vla-intel-18of23.patch
+Patch906: gdb-vla-intel-19of23.patch
+Patch907: gdb-vla-intel-20of23.patch
+Patch908: gdb-vla-intel-21of23.patch
+Patch909: gdb-vla-intel-22of23.patch
+Patch910: gdb-vla-intel-23of23.patch
+
+# Fix ASAN crash regression with demangled names copy (Tom Tromey).
+Patch911: gdb-bfd-demangled-names.patch
+
+# Fix gdb-7.8 watchpoint-fork.exp regression (Pedro Alves).
+Patch913: gdb-watchpoint-fork-fix.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -707,20 +711,30 @@ find -name "*.info*"|xargs rm -f
 
 %patch349 -p1
 %patch232 -p1
-%patch868 -p1
-%patch869 -p1
-%patch870 -p1
-%patch871 -p1
-%patch872 -p1
-%patch873 -p1
-%patch874 -p1
-%patch875 -p1
-%patch876 -p1
-%patch877 -p1
-%patch878 -p1
-%patch879 -p1
-%patch880 -p1
-%patch881 -p1
+%patch888 -p1
+%patch889 -p1
+%patch890 -p1
+%patch891 -p1
+%patch912 -p1
+%patch892 -p1
+%patch893 -p1
+%patch894 -p1
+%patch895 -p1
+%patch896 -p1
+%patch897 -p1
+%patch898 -p1
+%patch899 -p1
+%patch900 -p1
+%patch901 -p1
+%patch902 -p1
+%patch903 -p1
+%patch904 -p1
+%patch905 -p1
+%patch906 -p1
+%patch907 -p1
+%patch908 -p1
+%patch909 -p1
+%patch910 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -760,7 +774,6 @@ find -name "*.info*"|xargs rm -f
 %patch274 -p1
 %patch659 -p1
 %patch353 -p1
-%patch276 -p1
 %patch282 -p1
 %patch284 -p1
 %patch289 -p1
@@ -817,13 +830,11 @@ find -name "*.info*"|xargs rm -f
 %patch818 -p1
 %patch832 -p1
 %patch843 -p1
-%patch846 -p1
-%patch850 -p1
-%patch851 -p1
 %patch852 -p1
 %patch863 -p1
-%patch865 -p1
-%patch866 -p1
+%patch887 -p1
+%patch911 -p1
+%patch913 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -910,6 +921,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
+	--without-guile						\
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
 %else
@@ -1308,6 +1320,9 @@ then
 fi
 
 %changelog
+* Thu Jun 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-1.fc21
+- Rebase to FSF GDB 7.7.90.20140613 (pre-7.8 snapshot).
+
 * Sat Jun 07 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.7.1-21
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_21_Mass_Rebuild
 

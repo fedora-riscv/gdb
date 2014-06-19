@@ -1,369 +1,321 @@
-http://sourceware.org/ml/gdb-patches/2014-02/msg00179.html
-Subject: [obv] testsuite: Fix i386-sse-stack-align.exp regression since GDB_PARALLEL
+http://sourceware.org/ml/gdb-patches/2014-06/msg00656.html
+Subject: Re: Regression with default scheduler-locking=step  [Re: [pushed] Consecutive step-overs trigger internal error.]
 
+On 06/17/2014 08:24 PM, Jan Kratochvil wrote:
+> On Tue, 22 Apr 2014 20:24:28 +0200, Pedro Alves wrote:
+>> Tested on x86_64 Fedora 17, native and gdbserver, and also native on
+>> top of my "software single-step on x86_64" series.
+> 
+> 483805cf9ea5a6dace41415d8830e93fccc49c43 is the first bad commit
+> commit 483805cf9ea5a6dace41415d8830e93fccc49c43
+> Author: Pedro Alves <palves@redhat.com>
+> Date:   Tue Apr 22 15:00:56 2014 +0100
+>     Consecutive step-overs trigger internal error.
+>     
+> (gdb) next^M
+> [Thread 0x7ffff7fda700 (LWP 27168) exited]^M
+> [New LWP 27168]^M
+> [Thread 0x7ffff74ee700 (LWP 27174) exited]^M
+> process 27168 is executing new program: /home/jkratoch/redhat/gdb-clean/gdb/testsuite/gdb.threads/thread-execl^M
+> [Thread debugging using libthread_db enabled]^M
+> Using host libthread_db library "/lib64/libthread_db.so.1".^M
+> infrun.c:5225: internal-error: switch_back_to_stepped_thread: Assertion `!schedlock_applies (1)' failed.^M
+> A problem internal to GDB has been detected,^M
+> further debugging may prove unreliable.^M
+> Quit this debugging session? (y or n) FAIL: gdb.threads/thread-execl.exp: get to main in new image (GDB internal error)
+> Resyncing due to internal error.
 
---u3/rZRmxL6MmkK24
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Thanks Jan.
 
-Hi Tom,
+> 
+> The regressions happens only with the attached patch which I am not sure if it
+> is considered as a valid FSF GDB regression or not but I think it is.
 
-$ make check//unix/-m32 RUNTESTFLAGS="gdb.arch/i386-sse-stack-align.exp GDB_PARALLEL=1"
-[...]
-Running /home/jkratoch/redhat/gdb-clean/gdb/testsuite/gdb.arch/i386-sse-stack-align.exp ...
-ERROR: (/home/jkratoch/redhat/gdb-clean/gdb/testsuite.unix.-m32/outputs/gdb.arch/i386-sse-stack-align/i386-sse-stack-align) No such file or directory
+If it worked before, then it's certainly a regression.  The user is
+free to do "set scheduler-locking step" herself.
 
+Here's a fix.  Let me know what you think.
 
-Checked in.
+8<---------------------------------
+>From f717378c16cb04f8350935a1336767d2541b36a5 Mon Sep 17 00:00:00 2001
+From: Pedro Alves <palves@redhat.com>
+Date: Wed, 18 Jun 2014 14:20:31 +0100
+Subject: [PATCH] Fix next over threaded execl with "set scheduler-locking
+Subject: [PATCH] Fix next over threaded execl with "set scheduler-locking
+ step".
 
+Running gdb.threads/thread-execl.exp with scheduler-locking set to
+"step" reveals a problem:
 
-Jan
+ (gdb) next^M
+ [Thread 0x7ffff7fda700 (LWP 27168) exited]^M
+ [New LWP 27168]^M
+ [Thread 0x7ffff74ee700 (LWP 27174) exited]^M
+ process 27168 is executing new program: /home/jkratoch/redhat/gdb-clean/gdb/testsuite/gdb.threads/thread-execl^M
+ [Thread debugging using libthread_db enabled]^M
+ Using host libthread_db library "/lib64/libthread_db.so.1".^M
+ infrun.c:5225: internal-error: switch_back_to_stepped_thread: Assertion `!schedlock_applies (1)' failed.^M
+ A problem internal to GDB has been detected,^M
+ further debugging may prove unreliable.^M
+ Quit this debugging session? (y or n) FAIL: gdb.threads/thread-execl.exp: schedlock step: get to main in new image (GDB internal error)
 
---u3/rZRmxL6MmkK24
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline; filename=1
+The assertion is correct.  The issue is that GDB is mistakenly trying
+to switch back to an exited thread, that was previously stepping when
+it exited.  This is exactly the sort of thing the test wants to make
+sure doesn't happen:
 
-commit 3c77faf33dc4c7bb693f05f44077ed687e9f8217
-Author: Jan Kratochvil <jan.kratochvil@redhat.com>
-Date:   Thu Feb 6 23:14:20 2014 +0100
+	# Now set a breakpoint at `main', and step over the execl call.  The
+	# breakpoint at main should be reached.  GDB should not try to revert
+	# back to the old thread from the old image and resume stepping it
 
-    Fix i386-sse-stack-align.exp regression since GDB_PARALLEL.
-    
-    gdb/testsuite/
-    2014-02-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
-    
-    	Fix i386-sse-stack-align.exp regression since GDB_PARALLEL.
-    	* gdb.arch/i386-sse-stack-align.exp: Use standard_output_file.
+We don't see this bug with schedlock off only because a different
+sequence of events makes GDB manage to delete the thread instead of
+marking it exited.
 
-diff --git a/gdb/testsuite/ChangeLog b/gdb/testsuite/ChangeLog
-index 8c846b8..13ccaf3 100644
-### a/gdb/testsuite/ChangeLog
-### b/gdb/testsuite/ChangeLog
-## -1,3 +1,8 @@
-+2014-02-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
-+
-+	Fix i386-sse-stack-align.exp regression since GDB_PARALLEL.
-+	* gdb.arch/i386-sse-stack-align.exp: Use standard_output_file.
-+
- 2014-02-06  Doug Evans  <xdje42@gmail.com>
+This particular internal error can be fixed by making the loop over
+all threads in switch_back_to_stepped_thread skip exited threads.
+But, looking over other ALL_THREADS users, all either can or should be
+skipping exited threads too.  So for simplicity, this patch replaces
+ALL_THREADS with a new macro that skips exited threads itself, and
+updates everything to use it.
+
+Tested on x86_64 Fedora 20.
+
+gdb/
+2014-06-18  Pedro Alves  <palves@redhat.com>
+
+	* gdbthread.h (ALL_THREADS): Delete.
+	(ALL_NON_EXITED_THREADS): New macro.
+	* btrace.c (btrace_free_objfile): Use ALL_NON_EXITED_THREADS
+	instead of ALL_THREADS.
+	* infrun.c (find_thread_needs_step_over)
+	(switch_back_to_stepped_thread): Use ALL_NON_EXITED_THREADS
+	instead of ALL_THREADS.
+	* record-btrace.c (record_btrace_open)
+	(record_btrace_stop_recording, record_btrace_close)
+	(record_btrace_is_replaying, record_btrace_resume)
+	(record_btrace_find_thread_to_move, record_btrace_wait): Likewise.
+	* remote.c (append_pending_thread_resumptions): Likewise.
+
+gdb/testsuite/
+2014-06-18  Pedro Alves  <palves@redhat.com>
+
+	* gdb.threads/thread-execl.exp (do_test): New procedure, factored
+	out from ...
+	(top level): ... here.  Iterate running tests under different
+	scheduler-locking settings.
+---
+ gdb/btrace.c                               |  2 +-
+ gdb/gdbthread.h                            |  8 ++++--
+ gdb/infrun.c                               |  4 +--
+ gdb/record-btrace.c                        | 14 +++++-----
+ gdb/remote.c                               |  2 +-
+ gdb/testsuite/gdb.threads/thread-execl.exp | 44 ++++++++++++++++++++----------
+ gdb/thread.c                               |  2 +-
+ 7 files changed, 46 insertions(+), 30 deletions(-)
+
+diff --git a/gdb/btrace.c b/gdb/btrace.c
+index 601eb41..87a171e 100644
+--- a/gdb/btrace.c
++++ b/gdb/btrace.c
+@@ -958,7 +958,7 @@ btrace_free_objfile (struct objfile *objfile)
  
- 	* gdb.python/py-breakpoint.exp (test_bkpt_eval_funcs): Update expected
-diff --git a/gdb/testsuite/gdb.arch/i386-sse-stack-align.exp b/gdb/testsuite/gdb.arch/i386-sse-stack-align.exp
-index b5a7e1e..462df1f 100644
---- a/gdb/testsuite/gdb.arch/i386-sse-stack-align.exp
-+++ b/gdb/testsuite/gdb.arch/i386-sse-stack-align.exp
-@@ -22,7 +22,7 @@ set testfile "i386-sse-stack-align"
- set srcfile ${testfile}.S
- set csrcfile ${testfile}.c
- set executable ${testfile}
--set binfile ${objdir}/${subdir}/${executable}
-+set binfile [standard_output_file ${executable}]
- set opts {}
+   DEBUG ("free objfile");
  
- if [info exists COMPILE] {
-
---u3/rZRmxL6MmkK24--
-
-
-
-commit 20dca09662aa0d2706fbe325b8f448ef74773028
-Author: Andreas Arnez <arnez@linux.vnet.ibm.com>
-Date:   Tue May 13 14:55:53 2014 +0200
-
-    PR target/16940 S390: Fix erroneous offset in fill_gregset.
-    
-    This fixes a bug that leads to various failures when debugging a
-    31-bit inferior with a 64-bit gdb on s390x.
-    
-    Conflicts:
-    
-    	gdb/ChangeLog
-
-### a/gdb/ChangeLog
-### b/gdb/ChangeLog
-## -1,3 +1,9 @@
-+2014-05-13  Andreas Arnez  <arnez@vnet.linux.ibm.com>
-+
-+	PR target/16940
-+	* s390-linux-nat.c (fill_gregset): Remove erroneous offset 4 in
-+	call to regcache_raw_collect.
-+
- 2014-05-05  Joel Brobecker  <brobecker@adacore.com>
- 
- 	* version.in: Set GDB version number to 7.7.1.DATE-cvs.
---- a/gdb/s390-linux-nat.c
-+++ b/gdb/s390-linux-nat.c
-@@ -164,7 +164,7 @@ fill_gregset (const struct regcache *regcache, gregset_t *regp, int regno)
- 		  memset (p, 0, 4);
- 		  p += 4;
- 		}
--	      regcache_raw_collect (regcache, reg, p + 4);
-+	      regcache_raw_collect (regcache, reg, p);
- 	    }
- 	}
- 
-
-
-
-https://bugzilla.redhat.com/show_bug.cgi?id=1086894
-commit f2205de0080d999c9b67872c9db471c31b53e378
-Author: Hui Zhu <teawater@gmail.com>
-Date:   Tue May 20 13:19:06 2014 +0800
-
-    Fix issue #15778: GDB Aarch64 signal frame unwinder issue
-    
-    The root cause of this issue is unwinder of "#3  <signal handler called>"
-    doesn't supply right values of registers.
-    When GDB want to get the previous frame of "#3  <signal handler called>",
-    it will call cache init function of unwinder "aarch64_linux_sigframe_init".
-    The address or the value of the registers is get from this function.
-    So the bug is inside thie function.
-    
-    I check the asm code of "#3  <signal handler called>":
-    (gdb) frame 3
-    (gdb) p $pc
-    $1 = (void (*)()) 0x7f931fa4d0
-    (gdb) disassemble $pc, +10
-    Dump of assembler code from 0x7f931fa4d0 to 0x7f931fa4da:
-    => 0x0000007f931fa4d0:	mov	x8, #0x8b                  	// #139
-       0x0000007f931fa4d4:	svc	#0x0
-       0x0000007f931fa4d8:	nop
-    
-    This is the syscall sys_rt_sigreturn, Linux kernel function "restore_sigframe"
-    will set the frame:
-    	for (i = 0; i < 31; i++)
-    		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-    				 err);
-    	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
-    	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
-    The struct of uc_mcontext is:
-    struct sigcontext {
-    	__u64 fault_address;
-    	/* AArch64 registers */
-    	__u64 regs[31];
-    	__u64 sp;
-    	__u64 pc;
-    	__u64 pstate;
-    	/* 4K reserved for FP/SIMD state and future expansion */
-    	__u8 __reserved[4096] __attribute__((__aligned__(16)));
-    };
-    
-    But in GDB function "aarch64_linux_sigframe_init", the code the get address
-    of registers is:
-      for (i = 0; i < 31; i++)
-        {
-          trad_frame_set_reg_addr (this_cache,
-    			       AARCH64_X0_REGNUM + i,
-    			       sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
-    			       + i * AARCH64_SIGCONTEXT_REG_SIZE);
-        }
-    
-      trad_frame_set_reg_addr (this_cache, AARCH64_FP_REGNUM, fp);
-      trad_frame_set_reg_addr (this_cache, AARCH64_LR_REGNUM, fp + 8);
-      trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM, fp + 8);
-    
-    The code that get pc and sp is not right, so I change the code according
-    to Linux kernel code:
-      trad_frame_set_reg_addr (this_cache, AARCH64_SP_REGNUM,
-    			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
-    			     + 31 * AARCH64_SIGCONTEXT_REG_SIZE);
-      trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM,
-    			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
-    			     + 32 * AARCH64_SIGCONTEXT_REG_SIZE);
-    
-    The issue was fixed by this change, and I did the regression test.  It
-    also fixed a lot of other XFAIL and FAIL.
-    
-    2014-05-20  Hui Zhu  <hui@codesourcery.com>
-    	    Yao Qi  <yao@codesourcery.com>
-    
-    	PR backtrace/16558
-    	* aarch64-linux-tdep.c (aarch64_linux_sigframe_init): Update comments
-    	and change address of sp and pc.
-
-### a/gdb/ChangeLog
-### b/gdb/ChangeLog
-## -1,3 +1,10 @@
-+2014-05-20  Hui Zhu  <hui@codesourcery.com>
-+	    Yao Qi  <yao@codesourcery.com>
-+
-+	PR backtrace/16558
-+	* aarch64-linux-tdep.c (aarch64_linux_sigframe_init): Update comments
-+	and change address of sp and pc.
-+
- 2014-05-19  Tom Tromey  <tromey@redhat.com>
- 
- 	* gdbtypes.c (rank_function): Use XNEWVEC.
---- a/gdb/aarch64-linux-tdep.c
-+++ b/gdb/aarch64-linux-tdep.c
-@@ -53,28 +53,30 @@
- 
- /* Signal frame handling.
- 
--      +----------+  ^
--      | saved lr |  |
--   +->| saved fp |--+
--   |  |          |
--   |  |          |
--   |  +----------+
--   |  | saved lr |
--   +--| saved fp |
--   ^  |          |
--   |  |          |
--   |  +----------+
--   ^  |          |
--   |  | signal   |
--   |  |          |
--   |  | saved lr |-->interrupted_function_pc
--   +--| saved fp |
--   |  +----------+
--   |  | saved lr |--> default_restorer (movz x8, NR_sys_rt_sigreturn; svc 0)
--   +--| saved fp |<- FP
--      |          |
--      |          |<- SP
--      +----------+
-+      +------------+  ^
-+      | saved lr   |  |
-+   +->| saved fp   |--+
-+   |  |            |
-+   |  |            |
-+   |  +------------+
-+   |  | saved lr   |
-+   +--| saved fp   |
-+   ^  |            |
-+   |  |            |
-+   |  +------------+
-+   ^  |            |
-+   |  | signal     |
-+   |  |            |        SIGTRAMP_FRAME (struct rt_sigframe)
-+   |  | saved regs |
-+   +--| saved sp   |--> interrupted_sp
-+   |  | saved pc   |--> interrupted_pc
-+   |  |            |
-+   |  +------------+
-+   |  | saved lr   |--> default_restorer (movz x8, NR_sys_rt_sigreturn; svc 0)
-+   +--| saved fp   |<- FP
-+      |            |         NORMAL_FRAME
-+      |            |<- SP
-+      +------------+
- 
-   On signal delivery, the kernel will create a signal handler stack
-   frame and setup the return address in LR to point at restorer stub.
-@@ -123,6 +125,8 @@
-   d28015a8        movz    x8, #0xad
-   d4000001        svc     #0x0
- 
-+  This is a system call sys_rt_sigreturn.
-+
-   We detect signal frames by snooping the return code for the restorer
-   instruction sequence.
- 
-@@ -146,7 +150,6 @@ aarch64_linux_sigframe_init (const struct tramp_frame *self,
- {
-   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-   CORE_ADDR sp = get_frame_register_unsigned (this_frame, AARCH64_SP_REGNUM);
--  CORE_ADDR fp = get_frame_register_unsigned (this_frame, AARCH64_FP_REGNUM);
-   CORE_ADDR sigcontext_addr =
-     sp
-     + AARCH64_RT_SIGFRAME_UCONTEXT_OFFSET
-@@ -160,12 +163,14 @@ aarch64_linux_sigframe_init (const struct tramp_frame *self,
- 			       sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
- 			       + i * AARCH64_SIGCONTEXT_REG_SIZE);
-     }
--
--  trad_frame_set_reg_addr (this_cache, AARCH64_FP_REGNUM, fp);
--  trad_frame_set_reg_addr (this_cache, AARCH64_LR_REGNUM, fp + 8);
--  trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM, fp + 8);
--
--  trad_frame_set_id (this_cache, frame_id_build (fp, func));
-+  trad_frame_set_reg_addr (this_cache, AARCH64_SP_REGNUM,
-+			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
-+			     + 31 * AARCH64_SIGCONTEXT_REG_SIZE);
-+  trad_frame_set_reg_addr (this_cache, AARCH64_PC_REGNUM,
-+			   sigcontext_addr + AARCH64_SIGCONTEXT_XO_OFFSET
-+			     + 32 * AARCH64_SIGCONTEXT_REG_SIZE);
-+
-+  trad_frame_set_id (this_cache, frame_id_build (sp, func));
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     btrace_clear (tp);
  }
  
- static const struct tramp_frame aarch64_linux_rt_sigframe =
-
-
-
-Bug 1102624 - latest gdb -15 build is FTBFS on aarch64
-https://bugzilla.redhat.com/show_bug.cgi?id=1102624
-commit 036cd38182bde32d8297b630cd5c861d53b8949e
-Author: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-Date:   Thu May 22 16:07:20 2014 +0100
-
-    Include asm/ptrace.h in aarch64-linux-nat.c
-    
-    A recent change to glibc removed asm/ptrace.h from user.h for
-    AArch64. This meant that cross-native builds of gdb using trunk
-    glibc broke because aarch64-linux-nat.c because user_hwdebug_state
-    couldn't be found.
-    
-    Fixed by including asm/ptrace.h like other ports.
-    
-    2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
-    
-           * aarch64-linux-nat.c (asm/ptrace.h): Include.
-
-### a/gdb/ChangeLog
-### b/gdb/ChangeLog
-## -1,5 +1,9 @@
- 2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+diff --git a/gdb/gdbthread.h b/gdb/gdbthread.h
+index 9f5dee6..64e37c3 100644
+--- a/gdb/gdbthread.h
++++ b/gdb/gdbthread.h
+@@ -317,10 +317,12 @@ void thread_change_ptid (ptid_t old_ptid, ptid_t new_ptid);
+ typedef int (*thread_callback_func) (struct thread_info *, void *);
+ extern struct thread_info *iterate_over_threads (thread_callback_func, void *);
  
-+	* aarch64-linux-nat.c (asm/ptrace.h): Include.
+-/* Traverse all threads.  */
++/* Traverse all threads, except those that have THREAD_EXITED
++   state.  */
+ 
+-#define ALL_THREADS(T)				\
+-  for (T = thread_list; T; T = T->next)
++#define ALL_NON_EXITED_THREADS(T)				\
++  for (T = thread_list; T; T = T->next) \
++    if ((T)->state != THREAD_EXITED)
+ 
+ extern int thread_count (void);
+ 
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index 4e808d9..e8e26e0 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -2160,7 +2160,7 @@ find_thread_needs_step_over (int step, struct thread_info *except)
+       return NULL;
+     }
+ 
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     {
+       /* Ignore the EXCEPT thread.  */
+       if (tp == except)
+@@ -5204,7 +5204,7 @@ switch_back_to_stepped_thread (struct execution_control_state *ecs)
+ 	 step/next/etc.  */
+       stepping_thread = NULL;
+       step_over = NULL;
+-      ALL_THREADS (tp)
++      ALL_NON_EXITED_THREADS (tp)
+         {
+ 	  /* Ignore threads of processes we're not resuming.  */
+ 	  if (!sched_multi
+diff --git a/gdb/record-btrace.c b/gdb/record-btrace.c
+index e0c537a8..6a9bfe1 100644
+--- a/gdb/record-btrace.c
++++ b/gdb/record-btrace.c
+@@ -206,7 +206,7 @@ record_btrace_open (char *args, int from_tty)
+   gdb_assert (record_btrace_thread_observer == NULL);
+ 
+   disable_chain = make_cleanup (null_cleanup, NULL);
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     if (args == NULL || *args == 0 || number_is_in_list (args, tp->num))
+       {
+ 	btrace_enable (tp);
+@@ -238,7 +238,7 @@ record_btrace_stop_recording (struct target_ops *self)
+ 
+   record_btrace_auto_disable ();
+ 
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     if (tp->btrace.target != NULL)
+       btrace_disable (tp);
+ }
+@@ -259,7 +259,7 @@ record_btrace_close (struct target_ops *self)
+ 
+   /* We should have already stopped recording.
+      Tear down btrace in case we have not.  */
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     btrace_teardown (tp);
+ }
+ 
+@@ -835,7 +835,7 @@ record_btrace_is_replaying (struct target_ops *self)
+ {
+   struct thread_info *tp;
+ 
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     if (btrace_is_replaying (tp))
+       return 1;
+ 
+@@ -1522,7 +1522,7 @@ record_btrace_resume (struct target_ops *ops, ptid_t ptid, int step,
+ 
+   /* Stop replaying other threads if the thread to resume is not replaying.  */
+   if (!btrace_is_replaying (tp) && execution_direction != EXEC_REVERSE)
+-    ALL_THREADS (other)
++    ALL_NON_EXITED_THREADS (other)
+       record_btrace_stop_replaying (other);
+ 
+   /* As long as we're not replaying, just forward the request.  */
+@@ -1572,7 +1572,7 @@ record_btrace_find_thread_to_move (ptid_t ptid)
+     return tp;
+ 
+   /* Otherwise, find one other thread that has been resumed.  */
+-  ALL_THREADS (tp)
++  ALL_NON_EXITED_THREADS (tp)
+     if ((tp->btrace.flags & BTHR_MOVE) != 0)
+       return tp;
+ 
+@@ -1777,7 +1777,7 @@ record_btrace_wait (struct target_ops *ops, ptid_t ptid,
+ 
+   /* Stop all other threads. */
+   if (!non_stop)
+-    ALL_THREADS (other)
++    ALL_NON_EXITED_THREADS (other)
+       other->btrace.flags &= ~BTHR_MOVE;
+ 
+   /* Start record histories anew from the current position.  */
+diff --git a/gdb/remote.c b/gdb/remote.c
+index 6915dd8..b5318f1 100644
+--- a/gdb/remote.c
++++ b/gdb/remote.c
+@@ -4626,7 +4626,7 @@ append_pending_thread_resumptions (char *p, char *endp, ptid_t ptid)
+ {
+   struct thread_info *thread;
+ 
+-  ALL_THREADS (thread)
++  ALL_NON_EXITED_THREADS (thread)
+     if (ptid_match (thread->ptid, ptid)
+ 	&& !ptid_equal (inferior_ptid, thread->ptid)
+ 	&& thread->suspend.stop_signal != GDB_SIGNAL_0
+diff --git a/gdb/testsuite/gdb.threads/thread-execl.exp b/gdb/testsuite/gdb.threads/thread-execl.exp
+index d837fe4..14b96d2 100644
+--- a/gdb/testsuite/gdb.threads/thread-execl.exp
++++ b/gdb/testsuite/gdb.threads/thread-execl.exp
+@@ -28,19 +28,33 @@ if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
+     return -1
+ }
+ 
+-clean_restart ${binfile}
+-
+-runto_main
+-
+-# Get ourselves to the thread that execs
+-gdb_breakpoint "thread_execler"
+-gdb_test "continue" ".*thread_execler.*" "continue to thread start"
+-
+-# Now set a breakpoint at `main', and step over the execl call.  The
+-# breakpoint at main should be reached.  GDB should not try to revert
+-# back to the old thread from the old image and resume stepping it
+-# (since it is gone).
+-gdb_breakpoint "main"
+-gdb_test "next" ".*main.*" "get to main in new image"
++# Run the test proper.  SCHEDLOCK specifies what scheduler-locking
++# should be set to.
 +
-+2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
++proc do_test { schedlock } {
++    global binfile
 +
- 	* MAINTAINERS (Write After Approval): Move self back from
- 	paper trail.
++    with_test_prefix "schedlock $schedlock" {
++	clean_restart ${binfile}
++
++	if ![runto_main] {
++	    return 0
++	}
++
++	# Get ourselves to the thread that execs.
++	gdb_breakpoint "thread_execler"
++	gdb_test "continue" ".*thread_execler.*" "continue to thread start"
++
++	# Now set a breakpoint at `main', and step over the execl call.  The
++	# breakpoint at main should be reached.  GDB should not try to revert
++	# back to the old thread from the old image and resume stepping it
++	# (since it is gone).
++	gdb_breakpoint "main"
++	gdb_test_no_output "set scheduler-locking $schedlock"
++	gdb_test "next" ".*main.*" "get to main in new image"
++    }
++}
  
---- a/gdb/aarch64-linux-nat.c
-+++ b/gdb/aarch64-linux-nat.c
-@@ -33,6 +33,7 @@
+-return 0
++foreach schedlock {"off" "step" "on"} {
++    do_test $schedlock
++}
+diff --git a/gdb/thread.c b/gdb/thread.c
+index 7bc5271..532149d 100644
+--- a/gdb/thread.c
++++ b/gdb/thread.c
+@@ -1243,7 +1243,7 @@ thread_apply_all_command (char *cmd, int from_tty)
+       ta_cleanup.tp_array = tp_array;
+       ta_cleanup.count = tc;
  
- #include <sys/ptrace.h>
- #include <sys/utsname.h>
-+#include <asm/ptrace.h>
- 
- #include "gregset.h"
- 
-commit e9dae05e9c32efda9724330c6d5ade3ca848591d
-Author: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-Date:   Fri May 23 09:01:14 2014 +0100
+-      ALL_THREADS (tp)
++      ALL_NON_EXITED_THREADS (tp)
+         {
+           tp_array[i] = tp;
+           tp->refcount++;
+-- 
+1.9.3
 
-    Include asm/ptrace.h for linux-aarch64-low.c
-    
-    A recent change to glibc removed asm/ptrace.h from user.h for AArch64.
-    This meant that cross-native builds of gdbserver using trunk glibc broke
-    because linux-aarch64-low.c because user_hwdebug_state couldn't be found.
-    
-    This is like commit #036cd38182bde32d8297b630cd5c861d53b8949e
-    
-    2014-05-23  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
-    
-            * linux-aarch64-low.c (asm/ptrace.h): Include.
 
-### a/gdb/gdbserver/ChangeLog
-### b/gdb/gdbserver/ChangeLog
-## -1,3 +1,7 @@
-+2014-05-23  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
-+
-+	* linux-aarch64-low.c (asm/ptrace.h): Include.
-+
- 2014-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
- 
- 	Fix TLS access for -static -pthread.
---- a/gdb/gdbserver/linux-aarch64-low.c
-+++ b/gdb/gdbserver/linux-aarch64-low.c
-@@ -26,6 +26,7 @@
- #include <signal.h>
- #include <sys/user.h>
- #include <sys/ptrace.h>
-+#include <asm/ptrace.h>
- #include <sys/uio.h>
- 
- #include "gdb_proc_service.h"

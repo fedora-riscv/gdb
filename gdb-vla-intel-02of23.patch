@@ -1,0 +1,192 @@
+Subject: [PATCH 02/23] dwarf: add DW_AT_data_location support
+Message-Id: <1401861266-6240-3-git-send-email-keven.boell@intel.com>
+
+An object might have a descriptor proceeding the actual value.
+To point the debugger to the actually value of an object
+DW_AT_data_location is used for. For example the compile may
+emit for this entity:
+
+  1| int foo[N];
+
+the following descriptor:
+
+struct array {
+  size_t size;
+  void*  data; // DW_AT_data_location describes this location
+}
+
+This allows GDB to print the actual data of an type.
+
+2014-05-28  Sanimir Agovic  <sanimir.agovic@intel.com>
+            Keven Boell  <keven.boell@intel.com>
+
+	* dwarf2read.c (set_die_type): Parse and save DW_AT_data_location
+	attribute.
+	* gdbtypes.c (is_dynamic_type): Consider a type being dynamic if
+	the data location has not yet been resolved.
+	(resolve_dynamic_type): Evaluate data location baton
+	if present and save its value.
+	* gdbtypes.h <main_type>: Add data_location.
+	(TYPE_DATA_LOCATION): New macro.
+	(TYPE_DATA_LOCATION_ADDR): New macro.
+	(TYPE_DATA_LOCATION_IS_ADDRESS): New macro.
+	* value.c: Include dwarf2loc.h.
+	(value_fetch_lazy): Use data location addres to read value from
+	memory.
+	(coerce_ref): Construct new value from data location.
+
+Change-Id: Ic633fa125efdb5e438204e4f80bb3a1c97758b12
+
+Signed-off-by: Keven Boell <keven.boell@intel.com>
+---
+ gdb/dwarf2read.c |   15 +++++++++++++++
+ gdb/gdbtypes.c   |   29 +++++++++++++++++++++++++++--
+ gdb/gdbtypes.h   |   14 ++++++++++++++
+ gdb/value.c      |    8 +++++++-
+ 4 files changed, 63 insertions(+), 3 deletions(-)
+
+Index: gdb-7.7.90.20140613/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.7.90.20140613.orig/gdb/dwarf2read.c	2014-06-14 15:06:00.834714409 +0200
++++ gdb-7.7.90.20140613/gdb/dwarf2read.c	2014-06-14 15:06:08.326719753 +0200
+@@ -21642,6 +21642,7 @@ set_die_type (struct die_info *die, stru
+ {
+   struct dwarf2_per_cu_offset_and_type **slot, ofs;
+   struct objfile *objfile = cu->objfile;
++  struct attribute *attr;
+ 
+   /* For Ada types, make sure that the gnat-specific data is always
+      initialized (if not already set).  There are a few types where
+@@ -21656,6 +21657,20 @@ set_die_type (struct die_info *die, stru
+       && !HAVE_GNAT_AUX_INFO (type))
+     INIT_GNAT_SPECIFIC (type);
+ 
++  /* Read DW_AT_data_location and set in type.  */
++  attr = dwarf2_attr (die, DW_AT_data_location, cu);
++  if (attr_form_is_block (attr))
++    {
++      struct dynamic_prop prop;
++
++      if (attr_to_dynamic_prop (attr, die, cu, &prop))
++	{
++	  TYPE_DATA_LOCATION (type)
++	    = obstack_alloc (&objfile->objfile_obstack, sizeof (prop));
++	  *TYPE_DATA_LOCATION (type) = prop;
++	}
++    }
++
+   if (dwarf2_per_objfile->die_type_hash == NULL)
+     {
+       dwarf2_per_objfile->die_type_hash =
+Index: gdb-7.7.90.20140613/gdb/gdbtypes.c
+===================================================================
+--- gdb-7.7.90.20140613.orig/gdb/gdbtypes.c	2014-06-14 15:06:00.836714410 +0200
++++ gdb-7.7.90.20140613/gdb/gdbtypes.c	2014-06-14 15:12:28.963986344 +0200
+@@ -1634,7 +1634,12 @@ is_dynamic_type (struct type *type)
+ 	   or the elements it contains have a dynamic contents.  */
+ 	if (is_dynamic_type (TYPE_INDEX_TYPE (type)))
+ 	  return 1;
+-	return is_dynamic_type (TYPE_TARGET_TYPE (type));
++	else if (TYPE_DATA_LOCATION (type) != NULL
++          && (TYPE_DATA_LOCATION_KIND (type) == PROP_LOCEXPR
++              || TYPE_DATA_LOCATION_KIND (type) == PROP_LOCLIST))
++    return 1;
++  else
++    return is_dynamic_type (TYPE_TARGET_TYPE (type));
+       }
+ 
+     case TYPE_CODE_STRUCT:
+@@ -1830,6 +1835,8 @@ resolve_dynamic_type (struct type *type,
+ {
+   struct type *real_type = check_typedef (type);
+   struct type *resolved_type = type;
++  const struct dynamic_prop *prop;
++  CORE_ADDR value;
+ 
+   if (!is_dynamic_type (real_type))
+     return type;
+@@ -1869,6 +1876,18 @@ resolve_dynamic_type (struct type *type,
+       break;
+     }
+ 
++  type = resolved_type;
++
++  /* Resolve data_location attribute.  */
++  prop = TYPE_DATA_LOCATION (type);
++  if (dwarf2_evaluate_property (prop, addr, &value))
++    {
++      TYPE_DATA_LOCATION_ADDR (type) = value;
++      TYPE_DATA_LOCATION_KIND (type) = PROP_CONST;
++    }
++  else
++    TYPE_DATA_LOCATION (type) = NULL;
++
+   return resolved_type;
+ }
+ 
+@@ -4078,6 +4097,13 @@ copy_type_recursive (struct objfile *obj
+       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
+     }
+ 
++  /* Copy the data location information.  */
++  if (TYPE_DATA_LOCATION (type) != NULL)
++    {
++      TYPE_DATA_LOCATION (new_type) = xmalloc (sizeof (struct dynamic_prop));
++      *TYPE_DATA_LOCATION (new_type) = *TYPE_DATA_LOCATION (type);
++    }
++
+   /* Copy pointers to other types.  */
+   if (TYPE_TARGET_TYPE (type))
+     TYPE_TARGET_TYPE (new_type) = 
+Index: gdb-7.7.90.20140613/gdb/gdbtypes.h
+===================================================================
+--- gdb-7.7.90.20140613.orig/gdb/gdbtypes.h	2014-06-14 15:06:00.837714411 +0200
++++ gdb-7.7.90.20140613/gdb/gdbtypes.h	2014-06-14 15:06:08.328719754 +0200
+@@ -725,6 +725,10 @@ struct main_type
+ 
+     struct func_type *func_stuff;
+   } type_specific;
++
++  /* * Indirection to actual data.  */
++
++  struct dynamic_prop *data_location;
+ };
+ 
+ /* * A ``struct type'' describes a particular instance of a type, with
+@@ -1204,6 +1208,16 @@ extern void allocate_gnat_aux_type (stru
+ #define TYPE_LOW_BOUND_KIND(range_type) \
+   TYPE_RANGE_DATA(range_type)->low.kind
+ 
++/* Attribute accessors for VLA support.  */
++#define TYPE_DATA_LOCATION(thistype) \
++  TYPE_MAIN_TYPE(thistype)->data_location
++#define TYPE_DATA_LOCATION_BATON(thistype) \
++  TYPE_DATA_LOCATION (thistype)->data.baton
++#define TYPE_DATA_LOCATION_ADDR(thistype) \
++  TYPE_DATA_LOCATION (thistype)->data.const_val
++#define TYPE_DATA_LOCATION_KIND(thistype) \
++  TYPE_DATA_LOCATION (thistype)->kind
++
+ /* Moto-specific stuff for FORTRAN arrays.  */
+ 
+ #define TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED(arraytype) \
+Index: gdb-7.7.90.20140613/gdb/value.c
+===================================================================
+--- gdb-7.7.90.20140613.orig/gdb/value.c	2014-06-14 15:06:00.838714412 +0200
++++ gdb-7.7.90.20140613/gdb/value.c	2014-06-14 15:06:08.329719755 +0200
+@@ -3699,8 +3699,14 @@ value_fetch_lazy (struct value *val)
+     }
+   else if (VALUE_LVAL (val) == lval_memory)
+     {
+-      CORE_ADDR addr = value_address (val);
+       struct type *type = check_typedef (value_enclosing_type (val));
++      CORE_ADDR addr;
++
++      if (TYPE_DATA_LOCATION (type) != NULL
++	  && TYPE_DATA_LOCATION_KIND (type) == PROP_CONST)
++	addr = TYPE_DATA_LOCATION_ADDR (type);
++      else
++	addr = value_address (val);
+ 
+       if (TYPE_LENGTH (type))
+ 	read_value_memory (val, 0, value_stack (val),
