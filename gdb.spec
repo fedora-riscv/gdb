@@ -25,7 +25,7 @@ Version: 7.7.90.20140613
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -916,7 +916,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 %ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
 %else
-	--enable-werror						\
+	--disable-werror						\
 %endif
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
@@ -1320,6 +1320,9 @@ then
 fi
 
 %changelog
+* Thu Jun 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-2.fc21
+- Temporarily use --disable-werror for readline-6.3's deprecated 'VFunction'.
+
 * Thu Jun 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-1.fc21
 - Rebase to FSF GDB 7.7.90.20140613 (pre-7.8 snapshot).
 
