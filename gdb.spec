@@ -25,7 +25,7 @@ Version: 7.7.90.20140613
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -537,6 +537,9 @@ Patch911: gdb-bfd-demangled-names.patch
 # Fix gdb-7.8 watchpoint-fork.exp regression (Pedro Alves).
 Patch913: gdb-watchpoint-fork-fix.patch
 
+# Fix --with-system-readline with readline-6.3 patch 5.
+Patch914: gdb-readline-6.3.5.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -835,6 +838,7 @@ find -name "*.info*"|xargs rm -f
 %patch887 -p1
 %patch911 -p1
 %patch913 -p1
+%patch914 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -916,7 +920,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 %ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
 %else
-	--disable-werror						\
+	--enable-werror						\
 %endif
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
@@ -1320,6 +1324,10 @@ then
 fi
 
 %changelog
+* Fri Jun 20 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-3.fc21
+- Fix --with-system-readline with readline-6.3 patch 5.
+  - Use --enable-werror again.
+
 * Thu Jun 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-2.fc21
 - Temporarily use --disable-werror for readline-6.3's deprecated 'VFunction'.
 
