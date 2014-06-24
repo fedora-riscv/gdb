@@ -25,7 +25,7 @@ Version: 7.7.90.20140613
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1324,6 +1324,9 @@ then
 fi
 
 %changelog
+* Tue Jun 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-4.fc21
+- [aarch64] Fix compilation error.
+
 * Fri Jun 20 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-3.fc21
 - Fix --with-system-readline with readline-6.3 patch 5.
   - Use --enable-werror again.
