@@ -18,14 +18,14 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140613
+%global snapsrc    20140627
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.7.90.20140613
+Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -218,7 +218,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -531,12 +531,6 @@ Patch908: gdb-vla-intel-21of23.patch
 Patch909: gdb-vla-intel-22of23.patch
 Patch910: gdb-vla-intel-23of23.patch
 
-# Fix ASAN crash regression with demangled names copy (Tom Tromey).
-Patch911: gdb-bfd-demangled-names.patch
-
-# Fix gdb-7.8 watchpoint-fork.exp regression (Pedro Alves).
-Patch913: gdb-watchpoint-fork-fix.patch
-
 # Fix --with-system-readline with readline-6.3 patch 5.
 Patch914: gdb-readline-6.3.5.patch
 
@@ -716,7 +710,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-%patch232 -p1
+#patch232 -p1
 %patch888 -p1
 %patch889 -p1
 %patch890 -p1
@@ -839,8 +833,6 @@ find -name "*.info*"|xargs rm -f
 %patch852 -p1
 %patch863 -p1
 %patch887 -p1
-%patch911 -p1
-%patch913 -p1
 %patch914 -p1
 %patch918 -p1
 
@@ -1328,6 +1320,9 @@ then
 fi
 
 %changelog
+* Fri Jun 27 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-6.fc21
+- Rebase to FSF GDB 7.7.90.20140627 (pre-7.8 snapshot).
+
 * Fri Jun 27 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140613-5.fc21
 - Continue backtrace even if a frame filter throws an exception (Phil Muldoon).
 
