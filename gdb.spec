@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -553,6 +553,9 @@ Patch852: gdb-gnat-dwarf-crash-3of3.patch
 Patch865: gdb-static-tls-1of2.patch
 Patch866: gdb-static-tls-2of2.patch
 
+# Fix crash on optimized-out entry data values (BZ 1111910).
+Patch919: gdb-entrydataoptimizedout.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -873,6 +876,7 @@ find -name "*.info*"|xargs rm -f
 %patch863 -p1
 %patch865 -p1
 %patch866 -p1
+%patch919 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1404,6 +1408,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-14.fc21
+- Fix crash on optimized-out entry data values (BZ 1111910).
+
 * Wed May 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-13.fc21
 - [s390*] Import upstream fix for 64->32 debugging.
 
