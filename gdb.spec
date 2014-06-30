@@ -25,7 +25,7 @@ Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -537,6 +537,9 @@ Patch914: gdb-readline-6.3.5.patch
 # Continue backtrace even if a frame filter throws an exception (Phil Muldoon).
 Patch918: gdb-btrobust.patch
 
+# Fix crash on optimized-out entry data values (BZ 1111910).
+Patch919: gdb-entrydataoptimizedout.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -835,6 +838,7 @@ find -name "*.info*"|xargs rm -f
 %patch887 -p1
 %patch914 -p1
 %patch918 -p1
+%patch919 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1320,6 +1324,9 @@ then
 fi
 
 %changelog
+* Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-7.fc21
+- Fix crash on optimized-out entry data values (BZ 1111910).
+
 * Fri Jun 27 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-6.fc21
 - Rebase to FSF GDB 7.7.90.20140627 (pre-7.8 snapshot).
 
