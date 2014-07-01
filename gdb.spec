@@ -25,7 +25,7 @@ Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1220,9 +1220,6 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 %ifnarch %{ix86} x86_64
  rm -f i386-linux.xml
 %endif
-%ifnarch ppc ppc64
- rm -f ppc{,64}-linux.xml
-%endif
 )
 
 # Documentation only for development.
@@ -1233,6 +1230,15 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 # We don't want a gdb specific one overwriting the system wide one.
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
+
+# /usr/share/gdb/guile/ gets installed even --without-guile
+# https://sourceware.org/bugzilla/show_bug.cgi?id=17105
+rm -rf $RPM_BUILD_ROOT%{_datadir}/gdb/guile
+
+# These files are unrelated to Fedora Linux.
+rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
+rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
+rmdir $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -1324,6 +1330,11 @@ then
 fi
 
 %changelog
+* Tue Jul  1 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-8.fc21
+- Do not remove %{_datadir}/gdb/syscalls/ppc*.xml as it is secondary target.
+- Remove: %{_datadir}/gdb/guile
+- Remove: %{_datadir}/gdb/system-gdbinit
+
 * Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-7.fc21
 - Fix crash on optimized-out entry data values (BZ 1111910).
 
