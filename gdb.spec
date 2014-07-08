@@ -25,7 +25,7 @@ Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -506,30 +506,8 @@ Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
 # VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
 Patch887: gdb-archer-vla-tests.patch
-Patch888: gdb-vla-intel-01of23.patch
-Patch889: gdb-vla-intel-02of23.patch
-Patch890: gdb-vla-intel-03of23.patch
-Patch891: gdb-vla-intel-04of23.patch
+Patch888: gdb-vla-intel.patch
 Patch912: gdb-vla-intel-04of23-fix.patch
-Patch892: gdb-vla-intel-05of23.patch
-Patch893: gdb-vla-intel-06of23.patch
-Patch894: gdb-vla-intel-07of23.patch
-Patch895: gdb-vla-intel-08of23.patch
-Patch896: gdb-vla-intel-09of23.patch
-Patch897: gdb-vla-intel-10of23.patch
-Patch898: gdb-vla-intel-11of23.patch
-Patch899: gdb-vla-intel-12of23.patch
-Patch900: gdb-vla-intel-13of23.patch
-Patch901: gdb-vla-intel-14of23.patch
-Patch902: gdb-vla-intel-15of23.patch
-Patch903: gdb-vla-intel-16of23.patch
-Patch904: gdb-vla-intel-17of23.patch
-Patch905: gdb-vla-intel-18of23.patch
-Patch906: gdb-vla-intel-19of23.patch
-Patch907: gdb-vla-intel-20of23.patch
-Patch908: gdb-vla-intel-21of23.patch
-Patch909: gdb-vla-intel-22of23.patch
-Patch910: gdb-vla-intel-23of23.patch
 
 # Fix --with-system-readline with readline-6.3 patch 5.
 Patch914: gdb-readline-6.3.5.patch
@@ -539,6 +517,10 @@ Patch918: gdb-btrobust.patch
 
 # Fix crash on optimized-out entry data values (BZ 1111910).
 Patch919: gdb-entrydataoptimizedout.patch
+
+# Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
+Patch920: gdb-python-completer-1of2.patch
+Patch921: gdb-python-completer-2of2.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -715,29 +697,7 @@ find -name "*.info*"|xargs rm -f
 %patch349 -p1
 #patch232 -p1
 %patch888 -p1
-%patch889 -p1
-%patch890 -p1
-%patch891 -p1
 %patch912 -p1
-%patch892 -p1
-%patch893 -p1
-%patch894 -p1
-%patch895 -p1
-%patch896 -p1
-%patch897 -p1
-%patch898 -p1
-%patch899 -p1
-%patch900 -p1
-%patch901 -p1
-%patch902 -p1
-%patch903 -p1
-%patch904 -p1
-%patch905 -p1
-%patch906 -p1
-%patch907 -p1
-%patch908 -p1
-%patch909 -p1
-%patch910 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -839,6 +799,8 @@ find -name "*.info*"|xargs rm -f
 %patch914 -p1
 %patch918 -p1
 %patch919 -p1
+%patch920 -p1
+%patch921 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -960,9 +922,8 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--disable-inprocess-agent				\
 %endif
-$(: %{_bindir}/mono-gdb.py is workaround for mono BZ 815501. )										\
-	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'				\
-	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}:%{_root_bindir}/mono-gdb.py'	\
+	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
+	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
@@ -1330,6 +1291,11 @@ then
 fi
 
 %changelog
+* Tue Jul  8 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-9.fc21
+- Rebase the Intel VLA patchset.
+- Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
+- Remove %{_bindir}/mono-gdb.py workaround of mono BZ 815501.
+
 * Tue Jul  1 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-8.fc21
 - Do not remove %{_datadir}/gdb/syscalls/ppc*.xml as it is secondary target.
 - Remove: %{_datadir}/gdb/guile
