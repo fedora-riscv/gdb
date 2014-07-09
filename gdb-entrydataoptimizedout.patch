@@ -1,93 +1,110 @@
-http://sourceware.org/ml/gdb-patches/2014-06/msg00797.html
-Subject: [patch+7.8] Fix crash on optimized-out entry data values
+http://sourceware.org/ml/gdb-patches/2014-07/msg00158.html
+Subject: [patchv2] Fix crash on optimized-out entry data values
 
 
---jRHKVT23PllUwdXP
+--UlVJffcvxoiEqYs2
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 
 Hi,
 
-https://bugzilla.redhat.com/show_bug.cgi?id=1111910
+former post of this fix was for:
+	[patch+7.8] Fix crash on optimized-out entry data values
+	https://sourceware.org/ml/gdb-patches/2014-06/msg00797.html
+=
+	https://bugzilla.redhat.com/show_bug.cgi?id=1111910
+	this can happen for real world -O2 -g executables:
+	#9  0x0000003b6e0998b2 in wxEntry (argc=@0x7fffffffd86c: 1,
+	    argc@entry=@0x7fffffffd86c: <optimized out>,
+					^^^^^^^^^^^^^^^
+	    argv=<optimized out>) at src/common/init.cpp:460
+	GDB did crash in such case.
 
-this can happen for real world -O2 -g executables:
-#9  0x0000003b6e0998b2 in wxEntry (argc=@0x7fffffffd86c: 1,
-    argc@entry=@0x7fffffffd86c: <optimized out>, 
-                                ^^^^^^^^^^^^^^^
-    argv=<optimized out>) at src/common/init.cpp:460
+But the fix was wrong/regressing as shown here:
+	https://bugzilla.redhat.com/show_bug.cgi?id=1117192
+	https://bugzilla.redhat.com/attachment.cgi?id=916298 (at the bottom)
 
-GDB did crash in such case.
+Here is a new fix, also with a new testcase reproducing crash of the wrong fix
+above.
 
-No regressions on {x86_64,x86_64-m32}-fedorarawhide-linux-gnu.
-
+No regressions on {x86_64,x86_64-m32,i686}-fedorarawhide-linux-gnu.
 
 
 Jan
 
---jRHKVT23PllUwdXP
+--UlVJffcvxoiEqYs2
 Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline; filename="entrydataoptimizedout.patch"
+Content-Disposition: inline; filename="optimfix2.patch"
 
 gdb/
-2014-06-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+2014-07-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
-	Fix crash on optimized-out entry data values.
-	* stack.c (read_frame_arg): Check value_optimized_out before calling
-	value_available_contents_eq.
-	* value.c (value_available_contents_bits_eq): Check OPTIMIZED_OUT for
-	VAL1 and VAL2.
-	* value.h (value_available_contents_eq): Mention optimized out values
-	in function comment.
+	* value.c (struct value): Extend the comment for fields optimized_out
+	and unavailable.
+	(value_available_contents_bits_eq): Handle OPTIMIZED_OUT values with
+	empty UNAVAILABLE as special cases.
 
 gdb/testsuite/
-2014-06-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+2014-07-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
-	Fix crash on optimized-out entry data values.
 	* gdb.arch/amd64-entry-value-paramref.S: New file.
 	* gdb.arch/amd64-entry-value-paramref.cc: New file.
 	* gdb.arch/amd64-entry-value-paramref.exp: New file.
+	* gdb.arch/amd64-optimout-repeat.S: New file.
+	* gdb.arch/amd64-optimout-repeat.c: New file.
+	* gdb.arch/amd64-optimout-repeat.exp: New file.
 
-diff --git a/gdb/stack.c b/gdb/stack.c
-index 0d6d8e7..a0f3513 100644
---- a/gdb/stack.c
-+++ b/gdb/stack.c
-@@ -413,6 +413,7 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
- 		      /* If the reference addresses match but dereferenced
- 			 content does not match print them.  */
- 		      if (val != val_deref
-+		          && !value_optimized_out (entryval_deref)
- 			  && value_available_contents_eq (val_deref, 0,
- 							  entryval_deref, 0,
- 						      TYPE_LENGTH (type_deref)))
 diff --git a/gdb/value.c b/gdb/value.c
-index 557056f..74b9d56 100644
+index 557056f..4b7495e 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
-@@ -700,6 +700,8 @@ value_available_contents_bits_eq (const struct value *val1, int offset1,
+@@ -198,12 +198,13 @@ struct value
+   unsigned int lazy : 1;
  
+   /* If nonzero, this is the value of a variable that does not
+-     actually exist in the program.  If nonzero, and LVAL is
++     actually fully exist in the program.  If nonzero, and LVAL is
+      lval_register, this is a register ($pc, $sp, etc., never a
+      program variable) that has not been saved in the frame.  All
+      optimized-out values are treated pretty much the same, except
+      registers have a different string representation and related
+-     error strings.  */
++     error strings.  It is true also for only partially optimized
++     out variables - see the 'unavailable' field below.  */
+   unsigned int optimized_out : 1;
+ 
+   /* If value is a variable, is it initialized or not.  */
+@@ -334,7 +335,10 @@ struct value
+      valid if lazy is nonzero.  */
+   gdb_byte *contents;
+ 
+-  /* Unavailable ranges in CONTENTS.  We mark unavailable ranges,
++  /* If OPTIMIZED_OUT is false then UNAVAILABLE must be VEC_empty
++     (not necessarily NULL).  If OPTIMIZED_OUT is true then VEC_empty
++     UNAVAILABLE means the whole value range.  Otherwise it specifies
++     unavailable ranges in CONTENTS.  We mark unavailable ranges,
+      rather than available, since the common and default case is for a
+      value to be available.  This is filled in at value read time.  The
+      unavailable ranges are tracked in bits.  */
+@@ -701,6 +705,15 @@ value_available_contents_bits_eq (const struct value *val1, int offset1,
    /* See function description in value.h.  */
    gdb_assert (!val1->lazy && !val2->lazy);
-+  gdb_assert (!val1->optimized_out);
-+  gdb_assert (!val2->optimized_out);
  
++  gdb_assert (val1->optimized_out || VEC_empty (range_s, val1->unavailable));
++  gdb_assert (val2->optimized_out || VEC_empty (range_s, val2->unavailable));
++  if (val1->optimized_out != val2->optimized_out)
++    return 0;
++  if (val1->optimized_out && val2->optimized_out
++      && VEC_empty (range_s, val1->unavailable)
++      && VEC_empty (range_s, val2->unavailable))
++    return 1;
++
    while (length > 0)
      {
-diff --git a/gdb/value.h b/gdb/value.h
-index c2e9faf..80a2225 100644
---- a/gdb/value.h
-+++ b/gdb/value.h
-@@ -499,7 +499,7 @@ extern void mark_value_bits_unavailable
-    read it.  As this routine is used by printing routines, which may
-    be printing values in the value history, long after the inferior is
-    gone, it works with const values.  Therefore, this routine must not
--   be called with lazy values.  */
-+   be called with lazy or optimized_out values.  */
- 
- extern int value_available_contents_eq (const struct value *val1, LONGEST offset1,
- 					const struct value *val2, LONGEST offset2,
+       range_s *r1, *r2;
 diff --git a/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.S b/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.S
 new file mode 100644
-index 0000000..6daee63
+index 0000000..a1e9d0a
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.S
 @@ -0,0 +1,459 @@
@@ -552,7 +569,7 @@ index 0000000..6daee63
 +	.section	.note.GNU-stack,"",@progbits
 diff --git a/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.cc b/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.cc
 new file mode 100644
-index 0000000..e3a28de
+index 0000000..aa473a3
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/amd64-entry-value-paramref.cc
 @@ -0,0 +1,33 @@
@@ -630,6 +647,386 @@ index 0000000..f06247d
 +
 +gdb_continue_to_breakpoint "break-here" ".* break-here .*"
 +gdb_test "frame" {bar \(ref=@0x[0-9a-f]+: 10, ref@entry=@0x[0-9a-f]+: <optimized out>\) at .*}
+diff --git a/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S
+new file mode 100755
+index 0000000..2f8f4d2
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S
+@@ -0,0 +1,297 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2012-2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* This file is compiled from gdb.arch/amd64-entry-value-param.c
++   using -g -dA -S -O2.  */
++
++	.file	"amd64-optimout-repeat.c"
++	.text
++.Ltext0:
++	.section	.text.unlikely,"ax",@progbits
++.LCOLDB0:
++	.section	.text.startup,"ax",@progbits
++.LHOTB0:
++	.p2align 4,,15
++	.section	.text.unlikely
++.Ltext_cold0:
++	.section	.text.startup
++	.globl	main
++	.type	main, @function
++main:
++.LFB0:
++	.file 1 "gdb.arch/amd64-optimout-repeat.c"
++	# gdb.arch/amd64-optimout-repeat.c:20
++	.loc 1 20 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++.LVL0:
++	# gdb.arch/amd64-optimout-repeat.c:29
++	.loc 1 29 0
++	xorl	%eax, %eax
++# SUCC: EXIT [100.0%] 
++	ret
++	.cfi_endproc
++.LFE0:
++	.size	main, .-main
++	.section	.text.unlikely
++.LCOLDE0:
++	.section	.text.startup
++.LHOTE0:
++	.text
++.Letext0:
++	.section	.text.unlikely
++.Letext_cold0:
++	.section	.debug_info,"",@progbits
++.Ldebug_info0:
++	.long	0x97	# Length of Compilation Unit Info
++	.value	0x4	# DWARF version number
++	.long	.Ldebug_abbrev0	# Offset Into Abbrev. Section
++	.byte	0x8	# Pointer Size (in bytes)
++	.uleb128 0x1	# (DIE (0xb) DW_TAG_compile_unit)
++	.long	.LASF1	# DW_AT_producer: "GNU C 4.9.1 20140709 (prerelease) -mtune=generic -march=x86-64 -g -O2"
++	.byte	0x1	# DW_AT_language
++	.long	.LASF2	# DW_AT_name: "gdb.arch/amd64-optimout-repeat.c"
++	.long	.LASF3	# DW_AT_comp_dir: ""
++	.long	.Ldebug_ranges0+0	# DW_AT_ranges
++	.quad	0	# DW_AT_low_pc
++	.long	.Ldebug_line0	# DW_AT_stmt_list
++	.uleb128 0x2	# (DIE (0x29) DW_TAG_subprogram)
++			# DW_AT_external
++	.long	.LASF4	# DW_AT_name: "main"
++	.byte	0x1	# DW_AT_decl_file (gdb.arch/amd64-optimout-repeat.c)
++	.byte	0x13	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x7c	# DW_AT_type
++	.quad	.LFB0	# DW_AT_low_pc
++	.quad	.LFE0-.LFB0	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0x7c	# DW_AT_sibling
++	.uleb128 0x3	# (DIE (0x4a) DW_TAG_structure_type)
++	.value	0x404	# DW_AT_byte_size
++	.byte	0x1	# DW_AT_decl_file (gdb.arch/amd64-optimout-repeat.c)
++	.byte	0x15	# DW_AT_decl_line
++	.long	0x6a	# DW_AT_sibling
++	.uleb128 0x4	# (DIE (0x53) DW_TAG_member)
++	.ascii "i\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (gdb.arch/amd64-optimout-repeat.c)
++	.byte	0x17	# DW_AT_decl_line
++	.long	0x7c	# DW_AT_type
++	.byte	0	# DW_AT_data_member_location
++	.uleb128 0x4	# (DIE (0x5d) DW_TAG_member)
++	.ascii "xxx\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (gdb.arch/amd64-optimout-repeat.c)
++	.byte	0x18	# DW_AT_decl_line
++	.long	0x83	# DW_AT_type
++	.byte	0x4	# DW_AT_data_member_location
++	.byte	0	# end of children of DIE 0x4a
++	.uleb128 0x5	# (DIE (0x6a) DW_TAG_variable)
++	.ascii "v\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (gdb.arch/amd64-optimout-repeat.c)
++	.byte	0x1a	# DW_AT_decl_line
++	.long	0x4a	# DW_AT_type
++	.uleb128 0x7	# DW_AT_location
++	.byte	0x30	# DW_OP_lit0
++	.byte	0x9f	# DW_OP_stack_value
++	.byte	0x93	# DW_OP_piece
++	.uleb128 0x4
++	.byte	0x93	# DW_OP_piece
++	.uleb128 0x400
++	.byte	0	# end of children of DIE 0x29
++	.uleb128 0x6	# (DIE (0x7c) DW_TAG_base_type)
++	.byte	0x4	# DW_AT_byte_size
++	.byte	0x5	# DW_AT_encoding
++	.ascii "int\0"	# DW_AT_name
++	.uleb128 0x7	# (DIE (0x83) DW_TAG_array_type)
++	.long	0x7c	# DW_AT_type
++	.long	0x93	# DW_AT_sibling
++	.uleb128 0x8	# (DIE (0x8c) DW_TAG_subrange_type)
++	.long	0x93	# DW_AT_type
++	.byte	0xff	# DW_AT_upper_bound
++	.byte	0	# end of children of DIE 0x83
++	.uleb128 0x9	# (DIE (0x93) DW_TAG_base_type)
++	.byte	0x8	# DW_AT_byte_size
++	.byte	0x7	# DW_AT_encoding
++	.long	.LASF0	# DW_AT_name: "sizetype"
++	.byte	0	# end of children of DIE 0xb
++	.section	.debug_abbrev,"",@progbits
++.Ldebug_abbrev0:
++	.uleb128 0x1	# (abbrev code)
++	.uleb128 0x11	# (TAG: DW_TAG_compile_unit)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x25	# (DW_AT_producer)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x13	# (DW_AT_language)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x1b	# (DW_AT_comp_dir)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x55	# (DW_AT_ranges)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x10	# (DW_AT_stmt_list)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x2	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3f	# (DW_AT_external)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x3	# (abbrev code)
++	.uleb128 0x13	# (TAG: DW_TAG_structure_type)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0x5	# (DW_FORM_data2)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x4	# (abbrev code)
++	.uleb128 0xd	# (TAG: DW_TAG_member)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x38	# (DW_AT_data_member_location)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.byte	0
++	.byte	0
++	.uleb128 0x5	# (abbrev code)
++	.uleb128 0x34	# (TAG: DW_TAG_variable)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x2	# (DW_AT_location)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.byte	0
++	.byte	0
++	.uleb128 0x6	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.byte	0
++	.byte	0
++	.uleb128 0x7	# (abbrev code)
++	.uleb128 0x1	# (TAG: DW_TAG_array_type)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x8	# (abbrev code)
++	.uleb128 0x21	# (TAG: DW_TAG_subrange_type)
++	.byte	0	# DW_children_no
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x2f	# (DW_AT_upper_bound)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.byte	0
++	.byte	0
++	.uleb128 0x9	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.byte	0
++	.byte	0
++	.byte	0
++	.section	.debug_aranges,"",@progbits
++	.long	0x2c	# Length of Address Ranges Info
++	.value	0x2	# DWARF Version
++	.long	.Ldebug_info0	# Offset of Compilation Unit Info
++	.byte	0x8	# Size of Address
++	.byte	0	# Size of Segment Descriptor
++	.value	0	# Pad to 16 byte boundary
++	.value	0
++	.quad	.LFB0	# Address
++	.quad	.LFE0-.LFB0	# Length
++	.quad	0
++	.quad	0
++	.section	.debug_ranges,"",@progbits
++.Ldebug_ranges0:
++	.quad	.LFB0	# Offset 0
++	.quad	.LFE0
++	.quad	0
++	.quad	0
++	.section	.debug_line,"",@progbits
++.Ldebug_line0:
++	.section	.debug_str,"MS",@progbits,1
++.LASF0:
++	.string	"sizetype"
++.LASF2:
++	.string	"gdb.arch/amd64-optimout-repeat.c"
++.LASF1:
++	.string	"GNU C 4.9.1 20140709 (prerelease) -mtune=generic -march=x86-64 -g -O2"
++.LASF3:
++	.string	""
++.LASF4:
++	.string	"main"
++	.ident	"GCC: (GNU) 4.9.1 20140709 (prerelease)"
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/gdb/testsuite/gdb.arch/amd64-optimout-repeat.c b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.c
+new file mode 100644
+index 0000000..a32b6de
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.c
+@@ -0,0 +1,29 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int
++main (void)
++{
++  struct
++    {
++      int i;
++      int xxx[0x100];
++    }
++  v = { 0 };
++
++  return v.i;
++}
+diff --git a/gdb/testsuite/gdb.arch/amd64-optimout-repeat.exp b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.exp
+new file mode 100644
+index 0000000..f3c93a4
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.exp
+@@ -0,0 +1,36 @@
++# Copyright (C) 2014 Free Software Foundation, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile .S .c
++set opts {}
++
++if [info exists COMPILE] {
++    # make check RUNTESTFLAGS="gdb.arch/amd64-optimout-repeat.exp COMPILE=1"
++    set srcfile ${srcfile2}
++    lappend opts debug optimize=-O2
++} elseif { ![istarget x86_64-*-* ] || ![is_lp64_target] } {
++    verbose "Skipping amd64-optimout-repeat."
++    return
++}
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile} $opts] } {
++    return -1
++}
++
++if ![runto_main] {
++    return -1
++}
++
++gdb_test "print v" { = {i = 0, xxx = {<optimized out> <repeats 256 times>}}}
 
---jRHKVT23PllUwdXP--
+--UlVJffcvxoiEqYs2--
 
