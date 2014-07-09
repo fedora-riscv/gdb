@@ -25,7 +25,7 @@ Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1291,6 +1291,9 @@ then
 fi
 
 %changelog
+* Wed Jul  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-10.fc21
+- Fix regression of the optimized-out entry data values fix (of BZ 1111910).
+
 * Tue Jul  8 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-9.fc21
 - Rebase the Intel VLA patchset.
 - Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
