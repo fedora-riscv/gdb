@@ -1,48 +1,74 @@
-http://sourceware.org/ml/gdb-patches/2014-07/msg00158.html
-Subject: [patchv2] Fix crash on optimized-out entry data values
+http://sourceware.org/ml/gdb-patches/2014-07/msg00277.html
+Subject: [patchv3] Fix crash on optimized-out entry data values
 
 
---UlVJffcvxoiEqYs2
+--Dxnq1zWXvFF0Q93v
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 
-Hi,
+On Wed, 09 Jul 2014 17:31:21 +0200, Jan Kratochvil wrote:
+> On Wed, 09 Jul 2014 13:52:00 +0200, Pedro Alves wrote:
+> > On 07/09/2014 11:33 AM, Jan Kratochvil wrote:
+> > > --- a/gdb/value.c
+> > > +++ b/gdb/value.c
+> > > @@ -198,12 +198,13 @@ struct value
+> > >    unsigned int lazy : 1;
+> > >  
+> > >    /* If nonzero, this is the value of a variable that does not
+> > > -     actually exist in the program.  If nonzero, and LVAL is
+> > > +     actually fully exist in the program.  If nonzero, and LVAL is
+> > >       lval_register, this is a register ($pc, $sp, etc., never a
+> > >       program variable) that has not been saved in the frame.  All
+> > >       optimized-out values are treated pretty much the same, except
+> > >       registers have a different string representation and related
+> > > -     error strings.  */
+> > > +     error strings.  It is true also for only partially optimized
+> > > +     out variables - see the 'unavailable' field below.  */
+> > >    unsigned int optimized_out : 1;
+> > >  
+> > >    /* If value is a variable, is it initialized or not.  */
+> > > @@ -334,7 +335,10 @@ struct value
+> > >       valid if lazy is nonzero.  */
+> > >    gdb_byte *contents;
+> > >  
+> > > -  /* Unavailable ranges in CONTENTS.  We mark unavailable ranges,
+> > > +  /* If OPTIMIZED_OUT is false then UNAVAILABLE must be VEC_empty
+> > > +     (not necessarily NULL).  
+> > 
+> > Hmm, why?  We can collect only part of a non-optimized out value.
+> > What am I missing?
+> 
+> I miss some documentation how these availability fields interact together.
 
-former post of this fix was for:
-	[patch+7.8] Fix crash on optimized-out entry data values
-	https://sourceware.org/ml/gdb-patches/2014-06/msg00797.html
-=
-	https://bugzilla.redhat.com/show_bug.cgi?id=1111910
-	this can happen for real world -O2 -g executables:
-	#9  0x0000003b6e0998b2 in wxEntry (argc=@0x7fffffffd86c: 1,
-	    argc@entry=@0x7fffffffd86c: <optimized out>,
-					^^^^^^^^^^^^^^^
-	    argv=<optimized out>) at src/common/init.cpp:460
-	GDB did crash in such case.
+>From a comment in mail
+	Message-Id: <201102071427.55970.pedro@codesourcery.com>
+	We give preference to printing <optimized out> rather
+	than <unavailable>, since if a value had been optimized out
+	at compile time, it can never be collected at run-time.
 
-But the fix was wrong/regressing as shown here:
-	https://bugzilla.redhat.com/show_bug.cgi?id=1117192
-	https://bugzilla.redhat.com/attachment.cgi?id=916298 (at the bottom)
-
-Here is a new fix, also with a new testcase reproducing crash of the wrong fix
-above.
-
-No regressions on {x86_64,x86_64-m32,i686}-fedorarawhide-linux-gnu.
+it seems it is just reversed, that 'unavailable' can exist only for
+!optimized_out and it cannot exist for for optimized_out values.
 
 
+> You are right, this patch regresses during gdbserver mode.
+
+It PASSes now even in gdbserver mode.
+
+
+Thanks,
 Jan
 
---UlVJffcvxoiEqYs2
+--Dxnq1zWXvFF0Q93v
 Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline; filename="optimfix2.patch"
+Content-Disposition: inline; filename="optimfix3.patch"
 
 gdb/
 2014-07-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* value.c (struct value): Extend the comment for fields optimized_out
 	and unavailable.
-	(value_available_contents_bits_eq): Handle OPTIMIZED_OUT values with
-	empty UNAVAILABLE as special cases.
+	(value_available_contents_bits_eq): Handle OPTIMIZED_OUT values as
+	special cases.
 
 gdb/testsuite/
 2014-07-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -55,48 +81,46 @@ gdb/testsuite/
 	* gdb.arch/amd64-optimout-repeat.exp: New file.
 
 diff --git a/gdb/value.c b/gdb/value.c
-index 557056f..4b7495e 100644
+index 557056f..c017c75 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
-@@ -198,12 +198,13 @@ struct value
+@@ -198,12 +198,14 @@ struct value
    unsigned int lazy : 1;
  
    /* If nonzero, this is the value of a variable that does not
 -     actually exist in the program.  If nonzero, and LVAL is
-+     actually fully exist in the program.  If nonzero, and LVAL is
++     actually exist in the program at all.  If nonzero, and LVAL is
       lval_register, this is a register ($pc, $sp, etc., never a
       program variable) that has not been saved in the frame.  All
       optimized-out values are treated pretty much the same, except
       registers have a different string representation and related
 -     error strings.  */
-+     error strings.  It is true also for only partially optimized
-+     out variables - see the 'unavailable' field below.  */
++     error strings.  When it is zero it still maybe only partially
++     available (equally partially optimized out) - see the
++     'unavailable' field below.  */
    unsigned int optimized_out : 1;
  
    /* If value is a variable, is it initialized or not.  */
-@@ -334,7 +335,10 @@ struct value
+@@ -334,7 +336,9 @@ struct value
       valid if lazy is nonzero.  */
    gdb_byte *contents;
  
 -  /* Unavailable ranges in CONTENTS.  We mark unavailable ranges,
-+  /* If OPTIMIZED_OUT is false then UNAVAILABLE must be VEC_empty
-+     (not necessarily NULL).  If OPTIMIZED_OUT is true then VEC_empty
-+     UNAVAILABLE means the whole value range.  Otherwise it specifies
++  /* If OPTIMIZED_OUT is nonzero then UNAVAILABLE must be VEC_empty
++     (not necessarily NULL).  Otherwise it specifies
 +     unavailable ranges in CONTENTS.  We mark unavailable ranges,
       rather than available, since the common and default case is for a
       value to be available.  This is filled in at value read time.  The
       unavailable ranges are tracked in bits.  */
-@@ -701,6 +705,15 @@ value_available_contents_bits_eq (const struct value *val1, int offset1,
+@@ -701,6 +705,13 @@ value_available_contents_bits_eq (const struct value *val1, int offset1,
    /* See function description in value.h.  */
    gdb_assert (!val1->lazy && !val2->lazy);
  
-+  gdb_assert (val1->optimized_out || VEC_empty (range_s, val1->unavailable));
-+  gdb_assert (val2->optimized_out || VEC_empty (range_s, val2->unavailable));
++  gdb_assert (!val1->optimized_out || VEC_empty (range_s, val1->unavailable));
++  gdb_assert (!val2->optimized_out || VEC_empty (range_s, val2->unavailable));
 +  if (val1->optimized_out != val2->optimized_out)
 +    return 0;
-+  if (val1->optimized_out && val2->optimized_out
-+      && VEC_empty (range_s, val1->unavailable)
-+      && VEC_empty (range_s, val2->unavailable))
++  if (val1->optimized_out && val2->optimized_out)
 +    return 1;
 +
    while (length > 0)
@@ -648,7 +672,7 @@ index 0000000..f06247d
 +gdb_continue_to_breakpoint "break-here" ".* break-here .*"
 +gdb_test "frame" {bar \(ref=@0x[0-9a-f]+: 10, ref@entry=@0x[0-9a-f]+: <optimized out>\) at .*}
 diff --git a/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S
-new file mode 100755
+new file mode 100644
 index 0000000..2f8f4d2
 --- /dev/null
 +++ b/gdb/testsuite/gdb.arch/amd64-optimout-repeat.S
@@ -1028,5 +1052,5 @@ index 0000000..f3c93a4
 +
 +gdb_test "print v" { = {i = 0, xxx = {<optimized out> <repeats 256 times>}}}
 
---UlVJffcvxoiEqYs2--
+--Dxnq1zWXvFF0Q93v--
 

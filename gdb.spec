@@ -18,14 +18,14 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140627
+%global snapsrc    20140711
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 Version: 7.7.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -218,7 +218,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -695,7 +695,7 @@ find -name "*.info*"|xargs rm -f
 %patch2 -p1
 
 %patch349 -p1
-#patch232 -p1
+%patch232 -p1
 %patch888 -p1
 %patch912 -p1
 %patch1 -p1
@@ -1059,7 +1059,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
 
   # Run all the scheduled testsuite runs also in the PIE mode.
   # See also: gdb-runtest-pie-override.exp
-  CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
+  ###CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
 
   ./orphanripper make %{?_smp_mflags} -k $CHECK || :
 )
@@ -1291,6 +1291,11 @@ then
 fi
 
 %changelog
+* Fri Jul 11 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140711-11.fc21
+- Fix regression#2 of the optimized-out entry data values fix (of BZ 1111910).
+- Rebase to FSF GDB 7.7.90.20140711 (pre-7.8 snapshot).
+- [testsuite] Disable --with testsuite PIE testing, it has too many false FAILs.
+
 * Wed Jul  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-10.fc21
 - Fix regression of the optimized-out entry data values fix (of BZ 1111910).
 

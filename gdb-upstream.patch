@@ -1,0 +1,439 @@
+http://sourceware.org/ml/gdb-patches/2014-07/msg00274.html
+Subject: [obv] Fix false argv0-symlink.exp FAIL running under a very long directory name
+
+Hi,
+
+checked in as obvious:
+
+Starting program: /home/jkratoch/redhat/gdb-test-fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff/gdb/testsuite/gdb.base/argv0-symlink-filelink ^M
+[...]
+(gdb) print argv[0]^M
+$1 = 0x7fffffffda39 "/home/jkratoch/redhat/gdb-test-", 'f' <repeats 169 times>...^M
+(gdb) FAIL: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+after "set print repeats 10000":
+
+print argv[0]^M
+$1 = 0x7fffffffda39 "/home/jkratoch/redhat/gdb-test-fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"...^M
+(gdb) FAIL: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+after "set print elements 10000":
+
+print argv[0]^M
+$1 = 0x7fffffffda39 "/home/jkratoch/redhat/gdb-test-fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff/gdb/testsuite/gdb.base/argv0-symlink-filelink"^M
+(gdb) PASS: gdb.base/argv0-symlink.exp: kept file symbolic link name
+
+commit 218c2655603748b844dcaf103e34fd14d8ee8aef
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Fri Jul 11 17:26:42 2014 +0200
+
+diff --git a/gdb/testsuite/ChangeLog b/gdb/testsuite/ChangeLog
+index 74f7bce..253eeeb 100644
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,9 @@
++2014-07-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix false FAIL running under a very long directory name.
++	* gdb.base/argv0-symlink.exp: Add "set print repeats 10000"
++	and "set print elements 10000".  Twice.
++
+ 2014-07-11  Yao Qi  <yao@codesourcery.com>
+ 
+ 	* gdb.base/exprs.exp: "set print symbol off".
+diff --git a/gdb/testsuite/gdb.base/argv0-symlink.exp b/gdb/testsuite/gdb.base/argv0-symlink.exp
+index 0e0202d..d849b4c 100644
+--- a/gdb/testsuite/gdb.base/argv0-symlink.exp
++++ b/gdb/testsuite/gdb.base/argv0-symlink.exp
+@@ -36,6 +36,9 @@ if ![runto_main] {
+     return -1
+ }
+ 
++gdb_test_no_output "set print repeats 10000"
++gdb_test_no_output "set print elements 10000"
++
+ gdb_test {print argv[0]} "/$filelink\"" $test
+ 
+ # For a link named /PATH/TO/DIR/LINK, we want to check the output
+@@ -67,6 +70,9 @@ if ![runto_main] {
+     return -1
+ }
+ 
++gdb_test_no_output "set print repeats 10000"
++gdb_test_no_output "set print elements 10000"
++
+ # gdbserver does not have this issue.
+ if ![is_remote target] {
+     setup_kfail "*-*-*" gdb/15934
+
+
+
+
+commit 768fbcfda81ff37027eb7a02c043ff669f7701fa
+Author: Pedro Alves <palves@redhat.com>
+Date:   Fri Jul 11 11:11:20 2014 +0100
+
+    GDBserver crashes when killing a multi-thread process
+    
+    Here's an example, with the new test:
+    
+     gdbserver :9999 gdb.threads/kill
+     gdb gdb.threads/kill
+     (gdb) b 52
+     Breakpoint 1 at 0x4007f4: file kill.c, line 52.
+     Continuing.
+    
+     Breakpoint 1, main () at kill.c:52
+     52        return 0; /* set break here */
+     (gdb) k
+     Kill the program being debugged? (y or n) y
+    
+     gdbserver :9999 gdb.threads/kill
+     Process gdb.base/watch_thread_num created; pid = 9719
+     Listening on port 1234
+     Remote debugging from host 127.0.0.1
+     Killing all inferiors
+     Segmentation fault (core dumped)
+    
+    Backtrace:
+    
+     (gdb) bt
+     #0  0x00000000004068a0 in find_inferior (list=0x66b060 <all_threads>, func=0x427637 <kill_one_lwp_callback>, arg=0x7fffffffd3fc) at src/gdb/gdbserver/inferiors.c:199
+     #1  0x00000000004277b6 in linux_kill (pid=15708) at src/gdb/gdbserver/linux-low.c:966
+     #2  0x000000000041354d in kill_inferior (pid=15708) at src/gdb/gdbserver/target.c:163
+     #3  0x00000000004107e9 in kill_inferior_callback (entry=0x6704f0) at src/gdb/gdbserver/server.c:2934
+     #4  0x0000000000406522 in for_each_inferior (list=0x66b050 <all_processes>, action=0x4107a6 <kill_inferior_callback>) at src/gdb/gdbserver/inferiors.c:57
+     #5  0x0000000000412377 in process_serial_event () at src/gdb/gdbserver/server.c:3767
+     #6  0x000000000041267c in handle_serial_event (err=0, client_data=0x0) at src/gdb/gdbserver/server.c:3880
+     #7  0x00000000004189ff in handle_file_event (event_file_desc=4) at src/gdb/gdbserver/event-loop.c:434
+     #8  0x00000000004181c6 in process_event () at src/gdb/gdbserver/event-loop.c:189
+     #9  0x0000000000418f45 in start_event_loop () at src/gdb/gdbserver/event-loop.c:552
+     #10 0x0000000000411272 in main (argc=3, argv=0x7fffffffd8d8) at src/gdb/gdbserver/server.c:3283
+    
+    The problem is that linux_wait_for_event deletes lwps that have exited
+    (even those not passed in as lwps of interest), while the lwp/thread
+    list is being walked on with find_inferior.  find_inferior can handle
+    the current iterated inferior being deleted, but not others.
+    
+    When killing lwps, we don't really care about any of the pending
+    status handling of linux_wait_for_event.  We can just waitpid the lwps
+    directly, which is also what GDB does (see
+    linux-nat.c:kill_wait_callback).  This way the lwps are not deleted
+    while we're walking the list.  They'll be deleted by linux_mourn
+    afterwards.
+    
+    This crash triggers several times when running the testsuite against
+    GDBserver with the native-gdbserver board (target remote), but as GDB
+    can't distinguish between GDBserver crashing and "kill" being
+    sucessful, as in both cases the connection is closed (the 'k' packet
+    doesn't require a reply), and the inferior is gone, that results in no
+    FAIL.
+    
+    The patch adds a generic test that catches the issue with
+    extended-remote mode (and works fine with native testing too).  Here's
+    how it fails with the native-extended-gdbserver board without the fix:
+    
+     (gdb) info threads
+       Id   Target Id         Frame
+       6    Thread 15367.15374 0x000000373bcbc98d in nanosleep () at ../sysdeps/unix/syscall-template.S:81
+       5    Thread 15367.15373 0x000000373bcbc98d in nanosleep () at ../sysdeps/unix/syscall-template.S:81
+       4    Thread 15367.15372 0x000000373bcbc98d in nanosleep () at ../sysdeps/unix/syscall-template.S:81
+       3    Thread 15367.15371 0x000000373bcbc98d in nanosleep () at ../sysdeps/unix/syscall-template.S:81
+       2    Thread 15367.15370 0x000000373bcbc98d in nanosleep () at ../sysdeps/unix/syscall-template.S:81
+     * 1    Thread 15367.15367 main () at .../gdb.threads/kill.c:52
+     (gdb) kill
+     Kill the program being debugged? (y or n) y
+     Remote connection closed
+     ^^^^^^^^^^^^^^^^^^^^^^^^
+     (gdb) FAIL: gdb.threads/kill.exp: kill
+    
+    Extended remote should remain connected after the kill.
+    
+    gdb/gdbserver/
+    2014-07-11  Pedro Alves  <palves@redhat.com>
+    
+    	* linux-low.c (kill_wait_lwp): New function, based on
+    	kill_one_lwp_callback, but use my_waitpid directly.
+    	(kill_one_lwp_callback, linux_kill): Use it.
+    
+    gdb/testsuite/
+    2014-07-11  Pedro Alves  <palves@redhat.com>
+    
+    	* gdb.threads/kill.c: New file.
+    	* gdb.threads/kill.exp: New file.
+
+### a/gdb/gdbserver/ChangeLog
+### b/gdb/gdbserver/ChangeLog
+## -1,3 +1,9 @@
++2014-07-11  Pedro Alves  <palves@redhat.com>
++
++	* linux-low.c (kill_wait_lwp): New function, based on
++	kill_one_lwp_callback, but use my_waitpid directly.
++	(kill_one_lwp_callback, linux_kill): Use it.
++
+ 2014-06-23  Pedro Alves  <palves@redhat.com>
+ 
+ 	* linux-x86-low.c (x86_linux_prepare_to_resume): Clear DR_CONTROL
+--- a/gdb/gdbserver/linux-low.c
++++ b/gdb/gdbserver/linux-low.c
+@@ -909,6 +909,46 @@ linux_kill_one_lwp (struct lwp_info *lwp)
+ 		  errno ? strerror (errno) : "OK");
+ }
+ 
++/* Kill LWP and wait for it to die.  */
++
++static void
++kill_wait_lwp (struct lwp_info *lwp)
++{
++  struct thread_info *thr = get_lwp_thread (lwp);
++  int pid = ptid_get_pid (ptid_of (thr));
++  int lwpid = ptid_get_lwp (ptid_of (thr));
++  int wstat;
++  int res;
++
++  if (debug_threads)
++    debug_printf ("kwl: killing lwp %d, for pid: %d\n", lwpid, pid);
++
++  do
++    {
++      linux_kill_one_lwp (lwp);
++
++      /* Make sure it died.  Notes:
++
++	 - The loop is most likely unnecessary.
++
++	 - We don't use linux_wait_for_event as that could delete lwps
++	   while we're iterating over them.  We're not interested in
++	   any pending status at this point, only in making sure all
++	   wait status on the kernel side are collected until the
++	   process is reaped.
++
++	 - We don't use __WALL here as the __WALL emulation relies on
++	   SIGCHLD, and killing a stopped process doesn't generate
++	   one, nor an exit status.
++      */
++      res = my_waitpid (lwpid, &wstat, 0);
++      if (res == -1 && errno == ECHILD)
++	res = my_waitpid (lwpid, &wstat, __WCLONE);
++    } while (res > 0 && WIFSTOPPED (wstat));
++
++  gdb_assert (res > 0);
++}
++
+ /* Callback for `find_inferior'.  Kills an lwp of a given process,
+    except the leader.  */
+ 
+@@ -917,7 +957,6 @@ kill_one_lwp_callback (struct inferior_list_entry *entry, void *args)
+ {
+   struct thread_info *thread = (struct thread_info *) entry;
+   struct lwp_info *lwp = get_thread_lwp (thread);
+-  int wstat;
+   int pid = * (int *) args;
+ 
+   if (ptid_get_pid (entry->id) != pid)
+@@ -936,14 +975,7 @@ kill_one_lwp_callback (struct inferior_list_entry *entry, void *args)
+       return 0;
+     }
+ 
+-  do
+-    {
+-      linux_kill_one_lwp (lwp);
+-
+-      /* Make sure it died.  The loop is most likely unnecessary.  */
+-      pid = linux_wait_for_event (thread->entry.id, &wstat, __WALL);
+-    } while (pid > 0 && WIFSTOPPED (wstat));
+-
++  kill_wait_lwp (lwp);
+   return 0;
+ }
+ 
+@@ -952,8 +984,6 @@ linux_kill (int pid)
+ {
+   struct process_info *process;
+   struct lwp_info *lwp;
+-  int wstat;
+-  int lwpid;
+ 
+   process = find_process_pid (pid);
+   if (process == NULL)
+@@ -976,21 +1006,7 @@ linux_kill (int pid)
+ 		      pid);
+     }
+   else
+-    {
+-      struct thread_info *thr = get_lwp_thread (lwp);
+-
+-      if (debug_threads)
+-	debug_printf ("lk_1: killing lwp %ld, for pid: %d\n",
+-		      lwpid_of (thr), pid);
+-
+-      do
+-	{
+-	  linux_kill_one_lwp (lwp);
+-
+-	  /* Make sure it died.  The loop is most likely unnecessary.  */
+-	  lwpid = linux_wait_for_event (thr->entry.id, &wstat, __WALL);
+-	} while (lwpid > 0 && WIFSTOPPED (wstat));
+-    }
++    kill_wait_lwp (lwp);
+ 
+   the_target->mourn (process);
+ 
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,8 @@
++2014-07-11  Pedro Alves  <palves@redhat.com>
++
++	* gdb.threads/kill.c: New file.
++	* gdb.threads/kill.exp: New file.
++
+ 2014-07-09  Pedro Alves  <palves@redhat.com>
+ 
+ 	* gdb.base/attach-wait-input.exp: New file.
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/kill.c
+@@ -0,0 +1,64 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#ifdef USE_THREADS
++
++#include <unistd.h>
++#include <pthread.h>
++
++#define NUM 5
++
++pthread_barrier_t barrier;
++
++void *
++thread_function (void *arg)
++{
++  volatile unsigned int counter = 1;
++
++  pthread_barrier_wait (&barrier);
++
++  while (counter > 0)
++    {
++      counter++;
++      usleep (1);
++    }
++
++  pthread_exit (NULL);
++}
++
++#endif /* USE_THREADS */
++
++void
++setup (void)
++{
++#ifdef USE_THREADS
++  pthread_t threads[NUM];
++  int i;
++
++  pthread_barrier_init (&barrier, NULL, NUM + 1);
++  for (i = 0; i < NUM; i++)
++    pthread_create (&threads[i], NULL, thread_function, NULL);
++  pthread_barrier_wait (&barrier);
++#endif /* USE_THREADS */
++}
++
++int
++main (void)
++{
++  setup ();
++  return 0; /* set break here */
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/kill.exp
+@@ -0,0 +1,77 @@
++# This testcase is part of GDB, the GNU debugger.
++
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++standard_testfile
++
++# Run the test proper.  THREADED indicates whether to build a threaded
++# program and spawn several threads before trying to kill the program.
++
++proc test {threaded} {
++    global testfile srcfile
++
++    with_test_prefix [expr ($threaded)?"threaded":"non-threaded"] {
++
++	set options {debug}
++	if {$threaded} {
++	    lappend options "pthreads"
++	    lappend options "additional_flags=-DUSE_THREADS"
++	    set prog ${testfile}_threads
++	} else {
++	    set prog ${testfile}_nothreads
++	}
++
++	if {[prepare_for_testing "failed to prepare" $prog $srcfile $options] == -1} {
++	    return -1
++	}
++
++	if { ![runto main] } then {
++	    fail "run to main"
++	    return
++	}
++
++	set linenum [gdb_get_line_number "set break here"]
++	gdb_breakpoint "$srcfile:$linenum"
++	gdb_continue_to_breakpoint "break here" ".*break here.*"
++
++	if {$threaded} {
++	    gdb_test "info threads" "6.*5.*4.*3.*2.*1.*" "all threads started"
++	}
++
++	# This kills and ensures no output other than the prompt comes out,
++	# like:
++	#
++	#  (gdb) kill
++	#  Kill the program being debugged? (y or n) y
++	#  (gdb)
++	#
++	# If we instead saw more output, like e.g., with an extended-remote
++	# connection:
++	#
++	#  (gdb) kill
++	#  Kill the program being debugged? (y or n) y
++	#  Remote connection closed
++	#  (gdb)
++	#
++	# the above would mean that the remote end crashed.
++
++	gdb_test "kill" "^y" "kill program" "Kill the program being debugged\\? \\(y or n\\) $" "y"
++    }
++}
++
++foreach threaded {true false} {
++    test $threaded
++}
