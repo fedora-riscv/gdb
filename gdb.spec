@@ -21,17 +21,18 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20140721
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.7.91.%{snapsrc}
+%global tarname gdb-7.7.91.%{snapsrc}
+Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: gdb-%{version}.tar.bz2
+Source: %{tarname}.tar.bz2
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -40,7 +41,7 @@ Obsoletes: devtoolset-1.0-%{pkg_name}
 %endif
 
 # For our convenience
-%global gdb_src %{pkg_name}-%{version}
+%global gdb_src %{tarname}
 %global gdb_build build-%{_target_platform}
 
 # Make sure we get rid of the old package gdb64, now that we have unified
@@ -1299,6 +1300,9 @@ then
 fi
 
 %changelog
+* Tue Jul 22 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-13.fc21
+- Bump the package version number to final 7.8; still using 7.7.91.20140721.tar.
+
 * Tue Jul 22 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.91.20140721-12.fc21
 - Rebase to FSF GDB 7.7.91.20140721 (pre-7.8 snapshot).
 - Rebase the Intel VLA patchset.
