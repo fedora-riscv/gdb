@@ -3,19 +3,18 @@ https://sourceware.org/ml/gdb-patches/2014-06/msg00108.html
 https://github.com/intel-gdb/vla/tree/vla-fortran
 
 GIT snapshot:
-commit c622a047d23bcbc4dc68398fc70b531cebd8f5ee
+commit 511bff520372ffc10fa2ff569c176bdf1e6e475d
 
 
 diff --git a/gdb/NEWS b/gdb/NEWS
-index d9a19ae..1f22fea 100644
+index d9a19ae..e6885d2 100644
 ### a/gdb/NEWS
 ### b/gdb/NEWS
-@@ -3,6 +3,10 @@
+@@ -3,6 +3,9 @@
  
  *** Changes since GDB 7.8
  
-+* Fortran dynamic array support: GDB has now support for
-+  dynamic arrays in Fortran. It allows the user to evaluate
++* Fortran dynamic array support: It allows the user to evaluate
 +  dynamic arrays like an ordinary static array.
 +
  *** Changes in GDB 7.8
@@ -78,7 +77,7 @@ index 39dadf3..8cebbe8 100644
  
  /* The location of a value.  */
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index fcab9b9..4aac278 100644
+index fcab9b9..a624dac 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
 @@ -306,6 +306,7 @@ struct dwarf_expr_baton
@@ -138,7 +137,19 @@ index fcab9b9..4aac278 100644
  
    ctx = new_dwarf_expr_context ();
    old_chain = make_cleanup_free_dwarf_expr_context (ctx);
-@@ -2436,6 +2456,7 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
+@@ -2326,6 +2346,11 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
+ 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
+ 
+ 	    do_cleanups (value_chain);
++
++	    /* Select right frame to correctly evaluate VLA's during a backtrace.  */
++	    if (is_dynamic_type (type))
++	      select_frame (frame);
++
+ 	    retval = value_at_lazy (type, address + byte_offset);
+ 	    if (in_stack_memory)
+ 	      set_value_stack (retval, 1);
+@@ -2436,6 +2461,7 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
  
  static int
  dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
@@ -146,7 +157,7 @@ index fcab9b9..4aac278 100644
  			   CORE_ADDR *valp)
  {
    struct dwarf_expr_context *ctx;
-@@ -2451,6 +2472,7 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
+@@ -2451,6 +2477,7 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
  
    baton.frame = get_selected_frame (NULL);
    baton.per_cu = dlbaton->per_cu;
@@ -154,7 +165,7 @@ index fcab9b9..4aac278 100644
  
    objfile = dwarf2_per_cu_objfile (dlbaton->per_cu);
  
-@@ -2491,7 +2513,8 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
+@@ -2491,7 +2518,8 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
  /* See dwarf2loc.h.  */
  
  int
@@ -164,7 +175,7 @@ index fcab9b9..4aac278 100644
  {
    if (prop == NULL)
      return 0;
-@@ -2502,7 +2525,7 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
+@@ -2502,7 +2530,7 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
        {
  	const struct dwarf2_property_baton *baton = prop->data.baton;
  
@@ -173,31 +184,7 @@ index fcab9b9..4aac278 100644
  	  {
  	    if (baton->referenced_type)
  	      {
-@@ -2510,6 +2533,11 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
- 
- 		*value = value_as_address (val);
- 	      }
-+	    if (baton->post_values.data && baton->post_values.size > 0)
-+	      {
-+	        CORE_ADDR new_addr = *value;
-+	        dwarf2_locexpr_baton_eval (&baton->post_values, new_addr, value);
-+	      }
- 	    return 1;
- 	  }
-       }
-@@ -2532,6 +2560,11 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
- 	    if (!value_optimized_out (val))
- 	      {
- 		*value = value_as_address (val);
-+		if (baton->post_values.data && baton->post_values.size > 0)
-+		  {
-+		    CORE_ADDR new_addr = *value;
-+		    dwarf2_locexpr_baton_eval (&baton->post_values, new_addr, value);
-+		  }
- 		return 1;
- 	      }
- 	  }
-@@ -2546,6 +2579,20 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
+@@ -2546,6 +2574,20 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
    return 0;
  }
  
@@ -218,7 +205,7 @@ index fcab9b9..4aac278 100644
  
  /* Helper functions and baton for dwarf2_loc_desc_needs_frame.  */
  
-@@ -2653,6 +2700,15 @@ needs_get_addr_index (void *baton, unsigned int index)
+@@ -2653,6 +2695,15 @@ needs_get_addr_index (void *baton, unsigned int index)
    return 1;
  }
  
@@ -234,7 +221,7 @@ index fcab9b9..4aac278 100644
  /* Virtual method table for dwarf2_loc_desc_needs_frame below.  */
  
  static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
-@@ -2667,7 +2723,8 @@ static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
+@@ -2667,7 +2718,8 @@ static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
    needs_frame_dwarf_call,
    NULL,				/* get_base_type */
    needs_dwarf_reg_entry_value,
@@ -244,7 +231,7 @@ index fcab9b9..4aac278 100644
  };
  
  /* Return non-zero iff the location expression at DATA (length SIZE)
-@@ -3316,6 +3373,10 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
+@@ -3316,6 +3368,10 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
  	  unimplemented (op);
  	  break;
  
@@ -256,7 +243,7 @@ index fcab9b9..4aac278 100644
  	  offset = extract_signed_integer (op_ptr, 2, byte_order);
  	  op_ptr += 2;
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index 8ad5fa9..cf648eb 100644
+index 8ad5fa9..fb65c5c 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
 @@ -96,11 +96,18 @@ struct value *dwarf2_evaluate_loc_desc (struct type *type,
@@ -278,21 +265,11 @@ index 8ad5fa9..cf648eb 100644
  /* The symbol location baton types used by the DWARF-2 reader (i.e.
     SYMBOL_LOCATION_BATON for a LOC_COMPUTED symbol).  "struct
     dwarf2_locexpr_baton" is for a symbol with a single location
-@@ -161,6 +168,9 @@ struct dwarf2_property_baton
-     /* Location list to be evaluated in the context of REFERENCED_TYPE.  */
-     struct dwarf2_loclist_baton loclist;
-   };
-+
-+  /* Attributes, which will be pushed after evaluating locexpr or loclist.  */
-+  struct dwarf2_locexpr_baton post_values;
- };
- 
- extern const struct symbol_computed_ops dwarf2_locexpr_funcs;
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 276d2f1..f5b35d7 100644
+index 276d2f1..fbf13ce 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -1847,6 +1847,15 @@ static void free_dwo_file_cleanup (void *);
+@@ -1847,6 +1847,12 @@ static void free_dwo_file_cleanup (void *);
  static void process_cu_includes (void);
  
  static void check_producer (struct dwarf2_cu *cu);
@@ -302,13 +279,10 @@ index 276d2f1..f5b35d7 100644
 +		      struct dwarf2_cu *cu, struct dynamic_prop *prop,
 +		      const gdb_byte *additional_data, int additional_data_size);
 +
-+static void add_post_values_to_baton (struct dwarf2_property_baton *baton,
-+        const gdb_byte *data, int size, struct dwarf2_cu *cu);
-+
  
  /* Various complaints about symbol reading that don't abort the process.  */
  
-@@ -14201,29 +14210,90 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14201,29 +14207,92 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -348,7 +322,6 @@ index 276d2f1..f5b35d7 100644
 +                 data attribute, to reflect DWARF specialities to get address
 +                 sizes.  */
 +              const gdb_byte append_ops[] = {
-+                DW_OP_push_object_address,
 +                /* DW_OP_deref_size: size of an address on the target machine
 +                   (bytes), where the size will be specified by the next
 +                   operand.  */
@@ -368,7 +341,10 @@ index 276d2f1..f5b35d7 100644
 +             is the address size of the target machine.  */
 +          else
 +            {
-+              if (!attr_to_dynamic_prop (attr, die, cu, &high, NULL, 0))
++              const gdb_byte append_ops[] = { DW_OP_deref };
++
++              if (!attr_to_dynamic_prop (attr, die, cu, &high, append_ops,
++                      ARRAY_SIZE (append_ops)))
 +                complaint (&symfile_complaints,
 +                        _("Could not parse DW_AT_string_length"));
 +            }
@@ -406,31 +382,10 @@ index 276d2f1..f5b35d7 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -14540,13 +14610,36 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14540,13 +14609,15 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
    return set_die_type (die, type, cu);
  }
  
-+/* Add post processing op-codes to a dwarf2_property_baton.  */
-+
-+static void add_post_values_to_baton (struct dwarf2_property_baton *baton,
-+        const gdb_byte *data, int size, struct dwarf2_cu *cu)
-+{
-+  if (data != NULL && size > 0)
-+    {
-+      struct obstack *obstack = &cu->objfile->objfile_obstack;
-+      gdb_byte *post_data;
-+
-+      post_data = obstack_alloc (obstack, size);
-+      memcpy(post_data, data, size);
-+      baton->post_values.data = post_data;
-+      baton->post_values.size = size;
-+      baton->post_values.per_cu = cu->per_cu;
-+    } else {
-+      baton->post_values.data = NULL;
-+      baton->post_values.size = 0;
-+      baton->post_values.per_cu = NULL;
-+    }
-+}
 +
  /* Parse dwarf attribute if it's a block, reference or constant and put the
     resulting value of the attribute into struct bound_prop.
@@ -444,37 +399,66 @@ index 276d2f1..f5b35d7 100644
  {
    struct dwarf2_property_baton *baton;
    struct obstack *obstack = &cu->objfile->objfile_obstack;
-@@ -14559,8 +14652,10 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -14559,8 +14630,25 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
        baton = obstack_alloc (obstack, sizeof (*baton));
        baton->referenced_type = NULL;
        baton->locexpr.per_cu = cu->per_cu;
 -      baton->locexpr.size = DW_BLOCK (attr)->size;
-       baton->locexpr.data = DW_BLOCK (attr)->data;
-+      baton->locexpr.size = DW_BLOCK (attr)->size;
-+      add_post_values_to_baton (baton, additional_data,
-+                                additional_data_size, cu);
+-      baton->locexpr.data = DW_BLOCK (attr)->data;
++
++      if (additional_data != NULL && additional_data_size > 0)
++        {
++          gdb_byte *data;
++
++          data = obstack_alloc (&cu->objfile->objfile_obstack,
++                  DW_BLOCK (attr)->size + additional_data_size);
++          memcpy (data, DW_BLOCK (attr)->data, DW_BLOCK (attr)->size);
++          memcpy (data + DW_BLOCK (attr)->size,
++                  additional_data, additional_data_size);
++
++          baton->locexpr.data = data;
++          baton->locexpr.size = DW_BLOCK (attr)->size + additional_data_size;
++        }
++      else
++        {
++          baton->locexpr.data = DW_BLOCK (attr)->data;
++          baton->locexpr.size = DW_BLOCK (attr)->size;
++        }
        prop->data.baton = baton;
        prop->kind = PROP_LOCEXPR;
        gdb_assert (prop->data.baton != NULL);
-@@ -14581,6 +14676,8 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -14590,8 +14678,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  	  baton = obstack_alloc (obstack, sizeof (*baton));
  	  baton->referenced_type = die_type (target_die, target_cu);
- 	  fill_in_loclist_baton (cu, &baton->loclist, target_attr);
-+	  add_post_values_to_baton (baton, additional_data,
-+	                            additional_data_size, cu);
- 	  prop->data.baton = baton;
- 	  prop->kind = PROP_LOCLIST;
- 	  gdb_assert (prop->data.baton != NULL);
-@@ -14592,6 +14689,8 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  	  baton->locexpr.per_cu = cu->per_cu;
- 	  baton->locexpr.size = DW_BLOCK (target_attr)->size;
- 	  baton->locexpr.data = DW_BLOCK (target_attr)->data;
-+	  add_post_values_to_baton (baton, additional_data,
-+	                            additional_data_size, cu);
+-	  baton->locexpr.size = DW_BLOCK (target_attr)->size;
+-	  baton->locexpr.data = DW_BLOCK (target_attr)->data;
++
++	  if (additional_data != NULL && additional_data_size > 0)
++	    {
++	      gdb_byte *data;
++
++	      data = obstack_alloc (&cu->objfile->objfile_obstack,
++	              DW_BLOCK (target_attr)->size + additional_data_size);
++	      memcpy (data, DW_BLOCK (target_attr)->data,
++	              DW_BLOCK (target_attr)->size);
++	      memcpy (data + DW_BLOCK (target_attr)->size,
++	              additional_data, additional_data_size);
++
++	      baton->locexpr.data = data;
++	      baton->locexpr.size = (DW_BLOCK (target_attr)->size
++	                             + additional_data_size);
++	    }
++	  else
++	    {
++	      baton->locexpr.data = DW_BLOCK (target_attr)->data;
++	      baton->locexpr.size = DW_BLOCK (target_attr)->size;
++	    }
++
  	  prop->data.baton = baton;
  	  prop->kind = PROP_LOCEXPR;
  	  gdb_assert (prop->data.baton != NULL);
-@@ -14626,7 +14725,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14626,7 +14734,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type, *orig_base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -483,7 +467,7 @@ index 276d2f1..f5b35d7 100644
    int low_default_is_valid;
    int high_bound_is_count = 0;
    const char *name;
-@@ -14646,7 +14745,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14646,7 +14754,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    low.kind = PROP_CONST;
    high.kind = PROP_CONST;
@@ -493,7 +477,7 @@ index 276d2f1..f5b35d7 100644
  
    /* Set LOW_DEFAULT_IS_VALID if current language and DWARF version allow
       omitting DW_AT_lower_bound.  */
-@@ -14679,19 +14780,26 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14679,19 +14789,26 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -523,7 +507,7 @@ index 276d2f1..f5b35d7 100644
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -14755,7 +14863,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14755,7 +14872,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        && !TYPE_UNSIGNED (base_type) && (high.data.const_val & negative_mask))
      high.data.const_val |= negative_mask;
  
@@ -532,7 +516,7 @@ index 276d2f1..f5b35d7 100644
  
    if (high_bound_is_count)
      TYPE_RANGE_DATA (range_type)->flag_upper_bound_is_count = 1;
-@@ -21673,6 +21781,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -21673,6 +21790,8 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  {
    struct dwarf2_per_cu_offset_and_type **slot, ofs;
    struct objfile *objfile = cu->objfile;
@@ -541,7 +525,7 @@ index 276d2f1..f5b35d7 100644
  
    /* For Ada types, make sure that the gnat-specific data is always
       initialized (if not already set).  There are a few types where
-@@ -21687,6 +21797,43 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -21687,6 +21806,43 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
        && !HAVE_GNAT_AUX_INFO (type))
      INIT_GNAT_SPECIFIC (type);
  
@@ -864,7 +848,7 @@ index 408c8cc..38f32e0 100644
              fputs_filtered (", ", stream);
          }
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index d0c002f..3f52d61 100644
+index e99a2f3..53cae2c 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -805,7 +805,8 @@ allocate_stub_method (struct type *type)
@@ -934,9 +918,9 @@ index d0c002f..3f52d61 100644
        else if (bit_stride > 0)
  	TYPE_LENGTH (result_type) =
  	  (bit_stride * (high_bound - low_bound + 1) + 7) / 8;
-@@ -1616,11 +1628,30 @@ stub_noname_complaint (void)
- int
- is_dynamic_type (struct type *type)
+@@ -1616,12 +1628,31 @@ stub_noname_complaint (void)
+ static int
+ is_dynamic_type_internal (struct type *type, int top_level)
  {
 +  int index;
 +
@@ -945,7 +929,8 @@ index d0c002f..3f52d61 100644
 +
    type = check_typedef (type);
  
-   if (TYPE_CODE (type) == TYPE_CODE_REF)
+   /* We only want to recognize references at the outermost level.  */
+   if (top_level && TYPE_CODE (type) == TYPE_CODE_REF)
      type = check_typedef (TYPE_TARGET_TYPE (type));
  
 +  if (TYPE_ASSOCIATED_PROP (type))
@@ -965,7 +950,7 @@ index d0c002f..3f52d61 100644
    switch (TYPE_CODE (type))
      {
      case TYPE_CODE_RANGE:
-@@ -1630,11 +1661,19 @@ is_dynamic_type (struct type *type)
+@@ -1631,11 +1662,19 @@ is_dynamic_type_internal (struct type *type, int top_level)
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
@@ -975,21 +960,21 @@ index d0c002f..3f52d61 100644
 +     - the bounds are dynamic,
 +	   - the elements it contains have a dynamic contents
 +     - a data_locaton attribute was found.  */
- 	if (is_dynamic_type (TYPE_INDEX_TYPE (type)))
+ 	if (is_dynamic_type_internal (TYPE_INDEX_TYPE (type), 0))
  	  return 1;
--	return is_dynamic_type (TYPE_TARGET_TYPE (type));
+-	return is_dynamic_type_internal (TYPE_TARGET_TYPE (type), 0);
 +	else if (TYPE_DATA_LOCATION (type) != NULL
 +	         && (TYPE_DATA_LOCATION_KIND (type) == PROP_LOCEXPR
 +	             || TYPE_DATA_LOCATION_KIND (type) == PROP_LOCLIST))
 +    return 1;
 +  else
-+    return is_dynamic_type (TYPE_TARGET_TYPE (type));
++    return is_dynamic_type_internal (TYPE_TARGET_TYPE (type), 0);
 +	break;
        }
  
      case TYPE_CODE_STRUCT:
-@@ -1647,28 +1686,40 @@ is_dynamic_type (struct type *type)
- 	      && is_dynamic_type (TYPE_FIELD_TYPE (type, i)))
+@@ -1648,6 +1687,17 @@ is_dynamic_type_internal (struct type *type, int top_level)
+ 	      && is_dynamic_type_internal (TYPE_FIELD_TYPE (type, i), 0))
  	    return 1;
        }
 +    case TYPE_CODE_PTR:
@@ -1006,8 +991,9 @@ index d0c002f..3f52d61 100644
        break;
      }
  
-   return 0;
- }
+@@ -1666,22 +1716,23 @@ static struct type *resolve_dynamic_type_internal (struct type *type,
+ 						   CORE_ADDR addr,
+ 						   int top_level);
  
 -/* Given a dynamic range type (dyn_range_type), return a static version
 -   of that type.  */
@@ -1034,7 +1020,7 @@ index d0c002f..3f52d61 100644
      {
        low_bound.kind = PROP_CONST;
        low_bound.data.const_val = value;
-@@ -1680,7 +1731,7 @@ resolve_dynamic_range (struct type *dyn_range_type)
+@@ -1693,7 +1744,7 @@ resolve_dynamic_range (struct type *dyn_range_type)
      }
  
    prop = &TYPE_RANGE_DATA (dyn_range_type)->high;
@@ -1043,7 +1029,7 @@ index d0c002f..3f52d61 100644
      {
        high_bound.kind = PROP_CONST;
        high_bound.data.const_val = value;
-@@ -1694,10 +1745,17 @@ resolve_dynamic_range (struct type *dyn_range_type)
+@@ -1707,10 +1758,17 @@ resolve_dynamic_range (struct type *dyn_range_type)
        high_bound.kind = PROP_UNDEFINED;
        high_bound.data.const_val = 0;
      }
@@ -1064,7 +1050,7 @@ index d0c002f..3f52d61 100644
    TYPE_RANGE_DATA (static_range_type)->flag_bound_evaluated = 1;
    return static_range_type;
  }
-@@ -1707,29 +1765,52 @@ resolve_dynamic_range (struct type *dyn_range_type)
+@@ -1720,29 +1778,52 @@ resolve_dynamic_range (struct type *dyn_range_type)
     of the associated array.  */
  
  static struct type *
@@ -1125,24 +1111,16 @@ index d0c002f..3f52d61 100644
  }
  
  /* Resolve dynamic bounds of members of the union TYPE to static
-@@ -1823,6 +1904,7 @@ resolve_dynamic_struct (struct type *type, CORE_ADDR addr)
-   return resolved_type;
- }
- 
-+
- /* See gdbtypes.h  */
- 
- struct type *
-@@ -1830,6 +1912,8 @@ resolve_dynamic_type (struct type *type, CORE_ADDR addr)
+@@ -1846,6 +1927,8 @@ resolve_dynamic_type_internal (struct type *type, CORE_ADDR addr,
  {
    struct type *real_type = check_typedef (type);
    struct type *resolved_type = type;
 +  const struct dynamic_prop *prop;
 +  CORE_ADDR value;
  
-   if (!is_dynamic_type (real_type))
+   if (!is_dynamic_type_internal (real_type, top_level))
      return type;
-@@ -1853,11 +1937,12 @@ resolve_dynamic_type (struct type *type, CORE_ADDR addr)
+@@ -1871,11 +1954,12 @@ resolve_dynamic_type_internal (struct type *type, CORE_ADDR addr,
  	}
  
        case TYPE_CODE_ARRAY:
@@ -1157,7 +1135,7 @@ index d0c002f..3f52d61 100644
  	break;
  
      case TYPE_CODE_UNION:
-@@ -1869,6 +1954,25 @@ resolve_dynamic_type (struct type *type, CORE_ADDR addr)
+@@ -1887,6 +1971,25 @@ resolve_dynamic_type_internal (struct type *type, CORE_ADDR addr,
        break;
      }
  
@@ -1183,7 +1161,7 @@ index d0c002f..3f52d61 100644
    return resolved_type;
  }
  
-@@ -4078,6 +4182,27 @@ copy_type_recursive (struct objfile *objfile,
+@@ -4104,6 +4207,27 @@ copy_type_recursive (struct objfile *objfile,
        *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
      }
  
@@ -1211,7 +1189,7 @@ index d0c002f..3f52d61 100644
    /* Copy pointers to other types.  */
    if (TYPE_TARGET_TYPE (type))
      TYPE_TARGET_TYPE (new_type) = 
-@@ -4124,6 +4249,44 @@ copy_type (const struct type *type)
+@@ -4150,6 +4274,44 @@ copy_type (const struct type *type)
    memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
  	  sizeof (struct main_type));
  
@@ -1257,10 +1235,10 @@ index d0c002f..3f52d61 100644
  }
  
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index bb6352d..5818f79 100644
+index 5008ef4..436edf8 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
-@@ -670,6 +670,10 @@ struct main_type
+@@ -669,6 +669,10 @@ struct main_type
  
        struct dynamic_prop high;
  
@@ -1271,7 +1249,7 @@ index bb6352d..5818f79 100644
        /* True if HIGH range bound contains the number of elements in the
  	 subrange. This affects how the final hight bound is computed.  */
  
-@@ -725,6 +729,23 @@ struct main_type
+@@ -724,6 +728,23 @@ struct main_type
  
      struct func_type *func_stuff;
    } type_specific;
@@ -1295,7 +1273,7 @@ index bb6352d..5818f79 100644
  };
  
  /* * A ``struct type'' describes a particular instance of a type, with
-@@ -1203,6 +1224,39 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -1202,6 +1223,39 @@ extern void allocate_gnat_aux_type (struct type *);
    TYPE_RANGE_DATA(range_type)->high.kind
  #define TYPE_LOW_BOUND_KIND(range_type) \
    TYPE_RANGE_DATA(range_type)->low.kind
@@ -1335,7 +1313,7 @@ index bb6352d..5818f79 100644
  
  /* Moto-specific stuff for FORTRAN arrays.  */
  
-@@ -1210,6 +1264,9 @@ extern void allocate_gnat_aux_type (struct type *);
+@@ -1209,6 +1263,9 @@ extern void allocate_gnat_aux_type (struct type *);
     TYPE_HIGH_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
  #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
     TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
@@ -1345,7 +1323,7 @@ index bb6352d..5818f79 100644
  
  #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
-@@ -1678,6 +1735,7 @@ extern struct type *create_array_type_with_stride
+@@ -1677,6 +1734,7 @@ extern struct type *create_array_type_with_stride
  
  extern struct type *create_range_type (struct type *, struct type *,
  				       const struct dynamic_prop *,
@@ -2030,10 +2008,10 @@ index 0000000..6053c17
 +gdb_test "print sizeof(pvla)" " = 4000" "print sizeof associated pvla"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.exp b/gdb/testsuite/gdb.fortran/vla-stride.exp
 new file mode 100644
-index 0000000..e791115
+index 0000000..35f585d
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.exp
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,44 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -2061,13 +2039,6 @@ index 0000000..e791115
 +    continue
 +}
 +
-+gdb_breakpoint [gdb_get_line_number "reverse-elements"]
-+gdb_continue_to_breakpoint "reverse-elements"
-+gdb_test "print pvla" " = \\\(10, 9, 8, 7, 6, 5, 4, 3, 2, 1\\\)" \
-+  "print reverse-elements"
-+gdb_test "print pvla(1)" " = 10" "print first reverse-element"
-+gdb_test "print pvla(10)" " = 1" "print last reverse-element"
-+
 +gdb_breakpoint [gdb_get_line_number "re-reverse-elements"]
 +gdb_continue_to_breakpoint "re-reverse-elements"
 +gdb_test "print pvla" " = \\\(1, 2, 3, 4, 5, 6, 7, 8, 9, 10\\\)" \
@@ -2087,7 +2058,7 @@ index 0000000..e791115
 +gdb_test "print pvla(1)" " = 5" "print one single-element"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.f90 b/gdb/testsuite/gdb.fortran/vla-stride.f90
 new file mode 100644
-index 0000000..1f8cc55
+index 0000000..6aa4f2b
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.f90
 @@ -0,0 +1,30 @@
@@ -2115,7 +2086,7 @@ index 0000000..1f8cc55
 +  vla = (/ (I, I = 1,10) /)
 +
 +  pvla => vla(10:1:-1)
-+  pvla => pvla(10:1:-1) ! reverse-elements
++  pvla => pvla(10:1:-1)
 +  pvla => vla(1:10:2)   ! re-reverse-elements
 +  pvla => vla(5:4:-2)   ! odd-elements
 +
@@ -3157,7 +3128,7 @@ index 6698247..7a415cf 100644
 +
  #endif
 diff --git a/gdb/value.c b/gdb/value.c
-index 557056f..4e91a43 100644
+index 29abe5f..5efea89 100644
 --- a/gdb/value.c
 +++ b/gdb/value.c
 @@ -43,6 +43,7 @@
@@ -3168,7 +3139,7 @@ index 557056f..4e91a43 100644
  
  /* Prototypes for exported functions.  */
  
-@@ -1646,6 +1647,25 @@ set_value_component_location (struct value *component,
+@@ -1627,6 +1628,25 @@ set_value_component_location (struct value *component,
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
@@ -3194,7 +3165,7 @@ index 557056f..4e91a43 100644
  }
  
  
-@@ -2950,13 +2970,22 @@ value_primitive_field (struct value *arg1, int offset,
+@@ -2931,13 +2951,22 @@ value_primitive_field (struct value *arg1, int offset,
  	v = allocate_value_lazy (type);
        else
  	{
@@ -3223,7 +3194,7 @@ index 557056f..4e91a43 100644
      }
    set_value_component_location (v, arg1);
    VALUE_REGNUM (v) = VALUE_REGNUM (arg1);
-@@ -3539,7 +3568,8 @@ readjust_indirect_value_type (struct value *value, struct type *enc_type,
+@@ -3520,7 +3549,8 @@ readjust_indirect_value_type (struct value *value, struct type *enc_type,
  			      struct value *original_value)
  {
    /* Re-adjust type.  */
@@ -3233,7 +3204,7 @@ index 557056f..4e91a43 100644
  
    /* Add embedding info.  */
    set_value_enclosing_type (value, enc_type);
-@@ -3556,6 +3586,12 @@ coerce_ref (struct value *arg)
+@@ -3537,6 +3567,12 @@ coerce_ref (struct value *arg)
    struct value *retval;
    struct type *enc_type;
  
@@ -3246,7 +3217,7 @@ index 557056f..4e91a43 100644
    retval = coerce_ref_if_computed (arg);
    if (retval)
      return retval;
-@@ -3699,8 +3735,14 @@ value_fetch_lazy (struct value *val)
+@@ -3680,8 +3716,14 @@ value_fetch_lazy (struct value *val)
      }
    else if (VALUE_LVAL (val) == lval_memory)
      {

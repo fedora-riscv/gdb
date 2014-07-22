@@ -18,14 +18,14 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140711
+%global snapsrc    20140721
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-Version: 7.7.90.%{snapsrc}
+Version: 7.7.91.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -516,11 +516,16 @@ Patch914: gdb-readline-6.3.5.patch
 Patch918: gdb-btrobust.patch
 
 # Fix crash on optimized-out entry data values (BZ 1111910).
-Patch919: gdb-entrydataoptimizedout.patch
+Patch922: gdb-entryval-crash-1of3.patch
+Patch923: gdb-entryval-crash-2of3.patch
+Patch919: gdb-entryval-crash-3of3.patch
 
 # Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
 Patch920: gdb-python-completer-1of2.patch
 Patch921: gdb-python-completer-2of2.patch
+
+# [testsuite] Fix paginate-*.exp race for "read1".
+Patch924: gdb-testsuite-pagination-read1.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -798,9 +803,12 @@ find -name "*.info*"|xargs rm -f
 %patch887 -p1
 %patch914 -p1
 %patch918 -p1
-%patch919 -p1
 %patch920 -p1
 %patch921 -p1
+%patch922 -p1
+%patch923 -p1
+%patch919 -p1
+%patch924 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1291,6 +1299,12 @@ then
 fi
 
 %changelog
+* Tue Jul 22 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.91.20140721-12.fc21
+- Rebase to FSF GDB 7.7.91.20140721 (pre-7.8 snapshot).
+- Rebase the Intel VLA patchset.
+- New fix of the optimized-out entry data values crash (BZ 1111910).
+- [testsuite] Fix paginate-*.exp race for "read1".
+
 * Fri Jul 11 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140711-11.fc21
 - Fix regression#2 of the optimized-out entry data values fix (of BZ 1111910).
 - Rebase to FSF GDB 7.7.90.20140711 (pre-7.8 snapshot).
