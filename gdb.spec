@@ -18,7 +18,7 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140721
+%global snapsrc    20140724
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-7.7.91.%{snapsrc}
@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -516,11 +516,6 @@ Patch914: gdb-readline-6.3.5.patch
 # Continue backtrace even if a frame filter throws an exception (Phil Muldoon).
 Patch918: gdb-btrobust.patch
 
-# Fix crash on optimized-out entry data values (BZ 1111910).
-Patch922: gdb-entryval-crash-1of3.patch
-Patch923: gdb-entryval-crash-2of3.patch
-Patch919: gdb-entryval-crash-3of3.patch
-
 # Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
 Patch920: gdb-python-completer-1of2.patch
 Patch921: gdb-python-completer-2of2.patch
@@ -806,9 +801,6 @@ find -name "*.info*"|xargs rm -f
 %patch918 -p1
 %patch920 -p1
 %patch921 -p1
-%patch922 -p1
-%patch923 -p1
-%patch919 -p1
 %patch924 -p1
 
 %patch848 -p1
@@ -1300,6 +1292,10 @@ then
 fi
 
 %changelog
+* Thu Jul 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-14.fc21
+- Rebase to FSF GDB 7.7.91.20140724 (pre-7.8 snapshot).
+- Import TUI regression fix (Pedro Alves, BZ 1123003).
+
 * Tue Jul 22 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-13.fc21
 - Bump the package version number to final 7.8; still using 7.7.91.20140721.tar.
 
