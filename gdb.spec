@@ -18,21 +18,21 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140724
+%global snapsrc    20140611
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-%global tarname gdb-7.7.91.%{snapsrc}
+%global tarname gdb-%{version}
 Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
-# ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.bz2
-Source: %{tarname}.tar.bz2
+# ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.gz
+Source: %{tarname}.tar.gz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -509,6 +509,7 @@ Patch852: gdb-gnat-dwarf-crash-3of3.patch
 Patch887: gdb-archer-vla-tests.patch
 Patch888: gdb-vla-intel.patch
 Patch912: gdb-vla-intel-04of23-fix.patch
+Patch889: gdb-vla-intel-stringbt-fix.patch
 
 # Fix --with-system-readline with readline-6.3 patch 5.
 Patch914: gdb-readline-6.3.5.patch
@@ -520,8 +521,8 @@ Patch918: gdb-btrobust.patch
 Patch920: gdb-python-completer-1of2.patch
 Patch921: gdb-python-completer-2of2.patch
 
-# [testsuite] Fix paginate-*.exp race for "read1".
-Patch924: gdb-testsuite-pagination-read1.patch
+# Display Fortran strings in backtraces.
+Patch925: gdb-fortran-frame-string.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -699,6 +700,7 @@ find -name "*.info*"|xargs rm -f
 %patch232 -p1
 %patch888 -p1
 %patch912 -p1
+%patch889 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -801,7 +803,7 @@ find -name "*.info*"|xargs rm -f
 %patch918 -p1
 %patch920 -p1
 %patch921 -p1
-%patch924 -p1
+%patch925 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1292,6 +1294,10 @@ then
 fi
 
 %changelog
+* Sat Aug  2 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-15.fc21
+- Rebase to FSF GDB 7.8.
+- Display Fortran strings in backtraces.
+
 * Thu Jul 24 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-14.fc21
 - Rebase to FSF GDB 7.7.91.20140724 (pre-7.8 snapshot).
 - Import TUI regression fix (Pedro Alves, BZ 1123003).
