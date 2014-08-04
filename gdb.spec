@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -524,6 +524,9 @@ Patch921: gdb-python-completer-2of2.patch
 # Display Fortran strings in backtraces.
 Patch925: gdb-fortran-frame-string.patch
 
+# Fix -Werror=unused-variable error configuring babeltrace.
+Patch926: gdb-babeltrace-configure.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -555,6 +558,9 @@ BuildRequires: texlive-collection-latexrecommended
 %endif
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
+%if 0%{!?rhel:1}
+BuildRequires: libbabeltrace-devel%{?_isa}
+%endif
 
 %if 0%{?_with_testsuite:1}
 
@@ -804,6 +810,7 @@ find -name "*.info*"|xargs rm -f
 %patch920 -p1
 %patch921 -p1
 %patch925 -p1
+%patch926 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -891,6 +898,11 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 	--disable-sim						\
 	--disable-rpath						\
 	--without-guile						\
+%if 0%{!?rhel:1}
+	--with-babeltrace					\
+%else
+	--without-babeltrace					\
+%endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
 %else
@@ -1294,6 +1306,9 @@ then
 fi
 
 %changelog
+* Mon Aug  4 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-16.fc21
+- Enable babeltrace compile-time feature.
+
 * Sat Aug  2 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-15.fc21
 - Rebase to FSF GDB 7.8.
 - Display Fortran strings in backtraces.
