@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1310,6 +1310,9 @@ then
 fi
 
 %changelog
+* Thu Aug 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-18.fc21
+- [rhel] Adjust the previous patch for compilation on older GCCs.
+
 * Wed Aug 13 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-17.fc21
 - Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 
