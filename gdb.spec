@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1408,16 +1408,19 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
-* Fri Jul 11 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-17.fc21
+* Thu Aug 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-18.fc20
+- Import upstream demangler fixes (Gary Benson, Andrew Burgess, BZ 1119559).
+
+* Fri Jul 11 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-17.fc20
 - Fix regression#2 of the optimized-out entry data values fix (of BZ 1111910).
 
-* Wed Jul  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-16.fc21
+* Wed Jul  9 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-16.fc20
 - Fix regression of the optimized-out entry data values fix (of BZ 1111910).
 
-* Tue Jul  1 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-15.fc21
+* Tue Jul  1 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-15.fc20
 - Fix memory errors with demangled name hash (Tom Tromey).
 
-* Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-14.fc21
+* Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-14.fc20
 - Fix crash on optimized-out entry data values (BZ 1111910).
 
 * Wed May 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-13.fc21
