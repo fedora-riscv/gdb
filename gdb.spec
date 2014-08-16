@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1310,6 +1310,9 @@ then
 fi
 
 %changelog
+* Sat Aug 16 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.8-19
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_22_Mass_Rebuild
+
 * Thu Aug 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-18.fc21
 - [rhel] Adjust the previous patch for compilation on older GCCs.
 
