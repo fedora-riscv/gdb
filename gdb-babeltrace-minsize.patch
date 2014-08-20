@@ -1,0 +1,237 @@
+http://sourceware.org/ml/gdb-patches/2014-08/msg00376.html
+Subject: Re: --with-babeltrace generates many FAILs
+
+On 08/19/2014 10:07 PM, Jan Kratochvil wrote:
+>  * '#if HAVE_LIBBABELTRACE1_1_0' could have a comment that >=1.1.1 rejects the
+>    faked packet (what you described in the mail but not in the patch).
+
+Fixed.  To be precise, >= 1.1.2 rejects the faked packet, 1.1.1
+doesn't.  See the table I posted.
+
+>  * It is always better to check for feature/defect than to check for version.
+>    For example because various distros backport various fixes (unfortunately
+>    including their possible regressions/defects) and so version checks may be
+>    misleading then.  At least in this case it seems to me as possible to check
+>    how libbacktrace behaves from configure; although maybe it is not easy
+>    enough, not sure.
+
+In order to check libbabeltrace's behaviour in configure, we have to write
+a c program to generate CTF data and read the trace data via
+babeltrace or any program (using libbabeltrace) written by ourselves.
+It is not easy to do so.
+
+The patch is updated.  OK to apply?
+
+-- 
+Yao (齐尧)
+
+Subject: [PATCH] Check babeltrace 1.1.0
+Subject: [PATCH] Check babeltrace 1.1.0
+
+When GDB uses recent version of babeltrace, such as 1.2.x, we'll see
+such error emitted from babeltrace library,
+
+ (gdb) target ctf .../gdb/testsuite/gdb.trace/actions.ctf
+ [error] Invalid CTF stream: content size is smaller than
+packet headers.
+ [error] Stream index creation error.
+ [error] Open file stream error.
+
+The problem can be reproduce out of GDB too, using babeltrace,
+
+ $ babeltrace ./fake-packet.ctf/
+ [error] Invalid CTF stream: content size is smaller than packet headers.
+ [error] Stream index creation error.
+ [error] Open file stream error.
+
+Recent babeltrace library becomes more strict on CTF, and complains
+about one "faked packet" GDB adds, when saving trace data in ctf
+format from GDB.  babeltrace 1.1.0 has a bug that it can't read trace
+data smaller than a certain size (see https://bugs.lttng.org/issues/450).
+We workaround it in GDB to append some meaningless data in a faked
+packet to make sure trace file is large enough (see ctf.c:ctf_end).
+The babeltrace issue was fixed in 1.1.1 release.  However, babeltrace
+recent release (since 1.1.2) starts to complain about such faked
+packet.  Here is a table shows that whether faked packet or no faked
+packet is supported by various babeltrace releases,
+
+        faked packet      no faked packet
+1.1.0      Yes                 No
+1.1.1      Yes                 Yes
+1.1.2      No                  Yes
+1.2.0      No                  Yes
+
+We decide to include the code to workaround 1.1.0 issue only if 1.1.0
+is used.  We choose pkg-config to check babeltrace's version in
+configure.
+
+gdb:
+
+2014-08-20  Yao Qi  <yao@codesourcery.com>
+
+	* configure.ac: Disable babeltrace support if pkg-config is
+	missing.  Use pkg-config to check whether libbabeltrace is
+	1.1.0.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* ctf.c (CTF_FILE_MIN_SIZE): Remove.
+	(ctf_end): Wrap the code with
+	#if HAVE_LIBBABELTRACE1_1_0 #endif.
+	[HAVE_LIBBABELTRACE1_1_0] (CTF_FILE_MIN_SIZE): New macro.
+---
+ gdb/config.in    |  3 +++
+ gdb/configure    | 25 +++++++++++++++++++++++++
+ gdb/configure.ac | 22 ++++++++++++++++++++++
+ gdb/ctf.c        | 25 ++++++++++++++++---------
+ 4 files changed, 66 insertions(+), 9 deletions(-)
+
+diff --git a/gdb/config.in b/gdb/config.in
+index b853412..54152cd 100644
+--- a/gdb/config.in
++++ b/gdb/config.in
+@@ -183,6 +183,9 @@
+ /* Define if you have the babeltrace library. */
+ #undef HAVE_LIBBABELTRACE
+ 
++/* Define to 1 if you have libbabeltrace 1.1.0 */
++#undef HAVE_LIBBABELTRACE1_1_0
++
+ /* Define to 1 if you have the `dl' library (-ldl). */
+ #undef HAVE_LIBDL
+ 
+diff --git a/gdb/configure b/gdb/configure
+index 9253e28..d4e2c6e 100755
+--- a/gdb/configure
++++ b/gdb/configure
+@@ -14817,6 +14817,11 @@ $as_echo "$with_babeltrace" >&6; }
+ if test "x$with_babeltrace" = "xno"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: babletrace support disabled; GDB is unable to read CTF data." >&5
+ $as_echo "$as_me: WARNING: babletrace support disabled; GDB is unable to read CTF data." >&2;}
++elif test "${pkg_config_prog_path}" = "missing"; then
++  # pkg-config is used to check the version of libbabeltrace.  If pkg-config
++  # is missing, we have to disable babeltrace support.
++  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: pkg-config not found, babletrace support disabled" >&5
++$as_echo "$as_me: WARNING: pkg-config not found, babletrace support disabled" >&2;}
+ else
+   # Append -Werror to CFLAGS so that configure can catch the warning
+   # "assignment from incompatible pointer type", which is related to
+@@ -15307,6 +15312,26 @@ $as_echo "$LIBBABELTRACE" >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: babeltrace is missing or unusable; GDB is unable to read CTF data." >&5
+ $as_echo "$as_me: WARNING: babeltrace is missing or unusable; GDB is unable to read CTF data." >&2;}
+      fi
++  else
++     # Need to know whether libbabeltrace is 1.1.0.
++     pkg_config_path=
++     for x in $LTLIBBABELTRACE; do
++       case "$x" in
++         -L*)
++	   dir=`echo "X$x" | sed -e 's/^X-L//'`
++	   if test -d "$dir/pkgconfig"; then
++	     pkg_config_path="${pkg_config_path}${pkg_config_path:+:}$dir/pkgconfig"
++	   fi
++	   ;;
++       esac
++     done
++
++     `PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$pkg_config_path ${pkg_config_prog_path} babeltrace = 1.1.0`
++     if test "$?" -eq 0 ; then
++
++$as_echo "#define HAVE_LIBBABELTRACE1_1_0 1" >>confdefs.h
++
++     fi
+   fi
+ fi
+ 
+diff --git a/gdb/configure.ac b/gdb/configure.ac
+index 61919b4..1d8d400 100644
+--- a/gdb/configure.ac
++++ b/gdb/configure.ac
+@@ -2420,6 +2420,10 @@ AC_MSG_RESULT([$with_babeltrace])
+ 
+ if test "x$with_babeltrace" = "xno"; then
+   AC_MSG_WARN([babletrace support disabled; GDB is unable to read CTF data.])
++elif test "${pkg_config_prog_path}" = "missing"; then
++  # pkg-config is used to check the version of libbabeltrace.  If pkg-config
++  # is missing, we have to disable babeltrace support.
++  AC_MSG_WARN([pkg-config not found, babletrace support disabled])
+ else
+   # Append -Werror to CFLAGS so that configure can catch the warning
+   # "assignment from incompatible pointer type", which is related to
+@@ -2450,6 +2454,24 @@ else
+      else
+        AC_MSG_WARN([babeltrace is missing or unusable; GDB is unable to read CTF data.])
+      fi
++  else
++     # Need to know whether libbabeltrace is 1.1.0.
++     pkg_config_path=
++     for x in $LTLIBBABELTRACE; do
++       case "$x" in
++         -L*)
++	   dir=`echo "X$x" | sed -e 's/^X-L//'`
++	   if test -d "$dir/pkgconfig"; then
++	     pkg_config_path="${pkg_config_path}${pkg_config_path:+:}$dir/pkgconfig"
++	   fi
++	   ;;
++       esac
++     done
++
++     `PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$pkg_config_path ${pkg_config_prog_path} babeltrace = 1.1.0`
++     if test "$?" -eq 0 ; then
++       AC_DEFINE([HAVE_LIBBABELTRACE1_1_0], [1], [Define to 1 if you have libbabeltrace 1.1.0])
++     fi
+   fi
+ fi
+ 
+diff --git a/gdb/ctf.c b/gdb/ctf.c
+index df645c0..684da50 100644
+--- a/gdb/ctf.c
++++ b/gdb/ctf.c
+@@ -623,11 +623,6 @@ ctf_write_definition_end (struct trace_file_writer *self)
+   self->ops->frame_ops->end (self);
+ }
+ 
+-/* The minimal file size of data stream.  It is required by
+-   babeltrace.  */
+-
+-#define CTF_FILE_MIN_SIZE		4096
+-
+ /* This is the implementation of trace_file_write_ops method
+    end.  */
+ 
+@@ -637,10 +632,21 @@ ctf_end (struct trace_file_writer *self)
+   struct ctf_trace_file_writer *writer = (struct ctf_trace_file_writer *) self;
+ 
+   gdb_assert (writer->tcs.content_size == 0);
+-  /* The babeltrace requires or assumes that the size of datastream
+-     file is greater than 4096 bytes.  If we don't generate enough
+-     packets and events, create a fake packet which has zero event,
+-      to use up the space.  */
++
++#if HAVE_LIBBABELTRACE1_1_0
++  /* The babeltrace-1.1.0 requires or assumes that the size of datastream
++     file is greater than 4096 bytes.  This was fixed after 1.1.0 release.
++     See https://bugs.lttng.org/issues/450
++     If we don't generate enough packets and events, create a fake packet
++     which has zero event, to use up the space.  However, babeltrace
++     release (since 1.1.2) starts to complain about such faked packet,
++     we include this workaround only for babeltrace 1.1.0.  */
++
++  /* The minimal file size of data stream.  It is required by
++     babeltrace.  */
++
++#define CTF_FILE_MIN_SIZE		4096
++
+   if (writer->tcs.packet_start < CTF_FILE_MIN_SIZE)
+     {
+       uint32_t u32;
+@@ -681,6 +687,7 @@ ctf_end (struct trace_file_writer *self)
+ 	  ctf_save_write (&writer->tcs, &b, 1);
+ 	}
+     }
++#endif /* HAVE_LIBBABELTRACE1_1_0 */
+ }
+ 
+ /* This is the implementation of trace_frame_write_ops method
+-- 
+1.9.3
+

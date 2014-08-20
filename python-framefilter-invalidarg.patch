@@ -1,0 +1,596 @@
+http://sourceware.org/ml/gdb-patches/2014-08/msg00364.html
+Subject: [patch+7.8?] Fix crash on Python frame filters with unreadable arg
+
+
+--d6Gm4EdcadzBjdND
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+Hi,
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1126177
+
+ERROR: AddressSanitizer: SEGV on unknown address 0x000000000050 (pc 0x000000992bef sp 0x7ffff9039530 bp 0x7ffff9039540 T0)
+    #0 0x992bee in value_type .../gdb/value.c:925
+    #1 0x87c951 in py_print_single_arg python/py-framefilter.c:445
+    #2 0x87cfae in enumerate_args python/py-framefilter.c:596
+    #3 0x87e0b0 in py_print_args python/py-framefilter.c:968
+
+It crashes because frame_arg::val is documented it may contain NULL
+(frame_arg::error is then non-NULL) but the code does not handle it.
+
+Another bug is that py_print_single_arg() calls goto out of its TRY_CATCH
+which messes up GDB cleanup chain crashing GDB later.
+
+I tried to somehow separate it to two patches first but it in the end kept
+them merged.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedorarawhide-linux-gnu.
+
+It is probably 7.7 regression (I have not verified it) due to the introduction
+of Python frame filters.
+
+I am not sure if it is more suitable for gdb.arch/ or gdb.python/ , used the
+latter.
+
+
+Thanks,
+Jan
+
+--d6Gm4EdcadzBjdND
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename="pyinvalidarg.patch"
+
+gdb/
+2014-08-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* python/py-framefilter.c (py_print_single_arg): Handle NULL FA->VAL.
+	Fix goto out of TRY_CATCH.
+
+gdb/testsuite/
+2014-08-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/amd64-py-framefilter-invalidarg.S: New file.
+	* gdb.python/py-framefilter-invalidarg-gdb.py.in: New file.
+	* gdb.python/py-framefilter-invalidarg.exp: New file.
+	* gdb.python/py-framefilter-invalidarg.py: New file.
+
+diff --git a/gdb/python/py-framefilter.c b/gdb/python/py-framefilter.c
+index 9db83c7..d53282f 100644
+--- a/gdb/python/py-framefilter.c
++++ b/gdb/python/py-framefilter.c
+@@ -365,9 +365,12 @@ py_print_single_arg (struct ui_out *out,
+ {
+   struct value *val;
+   volatile struct gdb_exception except;
++  enum ext_lang_bt_status retval = EXT_LANG_BT_OK;
+ 
+   if (fa != NULL)
+     {
++      if (fa->val == NULL && fa->error == NULL)
++	return EXT_LANG_BT_OK;
+       language = language_def (SYMBOL_LANGUAGE (fa->sym));
+       val = fa->val;
+     }
+@@ -433,16 +436,18 @@ py_print_single_arg (struct ui_out *out,
+       /* For MI print the type, but only for simple values.  This seems
+ 	 weird, but this is how MI choose to format the various output
+ 	 types.  */
+-      if (args_type == MI_PRINT_SIMPLE_VALUES)
++      if (args_type == MI_PRINT_SIMPLE_VALUES && val != NULL)
+ 	{
+ 	  if (py_print_type (out, val) == EXT_LANG_BT_ERROR)
+ 	    {
++	      retval = EXT_LANG_BT_ERROR;
+ 	      do_cleanups (cleanups);
+-	      goto error;
++	      continue;
+ 	    }
+ 	}
+ 
+-      annotate_arg_value (value_type (val));
++      if (val != NULL)
++	annotate_arg_value (value_type (val));
+ 
+       /* If the output is to the CLI, and the user option "set print
+ 	 frame-arguments" is set to none, just output "...".  */
+@@ -454,27 +459,25 @@ py_print_single_arg (struct ui_out *out,
+ 	     for the case of MI_PRINT_NO_VALUES.  */
+ 	  if (args_type != NO_VALUES)
+ 	    {
+-	      if (py_print_value (out, val, opts, 0, args_type, language)
+-		  == EXT_LANG_BT_ERROR)
++	      if (val == NULL)
+ 		{
+-		  do_cleanups (cleanups);
+-		  goto error;
++		  gdb_assert (fa != NULL && fa->error != NULL);
++		  ui_out_field_fmt (out, "value",
++				    _("<error reading variable: %s>"),
++				    fa->error);
+ 		}
++	      else if (py_print_value (out, val, opts, 0, args_type, language)
++		       == EXT_LANG_BT_ERROR)
++		retval = EXT_LANG_BT_ERROR;
+ 	    }
+ 	}
+ 
+       do_cleanups (cleanups);
+     }
+   if (except.reason < 0)
+-    {
+-      gdbpy_convert_exception (except);
+-      goto error;
+-    }
+-
+-  return EXT_LANG_BT_OK;
++    gdbpy_convert_exception (except);
+ 
+- error:
+-  return EXT_LANG_BT_ERROR;
++  return retval;
+ }
+ 
+ /* Helper function to loop over frame arguments provided by the
+diff --git a/gdb/testsuite/gdb.python/amd64-py-framefilter-invalidarg.S b/gdb/testsuite/gdb.python/amd64-py-framefilter-invalidarg.S
+new file mode 100755
+index 0000000..3ac1b23
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/amd64-py-framefilter-invalidarg.S
+@@ -0,0 +1,261 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++/* This file is compiled from a single line
++   int main (int argc, char **argv) { return 0; }
++   using -g -dA -S -O2 and patched as #if-ed below.  */
++
++	.file	"py-framefilter-invalidarg.c"
++	.text
++.Ltext0:
++	.globl	main
++	.type	main, @function
++main:
++.LFB0:
++	.file 1 "py-framefilter-invalidarg.c"
++	# py-framefilter-invalidarg.c:1
++	.loc 1 1 0
++	.cfi_startproc
++# BLOCK 2 seq:0
++# PRED: ENTRY (FALLTHRU)
++	pushq	%rbp
++	.cfi_def_cfa_offset 16
++	.cfi_offset 6, -16
++	movq	%rsp, %rbp
++	.cfi_def_cfa_register 6
++	movl	%edi, -4(%rbp)
++	movq	%rsi, -16(%rbp)
++	# py-framefilter-invalidarg.c:2
++	.loc 1 2 0
++	movl	$0, %eax
++	# py-framefilter-invalidarg.c:3
++	.loc 1 3 0
++	popq	%rbp
++	.cfi_def_cfa 7, 8
++# SUCC: EXIT [100.0%] 
++	ret
++	.cfi_endproc
++.LFE0:
++	.size	main, .-main
++.Letext0:
++	.section	.debug_info,"",@progbits
++.Ldebug_info0:
++	.long	.Le - .Ls	# Length of Compilation Unit Info
++.Ls:
++	.value	0x4	# DWARF version number
++	.long	.Ldebug_abbrev0	# Offset Into Abbrev. Section
++	.byte	0x8	# Pointer Size (in bytes)
++	.uleb128 0x1	# (DIE (0xb) DW_TAG_compile_unit)
++	.long	.LASF3	# DW_AT_producer: "GNU C 4.9.1 20140813 (Red Hat 4.9.1-7) -mtune=generic -march=x86-64 -g"
++	.byte	0x1	# DW_AT_language
++	.long	.LASF4	# DW_AT_name: "py-framefilter-invalidarg.c"
++	.long	.LASF5	# DW_AT_comp_dir: ""
++	.quad	.Ltext0	# DW_AT_low_pc
++	.quad	.Letext0-.Ltext0	# DW_AT_high_pc
++	.long	.Ldebug_line0	# DW_AT_stmt_list
++die2d:
++	.uleb128 0x2	# (DIE (0x2d) DW_TAG_subprogram)
++			# DW_AT_external
++	.long	.LASF6	# DW_AT_name: "main"
++	.byte	0x1	# DW_AT_decl_file (py-framefilter-invalidarg.c)
++	.byte	0x1	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	die6b-.Ldebug_info0	# DW_AT_type
++	.quad	.LFB0	# DW_AT_low_pc
++	.quad	.LFE0-.LFB0	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++die4e:
++	.uleb128 0x3	# (DIE (0x4e) DW_TAG_formal_parameter)
++	.long	.LASF0	# DW_AT_name: "argc"
++	.byte	0x1	# DW_AT_decl_file (py-framefilter-invalidarg.c)
++	.byte	0x1	# DW_AT_decl_line
++	.long	die6b-.Ldebug_info0	# DW_AT_type
++#if 0
++	.uleb128 0x2	# DW_AT_location
++	.byte	0x91	# DW_OP_fbreg
++	.sleb128 -20
++#endif
++#if 0
++	.uleb128 1f - 2f	# DW_AT_location
++2:
++	.byte	0x03	# DW_OP_addr
++	.quad 0
++1:
++#endif
++#if 1
++	.uleb128 1f - 2f	# DW_AT_location
++2:
++	.byte	0x13	# DW_OP_drop
++	.quad 0
++1:
++#endif
++die5c:
++	.uleb128 0x3	# (DIE (0x5c) DW_TAG_formal_parameter)
++	.long	.LASF1	# DW_AT_name: "argv"
++	.byte	0x1	# DW_AT_decl_file (py-framefilter-invalidarg.c)
++	.byte	0x1	# DW_AT_decl_line
++	.long	die72-.Ldebug_info0	# DW_AT_type
++	.uleb128 0x2	# DW_AT_location
++	.byte	0x91	# DW_OP_fbreg
++	.sleb128 -32
++	.byte	0	# end of children of DIE 0x2d
++die6b:
++	.uleb128 0x4	# (DIE (0x6b) DW_TAG_base_type)
++	.byte	0x4	# DW_AT_byte_size
++	.byte	0x5	# DW_AT_encoding
++	.ascii "int\0"	# DW_AT_name
++die72:
++	.uleb128 0x5	# (DIE (0x72) DW_TAG_pointer_type)
++	.byte	0x8	# DW_AT_byte_size
++	.long	die78-.Ldebug_info0	# DW_AT_type
++die78:
++	.uleb128 0x5	# (DIE (0x78) DW_TAG_pointer_type)
++	.byte	0x8	# DW_AT_byte_size
++	.long	die7e-.Ldebug_info0	# DW_AT_type
++die7e:
++	.uleb128 0x6	# (DIE (0x7e) DW_TAG_base_type)
++	.byte	0x1	# DW_AT_byte_size
++	.byte	0x6	# DW_AT_encoding
++	.long	.LASF2	# DW_AT_name: "char"
++	.byte	0	# end of children of DIE 0xb
++.Le:
++	.section	.debug_abbrev,"",@progbits
++.Ldebug_abbrev0:
++	.uleb128 0x1	# (abbrev code)
++	.uleb128 0x11	# (TAG: DW_TAG_compile_unit)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x25	# (DW_AT_producer)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x13	# (DW_AT_language)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x1b	# (DW_AT_comp_dir)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x10	# (DW_AT_stmt_list)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x2	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3f	# (DW_AT_external)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.byte	0
++	.byte	0
++	.uleb128 0x3	# (abbrev code)
++	.uleb128 0x5	# (TAG: DW_TAG_formal_parameter)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x2	# (DW_AT_location)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.byte	0
++	.byte	0
++	.uleb128 0x4	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.byte	0
++	.byte	0
++	.uleb128 0x5	# (abbrev code)
++	.uleb128 0xf	# (TAG: DW_TAG_pointer_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x6	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.byte	0
++	.byte	0
++	.byte	0
++	.section	.debug_aranges,"",@progbits
++	.long	0x2c	# Length of Address Ranges Info
++	.value	0x2	# DWARF Version
++	.long	.Ldebug_info0	# Offset of Compilation Unit Info
++	.byte	0x8	# Size of Address
++	.byte	0	# Size of Segment Descriptor
++	.value	0	# Pad to 16 byte boundary
++	.value	0
++	.quad	.Ltext0	# Address
++	.quad	.Letext0-.Ltext0	# Length
++	.quad	0
++	.quad	0
++	.section	.debug_line,"",@progbits
++.Ldebug_line0:
++	.section	.debug_str,"MS",@progbits,1
++.LASF1:
++	.string	"argv"
++.LASF4:
++	.string	"py-framefilter-invalidarg.c"
++.LASF5:
++	.string	""
++.LASF0:
++	.string	"argc"
++.LASF3:
++	.string	"GNU C 4.9.1 20140813 (Red Hat 4.9.1-7) -mtune=generic -march=x86-64 -g"
++.LASF6:
++	.string	"main"
++.LASF2:
++	.string	"char"
++	.ident	"GCC: (GNU) 4.9.1 20140813 (Red Hat 4.9.1-7)"
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/gdb/testsuite/gdb.python/py-framefilter-invalidarg-gdb.py.in b/gdb/testsuite/gdb.python/py-framefilter-invalidarg-gdb.py.in
+new file mode 100644
+index 0000000..1fa6ffc
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-framefilter-invalidarg-gdb.py.in
+@@ -0,0 +1,48 @@
++# Copyright (C) 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This file is part of the GDB testsuite.  It tests Python-based
++# frame-filters.
++import gdb
++import itertools
++from gdb.FrameDecorator import FrameDecorator
++
++
++class FrameObjFile ():
++
++    def __init__ (self):
++        self.name = "Filter1"
++        self.priority = 1
++        self.enabled = False
++        gdb.current_progspace().frame_filters ["Progspace" + self.name] = self
++        gdb.current_objfile().frame_filters ["ObjectFile" + self.name] = self
++
++    def filter (self, frame_iter):
++        return frame_iter
++
++class FrameObjFile2 ():
++
++    def __init__ (self):
++        self.name = "Filter2"
++        self.priority = 100
++        self.enabled = True
++        gdb.current_progspace().frame_filters ["Progspace" + self.name] = self
++        gdb.current_objfile().frame_filters ["ObjectFile" + self.name] = self
++
++    def filter (self, frame_iter):
++        return frame_iter
++
++FrameObjFile()
++FrameObjFile2()
+diff --git a/gdb/testsuite/gdb.python/py-framefilter-invalidarg.exp b/gdb/testsuite/gdb.python/py-framefilter-invalidarg.exp
+new file mode 100644
+index 0000000..f70d16e
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-framefilter-invalidarg.exp
+@@ -0,0 +1,67 @@
++# Copyright (C) 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++load_lib gdb-python.exp
++
++standard_testfile amd64-py-framefilter-invalidarg.S
++
++if { ![istarget x86_64-*-* ] || ![is_lp64_target] } {
++    verbose "Skipping py-framefilter-invalidarg."
++    return
++}
++
++# We cannot use prepare_for_testing as we have to set the safe-patch
++# to check objfile and progspace printers.
++if {[build_executable $testfile.exp $testfile $srcfile {}] == -1} {
++    return -1
++}
++
++# Start with a fresh gdb.
++gdb_exit
++gdb_start
++
++# Skip all tests if Python scripting is not enabled.
++if { [skip_python_tests] } { continue }
++
++# Make the -gdb.py script available to gdb, it is automagically loaded by gdb.
++# Care is taken to put it in the same directory as the binary so that
++# gdb will find it.
++set remote_obj_python_file \
++    [remote_download \
++	 host ${srcdir}/${subdir}/${testfile}-gdb.py.in \
++	 [standard_output_file ${testfile}-gdb.py]]
++
++gdb_reinitialize_dir $srcdir/$subdir
++gdb_test_no_output "set auto-load safe-path ${remote_obj_python_file}" \
++    "set auto-load safe-path"
++gdb_load ${binfile}
++# Verify gdb loaded the script.
++gdb_test "info auto-load python-scripts" "Yes.*/${testfile}-gdb.py.*" \
++    "Test auto-load had loaded python scripts"
++
++if ![runto_main] then {
++    perror "couldn't run to breakpoint"
++    return
++}
++gdb_test_no_output "set python print-stack full" \
++    "Set python print-stack to full"
++
++# Load global frame-filters
++set remote_python_file [gdb_remote_download host \
++			    ${srcdir}/${subdir}/${testfile}.py]
++gdb_test_no_output "python exec (open ('${remote_python_file}').read ())" \
++    "Load python file"
++
++gdb_test "bt" " in niam \\(argc=<error reading variable: dwarf expression stack underflow>, argv=0x\[0-9a-f\]+\\) at py-framefilter-invalidarg.c:\[0-9\]+" "bt full with filters"
+diff --git a/gdb/testsuite/gdb.python/py-framefilter-invalidarg.py b/gdb/testsuite/gdb.python/py-framefilter-invalidarg.py
+new file mode 100644
+index 0000000..d5f92cb
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-framefilter-invalidarg.py
+@@ -0,0 +1,59 @@
++# Copyright (C) 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This file is part of the GDB testsuite.  It tests Python-based
++# frame-filters.
++import gdb
++import itertools
++from gdb.FrameDecorator import FrameDecorator
++import copy
++
++class Reverse_Function (FrameDecorator):
++
++    def __init__(self, fobj):
++        super(Reverse_Function, self).__init__(fobj)
++        self.fobj = fobj
++
++    def function (self):
++        fname = str (self.fobj.function())
++        if (fname == None or fname == ""):
++            return None
++        if fname == 'end_func':
++            extra = self.fobj.inferior_frame().read_var('str').string()
++        else:
++            extra = ''
++        fname = fname[::-1] + extra
++        return fname
++
++class FrameFilter ():
++
++    def __init__ (self):
++        self.name = "Reverse"
++        self.priority = 100
++        self.enabled = True
++        gdb.frame_filters [self.name] = self
++
++    def filter (self, frame_iter):
++        # Python 3.x moved the itertools.imap functionality to map(),
++        # so check if it is available.
++        if hasattr(itertools, "imap"):
++            frame_iter = itertools.imap (Reverse_Function,
++                                         frame_iter)
++        else:
++            frame_iter = map(Reverse_Function, frame_iter)
++
++        return frame_iter
++
++FrameFilter()
+
+--d6Gm4EdcadzBjdND--
+

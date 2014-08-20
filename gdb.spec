@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -525,10 +525,15 @@ Patch921: gdb-python-completer-2of2.patch
 Patch925: gdb-fortran-frame-string.patch
 
 # Fix -Werror=unused-variable error configuring babeltrace.
+# Fix babeltrace errors (Yao Qi).
 Patch926: gdb-babeltrace-configure.patch
+Patch928: gdb-babeltrace-minsize.patch
 
 # Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 Patch927: gdb-python-gil.patch
+
+# Fix crash on Python frame filters with unreadable arg (BZ 1126177).
+Patch929: python-framefilter-invalidarg.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -814,7 +819,9 @@ find -name "*.info*"|xargs rm -f
 %patch921 -p1
 %patch925 -p1
 %patch926 -p1
+%patch928 -p1
 %patch927 -p1
+%patch929 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1310,6 +1317,10 @@ then
 fi
 
 %changelog
+* Wed Aug 20 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-20.fc21
+- Fix babeltrace errors (Yao Qi).
+- Fix crash on Python frame filters with unreadable arg (BZ 1126177).
+
 * Sat Aug 16 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.8-19
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_21_22_Mass_Rebuild
 
