@@ -1,0 +1,217 @@
+http://sourceware.org/ml/gdb-patches/2014-09/msg00174.html
+Subject: Re: Regression: GDB stopped on run with attached process (PR 17347) [Re: [pushed+7.8] Re: [PATCH] Fix "attach" command vs user input race
+
+
+--a8Wt8u1KmwUX3Y2C
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Wed, 03 Sep 2014 22:11:03 +0200, Pedro Alves wrote:
+> On 09/03/2014 08:58 AM, Jan Kratochvil wrote:
+> 
+> > https://sourceware.org/bugzilla/show_bug.cgi?id=17347
+> 
+> Thanks Jan.
+> 
+> Here's a fix, test included.  Comments?
+
+In the testsuite run from the Fedora rpm packaging I get:
+
+GNU gdb (GDB) Fedora 7.8-21.fc21^M
+Copyright (C) 2014 Free Software Foundation, Inc.^M
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>^M
+This is free software: you are free to change and redistribute it.^M
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"^M
+and "show warranty" for details.^M
+This GDB was configured as "i686-redhat-linux-gnu".^M
+Type "show configuration" for configuration details.^M
+For bug reporting instructions, please see:^M
+<http://www.gnu.org/software/gdb/bugs/>.^M
+Find the GDB manual and other documentation resources online at:^M
+<http://www.gnu.org/software/gdb/documentation/>.^M
+For help, type "help".^M
+Type "apropos word" to search for commands related to "word".^M
+Attaching to process 27028^M
+Reading symbols from /unsafebuild-i686-redhat-linux-gnu/gdb/testsuite.unix.-m32/outputs/gdb.base/attach/attach...done.^M
+Reading symbols from /lib/libm.so.6...Reading symbols from /usr/lib/debug/usr/lib/libm-2.19.90.so.debug...done.^M
+done.^M
+Loaded symbols for /lib/libm.so.6^M
+Reading symbols from /lib/libc.so.6...Reading symbols from /usr/lib/debug/usr/lib/libc-2.19.90.so.debug...done.^M
+done.^M
+Loaded symbols for /lib/libc.so.6^M
+Reading symbols from /lib/ld-linux.so.2...Reading symbols from /usr/lib/debug/usr/lib/ld-2.19.90.so.debug...done.^M
+done.^M
+Loaded symbols for /lib/ld-linux.so.2^M
+main ()^M
+    at gdb/testsuite/gdb.base/attach.c:15^M
+15       while (! should_exit)^M
+The program being debugged has been started already.^M
+Start it from the beginning? (y or n) PASS: gdb.base/attach.exp: cmdline attach run: run to prompt
+y^M
+^M
+Temporary breakpoint 1 at 0x8048481: file gdb/testsuite/gdb.base/attach.c, line 13.^M
+Starting program: /unsafe/home/jkratoch/hammock/20140907fedorarel21-f21/fedora-2---Type <return> to continue, or q <return> to quit---ERROR: Window too small.
+UNRESOLVED: gdb.base/attach.exp: cmdline attach run: run to main
+
+
+While I do not fully understand why that happens in every run of that Fedora
+testsuite while it never happens during my reproducibility attempts by hand
+I find it understandable and the Fedora testsuite issues does get fixed by the
+attached patch.
+
+
+> --- a/gdb/testsuite/gdb.base/attach.exp
+> +++ b/gdb/testsuite/gdb.base/attach.exp
+> @@ -58,6 +58,37 @@ if [get_compiler_info] {
+>      return -1
+>  }
+>  
+> +# Start the program running and then wait for a bit, to be sure that
+> +# it can be attached to.  Return the process's PID.
+> +
+> +proc spawn_test_prog { executable } {
+> +    set testpid [eval exec $executable &]
+> +    exec sleep 2
+
+Unrelated to this patch - this patch only moved the code.  Also the code move
+could be a separate patch:
+
+I do not see why the testsuite commonly uses "exec sleep" while it also uses
+"sleep" itself which also works fine.
+
+
+> +    if { [istarget "*-*-cygwin*"] } {
+> +	# testpid is the Cygwin PID, GDB uses the Windows PID, which might be
+> +	# different due to the way fork/exec works.
+> +	set testpid [ exec ps -e | gawk "{ if (\$1 == $testpid) print \$4; }" ]
+> +    }
+> +
+> +    return $testpid
+> +}
+[...]
+> @@ -429,6 +427,50 @@ proc do_command_attach_tests {} {
+>      remote_exec build "kill -9 ${testpid}"
+>  }
+>  
+> +# Test ' gdb --pid PID -ex "run" '.  GDB used to have a bug where
+> +# "run" would run before the attach finished - PR17347.
+> +
+> +proc test_command_line_attach_run {} {
+> +    global gdb_prompt
+> +    global binfile
+
+> +    global verbose
+> +    global GDB
+> +    global INTERNAL_GDBFLAGS
+
+These 3 lines are unused.
+
+
+> +
+> +    if ![isnative] then {
+> +	unsupported "commandline attach run test"
+> +	return 0
+> +    }
+> +
+> +    with_test_prefix "cmdline attach run" {
+> +	set testpid [spawn_test_prog $binfile]
+> +
+> +	set test "run to prompt"
+> +	gdb_exit
+> +	set res [gdb_spawn_with_cmdline_opts "--pid=$testpid -ex \"start\""]
+
+Here see the attachment.
+
+
+> +	if { $res != 0} {
+> +	    fail $test
+> +	    return $res
+> +	}
+> +	gdb_test_multiple "" $test {
+> +	    -re {Attaching to.*Start it from the beginning\? \(y or n\) } {
+> +		pass $test
+> +	    }
+> +	}
+> +
+> +	send_gdb "y\n"
+> +
+> +	set test "run to main"
+> +	gdb_test_multiple "" $test {
+> +	    -re "Temporary breakpoint .* main .*$gdb_prompt $" {
+> +		pass $test
+> +	    }
+> +	}
+> +
+> +	# Get rid of the process
+> +	remote_exec build "kill -9 ${testpid}"
+> +    }
+> +}
+>  
+>  # Start with a fresh gdb
+>  
+> @@ -453,4 +495,6 @@ do_call_attach_tests
+>  
+>  do_command_attach_tests
+>  
+> +test_command_line_attach_run
+> +
+>  return 0
+> diff --git a/gdb/top.c b/gdb/top.c
+> index fc2b84d..ba71f8f 100644
+> --- a/gdb/top.c
+> +++ b/gdb/top.c
+> @@ -373,6 +373,21 @@ check_frame_language_change (void)
+>      }
+>  }
+>  
+
+Missing:
+/* See top.h.  */
+
+Unless that rule from me has been abandoned.
+
+
+> +void
+> +maybe_wait_sync_command_done (int was_sync)
+> +{
+> +  /* If the interpreter is in sync mode (we're running a user
+> +     command's list, running command hooks or similars), and we
+> +     just ran a synchronous command that started the target, wait
+> +     for that command to end.  */
+> +  if (!interpreter_async && !was_sync && sync_execution)
+> +    {
+> +      while (gdb_do_one_event () >= 0)
+> +	if (!sync_execution)
+> +	  break;
+> +    }
+> +}
+> +
+>  /* Execute the line P as a command, in the current user context.
+>     Pass FROM_TTY as second argument to the defining function.  */
+>  
+
+
+Thanks,
+Jan
+
+--a8Wt8u1KmwUX3Y2C
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+diff --git a/gdb/testsuite/gdb.base/attach.exp b/gdb/testsuite/gdb.base/attach.exp
+index c94c127..6e566a3 100644
+--- a/gdb/testsuite/gdb.base/attach.exp
++++ b/gdb/testsuite/gdb.base/attach.exp
+@@ -447,7 +444,8 @@ proc test_command_line_attach_run {} {
+ 
+ 	set test "run to prompt"
+ 	gdb_exit
+-	set res [gdb_spawn_with_cmdline_opts "--pid=$testpid -ex \"start\""]
++	set res [gdb_spawn_with_cmdline_opts \
++		 "-iex set\\ height\\ 0 -iex set\\ width\\ 0 --pid=$testpid -ex \"start\""]
+ 	if { $res != 0} {
+ 	    fail $test
+ 	    return $res
+
+--a8Wt8u1KmwUX3Y2C--
+
