@@ -1,0 +1,89 @@
+http://sourceware.org/ml/gdb-patches/2014-09/msg00381.html
+Subject: [testsuite patch] runaway attach processes  [Re: Regression: GDB stopped on run with attached process (PR 17347)]
+
+
+--RnlQjJ0d97Da+TV1
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Thu, 11 Sep 2014 14:35:53 +0200, Pedro Alves wrote:
+> Thanks, pushed to both master and 7.8.
+
+I have started seeing occasional runaway 'attach' processes these days.
+I cannot be certain it is really caused by this patch, for example
+grep 'FAIL.*cmdline attach run' does not show anything in my logs.
+
+But as I remember this 'attach' runaway process always happened in GDB (but
+I do not remember it in the past months) I think it would be most safe to just
+solve it forever by [attached].
+
+
+Jan
+
+--RnlQjJ0d97Da+TV1
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+gdb/testsuite/
+2014-09-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/attach.c: Include unistd.h.
+	(main): Call alarm.  Add label postloop.
+	* gdb.base/attach.exp (do_attach_tests): Use gdb_get_line_number,
+	gdb_breakpoint, gdb_continue_to_breakpoint.
+	(test_command_line_attach_run): Kill ${testpid} in one exit path.
+
+diff --git a/gdb/testsuite/gdb.base/attach.c b/gdb/testsuite/gdb.base/attach.c
+index 0041b47..91b180c 100644
+--- a/gdb/testsuite/gdb.base/attach.c
++++ b/gdb/testsuite/gdb.base/attach.c
+@@ -5,6 +5,7 @@
+    exit unless/until gdb sets the variable to non-zero.)
+    */
+ #include <stdio.h>
++#include <unistd.h>
+ 
+ int  should_exit = 0;
+ 
+@@ -12,9 +13,11 @@ int main ()
+ {
+   int  local_i = 0;
+ 
++  alarm (60);
++
+   while (! should_exit)
+     {
+       local_i++;
+     }
+-  return 0;
++  return 0; /* postloop */
+ }
+diff --git a/gdb/testsuite/gdb.base/attach.exp b/gdb/testsuite/gdb.base/attach.exp
+index 6340496..5fb5c53 100644
+--- a/gdb/testsuite/gdb.base/attach.exp
++++ b/gdb/testsuite/gdb.base/attach.exp
+@@ -256,11 +256,8 @@ proc do_attach_tests {} {
+ 
+     # Verify that the modification really happened.
+ 
+-    gdb_test "tbreak 19" "Temporary breakpoint .*at.*$srcfile, line 19.*" \
+-	"after attach2, set tbreak postloop"
+-
+-    gdb_test "continue" "main.*at.*$srcfile:19.*" \
+-	"after attach2, reach tbreak postloop"
++    gdb_breakpoint [gdb_get_line_number "postloop"] temporary
++    gdb_continue_to_breakpoint "postloop" ".* postloop .*"
+ 
+     # Allow the test process to exit, to cleanup after ourselves.
+ 
+@@ -451,6 +448,7 @@ proc test_command_line_attach_run {} {
+ 		 "-iex set\\ height\\ 0 -iex set\\ width\\ 0 --pid=$testpid -ex \"start\""]
+ 	if { $res != 0} {
+ 	    fail $test
++	    remote_exec build "kill -9 ${testpid}"
+ 	    return $res
+ 	}
+ 	gdb_test_multiple "" $test {
+
+--RnlQjJ0d97Da+TV1--
+

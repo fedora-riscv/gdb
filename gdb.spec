@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -538,6 +538,7 @@ Patch929: python-framefilter-invalidarg.patch
 # Fix GDB SIGTT* Stopped when using the PID argument (BZ 1136704, Pedro Alves).
 Patch930: gdb-async-stopped-on-pid-arg-1of2.patch
 Patch931: gdb-async-stopped-on-pid-arg-2of2.patch
+Patch970: gdb-async-stopped-on-pid-arg-testsuite.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -828,6 +829,7 @@ find -name "*.info*"|xargs rm -f
 %patch929 -p1
 %patch930 -p1
 %patch931 -p1
+%patch970 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1323,6 +1325,9 @@ then
 fi
 
 %changelog
+* Sun Sep 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-22.fc21
+- [testsuite] Fix runaway gdb.base/attach processes.
+
 * Sun Sep  7 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-21.fc21
 - Fix GDB SIGTT* Stopped when using the PID argument (BZ 1136704, Pedro Alves).
 
