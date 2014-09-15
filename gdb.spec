@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1194,7 +1194,9 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/locale/
 rm -f $RPM_BUILD_ROOT%{_infodir}/bfd*
 rm -f $RPM_BUILD_ROOT%{_infodir}/standard*
 rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
-rm -rf $RPM_BUILD_ROOT%{_includedir}
+# Just exclude the header files in the top directory, and don't exclude
+# the gdb/ directory, as it contains jit-reader.h.
+rm -rf $RPM_BUILD_ROOT%{_includedir}/*.h
 rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
 
 # pstack obsoletion
@@ -1266,6 +1268,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
+# Provide jit-reader.h so that users are able to write their own GDB JIT
+# plugins.
+%{_includedir}/gdb/jit-reader.h
 
 # don't include the files in include, they are part of binutils
 
@@ -1325,6 +1330,9 @@ then
 fi
 
 %changelog
+* Mon Sep 15 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.8-23.fc21
+- Install gdb/jit-reader.h on include directory (BZ 1141968).
+
 * Sun Sep 14 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-22.fc21
 - [testsuite] Fix runaway gdb.base/attach processes.
 
