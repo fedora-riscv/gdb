@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -556,6 +556,9 @@ Patch866: gdb-static-tls-2of2.patch
 # Fix crash on optimized-out entry data values (BZ 1111910).
 Patch919: gdb-entrydataoptimizedout.patch
 
+# Fix 'Slow gstack performance' (RH BZ 1149865, Jan Kratochvil).
+Patch974: gdb-slow-gstack-performance.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -877,6 +880,7 @@ find -name "*.info*"|xargs rm -f
 %patch865 -p1
 %patch866 -p1
 %patch919 -p1
+%patch974 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1413,6 +1417,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Mon Oct 06 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7.1-20.fc20
+- Fix 'Slow gstack performance' (RH BZ 1149865, Jan Kratochvil).
+
 * Mon Sep 15 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.8-19.fc20
 - Install gdb/jit-reader.h on include directory (BZ 1141968).
 
