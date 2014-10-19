@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -893,6 +893,9 @@ mv -f readline-doc readline/doc
 %build
 rm -rf %{buildroot}
 
+# https://bugzilla.redhat.com/show_bug.cgi?id=1154436
+export PERL5LIB="$PERL5LIB${PERL5LIB:+:}/usr/share/texi2html/lib/Unicode-EastAsianWidth/lib"
+
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
 # built.
@@ -1123,6 +1126,10 @@ echo ====================TESTING END=====================
 %endif
 
 %install
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=1154436
+export PERL5LIB="$PERL5LIB${PERL5LIB:+:}/usr/share/texi2html/lib/Unicode-EastAsianWidth/lib"
+
 # Initially we're in the %{gdb_src} directory.
 cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
@@ -1339,6 +1346,9 @@ then
 fi
 
 %changelog
+* Sun Oct 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-27.fc21
+- Workaround makeinfo F-22 Bug 1154436.
+
 * Sun Oct 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-26.fc21
 - Import 5 upstream gdb-7.8 branch fixes (async fix by Pedro Alves).
 
