@@ -26,7 +26,7 @@ Version: 7.8
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -547,6 +547,9 @@ Patch971: gdb-save-breakpoints-fix.patch
 # Fix 'Slow gstack performance' (RH BZ 1103894, Jan Kratochvil).
 Patch973: gdb-slow-gstack-performance.patch
 
+# Accelerate interactive symbols lookup 15x.
+Patch975: gdb-symbols-lookup-accel.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -839,6 +842,7 @@ find -name "*.info*"|xargs rm -f
 %patch970 -p1
 %patch971 -p1
 %patch973 -p1
+%patch975 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1346,6 +1350,9 @@ then
 fi
 
 %changelog
+* Mon Oct 20 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-28.fc21
+- Accelerate interactive symbols lookup 15x.
+
 * Sun Oct 19 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-27.fc21
 - Workaround makeinfo F-22 Bug 1154436.
 
