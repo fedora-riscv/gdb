@@ -1770,3 +1770,101 @@ gdb/testsuite/
 -- 
 1.9.3
 
+
+
+commit 54fbc750b54271efb75ae11ce49f14c4234a9476
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Thu Sep 18 08:21:40 2014 +0200
+
+    Fix regression for Linux vDSO in GDB (PR gdb/17407).
+    
+    since
+    	5979d6b69b20a8355ea94b75fad97415fce4788c
+    	https://sourceware.org/git/?p=binutils-gdb.git;a=commitdiff;h=5979d6b69b20a8355ea94b75fad97415fce4788c
+    	vdso handling
+    	https://sourceware.org/ml/binutils/2014-03/msg00082.html
+    	https://sourceware.org/ml/binutils/2014-04/msg00003.html
+    	Message-ID: <A78C989F6D9628469189715575E55B230AA884EB@IRSMSX104.ger.corp.intel.com>
+    I get on
+    	kernel-3.16.2-200.fc20.x86_64
+    	https://koji.fedoraproject.org/koji/buildinfo?buildID=575860
+    	attaching its vdso.bin.gz
+    GDB (FSF HEAD 5e43d46791c4c66fd83947a12d4f716b561a9103) regression:
+    reproducer:
+    	./gdb -ex start ./gdb
+    actual result / FAIL:
+    	Got object file from memory but can't read symbols: File truncated.
+    expected result / PASS:
+    	<nothing>
+    or / PASS:
+    	warning: Could not load shared library symbols for linux-vdso.so.1.
+    	Do you need "set solib-search-path" or "set sysroot"?
+    
+    That "warning: Could not load shared library..." is mostly harmless (it is
+    a bug in GDB), in the FAIL case it is not printed just because
+    bfd_check_format() fails there.
+    
+    It seems logical to me this way when the 'size' parameter has been already
+    added.
+    Alan Modra:
+    I was wrongly thinking that the section headers were
+    always last when I wrote that code.  (They are now!  If you relink
+    that vdso with current binutils master you won't hit this problem, but
+    that of course doesn't help existing kernels.)
+    
+    I do not see a regression for add-symbol-file-from-memory for libncurses.so.5
+    from the original thread above.
+    
+      Start of section headers:          1080 (bytes into file)
+      Size of section headers:           64 (bytes)
+      Number of section headers:         13
+      Section header string table index: 8
+    Section Headers:
+      [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+      [ 8] .fake_shstrtab    STRTAB          0000000000000780 000780 000076 00   A  0   0 32
+    Program Headers:
+      Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+      LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x0012fe 0x0012fe R E 0x1000
+    
+    size == 0x2000
+    shdr_end == 0x778 == 1080 + 13 * 64
+    high_offset == 0x12fe
+    
+           else if (size >= shdr_end)
+    -	high_offset = shdr_end;
+    +	high_offset = size;
+    
+    But then 0x778 < 0x780 for "Section header string table index" so whole
+    bfd_check_format() fails because section headers were not cleared here:
+      /* If the segments visible in memory didn't include the section headers,
+         then clear them from the file header.  */
+      if (high_offset < shdr_end)
+    
+    bfd/ChangeLog
+    2014-09-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR gdb/17407
+    	* elfcode.h (bfd_from_remote_memory): Use SIZE for HIGH_OFFSET.
+
+### a/bfd/ChangeLog
+### b/bfd/ChangeLog
+## -1,3 +1,8 @@
++2014-09-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	PR gdb/17407
++	* elfcode.h (bfd_from_remote_memory): Use SIZE for HIGH_OFFSET.
++
+ 2014-07-16  H.J. Lu  <hongjiu.lu@intel.com>
+ 
+ 	* elf32-i386.c (elf_i386_plt_sym_val): Match PLT entry only for
+--- a/bfd/elfcode.h
++++ b/bfd/elfcode.h
+@@ -1749,7 +1749,7 @@ NAME(_bfd_elf,bfd_from_remote_memory)
+ 	     headers.  */
+ 	}
+       else if (size >= shdr_end)
+-	high_offset = shdr_end;
++	high_offset = size;
+       else
+ 	{
+ 	  bfd_vma page_size = get_elf_backend_data (templ)->minpagesize;

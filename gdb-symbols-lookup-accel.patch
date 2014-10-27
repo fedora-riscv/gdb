@@ -78,49 +78,91 @@ index 055c87e..90bcd6d 100644
 
 --17pEHd4RhPHOinZp--
 
-http://sourceware.org/ml/gdb-patches/2014-10/msg00525.html
-Subject: [patch 2/2] Accelerate lookup_symbol_aux_objfile 8x
 
 
---K8nIJk4ghYZn606h
+http://sourceware.org/ml/gdb-patches/2014-10/msg00612.html
+Subject: [patchv2 2/2] Accelerate lookup_symbol_aux_objfile 14.5x  [Re: [patch 0/2] Accelerate symbol lookups 15x]
+
+
+--vtzGhvizbBRQ85DL
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 
-Hi,
+On Wed, 22 Oct 2014 10:55:18 +0200, Doug Evans wrote:
+> For example, the count of calls to dict_hash before/after goes from 13.8M to 31.
+> I'm guessing one t hing we're doing here is coping with an artifact of
+> dwz:
 
-lookup_symbol_aux_objfile() processing is very ineffective.  For each primary
-symtab it searches it and also all its secondary symtabs.  But that means that
-secondary symtabs included in many primary symtabs get needlessly searched
-many times during one lookup_symbol_aux_objfile() run.
+During my simple test on non-DWZ file (./gdb itself) it went 3684->3484.
 
-lookup_symbol_aux_objfile does not care in which primary/secondary symtab the
-symbol is found.
+The problem is that dict_cash(val) is called for the same val for each block
+(== symtab).
+
+On DWZ the saving is probably much larger as there are many more symtabs due
+to DW_TAG_partial_unit ones.
 
 
+> what was once one global block to represent the entire objfile is
+> now N.
+
+Without DWZ there are X global blocks for X primary symtabs for X CUs of
+objfile.  With DWZ there are X+Y global blocks for X+Y primary symtabs for
+X+Y CUs where Y are 'DW_TAG_partial_unit's.
+
+For 'DW_TAG_partial_unit's (Ys) their blockvector is usually empty.  But not
+always, I have found there typedef symbols, there can IMO be optimized-out
+static variables etc.
+
+
+> [I'm sure the patches help in the non-dwz case, but I suspect it's less.
+> Which isn't to say the patches aren't useful.
+> I just need play with a few more examples.]
+
+I agree.
+
+[patch 2/2] could needlessly performance-regress non-DWZ cases, therefore
+I have put back original ALL_OBJFILE_PRIMARY_SYMTABS (instead of my
+ALL_OBJFILE_SYMTABS) as it is perfectly sufficient.  For the performance
+testcase of mine:
+
+Benchmark on non-trivial application with    'p <tab><tab>':
+Command execution time:   4.215000 (cpu),   4.241466 (wall) --- both fixes with new [patch 2/2]
+Command execution time:   7.373000 (cpu),   7.395095 (wall) --- both fixes
+Command execution time:  13.572000 (cpu),  13.592689 (wall) --- just lookup_symbol_aux_objfile fix
+Command execution time: 113.036000 (cpu), 113.067995 (wall) --- FSF GDB HEAD
+
+That is additional 1.75x improvement, making the total improvement 26.8x.
+
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora21pre-linux-gnu in standard
+and .gdb_index-enabled runs.  Neither of the patches should cause any visible
+behavior change.
+
+
+Thanks,
 Jan
 
---K8nIJk4ghYZn606h
+--vtzGhvizbBRQ85DL
 Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline; filename="idxcache2.patch"
+Content-Disposition: inline; filename="idxcache2doug.patch"
 
 gdb/
-2014-10-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+2014-10-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* symtab.c (lookup_symbol_aux_objfile): Use ALL_OBJFILE_SYMTABS, inline
 	lookup_block_symbol.
 
 diff --git a/gdb/symtab.c b/gdb/symtab.c
-index c530d50..bc800ef 100644
+index c530d50..da13861 100644
 --- a/gdb/symtab.c
 +++ b/gdb/symtab.c
 @@ -1657,15 +1657,25 @@ lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
    const struct block *block;
    struct symtab *s;
  
--  ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
 +  gdb_assert (block_index == GLOBAL_BLOCK || block_index == STATIC_BLOCK);
 +
-+  ALL_OBJFILE_SYMTABS (objfile, s)
+   ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
      {
 +      struct dict_iterator dict_iter;
 +
@@ -145,5 +187,5 @@ index c530d50..bc800ef 100644
      }
  
 
---K8nIJk4ghYZn606h--
+--vtzGhvizbBRQ85DL--
 
