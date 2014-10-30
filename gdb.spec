@@ -22,17 +22,17 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.8
+Version: 7.8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
-# ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.gz
-Source: %{tarname}.tar.gz
+# ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.xz
+Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -524,20 +524,10 @@ Patch921: gdb-python-completer-2of2.patch
 # Display Fortran strings in backtraces.
 Patch925: gdb-fortran-frame-string.patch
 
-# Fix -Werror=unused-variable error configuring babeltrace.
-# Fix babeltrace errors (Yao Qi).
-Patch926: gdb-babeltrace-configure.patch
-Patch928: gdb-babeltrace-minsize.patch
-
 # Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 Patch927: gdb-python-gil.patch
 
-# Fix crash on Python frame filters with unreadable arg (BZ 1126177).
-Patch929: python-framefilter-invalidarg.patch
-
 # Fix GDB SIGTT* Stopped when using the PID argument (BZ 1136704, Pedro Alves).
-Patch930: gdb-async-stopped-on-pid-arg-1of2.patch
-Patch931: gdb-async-stopped-on-pid-arg-2of2.patch
 Patch970: gdb-async-stopped-on-pid-arg-testsuite.patch
 
 # Fix "save breakpoints" for signal catchpoints and disabled breakpoints
@@ -833,12 +823,7 @@ find -name "*.info*"|xargs rm -f
 %patch920 -p1
 %patch921 -p1
 %patch925 -p1
-%patch926 -p1
-%patch928 -p1
 %patch927 -p1
-%patch929 -p1
-%patch930 -p1
-%patch931 -p1
 %patch970 -p1
 %patch971 -p1
 %patch973 -p1
@@ -1343,6 +1328,9 @@ then
 fi
 
 %changelog
+* Thu Oct 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-30.fc21
+- Rebase to FSF GDB 7.8.1.
+
 * Mon Oct 27 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8-29.fc21
 - Backport vDSO regression.
 - Revert the makeinfo workaround from 7.8-27.fc21.
