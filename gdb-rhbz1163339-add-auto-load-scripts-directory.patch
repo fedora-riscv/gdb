@@ -1,0 +1,136 @@
+Date: Thu, 13 Nov 2014 16:26:37 +0100
+From: Jan Kratochvil <jan dot kratochvil at redhat dot com>
+To: gdb-patches at sourceware dot org
+Cc: Jakub Filak <jfilak at redhat dot com>
+Subject: [patch] Add add-auto-load-scripts-directory
+
+--jho1yZJdad60DJr+
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+Hi,
+
+there is already "add-auto-load-safe-path" which works
+like "set auto-load safe-path" but in append mode.
+
+There was missing an append equivalent for "set auto-load scripts-directory".
+
+ABRT has directory /var/cache/abrt-di/ as an alternative one
+to /usr/lib/debug/ . Therefore ABRT needs to use -iex parameters to add this
+/var/cache/abrt-di/ directory as a first-class debuginfo directory.
+Using absolute "set auto-load scripts-directory" would hard-code the path
+possibly overriding local system directory additions; besides it would not be
+nice anyway.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora21-linux-gnu; although I have
+seen some heavy regressions there today unrelated to this patch.
+
+
+Thanks,
+Jan
+
+--jho1yZJdad60DJr+
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename="addautoload.patch"
+
+gdb/
+2014-11-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add add-auto-load-scripts-directory.
+	* NEWS (Changes since GDB 7.8): Add add-auto-load-scripts-directory.
+	* auto-load.c (add_auto_load_dir): New function.
+	(_initialize_auto_load): Install it.
+
+gdb/doc/
+2014-11-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add add-auto-load-scripts-directory.
+	* gdb.texinfo (Auto-loading): Add add-auto-load-scripts-directory link.
+	(objfile-gdbdotext file): Add add-auto-load-scripts-directory.
+
+Index: gdb-7.6.1/gdb/NEWS
+===================================================================
+--- gdb-7.6.1.orig/gdb/NEWS
++++ gdb-7.6.1/gdb/NEWS
+@@ -1,6 +1,12 @@
+ 		What has changed in GDB?
+ 	     (Organized release by release)
+ 
++* New commands:
++
++add-auto-load-scripts-directory directory
++  Add entries to the list of directories from which to load auto-loaded
++  scripts.
++
+ *** Changes in GDB 7.8
+ 
+ * New command line options
+Index: gdb-7.6.1/gdb/auto-load.c
+===================================================================
+--- gdb-7.6.1.orig/gdb/auto-load.c
++++ gdb-7.6.1/gdb/auto-load.c
+@@ -298,6 +298,22 @@ Use 'set auto-load safe-path /' for disa
+   auto_load_safe_path_vec_update ();
+ }
+ 
++/* "add-auto-load-scripts-directory" command for the auto_load_dir configuration
++   variable.  */
++
++static void
++add_auto_load_dir (char *args, int from_tty)
++{
++  char *s;
++
++  if (args == NULL || *args == 0)
++    error (_("Directory argument required."));
++
++  s = xstrprintf ("%s%c%s", auto_load_dir, DIRNAME_SEPARATOR, args);
++  xfree (auto_load_dir);
++  auto_load_dir = s;
++}
++
+ /* Implementation for filename_is_in_pattern overwriting the caller's FILENAME
+    and PATTERN.  */
+ 
+@@ -1295,6 +1311,15 @@ access the current full list setting."),
+ 		 &cmdlist);
+   set_cmd_completer (cmd, filename_completer);
+ 
++  cmd = add_cmd ("add-auto-load-scripts-directory", class_support,
++		 add_auto_load_dir,
++		 _("Add entries to the list of directories from which to load "
++		   "auto-loaded scripts.\n\
++See the commands 'set auto-load scripts-directory' and\n\
++'show auto-load scripts-directory' to access the current full list setting."),
++		 &cmdlist);
++  set_cmd_completer (cmd, filename_completer);
++
+   add_setshow_boolean_cmd ("auto-load", class_maintenance,
+ 			   &debug_auto_load, _("\
+ Set auto-load verifications debugging."), _("\
+Index: gdb-7.6.1/gdb/doc/gdb.texinfo
+===================================================================
+--- gdb-7.6.1.orig/gdb/doc/gdb.texinfo
++++ gdb-7.6.1/gdb/doc/gdb.texinfo
+@@ -21929,6 +21929,8 @@ These are @value{GDBN} control commands
+ @tab Control for @value{GDBN} auto-loaded scripts location.
+ @item @xref{show auto-load scripts-directory}.
+ @tab Show @value{GDBN} auto-loaded scripts location.
++@item @xref{add-auto-load-scripts-directory}.
++@tab Add directory for auto-loaded scripts location list.
+ @item @xref{set auto-load local-gdbinit}.
+ @tab Control for init file in the current directory.
+ @item @xref{show auto-load local-gdbinit}.
+@@ -27213,6 +27215,12 @@ to the @env{PATH} environment variable.
+ @kindex show auto-load scripts-directory
+ @item show auto-load scripts-directory
+ Show @value{GDBN} auto-loaded scripts location.
++
++@anchor{add-auto-load-scripts-directory}
++@kindex add-auto-load-scripts-directory
++@item add-auto-load-scripts-directory @r{[}@var{directories}@r{]}
++Add an entry (or list of entries) to the list of auto-loaded scripts locations.
++Multiple entries may be delimited by the host platform path separator in use.
+ @end table
+ 
+ @value{GDBN} does not track which files it has already auto-loaded this way.
