@@ -39,7 +39,7 @@ Version: 7.7.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1353,6 +1353,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
+%{_includedir}/gdb
 # Provide jit-reader.h so that users are able to write their own GDB JIT
 # plugins.
 %{_includedir}/gdb/jit-reader.h
@@ -1421,6 +1422,9 @@ fi
 %endif # 0%{!?el5:1} || "%{_target_cpu}" == "noarch"
 
 %changelog
+* Thu Nov 20 2014 Sergio Durigan Junior <sergiodj@redhat.com> - 7.7.1-22.fc20
+- Fix 'Unowned dir /usr/include/gdb/' (RH BZ 1164991).
+
 * Mon Oct 20 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.1-21.fc20
 - Accelerate interactive symbols lookup 15x.
 
