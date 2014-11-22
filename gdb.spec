@@ -26,7 +26,7 @@ Version: 7.8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1334,6 +1334,9 @@ then
 fi
 
 %changelog
+* Sat Nov 22 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-34.fc21
+- [ppc64] Fix compatibility of Fedora errno workaround (for RH BZ 1166549).
+
 * Fri Nov 21 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-33.fc21
 - Fix regression accessing errno from a core file (RH BZ 1166549).
 

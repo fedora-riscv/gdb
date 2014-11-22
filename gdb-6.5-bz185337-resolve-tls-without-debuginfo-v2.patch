@@ -38,12 +38,14 @@ Index: gdb-7.8.1/gdb/printcmd.c
 ===================================================================
 --- gdb-7.8.1.orig/gdb/printcmd.c	2014-11-21 19:05:44.699959209 +0100
 +++ gdb-7.8.1/gdb/printcmd.c	2014-11-21 19:05:44.868959291 +0100
-@@ -980,6 +980,8 @@ print_command_1 (const char *exp, int vo
+@@ -980,6 +980,10 @@ print_command_1 (const char *exp, int vo
  
    if (exp && *exp)
      {
++      /* '*((int *(*) (void)) __errno_location) ()' is incompatible with
++	 function descriptors.  */
 +      if (target_has_execution && strcmp (exp, "errno") == 0)
-+	exp = "*((int *(*) (void)) __errno_location) ()";
++	exp = "*(*(int *(*)(void)) __errno_location) ()";
        expr = parse_expression (exp);
        make_cleanup (free_current_contents, &expr);
        val = evaluate_expression (expr);
@@ -182,7 +184,7 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
 +++ gdb-7.8.1/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp	2014-11-21 19:13:01.553171326 +0100
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,71 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -244,12 +246,7 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 +if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}${variant}" executable "additional_flags=-g2"] != "" } {
 +    return -1
 +}
-+# FIXME: Why?
-+set do_xfail 0
-+if { [istarget x86_64-*-* ] && ![is_lp64_target] } {
-+    set do_xfail 1
-+}
-+prep "macros=N threads=Y" $do_xfail
++prep "macros=N threads=Y"
 +
 +set variant g3thrY
 +if {[gdb_compile_pthreads "${srcdir}/${subdir}/${srcfile}" "${binfile}${variant}" executable "additional_flags=-g3"] != "" } {
