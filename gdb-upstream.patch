@@ -65,3 +65,310 @@ index 0e0202d..d849b4c 100644
  # gdbserver does not have this issue.
  if ![is_remote target] {
      setup_kfail "*-*-*" gdb/15934
+
+
+
+commit cac9b138f75c94c1256d054cbafdf208b8963ce1
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Mon Nov 24 18:05:04 2014 +0100
+
+    Reindent code (resolve_dynamic_type_internal).
+    
+    gdb/ChangeLog
+    2014-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	* gdbtypes.c (resolve_dynamic_type_internal): Reindent the code.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,7 @@
++2014-11-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* gdbtypes.c (resolve_dynamic_type_internal): Reindent the code.
++
+ 2014-11-24  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+ 
+ 	Pushed by Joel Brobecker  <brobecker@adacore.com>
+--- a/gdb/gdbtypes.c
++++ b/gdb/gdbtypes.c
+@@ -1877,31 +1877,31 @@ resolve_dynamic_type_internal (struct type *type, CORE_ADDR addr,
+ 
+   switch (TYPE_CODE (type))
+     {
+-      case TYPE_CODE_TYPEDEF:
++    case TYPE_CODE_TYPEDEF:
++      resolved_type = copy_type (type);
++      TYPE_TARGET_TYPE (resolved_type)
++	= resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type), addr,
++					 top_level);
++      break;
++
++    case TYPE_CODE_REF:
++      {
++	CORE_ADDR target_addr = read_memory_typed_address (addr, type);
++
+ 	resolved_type = copy_type (type);
+ 	TYPE_TARGET_TYPE (resolved_type)
+-	  = resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type), addr,
+-					   top_level);
++	  = resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type),
++					   target_addr, top_level);
+ 	break;
++      }
+ 
+-      case TYPE_CODE_REF:
+-	{
+-	  CORE_ADDR target_addr = read_memory_typed_address (addr, type);
+-
+-	  resolved_type = copy_type (type);
+-	  TYPE_TARGET_TYPE (resolved_type)
+-	    = resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type),
+-					     target_addr, top_level);
+-	  break;
+-	}
+-
+-      case TYPE_CODE_ARRAY:
+-	resolved_type = resolve_dynamic_array (type);
+-	break;
++    case TYPE_CODE_ARRAY:
++      resolved_type = resolve_dynamic_array (type);
++      break;
+ 
+-      case TYPE_CODE_RANGE:
+-	resolved_type = resolve_dynamic_range (type);
+-	break;
++    case TYPE_CODE_RANGE:
++      resolved_type = resolve_dynamic_range (type);
++      break;
+ 
+     case TYPE_CODE_UNION:
+       resolved_type = resolve_dynamic_union (type, addr);
+
+
+
+commit 5537b577695dd5cd72395590d7ebd7aa92ee856a
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Sat Dec 13 15:31:59 2014 +0100
+
+    Fix 7.8 regression: resolve_dynamic_struct: Assertion `TYPE_NFIELDS (type) > 0' (PR 17642)
+    
+    https://sourceware.org/bugzilla/show_bug.cgi?id=17642
+    
+    Regression since:
+    commit 012370f6818657a816df1463ee71ca4e4ee40b33
+    Author: Tom Tromey <tromey@redhat.com>
+    Date:   Thu May 8 11:26:44 2014 -0600
+        handle VLA in a struct or union
+    
+    Bugreport:
+    Regression with gdb scripts for Linux kernel
+    https://sourceware.org/ml/gdb/2014-08/msg00127.html
+    
+    That big change after "else" is just reindentation.
+    
+    gdb/ChangeLog
+    2014-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR symtab/17642
+    	* gdbtypes.c (resolve_dynamic_type_internal): Apply check_typedef to
+    	TYPE if not TYPE_CODE_TYPEDEF.
+    
+    gdb/testsuite/ChangeLog
+    2014-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	PR symtab/17642
+    	* gdb.base/vla-stub-define.c: New file.
+    	* gdb.base/vla-stub.c: New file.
+    	* gdb.base/vla-stub.exp: New file.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,9 @@
++2014-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	PR symtab/17642
++	* gdbtypes.c (resolve_dynamic_type_internal): Apply check_typedef to
++	TYPE if not TYPE_CODE_TYPEDEF.
++
+ 2014-12-12  Doug Evans  <xdje42@gmail.com>
+ 
+ 	* valops.c (value_maybe_namespace_elt): Remove unnecessary test of
+--- a/gdb/gdbtypes.c
++++ b/gdb/gdbtypes.c
+@@ -1888,41 +1888,47 @@ resolve_dynamic_type_internal (struct type *type, CORE_ADDR addr,
+   if (!is_dynamic_type_internal (real_type, top_level))
+     return type;
+ 
+-  switch (TYPE_CODE (type))
++  if (TYPE_CODE (type) == TYPE_CODE_TYPEDEF)
+     {
+-    case TYPE_CODE_TYPEDEF:
+       resolved_type = copy_type (type);
+       TYPE_TARGET_TYPE (resolved_type)
+ 	= resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type), addr,
+ 					 top_level);
+-      break;
++    }
++  else 
++    {
++      /* Before trying to resolve TYPE, make sure it is not a stub.  */
++      type = real_type;
+ 
+-    case TYPE_CODE_REF:
+-      {
+-	CORE_ADDR target_addr = read_memory_typed_address (addr, type);
++      switch (TYPE_CODE (type))
++	{
++	case TYPE_CODE_REF:
++	  {
++	    CORE_ADDR target_addr = read_memory_typed_address (addr, type);
+ 
+-	resolved_type = copy_type (type);
+-	TYPE_TARGET_TYPE (resolved_type)
+-	  = resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type),
+-					   target_addr, top_level);
+-	break;
+-      }
++	    resolved_type = copy_type (type);
++	    TYPE_TARGET_TYPE (resolved_type)
++	      = resolve_dynamic_type_internal (TYPE_TARGET_TYPE (type),
++					       target_addr, top_level);
++	    break;
++	  }
+ 
+-    case TYPE_CODE_ARRAY:
+-      resolved_type = resolve_dynamic_array (type);
+-      break;
++	case TYPE_CODE_ARRAY:
++	  resolved_type = resolve_dynamic_array (type);
++	  break;
+ 
+-    case TYPE_CODE_RANGE:
+-      resolved_type = resolve_dynamic_range (type);
+-      break;
++	case TYPE_CODE_RANGE:
++	  resolved_type = resolve_dynamic_range (type);
++	  break;
+ 
+-    case TYPE_CODE_UNION:
+-      resolved_type = resolve_dynamic_union (type, addr);
+-      break;
++	case TYPE_CODE_UNION:
++	  resolved_type = resolve_dynamic_union (type, addr);
++	  break;
+ 
+-    case TYPE_CODE_STRUCT:
+-      resolved_type = resolve_dynamic_struct (type, addr);
+-      break;
++	case TYPE_CODE_STRUCT:
++	  resolved_type = resolve_dynamic_struct (type, addr);
++	  break;
++	}
+     }
+ 
+   return resolved_type;
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,10 @@
++2014-12-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	PR symtab/17642
++	* gdb.base/vla-stub-define.c: New file.
++	* gdb.base/vla-stub.c: New file.
++	* gdb.base/vla-stub.exp: New file.
++
+ 2014-12-12  Phil Muldoon  <pmuldoon@redhat.com>
+ 	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 	    Tom Tromey  <tromey@redhat.com>
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/vla-stub-define.c
+@@ -0,0 +1,21 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++struct dynamic_struct
++{
++  int dynamic_field[0];
++} use_dynamic_struct;
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/vla-stub.c
+@@ -0,0 +1,37 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2014 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++struct dynamic_struct;
++typedef struct dynamic_struct dynamic_struct_t;
++
++struct static_struct
++{
++  int field;
++};
++typedef struct static_struct static_struct_t;
++
++struct local_struct
++{
++  static_struct_t here;
++  dynamic_struct_t *ptr;
++} local_struct;
++
++int
++main (void)
++{
++  return 0;
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/vla-stub.exp
+@@ -0,0 +1,25 @@
++# Copyright 2014 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile .c vla-stub-define.c
++if { [prepare_for_testing "failed to prepare for vla-stub.exp" \
++      ${testfile} [list ${srcfile} ${srcfile2}]] } {
++    return -1
++}
++
++gdb_test "p *local_struct.ptr" { = {dynamic_field = 0x0}}
++
++gdb_test "whatis local_struct.here" "type = static_struct_t"
++gdb_test "whatis *local_struct.ptr" "type = dynamic_struct_t"
