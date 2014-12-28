@@ -21,18 +21,18 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20140611
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-%global tarname gdb-%{version}
+%global tarname gdb-%{version}.20141228
 Version: 7.8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.xz
-Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+Source: %{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -1334,6 +1334,9 @@ then
 fi
 
 %changelog
+* Sun Dec 28 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-36.fc21
+- Rebase to 7.8.1.20141228 for a performance fix (PR binutils/17677).
+
 * Sat Dec 13 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-35.fc21
 - Fix resolve_dynamic_struct: Assertion `TYPE_NFIELDS (type) > 0' (PR 17642).
 
