@@ -26,7 +26,7 @@ Version: 7.8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 37%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -544,6 +544,9 @@ Patch975: gdb-symbols-lookup-accel.patch
 # BZ 1163339, Jan Kratochvil).
 Patch976: gdb-rhbz1163339-add-auto-load-scripts-directory.patch
 
+# Fix jit-reader.h for multi-lib.
+Patch978: gdb-jit-reader-multilib.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -833,6 +836,7 @@ find -name "*.info*"|xargs rm -f
 %patch973 -p1
 %patch975 -p1
 %patch976 -p1
+%patch978 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1271,10 +1275,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
-%{_includedir}/gdb
 # Provide jit-reader.h so that users are able to write their own GDB JIT
 # plugins.
-%{_includedir}/gdb/jit-reader.h
+%{_includedir}/gdb
 
 # don't include the files in include, they are part of binutils
 
@@ -1334,6 +1337,9 @@ then
 fi
 
 %changelog
+* Wed Jan  7 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-37.fc21
+- Fix jit-reader.h for multi-lib.
+
 * Sun Dec 28 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-36.fc21
 - Rebase to 7.8.1.20141228 for a performance fix (PR binutils/17677).
 
