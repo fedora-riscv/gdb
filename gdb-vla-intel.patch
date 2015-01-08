@@ -6,11 +6,11 @@ GIT snapshot:
 commit 511bff520372ffc10fa2ff569c176bdf1e6e475d
 
 
-Index: gdb-7.8.1/gdb/c-valprint.c
+Index: gdb-7.8.50.20141228/gdb/c-valprint.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/c-valprint.c	2014-12-13 15:52:07.695310276 +0100
-+++ gdb-7.8.1/gdb/c-valprint.c	2014-12-13 15:52:10.817307138 +0100
-@@ -538,7 +538,16 @@ c_value_print (struct value *val, struct
+--- gdb-7.8.50.20141228.orig/gdb/c-valprint.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/c-valprint.c	2015-01-06 23:03:07.424684753 +0100
+@@ -537,7 +537,16 @@ c_value_print (struct value *val, struct
  	{
  	  /* normal case */
  	  fprintf_filtered (stream, "(");
@@ -28,234 +28,27 @@ Index: gdb-7.8.1/gdb/c-valprint.c
  	  fprintf_filtered (stream, ") ");
  	}
      }
-Index: gdb-7.8.1/gdb/dwarf2expr.c
+Index: gdb-7.8.50.20141228/gdb/dwarf2loc.h
 ===================================================================
---- gdb-7.8.1.orig/gdb/dwarf2expr.c	2014-12-13 15:52:07.695310276 +0100
-+++ gdb-7.8.1/gdb/dwarf2expr.c	2014-12-13 15:52:10.817307138 +0100
-@@ -1478,6 +1478,12 @@ execute_stack_op (struct dwarf_expr_cont
- 	  }
- 	  break;
- 
-+        case DW_OP_push_object_address:
-+	  /* Return the address of the object we are currently observing.  */
-+	  result = (ctx->funcs->get_object_address) (ctx->baton);
-+	  result_val = value_from_ulongest (address_type, result);
-+	  break;
-+
- 	default:
- 	  error (_("Unhandled dwarf expression opcode 0x%x"), op);
- 	}
-Index: gdb-7.8.1/gdb/dwarf2expr.h
-===================================================================
---- gdb-7.8.1.orig/gdb/dwarf2expr.h	2014-12-13 15:52:07.696310275 +0100
-+++ gdb-7.8.1/gdb/dwarf2expr.h	2014-12-13 15:52:10.817307138 +0100
-@@ -84,12 +84,8 @@ struct dwarf_expr_context_funcs
-      This can throw an exception if the index is out of range.  */
-   CORE_ADDR (*get_addr_index) (void *baton, unsigned int index);
- 
--#if 0
--  /* Not yet implemented.  */
--
-   /* Return the `object address' for DW_OP_push_object_address.  */
-   CORE_ADDR (*get_object_address) (void *baton);
--#endif
- };
- 
- /* The location of a value.  */
-Index: gdb-7.8.1/gdb/dwarf2loc.c
-===================================================================
---- gdb-7.8.1.orig/gdb/dwarf2loc.c	2014-12-13 15:52:07.697310274 +0100
-+++ gdb-7.8.1/gdb/dwarf2loc.c	2014-12-13 15:52:10.818307137 +0100
-@@ -306,6 +306,7 @@ struct dwarf_expr_baton
- {
-   struct frame_info *frame;
-   struct dwarf2_per_cu_data *per_cu;
-+  CORE_ADDR obj_address;
- };
- 
- /* Helper functions for dwarf2_evaluate_loc_desc.  */
-@@ -1209,6 +1210,7 @@ dwarf_expr_push_dwarf_reg_entry_value (s
- 
-   baton_local.frame = caller_frame;
-   baton_local.per_cu = caller_per_cu;
-+  baton_local.obj_address = 0;
- 
-   saved_ctx.gdbarch = ctx->gdbarch;
-   saved_ctx.addr_size = ctx->addr_size;
-@@ -1238,6 +1240,22 @@ dwarf_expr_get_addr_index (void *baton,
-   return dwarf2_read_addr_index (debaton->per_cu, index);
- }
- 
-+/* Callback function for get_object_address. Return the address of the VLA
-+   object.  */
-+
-+static CORE_ADDR
-+dwarf_expr_get_obj_addr (void *baton)
-+{
-+  struct dwarf_expr_baton *debaton = baton;
-+
-+  gdb_assert (debaton != NULL);
-+
-+  if (debaton->obj_address == 0)
-+    error (_("Location address is not set."));
-+
-+  return debaton->obj_address;
-+}
-+
- /* VALUE must be of type lval_computed with entry_data_value_funcs.  Perform
-    the indirect method on it, that is use its stored target value, the sole
-    purpose of entry_data_value_funcs..  */
-@@ -2202,7 +2220,8 @@ static const struct dwarf_expr_context_f
-   dwarf_expr_dwarf_call,
-   dwarf_expr_get_base_type,
-   dwarf_expr_push_dwarf_reg_entry_value,
--  dwarf_expr_get_addr_index
-+  dwarf_expr_get_addr_index,
-+  dwarf_expr_get_obj_addr
- };
- 
- /* Evaluate a location description, starting at DATA and with length
-@@ -2231,6 +2250,7 @@ dwarf2_evaluate_loc_desc_full (struct ty
- 
-   baton.frame = frame;
-   baton.per_cu = per_cu;
-+  baton.obj_address = 0;
- 
-   ctx = new_dwarf_expr_context ();
-   old_chain = make_cleanup_free_dwarf_expr_context (ctx);
-@@ -2326,6 +2346,11 @@ dwarf2_evaluate_loc_desc_full (struct ty
- 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
- 
- 	    do_cleanups (value_chain);
-+
-+	    /* Select right frame to correctly evaluate VLA's during a backtrace.  */
-+	    if (is_dynamic_type (type))
-+	      select_frame (frame);
-+
- 	    retval = value_at_lazy (type, address + byte_offset);
- 	    if (in_stack_memory)
- 	      set_value_stack (retval, 1);
-@@ -2436,6 +2461,7 @@ dwarf2_evaluate_loc_desc (struct type *t
- 
- static int
- dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
-+         CORE_ADDR addr,
- 			   CORE_ADDR *valp)
- {
-   struct dwarf_expr_context *ctx;
-@@ -2451,6 +2477,7 @@ dwarf2_locexpr_baton_eval (const struct
- 
-   baton.frame = get_selected_frame (NULL);
-   baton.per_cu = dlbaton->per_cu;
-+  baton.obj_address = addr;
- 
-   objfile = dwarf2_per_cu_objfile (dlbaton->per_cu);
- 
-@@ -2491,7 +2518,8 @@ dwarf2_locexpr_baton_eval (const struct
- /* See dwarf2loc.h.  */
- 
- int
--dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR *value)
-+dwarf2_evaluate_property (const struct dynamic_prop *prop, CORE_ADDR address,
-+        CORE_ADDR *value)
- {
-   if (prop == NULL)
-     return 0;
-@@ -2502,7 +2530,7 @@ dwarf2_evaluate_property (const struct d
-       {
- 	const struct dwarf2_property_baton *baton = prop->data.baton;
- 
--	if (dwarf2_locexpr_baton_eval (&baton->locexpr, value))
-+	if (dwarf2_locexpr_baton_eval (&baton->locexpr, address, value))
- 	  {
- 	    if (baton->referenced_type)
- 	      {
-@@ -2546,6 +2574,20 @@ dwarf2_evaluate_property (const struct d
-   return 0;
- }
- 
-+/* See dwarf2loc.h.  */
-+
-+int
-+dwarf2_address_data_valid (const struct type *type)
-+{
-+  if (TYPE_NOT_ASSOCIATED (type))
-+    return 0;
-+
-+  if (TYPE_NOT_ALLOCATED (type))
-+    return 0;
-+
-+  return 1;
-+}
-+
- 
- /* Helper functions and baton for dwarf2_loc_desc_needs_frame.  */
- 
-@@ -2653,6 +2695,15 @@ needs_get_addr_index (void *baton, unsig
-   return 1;
- }
- 
-+/* DW_OP_push_object_address has a frame already passed through.  */
-+
-+static CORE_ADDR
-+needs_get_obj_addr (void *baton)
-+{
-+  /* Nothing to do.  */
-+  return 1;
-+}
-+
- /* Virtual method table for dwarf2_loc_desc_needs_frame below.  */
- 
- static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
-@@ -2667,7 +2718,8 @@ static const struct dwarf_expr_context_f
-   needs_frame_dwarf_call,
-   NULL,				/* get_base_type */
-   needs_dwarf_reg_entry_value,
--  needs_get_addr_index
-+  needs_get_addr_index,
-+  needs_get_obj_addr
- };
- 
- /* Return non-zero iff the location expression at DATA (length SIZE)
-@@ -3316,6 +3368,10 @@ dwarf2_compile_expr_to_ax (struct agent_
- 	  unimplemented (op);
- 	  break;
- 
-+  case DW_OP_push_object_address:
-+    unimplemented (op);
-+    break;
-+
- 	case DW_OP_skip:
- 	  offset = extract_signed_integer (op_ptr, 2, byte_order);
- 	  op_ptr += 2;
-Index: gdb-7.8.1/gdb/dwarf2loc.h
-===================================================================
---- gdb-7.8.1.orig/gdb/dwarf2loc.h	2014-12-13 15:52:07.697310274 +0100
-+++ gdb-7.8.1/gdb/dwarf2loc.h	2014-12-13 15:52:10.819307136 +0100
-@@ -96,11 +96,18 @@ struct value *dwarf2_evaluate_loc_desc (
-    into VALUE, otherwise returns 0.  */
- 
- int dwarf2_evaluate_property (const struct dynamic_prop *prop,
-+			      CORE_ADDR address,
+--- gdb-7.8.50.20141228.orig/gdb/dwarf2loc.h	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/dwarf2loc.h	2015-01-06 23:03:07.424684753 +0100
+@@ -111,6 +111,11 @@ int dwarf2_evaluate_property (const stru
+ 			      CORE_ADDR address,
  			      CORE_ADDR *value);
- 
- CORE_ADDR dwarf2_read_addr_index (struct dwarf2_per_cu_data *per_cu,
- 				  unsigned int addr_index);
  
 +/* Checks if a dwarf location definition is valid.
 +   Returns 1 if valid; 0 otherwise.  */
 +
 +extern int dwarf2_address_data_valid (const struct type *type);
 +
-+
- /* The symbol location baton types used by the DWARF-2 reader (i.e.
-    SYMBOL_LOCATION_BATON for a LOC_COMPUTED symbol).  "struct
-    dwarf2_locexpr_baton" is for a symbol with a single location
-Index: gdb-7.8.1/gdb/dwarf2read.c
+ /* A helper for the compiler interface that compiles a single dynamic
+    property to C code.
+ 
+Index: gdb-7.8.50.20141228/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/dwarf2read.c	2014-12-13 15:52:07.704310267 +0100
-+++ gdb-7.8.1/gdb/dwarf2read.c	2014-12-13 15:52:10.823307132 +0100
-@@ -1847,6 +1847,12 @@ static void free_dwo_file_cleanup (void
+--- gdb-7.8.50.20141228.orig/gdb/dwarf2read.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/dwarf2read.c	2015-01-06 23:04:09.691986881 +0100
+@@ -1844,6 +1844,12 @@ static void free_dwo_file_cleanup (void
  static void process_cu_includes (void);
  
  static void check_producer (struct dwarf2_cu *cu);
@@ -268,7 +61,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  
  /* Various complaints about symbol reading that don't abort the process.  */
  
-@@ -14182,29 +14188,92 @@ read_tag_string_type (struct die_info *d
+@@ -14241,29 +14247,92 @@ read_tag_string_type (struct die_info *d
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -368,7 +161,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -14521,13 +14590,15 @@ read_base_type (struct die_info *die, st
+@@ -14580,13 +14649,15 @@ read_base_type (struct die_info *die, st
    return set_die_type (die, type, cu);
  }
  
@@ -385,7 +178,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  {
    struct dwarf2_property_baton *baton;
    struct obstack *obstack = &cu->objfile->objfile_obstack;
-@@ -14540,8 +14611,25 @@ attr_to_dynamic_prop (const struct attri
+@@ -14599,8 +14670,25 @@ attr_to_dynamic_prop (const struct attri
        baton = obstack_alloc (obstack, sizeof (*baton));
        baton->referenced_type = NULL;
        baton->locexpr.per_cu = cu->per_cu;
@@ -413,7 +206,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
        prop->data.baton = baton;
        prop->kind = PROP_LOCEXPR;
        gdb_assert (prop->data.baton != NULL);
-@@ -14571,8 +14659,28 @@ attr_to_dynamic_prop (const struct attri
+@@ -14630,8 +14718,28 @@ attr_to_dynamic_prop (const struct attri
  	  baton = obstack_alloc (obstack, sizeof (*baton));
  	  baton->referenced_type = die_type (target_die, target_cu);
  	  baton->locexpr.per_cu = cu->per_cu;
@@ -444,7 +237,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  	  prop->data.baton = baton;
  	  prop->kind = PROP_LOCEXPR;
  	  gdb_assert (prop->data.baton != NULL);
-@@ -14607,7 +14715,7 @@ read_subrange_type (struct die_info *die
+@@ -14666,7 +14774,7 @@ read_subrange_type (struct die_info *die
    struct type *base_type, *orig_base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -453,7 +246,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
    int low_default_is_valid;
    int high_bound_is_count = 0;
    const char *name;
-@@ -14627,7 +14735,9 @@ read_subrange_type (struct die_info *die
+@@ -14686,7 +14794,9 @@ read_subrange_type (struct die_info *die
  
    low.kind = PROP_CONST;
    high.kind = PROP_CONST;
@@ -463,7 +256,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  
    /* Set LOW_DEFAULT_IS_VALID if current language and DWARF version allow
       omitting DW_AT_lower_bound.  */
-@@ -14660,19 +14770,26 @@ read_subrange_type (struct die_info *die
+@@ -14719,19 +14829,26 @@ read_subrange_type (struct die_info *die
        break;
      }
  
@@ -493,7 +286,7 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -14736,7 +14853,7 @@ read_subrange_type (struct die_info *die
+@@ -14795,7 +14912,7 @@ read_subrange_type (struct die_info *die
        && !TYPE_UNSIGNED (base_type) && (high.data.const_val & negative_mask))
      high.data.const_val |= negative_mask;
  
@@ -502,19 +295,18 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
  
    if (high_bound_is_count)
      TYPE_RANGE_DATA (range_type)->flag_upper_bound_is_count = 1;
-@@ -21654,6 +21771,8 @@ set_die_type (struct die_info *die, stru
- {
-   struct dwarf2_per_cu_offset_and_type **slot, ofs;
-   struct objfile *objfile = cu->objfile;
-+  struct attribute *attr;
-+  struct dynamic_prop prop;
+@@ -21860,7 +21977,44 @@ set_die_type (struct die_info *die, stru
  
-   /* For Ada types, make sure that the gnat-specific data is always
-      initialized (if not already set).  There are a few types where
-@@ -21668,6 +21787,43 @@ set_die_type (struct die_info *die, stru
-       && !HAVE_GNAT_AUX_INFO (type))
-     INIT_GNAT_SPECIFIC (type);
- 
+   /* Read DW_AT_data_location and set in type.  */
+   attr = dwarf2_attr (die, DW_AT_data_location, cu);
+-  if (attr_to_dynamic_prop (attr, die, cu, &prop))
++  if (attr_to_dynamic_prop (attr, die, cu, &prop, NULL, 0))
++    {
++      TYPE_DATA_LOCATION (type)
++        = obstack_alloc (&objfile->objfile_obstack, sizeof (prop));
++      *TYPE_DATA_LOCATION (type) = prop;
++    }
++
 +  /* Read DW_AT_allocated and set in type.  */
 +  attr = dwarf2_attr (die, DW_AT_allocated, cu);
 +  if (attr_form_is_block (attr))
@@ -546,28 +338,22 @@ Index: gdb-7.8.1/gdb/dwarf2read.c
 +  /* Read DW_AT_data_location and set in type.  */
 +  attr = dwarf2_attr (die, DW_AT_data_location, cu);
 +  if (attr_to_dynamic_prop (attr, die, cu, &prop, NULL, 0))
-+    {
-+      TYPE_DATA_LOCATION (type)
-+        = obstack_alloc (&objfile->objfile_obstack, sizeof (prop));
-+      *TYPE_DATA_LOCATION (type) = prop;
-+    }
-+
-   if (dwarf2_per_objfile->die_type_hash == NULL)
      {
-       dwarf2_per_objfile->die_type_hash =
-Index: gdb-7.8.1/gdb/f-typeprint.c
+       TYPE_DATA_LOCATION (type)
+         = obstack_alloc (&objfile->objfile_obstack, sizeof (prop));
+Index: gdb-7.8.50.20141228/gdb/f-typeprint.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/f-typeprint.c	2014-12-13 15:52:07.705310266 +0100
-+++ gdb-7.8.1/gdb/f-typeprint.c	2014-12-13 15:52:10.823307132 +0100
+--- gdb-7.8.50.20141228.orig/gdb/f-typeprint.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/f-typeprint.c	2015-01-06 23:03:07.428684772 +0100
 @@ -30,6 +30,7 @@
  #include "gdbcore.h"
  #include "target.h"
  #include "f-lang.h"
 +#include "valprint.h"
  
- #include <string.h>
- #include <errno.h>
-@@ -56,6 +57,17 @@ f_print_type (struct type *type, const c
+ #if 0				/* Currently unused.  */
+ static void f_type_print_args (struct type *, struct ui_file *);
+@@ -53,6 +54,17 @@ f_print_type (struct type *type, const c
    enum type_code code;
    int demangled_args;
  
@@ -585,7 +371,7 @@ Index: gdb-7.8.1/gdb/f-typeprint.c
    f_type_print_base (type, stream, show, level);
    code = TYPE_CODE (type);
    if ((varstring != NULL && *varstring != '\0')
-@@ -170,28 +182,36 @@ f_type_print_varspec_suffix (struct type
+@@ -167,28 +179,36 @@ f_type_print_varspec_suffix (struct type
        if (arrayprint_recurse_level == 1)
  	fprintf_filtered (stream, "(");
  
@@ -643,11 +429,11 @@ Index: gdb-7.8.1/gdb/f-typeprint.c
        if (arrayprint_recurse_level == 1)
  	fprintf_filtered (stream, ")");
        else
-Index: gdb-7.8.1/gdb/f-valprint.c
+Index: gdb-7.8.50.20141228/gdb/f-valprint.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/f-valprint.c	2014-12-13 15:52:07.705310266 +0100
-+++ gdb-7.8.1/gdb/f-valprint.c	2014-12-13 15:52:10.824307131 +0100
-@@ -39,8 +39,6 @@
+--- gdb-7.8.50.20141228.orig/gdb/f-valprint.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/f-valprint.c	2015-01-06 23:03:07.428684772 +0100
+@@ -36,8 +36,6 @@
  
  extern void _initialize_f_valprint (void);
  static void info_common_command (char *, int);
@@ -656,7 +442,7 @@ Index: gdb-7.8.1/gdb/f-valprint.c
  static void f77_get_dynamic_length_of_aggregate (struct type *);
  
  int f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
-@@ -48,15 +46,6 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIM
+@@ -45,15 +43,6 @@ int f77_array_offset_tbl[MAX_FORTRAN_DIM
  /* Array which holds offsets to be applied to get a row's elements
     for a given array.  Array also holds the size of each subarray.  */
  
@@ -672,7 +458,7 @@ Index: gdb-7.8.1/gdb/f-valprint.c
  int
  f77_get_lowerbound (struct type *type)
  {
-@@ -114,47 +103,6 @@ f77_get_dynamic_length_of_aggregate (str
+@@ -111,47 +100,6 @@ f77_get_dynamic_length_of_aggregate (str
      * TYPE_LENGTH (check_typedef (TYPE_TARGET_TYPE (type)));
  }
  
@@ -720,7 +506,7 @@ Index: gdb-7.8.1/gdb/f-valprint.c
  /* Actual function which prints out F77 arrays, Valaddr == address in 
     the superior.  Address == the address in the inferior.  */
  
-@@ -167,41 +115,62 @@ f77_print_array_1 (int nss, int ndimensi
+@@ -164,41 +112,62 @@ f77_print_array_1 (int nss, int ndimensi
  		   const struct value_print_options *options,
  		   int *elts)
  {
@@ -799,7 +585,7 @@ Index: gdb-7.8.1/gdb/f-valprint.c
  	    fprintf_filtered (stream, "...");
  	}
      }
-@@ -228,12 +197,6 @@ f77_print_array (struct type *type, cons
+@@ -225,12 +194,6 @@ f77_print_array (struct type *type, cons
  Type node corrupt! F77 arrays cannot have %d subscripts (%d Max)"),
  	   ndimensions, MAX_FORTRAN_DIMS);
  
@@ -812,7 +598,7 @@ Index: gdb-7.8.1/gdb/f-valprint.c
    f77_print_array_1 (1, ndimensions, type, valaddr, embedded_offset,
  		     address, stream, recurse, val, options, &elts);
  }
-@@ -378,12 +341,15 @@ f_val_print (struct type *type, const gd
+@@ -375,12 +338,15 @@ f_val_print (struct type *type, const gd
        fprintf_filtered (stream, "( ");
        for (index = 0; index < TYPE_NFIELDS (type); index++)
          {
@@ -833,11 +619,11 @@ Index: gdb-7.8.1/gdb/f-valprint.c
            if (index != TYPE_NFIELDS (type) - 1)
              fputs_filtered (", ", stream);
          }
-Index: gdb-7.8.1/gdb/gdbtypes.c
+Index: gdb-7.8.50.20141228/gdb/gdbtypes.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/gdbtypes.c	2014-12-13 15:52:07.707310264 +0100
-+++ gdb-7.8.1/gdb/gdbtypes.c	2014-12-13 15:53:10.675246976 +0100
-@@ -805,7 +805,8 @@ allocate_stub_method (struct type *type)
+--- gdb-7.8.50.20141228.orig/gdb/gdbtypes.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/gdbtypes.c	2015-01-06 23:03:07.429684777 +0100
+@@ -815,7 +815,8 @@ allocate_stub_method (struct type *type)
  struct type *
  create_range_type (struct type *result_type, struct type *index_type,
  		   const struct dynamic_prop *low_bound,
@@ -847,7 +633,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  {
    if (result_type == NULL)
      result_type = alloc_type_copy (index_type);
-@@ -820,6 +821,7 @@ create_range_type (struct type *result_t
+@@ -830,6 +831,7 @@ create_range_type (struct type *result_t
      TYPE_ZALLOC (result_type, sizeof (struct range_bounds));
    TYPE_RANGE_DATA (result_type)->low = *low_bound;
    TYPE_RANGE_DATA (result_type)->high = *high_bound;
@@ -855,7 +641,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  
    if (low_bound->kind == PROP_CONST && low_bound->data.const_val >= 0)
      TYPE_UNSIGNED (result_type) = 1;
-@@ -841,7 +843,7 @@ struct type *
+@@ -858,7 +860,7 @@ struct type *
  create_static_range_type (struct type *result_type, struct type *index_type,
  			  LONGEST low_bound, LONGEST high_bound)
  {
@@ -864,7 +650,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  
    low.kind = PROP_CONST;
    low.data.const_val = low_bound;
-@@ -849,7 +851,11 @@ create_static_range_type (struct type *r
+@@ -866,7 +868,11 @@ create_static_range_type (struct type *r
    high.kind = PROP_CONST;
    high.data.const_val = high_bound;
  
@@ -877,7 +663,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  
    return result_type;
  }
-@@ -1003,18 +1009,24 @@ create_array_type_with_stride (struct ty
+@@ -1020,18 +1026,24 @@ create_array_type_with_stride (struct ty
  
    TYPE_CODE (result_type) = TYPE_CODE_ARRAY;
    TYPE_TARGET_TYPE (result_type) = element_type;
@@ -904,7 +690,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
        else if (bit_stride > 0)
  	TYPE_LENGTH (result_type) =
  	  (bit_stride * (high_bound - low_bound + 1) + 7) / 8;
-@@ -1616,12 +1628,31 @@ stub_noname_complaint (void)
+@@ -1630,12 +1642,31 @@ stub_noname_complaint (void)
  static int
  is_dynamic_type_internal (struct type *type, int top_level)
  {
@@ -933,10 +719,10 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
 +      if (is_dynamic_type (TYPE_FIELD_TYPE (type, index)))
 +        return 1;
 +
-   switch (TYPE_CODE (type))
-     {
-     case TYPE_CODE_RANGE:
-@@ -1631,11 +1662,19 @@ is_dynamic_type_internal (struct type *t
+   /* Types that have a dynamic TYPE_DATA_LOCATION are considered
+      dynamic, even if the type itself is statically defined.
+      From a user's point of view, this may appear counter-intuitive;
+@@ -1656,11 +1687,19 @@ is_dynamic_type_internal (struct type *t
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
@@ -959,7 +745,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
        }
  
      case TYPE_CODE_STRUCT:
-@@ -1648,6 +1687,17 @@ is_dynamic_type_internal (struct type *t
+@@ -1673,6 +1712,17 @@ is_dynamic_type_internal (struct type *t
  	      && is_dynamic_type_internal (TYPE_FIELD_TYPE (type, i), 0))
  	    return 1;
        }
@@ -977,20 +763,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
        break;
      }
  
-@@ -1666,22 +1716,23 @@ static struct type *resolve_dynamic_type
- 						   CORE_ADDR addr,
- 						   int top_level);
- 
--/* Given a dynamic range type (dyn_range_type), return a static version
--   of that type.  */
-+/* Given a dynamic range type (dyn_range_type) and address,
-+   return a static version of that type.  */
- 
- static struct type *
--resolve_dynamic_range (struct type *dyn_range_type)
-+resolve_dynamic_range (struct type *dyn_range_type, CORE_ADDR addr)
- {
-   CORE_ADDR value;
+@@ -1701,7 +1751,8 @@ resolve_dynamic_range (struct type *dyn_
    struct type *static_range_type;
    const struct dynamic_prop *prop;
    const struct dwarf2_locexpr_baton *baton;
@@ -1000,22 +773,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  
    gdb_assert (TYPE_CODE (dyn_range_type) == TYPE_CODE_RANGE);
  
-   prop = &TYPE_RANGE_DATA (dyn_range_type)->low;
--  if (dwarf2_evaluate_property (prop, &value))
-+  if (dwarf2_evaluate_property (prop, addr, &value))
-     {
-       low_bound.kind = PROP_CONST;
-       low_bound.data.const_val = value;
-@@ -1693,7 +1744,7 @@ resolve_dynamic_range (struct type *dyn_
-     }
- 
-   prop = &TYPE_RANGE_DATA (dyn_range_type)->high;
--  if (dwarf2_evaluate_property (prop, &value))
-+  if (dwarf2_evaluate_property (prop, addr, &value))
-     {
-       high_bound.kind = PROP_CONST;
-       high_bound.data.const_val = value;
-@@ -1707,10 +1758,17 @@ resolve_dynamic_range (struct type *dyn_
+@@ -1732,10 +1783,17 @@ resolve_dynamic_range (struct type *dyn_
        high_bound.kind = PROP_UNDEFINED;
        high_bound.data.const_val = 0;
      }
@@ -1036,14 +794,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
    TYPE_RANGE_DATA (static_range_type)->flag_bound_evaluated = 1;
    return static_range_type;
  }
-@@ -1720,29 +1778,52 @@ resolve_dynamic_range (struct type *dyn_
-    of the associated array.  */
- 
- static struct type *
--resolve_dynamic_array (struct type *type)
-+resolve_dynamic_array (struct type *type, CORE_ADDR addr)
- {
-   CORE_ADDR value;
+@@ -1751,23 +1809,46 @@ resolve_dynamic_array (struct type *type
    struct type *elt_type;
    struct type *range_type;
    struct type *ary_dim;
@@ -1052,13 +803,12 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
  
 -  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY);
 +  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY
-+              || TYPE_CODE (type) == TYPE_CODE_STRING);
++	      || TYPE_CODE (type) == TYPE_CODE_STRING);
  
    elt_type = type;
    range_type = check_typedef (TYPE_INDEX_TYPE (elt_type));
--  range_type = resolve_dynamic_range (range_type);
-+  range_type = resolve_dynamic_range (range_type, addr);
-+
+   range_type = resolve_dynamic_range (range_type, addr);
+ 
 +  prop = TYPE_ALLOCATED_PROP (type);
 +  if (dwarf2_evaluate_property (prop, addr, &value))
 +    {
@@ -1072,11 +822,11 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
 +      TYPE_ASSOCIATED_PROP (copy)->kind = PROP_CONST;
 +      TYPE_ASSOCIATED_PROP (copy)->data.const_val = value;
 +    }
- 
++
    ary_dim = check_typedef (TYPE_TARGET_TYPE (elt_type));
  
 -  if (ary_dim != NULL && TYPE_CODE (ary_dim) == TYPE_CODE_ARRAY)
--    elt_type = resolve_dynamic_array (TYPE_TARGET_TYPE (type));
+-    elt_type = resolve_dynamic_array (TYPE_TARGET_TYPE (type), addr);
 +  if (ary_dim != NULL && (TYPE_CODE (ary_dim) == TYPE_CODE_ARRAY
 +          || TYPE_CODE (ary_dim) == TYPE_CODE_STRING))
 +    elt_type = resolve_dynamic_array (TYPE_TARGET_TYPE (copy), addr);
@@ -1088,42 +838,18 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
 -			    range_type);
 +  if (TYPE_CODE (type) == TYPE_CODE_STRING)
 +    return create_string_type (copy,
-+            elt_type,
-+            range_type);
++	    elt_type,
++	    range_type);
 +  else
 +    return create_array_type (copy,
-+            elt_type,
-+            range_type);
++	    elt_type,
++	    range_type);
  }
  
  /* Resolve dynamic bounds of members of the union TYPE to static
-@@ -1846,6 +1927,8 @@ resolve_dynamic_type_internal (struct ty
- {
-   struct type *real_type = check_typedef (type);
-   struct type *resolved_type = type;
-+  const struct dynamic_prop *prop;
-+  CORE_ADDR value;
- 
-   if (!is_dynamic_type_internal (real_type, top_level))
-     return type;
-@@ -1876,11 +1959,12 @@ resolve_dynamic_type_internal (struct ty
- 	  }
- 
- 	case TYPE_CODE_ARRAY:
--	  resolved_type = resolve_dynamic_array (type);
-+	case TYPE_CODE_STRING:
-+	  resolved_type = resolve_dynamic_array (type, addr);
- 	  break;
- 
- 	case TYPE_CODE_RANGE:
--	  resolved_type = resolve_dynamic_range (type);
-+	  resolved_type = resolve_dynamic_range (type, addr);
- 	  break;
- 
- 	case TYPE_CODE_UNION:
-@@ -1893,6 +1977,25 @@ resolve_dynamic_type_internal (struct ty
- 	}
-     }
+@@ -1938,6 +2019,25 @@ resolve_dynamic_type_internal (struct ty
+   else
+     TYPE_DATA_LOCATION (resolved_type) = NULL;
  
 +  /* Resolve data_location attribute.  */
 +  prop = TYPE_DATA_LOCATION (resolved_type);
@@ -1147,8 +873,8 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
    return resolved_type;
  }
  
-@@ -4110,6 +4213,27 @@ copy_type_recursive (struct objfile *obj
-       *TYPE_RANGE_DATA (new_type) = *TYPE_RANGE_DATA (type);
+@@ -4174,6 +4274,27 @@ copy_type_recursive (struct objfile *obj
+ 	      sizeof (struct dynamic_prop));
      }
  
 +  /* Copy the data location information.  */
@@ -1175,9 +901,9 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
    /* Copy pointers to other types.  */
    if (TYPE_TARGET_TYPE (type))
      TYPE_TARGET_TYPE (new_type) = 
-@@ -4156,6 +4280,44 @@ copy_type (const struct type *type)
-   memcpy (TYPE_MAIN_TYPE (new_type), TYPE_MAIN_TYPE (type),
- 	  sizeof (struct main_type));
+@@ -4227,6 +4348,44 @@ copy_type (const struct type *type)
+ 	      sizeof (struct dynamic_prop));
+     }
  
 +  if (TYPE_ALLOCATED_PROP (type))
 +    {
@@ -1220,11 +946,11 @@ Index: gdb-7.8.1/gdb/gdbtypes.c
    return new_type;
  }
  
-Index: gdb-7.8.1/gdb/gdbtypes.h
+Index: gdb-7.8.50.20141228/gdb/gdbtypes.h
 ===================================================================
---- gdb-7.8.1.orig/gdb/gdbtypes.h	2014-12-13 15:52:07.708310263 +0100
-+++ gdb-7.8.1/gdb/gdbtypes.h	2014-12-13 15:52:10.825307130 +0100
-@@ -670,6 +670,10 @@ struct main_type
+--- gdb-7.8.50.20141228.orig/gdb/gdbtypes.h	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/gdbtypes.h	2015-01-06 23:03:07.429684777 +0100
+@@ -660,6 +660,10 @@ struct main_type
  
        struct dynamic_prop high;
  
@@ -1235,15 +961,10 @@ Index: gdb-7.8.1/gdb/gdbtypes.h
        /* True if HIGH range bound contains the number of elements in the
  	 subrange. This affects how the final hight bound is computed.  */
  
-@@ -725,6 +729,23 @@ struct main_type
+@@ -720,6 +724,18 @@ struct main_type
+      this field yields to the location of the data for an object.  */
  
-     struct func_type *func_stuff;
-   } type_specific;
-+
-+  /* * Contains a location description value for the current type. Evaluating
-+     this field yields to the location of the data for an object.  */
-+
-+  struct dynamic_prop *data_location;
+   struct dynamic_prop *data_location;
 +
 +  /* Structure for DW_AT_allocated.
 +     The presence of this attribute indicates that the object of the type
@@ -1259,7 +980,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.h
  };
  
  /* * A ``struct type'' describes a particular instance of a type, with
-@@ -1203,6 +1224,39 @@ extern void allocate_gnat_aux_type (stru
+@@ -1198,6 +1214,39 @@ extern void allocate_gnat_aux_type (stru
    TYPE_RANGE_DATA(range_type)->high.kind
  #define TYPE_LOW_BOUND_KIND(range_type) \
    TYPE_RANGE_DATA(range_type)->low.kind
@@ -1297,9 +1018,9 @@ Index: gdb-7.8.1/gdb/gdbtypes.h
 +  && TYPE_ASSOCIATED_PROP (t)->kind == PROP_CONST \
 +  && !TYPE_ASSOCIATED_PROP (t)->data.const_val)
  
- /* Moto-specific stuff for FORTRAN arrays.  */
- 
-@@ -1210,6 +1264,9 @@ extern void allocate_gnat_aux_type (stru
+ /* Attribute accessors for the type data location.  */
+ #define TYPE_DATA_LOCATION(thistype) \
+@@ -1215,6 +1264,9 @@ extern void allocate_gnat_aux_type (stru
     TYPE_HIGH_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
  #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
     TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
@@ -1309,7 +1030,7 @@ Index: gdb-7.8.1/gdb/gdbtypes.h
  
  #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
-@@ -1678,6 +1735,7 @@ extern struct type *create_array_type_wi
+@@ -1685,6 +1737,7 @@ extern struct type *create_array_type_wi
  
  extern struct type *create_range_type (struct type *, struct type *,
  				       const struct dynamic_prop *,
@@ -1317,10 +1038,10 @@ Index: gdb-7.8.1/gdb/gdbtypes.h
  				       const struct dynamic_prop *);
  
  extern struct type *create_array_type (struct type *, struct type *,
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-alloc-assoc.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-alloc-assoc.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-alloc-assoc.exp	2014-12-13 15:52:10.825307130 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-alloc-assoc.exp	2015-01-06 23:03:07.429684777 +0100
 @@ -0,0 +1,65 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1387,10 +1108,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-alloc-assoc.exp
 +gdb_continue_to_breakpoint "vla2-deallocated"
 +gdb_test "print l" " = \\.FALSE\\." "print vla2 deallocated"
 +gdb_test "print vla2" " = <not allocated>" "print deallocated vla2"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-datatypes.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.exp	2014-12-13 15:52:10.825307130 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-datatypes.exp	2015-01-06 23:03:07.429684777 +0100
 @@ -0,0 +1,82 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1474,10 +1195,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.exp
 +  "print logicalvla(5,5,5) (2nd)"
 +gdb_test "print charactervla(5,5,5)" " = 'X'" \
 +  "print charactervla(5,5,5) (2nd)"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-datatypes.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.f90	2014-12-13 15:52:10.825307130 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-datatypes.f90	2015-01-06 23:03:07.429684777 +0100
 @@ -0,0 +1,51 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -1530,10 +1251,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-datatypes.f90
 +  ! dummy statement for bp
 +  l = .FALSE.                             ! vlas-modified
 +end program vla_primitives
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-func.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.exp	2014-12-13 15:52:10.825307130 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-func.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,61 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1596,10 +1317,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.exp
 +  "print vla3 (after func2)"
 +gdb_test "ptype vla3" "type = integer\\\(kind=4\\\) \\\(10\\\)" \
 +  "ptype vla3 (after func2)"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-func.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.f90	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-func.f90	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,71 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -1672,10 +1393,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-func.f90
 +
 +  ret = .TRUE.                ! func2-returned
 +end program vla_func
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-history.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-history.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-history.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-history.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,62 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1739,10 +1460,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-history.exp
 +# Try to access history values for vla values.
 +gdb_test "print \$9" " = 1311" "print \$9"
 +gdb_test "print \$10" " = 1001" "print \$10"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,87 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1831,10 +1552,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype-sub.exp
 +  "ptype array1(100) (arbitrary length)"
 +gdb_test "ptype array2(4,100)" "type = integer\\\(kind=4\\\)" \
 +  "ptype array2(4,100) (arbitrary length)"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-ptype.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-ptype.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,96 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1932,10 +1653,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-ptype.exp
 +gdb_test "ptype vla2(5, 45, 20)" \
 +  "no such vector element because not allocated" \
 +  "ptype vla2(5, 45, 20) not allocated"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sizeof.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sizeof.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-sizeof.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,46 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -1983,10 +1704,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 +gdb_breakpoint [gdb_get_line_number "pvla-associated"]
 +gdb_continue_to_breakpoint "pvla-associated"
 +gdb_test "print sizeof(pvla)" " = 4000" "print sizeof associated pvla"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-stride.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-stride.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,44 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2032,10 +1753,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.exp
 +gdb_continue_to_breakpoint "single-element"
 +gdb_test "print pvla" " = \\\(5\\\)" "print single-element"
 +gdb_test "print pvla(1)" " = 5" "print one single-element"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-stride.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.f90	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-stride.f90	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,30 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -2067,10 +1788,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-stride.f90
 +
 +  pvla => null()        ! single-element
 +end program vla_stride
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-strings.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.exp	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-strings.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,104 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2176,10 +1897,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.exp
 +  "whatis var_char_p after associated"
 +gdb_test "ptype var_char_p" "type = PTR TO -> \\( character\\*7 \\)" \
 +  "ptype var_char_p after associated"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-strings.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.f90	2014-12-13 15:52:10.826307129 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-strings.f90	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,40 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -2221,10 +1942,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-strings.f90
 +  var_char_p => null()
 +  l = associated(var_char_p)              ! var_char_p-not-associated
 +end program vla_strings
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sub.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-sub.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sub.f90	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-sub.f90	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,82 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -2308,10 +2029,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-sub.f90
 +
 +  call bar(sub_arr3, sub_arr1)
 +end program vla_sub
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp	2015-01-06 23:03:07.430684782 +0100
 @@ -0,0 +1,35 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2348,10 +2069,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-arbitrary.exp
 +gdb_test "p array1(100)" " = 100" "print arbitary array1(100)"
 +gdb_test "p array2(4,10)" " = 1" "print arbitary array2(4,10)"
 +gdb_test "p array2(4,100)" " = 1" "print arbitary array2(4,100)"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,49 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2402,10 +2123,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub-finish.exp
 +gdb_test "p sub_arr2(1, 1, 1)" " = 30" "sub_arr2(1, 1, 1) after finish"
 +gdb_test "p sub_arr2(2, 1, 1)" " = 20" "sub_arr2(2, 1, 1) after finish"
 +
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub.exp	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value-sub.exp	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,90 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2497,10 +2218,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value-sub.exp
 +  "set array(2,2,2) to 20 in subroutine (passed vla)"
 +gdb_test "print array2" " = \\( *\\( *\\( *30, *20, *3,\[()3, .\]*\\)" \
 +  "print array2 in foo after it was mofified in debugger (passed vla)"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value.exp	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla-value.exp	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,148 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2650,10 +2371,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla-value.exp
 +gdb_continue_to_breakpoint "pvla-deassociated"
 +gdb_test "print \$mypvar(1,3,8)" " = 1001" \
 +  "print \$mypvar(1,3,8) after deallocated"
-Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.fortran/vla.f90	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.fortran/vla.f90	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,56 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -2711,10 +2432,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.fortran/vla.f90
 +  allocate (vla3 (2,2))               ! vla2-deallocated
 +  vla3(:,:) = 13
 +end program vla
-Index: gdb-7.8.1/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.mi/mi-vla-fortran.exp	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.mi/mi-vla-fortran.exp	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,182 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +
@@ -2898,10 +2619,10 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
 +
 +mi_gdb_exit
 +return 0
-Index: gdb-7.8.1/gdb/testsuite/gdb.mi/vla.f90
+Index: gdb-7.8.50.20141228/gdb/testsuite/gdb.mi/vla.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.8.1/gdb/testsuite/gdb.mi/vla.f90	2014-12-13 15:52:10.827307128 +0100
++++ gdb-7.8.50.20141228/gdb/testsuite/gdb.mi/vla.f90	2015-01-06 23:03:07.431684787 +0100
 @@ -0,0 +1,42 @@
 +! Copyright 2014 Free Software Foundation, Inc.
 +!
@@ -2945,11 +2666,11 @@ Index: gdb-7.8.1/gdb/testsuite/gdb.mi/vla.f90
 +  pvla2 => null()
 +  l = associated(pvla2)       ! pvla2-set-to-null
 +end program vla
-Index: gdb-7.8.1/gdb/typeprint.c
+Index: gdb-7.8.50.20141228/gdb/typeprint.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/typeprint.c	2014-12-13 15:52:07.710310261 +0100
-+++ gdb-7.8.1/gdb/typeprint.c	2014-12-13 15:52:10.828307127 +0100
-@@ -459,6 +459,13 @@ whatis_exp (char *exp, int show)
+--- gdb-7.8.50.20141228.orig/gdb/typeprint.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/typeprint.c	2015-01-06 23:03:07.431684787 +0100
+@@ -456,6 +456,13 @@ whatis_exp (char *exp, int show)
  
    type = value_type (val);
  
@@ -2963,11 +2684,11 @@ Index: gdb-7.8.1/gdb/typeprint.c
    get_user_print_options (&opts);
    if (opts.objectprint)
      {
-Index: gdb-7.8.1/gdb/valarith.c
+Index: gdb-7.8.50.20141228/gdb/valarith.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/valarith.c	2014-12-13 15:52:07.711310260 +0100
-+++ gdb-7.8.1/gdb/valarith.c	2014-12-13 15:52:10.828307127 +0100
-@@ -195,12 +195,31 @@ value_subscripted_rvalue (struct value *
+--- gdb-7.8.50.20141228.orig/gdb/valarith.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/valarith.c	2015-01-06 23:03:07.432684792 +0100
+@@ -193,12 +193,31 @@ value_subscripted_rvalue (struct value *
    struct type *array_type = check_typedef (value_type (array));
    struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
    unsigned int elt_size = TYPE_LENGTH (elt_type);
@@ -3001,11 +2722,11 @@ Index: gdb-7.8.1/gdb/valarith.c
  
    if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
      v = allocate_value_lazy (elt_type);
-Index: gdb-7.8.1/gdb/valprint.c
+Index: gdb-7.8.50.20141228/gdb/valprint.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/valprint.c	2014-12-13 15:52:07.712310259 +0100
-+++ gdb-7.8.1/gdb/valprint.c	2014-12-13 15:52:10.828307127 +0100
-@@ -307,6 +307,18 @@ valprint_check_validity (struct ui_file
+--- gdb-7.8.50.20141228.orig/gdb/valprint.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/valprint.c	2015-01-06 23:03:07.432684792 +0100
+@@ -303,6 +303,18 @@ valprint_check_validity (struct ui_file
  {
    CHECK_TYPEDEF (type);
  
@@ -3024,7 +2745,7 @@ Index: gdb-7.8.1/gdb/valprint.c
    if (TYPE_CODE (type) != TYPE_CODE_UNION
        && TYPE_CODE (type) != TYPE_CODE_STRUCT
        && TYPE_CODE (type) != TYPE_CODE_ARRAY)
-@@ -362,6 +374,18 @@ val_print_invalid_address (struct ui_fil
+@@ -359,6 +371,18 @@ val_print_invalid_address (struct ui_fil
    fprintf_filtered (stream, _("<invalid address>"));
  }
  
@@ -3043,7 +2764,7 @@ Index: gdb-7.8.1/gdb/valprint.c
  /* A generic val_print that is suitable for use by language
     implementations of the la_val_print method.  This function can
     handle most type codes, though not all, notably exception
-@@ -803,12 +827,16 @@ static int
+@@ -800,12 +824,16 @@ static int
  value_check_printable (struct value *val, struct ui_file *stream,
  		       const struct value_print_options *options)
  {
@@ -3060,7 +2781,7 @@ Index: gdb-7.8.1/gdb/valprint.c
    if (value_entirely_optimized_out (val))
      {
        if (options->summary && !val_print_scalar_type_p (value_type (val)))
-@@ -834,6 +862,18 @@ value_check_printable (struct value *val
+@@ -831,6 +859,18 @@ value_check_printable (struct value *val
        return 0;
      }
  
@@ -3079,10 +2800,10 @@ Index: gdb-7.8.1/gdb/valprint.c
    return 1;
  }
  
-Index: gdb-7.8.1/gdb/valprint.h
+Index: gdb-7.8.50.20141228/gdb/valprint.h
 ===================================================================
---- gdb-7.8.1.orig/gdb/valprint.h	2014-12-13 15:52:07.712310259 +0100
-+++ gdb-7.8.1/gdb/valprint.h	2014-12-13 15:52:10.828307127 +0100
+--- gdb-7.8.50.20141228.orig/gdb/valprint.h	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/valprint.h	2015-01-06 23:03:07.432684792 +0100
 @@ -217,4 +217,8 @@ extern void output_command_const (const
  
  extern int val_print_scalar_type_p (struct type *type);
@@ -3092,11 +2813,11 @@ Index: gdb-7.8.1/gdb/valprint.h
 +extern void val_print_not_associated (struct ui_file *stream);
 +
  #endif
-Index: gdb-7.8.1/gdb/value.c
+Index: gdb-7.8.50.20141228/gdb/value.c
 ===================================================================
---- gdb-7.8.1.orig/gdb/value.c	2014-12-13 15:52:07.713310258 +0100
-+++ gdb-7.8.1/gdb/value.c	2014-12-13 15:52:10.829307126 +0100
-@@ -43,6 +43,7 @@
+--- gdb-7.8.50.20141228.orig/gdb/value.c	2015-01-06 22:51:17.663240907 +0100
++++ gdb-7.8.50.20141228/gdb/value.c	2015-01-06 23:03:07.433684797 +0100
+@@ -40,6 +40,7 @@
  #include "tracepoint.h"
  #include "cp-abi.h"
  #include "user-regs.h"
@@ -3104,7 +2825,7 @@ Index: gdb-7.8.1/gdb/value.c
  
  /* Prototypes for exported functions.  */
  
-@@ -1649,6 +1650,25 @@ set_value_component_location (struct val
+@@ -1755,6 +1756,25 @@ set_value_component_location (struct val
        if (funcs->copy_closure)
          component->location.computed.closure = funcs->copy_closure (whole);
      }
@@ -3130,7 +2851,7 @@ Index: gdb-7.8.1/gdb/value.c
  }
  
  
-@@ -2953,13 +2973,22 @@ value_primitive_field (struct value *arg
+@@ -3041,13 +3061,22 @@ value_primitive_field (struct value *arg
  	v = allocate_value_lazy (type);
        else
  	{
@@ -3159,7 +2880,7 @@ Index: gdb-7.8.1/gdb/value.c
      }
    set_value_component_location (v, arg1);
    VALUE_REGNUM (v) = VALUE_REGNUM (arg1);
-@@ -3542,7 +3571,8 @@ readjust_indirect_value_type (struct val
+@@ -3635,7 +3664,8 @@ readjust_indirect_value_type (struct val
  			      struct value *original_value)
  {
    /* Re-adjust type.  */
@@ -3169,7 +2890,7 @@ Index: gdb-7.8.1/gdb/value.c
  
    /* Add embedding info.  */
    set_value_enclosing_type (value, enc_type);
-@@ -3559,6 +3589,12 @@ coerce_ref (struct value *arg)
+@@ -3652,6 +3682,12 @@ coerce_ref (struct value *arg)
    struct value *retval;
    struct type *enc_type;
  
@@ -3182,7 +2903,7 @@ Index: gdb-7.8.1/gdb/value.c
    retval = coerce_ref_if_computed (arg);
    if (retval)
      return retval;
-@@ -3702,8 +3738,14 @@ value_fetch_lazy (struct value *val)
+@@ -3786,8 +3822,14 @@ value_fetch_lazy (struct value *val)
      }
    else if (VALUE_LVAL (val) == lval_memory)
      {
@@ -3198,3 +2919,39 @@ Index: gdb-7.8.1/gdb/value.c
  
        if (TYPE_LENGTH (type))
  	read_value_memory (val, 0, value_stack (val),
+Index: gdb-7.8.50.20141228/gdb/dwarf2loc.c
+===================================================================
+--- gdb-7.8.50.20141228.orig/gdb/dwarf2loc.c	2014-12-28 02:48:43.000000000 +0100
++++ gdb-7.8.50.20141228/gdb/dwarf2loc.c	2015-01-06 23:05:55.296499287 +0100
+@@ -2326,6 +2346,11 @@ dwarf2_evaluate_loc_desc_full (struct ty
+ 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
+ 
+ 	    do_cleanups (value_chain);
++
++	    /* Select right frame to correctly evaluate VLA's during a backtrace.  */
++	    if (is_dynamic_type (type))
++	      select_frame (frame);
++
+ 	    retval = value_at_lazy (type, address + byte_offset);
+ 	    if (in_stack_memory)
+ 	      set_value_stack (retval, 1);
+@@ -2546,6 +2546,19 @@ dwarf2_compile_property_to_c (struct ui_
+ 			     data, data + size, per_cu);
+ }
+ 
++/* See dwarf2loc.h.  */
++
++int
++dwarf2_address_data_valid (const struct type *type)
++{
++  if (TYPE_NOT_ASSOCIATED (type))
++    return 0;
++
++  if (TYPE_NOT_ALLOCATED (type))
++    return 0;
++
++  return 1;
++}
+ 
+ /* Helper functions and baton for dwarf2_loc_desc_needs_frame.  */
+ 

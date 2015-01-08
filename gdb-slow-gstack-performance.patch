@@ -134,11 +134,11 @@ gdb/
 	(dwarf_decode_line_header): Initialize offset and offset_in_dwz.
 	(dwarf_decode_lines): New parameter decode_mapping, use it.
 
-Index: gdb-7.8/gdb/dwarf2read.c
+Index: gdb-7.8.50.20141228/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.8.orig/gdb/dwarf2read.c
-+++ gdb-7.8/gdb/dwarf2read.c
-@@ -312,6 +312,9 @@ struct dwarf2_per_objfile
+--- gdb-7.8.50.20141228.orig/gdb/dwarf2read.c	2015-01-05 22:45:32.823240453 +0100
++++ gdb-7.8.50.20141228/gdb/dwarf2read.c	2015-01-05 22:49:35.270332647 +0100
+@@ -309,6 +309,9 @@ struct dwarf2_per_objfile
  
    /* The CUs we recently read.  */
    VEC (dwarf2_per_cu_ptr) *just_read_cus;
@@ -148,7 +148,7 @@ Index: gdb-7.8/gdb/dwarf2read.c
  };
  
  static struct dwarf2_per_objfile *dwarf2_per_objfile;
-@@ -1028,6 +1031,12 @@ typedef void (die_reader_func_ftype) (co
+@@ -1025,6 +1028,12 @@ typedef void (die_reader_func_ftype) (co
     which contains the following information.  */
  struct line_header
  {
@@ -161,27 +161,27 @@ Index: gdb-7.8/gdb/dwarf2read.c
    unsigned int total_length;
    unsigned short version;
    unsigned int header_length;
-@@ -1516,7 +1525,7 @@ static struct line_header *dwarf_decode_
+@@ -1513,7 +1522,7 @@ static struct line_header *dwarf_decode_
  
  static void dwarf_decode_lines (struct line_header *, const char *,
  				struct dwarf2_cu *, struct partial_symtab *,
--				int);
-+				int, int decode_mapping);
+-				CORE_ADDR);
++				CORE_ADDR, int decode_mapping);
  
- static void dwarf2_start_subfile (const char *, const char *, const char *);
+ static void dwarf2_start_subfile (const char *, const char *);
  
-@@ -1849,6 +1858,8 @@ static void process_cu_includes (void);
- 
- static void check_producer (struct dwarf2_cu *cu);
+@@ -2057,6 +2066,8 @@ get_section_file_name (const struct dwar
+ /* Return the id of SECTION.
+    Returns 0 if SECTION doesn't exist.  */
  
 +static void free_line_header_voidp (void *arg);
 +
  static int
- attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
- 		      struct dwarf2_cu *cu, struct dynamic_prop *prop,
-@@ -1920,6 +1931,29 @@ dwarf2_invalid_attrib_class_complaint (c
- 	     _("invalid attribute class or form for '%s' in '%s'"),
- 	     arg1, arg2);
+ get_section_id (const struct dwarf2_section_info *section)
+ {
+@@ -2461,6 +2472,29 @@ dwarf2_get_dwz_file (void)
+   dwarf2_per_objfile->dwz_file = result;
+   return result;
  }
 +
 +/* Hash function for line_header_hash.  */
@@ -207,20 +207,20 @@ Index: gdb-7.8/gdb/dwarf2read.c
 +}
 +
  
- #if WORDS_BIGENDIAN
+ /* DWARF quick_symbols_functions support.  */
  
-@@ -4459,7 +4493,7 @@ dwarf2_build_include_psymtabs (struct dw
+@@ -4454,7 +4488,7 @@ dwarf2_build_include_psymtabs (struct dw
      return;  /* No linetable, so no includes.  */
  
    /* NOTE: pst->dirname is DW_AT_comp_dir (if present).  */
--  dwarf_decode_lines (lh, pst->dirname, cu, pst, 1);
-+  dwarf_decode_lines (lh, pst->dirname, cu, pst, 1, 1);
+-  dwarf_decode_lines (lh, pst->dirname, cu, pst, pst->textlow);
++  dwarf_decode_lines (lh, pst->dirname, cu, pst, pst->textlow, 1);
  
    free_line_header (lh);
  }
-@@ -8989,24 +9023,64 @@ static void
+@@ -9002,24 +9036,64 @@ static void
  handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
- 			const char *comp_dir) /* ARI: editCase function */
+ 			const char *comp_dir, CORE_ADDR lowpc) /* ARI: editCase function */
  {
 +  struct objfile *objfile = dwarf2_per_objfile->objfile;
    struct attribute *attr;
@@ -249,7 +249,7 @@ Index: gdb-7.8/gdb/dwarf2read.c
 -	{
 -	  cu->line_header = line_header;
 -	  make_cleanup (free_cu_line_header, cu);
--	  dwarf_decode_lines (line_header, comp_dir, cu, NULL, 1);
+-	  dwarf_decode_lines (line_header, comp_dir, cu, NULL, lowpc);
 -	}
 +      dwarf2_per_objfile->line_header_hash
 +	= htab_create_alloc_ex (127, line_header_hash, line_header_eq,
@@ -289,12 +289,12 @@ Index: gdb-7.8/gdb/dwarf2read.c
 +      make_cleanup (free_cu_line_header, cu);
      }
 +  decode_mapping = (die->tag != DW_TAG_partial_unit);
-+  dwarf_decode_lines (line_header, comp_dir, cu, NULL, 1,
++  dwarf_decode_lines (line_header, comp_dir, cu, NULL, lowpc,
 +		      decode_mapping);
  }
  
  /* Process DW_TAG_compile_unit or DW_TAG_partial_unit.  */
-@@ -16969,6 +17043,16 @@ free_line_header (struct line_header *lh
+@@ -16917,6 +16991,16 @@ free_line_header (struct line_header *lh
    xfree (lh);
  }
  
@@ -311,7 +311,7 @@ Index: gdb-7.8/gdb/dwarf2read.c
  /* Add an entry to LH's include directory table.  */
  
  static void
-@@ -17099,6 +17183,9 @@ dwarf_decode_line_header (unsigned int o
+@@ -17047,6 +17131,9 @@ dwarf_decode_line_header (unsigned int o
    back_to = make_cleanup ((make_cleanup_ftype *) free_line_header,
                            (void *) lh);
  
@@ -321,12 +321,12 @@ Index: gdb-7.8/gdb/dwarf2read.c
    line_ptr = section->buffer + offset;
  
    /* Read in the header.  */
-@@ -17596,18 +17683,22 @@ dwarf_decode_lines_1 (struct line_header
-    as the corresponding symtab.  Since COMP_DIR is not used in the name of the
-    symtab we don't use it in the name of the psymtabs we create.
+@@ -17674,17 +17761,22 @@ dwarf_decode_lines_1 (struct line_header
     E.g. expand_line_sal requires this when finding psymtabs to expand.
--   A good testcase for this is mb-inline.exp.  */
-+   A good testcase for this is mb-inline.exp.
+    A good testcase for this is mb-inline.exp.
+ 
+-   LOWPC is the lowest address in CU (or 0 if not known).  */
++   LOWPC is the lowest address in CU (or 0 if not known).
 +
 +   Boolean DECODE_MAPPING specifies we need to fully decode .debug_line
 +   for its PC<->lines mapping information.  Otherwise only filenames
@@ -335,15 +335,15 @@ Index: gdb-7.8/gdb/dwarf2read.c
  static void
  dwarf_decode_lines (struct line_header *lh, const char *comp_dir,
  		    struct dwarf2_cu *cu, struct partial_symtab *pst,
--		    int want_line_info)
-+		    int want_line_info, int decode_mapping)
+-		    CORE_ADDR lowpc)
++		    CORE_ADDR lowpc, int decode_mapping)
  {
    struct objfile *objfile = cu->objfile;
    const int decode_for_pst_p = (pst != NULL);
-   struct subfile *first_subfile = current_subfile;
  
--  if (want_line_info)
-+  if (want_line_info && decode_mapping)
-     dwarf_decode_lines_1 (lh, comp_dir, cu, pst);
+-  dwarf_decode_lines_1 (lh, cu, decode_for_pst_p, lowpc);
++  if (decode_mapping)
++    dwarf_decode_lines_1 (lh, cu, decode_for_pst_p, lowpc);
  
    if (decode_for_pst_p)
+     {

@@ -21,12 +21,12 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20140611
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-%global tarname gdb-%{version}.20141228
-Version: 7.8.1
+%global tarname gdb-%{version}
+Version: 7.8.50.20150108
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 36%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -219,7 +219,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -506,20 +506,13 @@ Patch848: gdb-dts-rhel6-python-compat.patch
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
 # VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
-Patch887: gdb-archer-vla-tests.patch
 Patch888: gdb-vla-intel.patch
-Patch912: gdb-vla-intel-04of23-fix.patch
 Patch889: gdb-vla-intel-stringbt-fix.patch
-
-# Fix --with-system-readline with readline-6.3 patch 5.
-Patch914: gdb-readline-6.3.5.patch
+Patch912: gdb-vla-intel-04of23-fix.patch
+Patch887: gdb-archer-vla-tests.patch
 
 # Continue backtrace even if a frame filter throws an exception (Phil Muldoon).
 Patch918: gdb-btrobust.patch
-
-# Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
-Patch920: gdb-python-completer-1of2.patch
-Patch921: gdb-python-completer-2of2.patch
 
 # Display Fortran strings in backtraces.
 Patch925: gdb-fortran-frame-string.patch
@@ -527,22 +520,19 @@ Patch925: gdb-fortran-frame-string.patch
 # Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 Patch927: gdb-python-gil.patch
 
-# Fix GDB SIGTT* Stopped when using the PID argument (BZ 1136704, Pedro Alves).
-Patch970: gdb-async-stopped-on-pid-arg-testsuite.patch
-
-# Fix "save breakpoints" for signal catchpoints and disabled breakpoints
-# (BZ 1146170, Miroslav Franc).
-Patch971: gdb-save-breakpoints-fix.patch
-
 # Fix 'Slow gstack performance' (RH BZ 1103894, Jan Kratochvil).
 Patch973: gdb-slow-gstack-performance.patch
 
-# Accelerate interactive symbols lookup 15x.
-Patch975: gdb-symbols-lookup-accel.patch
+# Fix 'compile' compilation warning/error.
+Patch977: gdb-compile-warn_unused_result.patch
 
-# Fix '[RFE] please add add-auto-load-scripts-directory command' (RH
-# BZ 1163339, Jan Kratochvil).
-Patch976: gdb-rhbz1163339-add-auto-load-scripts-directory.patch
+# Fix jit-reader.h for multi-lib.
+Patch978: gdb-jit-reader-multilib.patch
+
+# Fix gdb-7.9pre regressions / new FAILs.
+Patch979: gdb-6.8-bz457187-largefile-test-regression-fix.patch
+Patch980: gdb-py-frame-rip-test-fix.patch
+Patch981: gdb-tekhex-regression-revert.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -719,11 +709,11 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch888 -p1
-%patch912 -p1
 %patch889 -p1
+%patch912 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -822,17 +812,15 @@ find -name "*.info*"|xargs rm -f
 %patch852 -p1
 %patch863 -p1
 %patch887 -p1
-%patch914 -p1
 %patch918 -p1
-%patch920 -p1
-%patch921 -p1
 %patch925 -p1
 %patch927 -p1
-%patch970 -p1
-%patch971 -p1
 %patch973 -p1
-%patch975 -p1
-%patch976 -p1
+%patch977 -p1
+%patch978 -p1
+%patch979 -p1
+%patch980 -p1
+%patch981 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1271,10 +1259,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/pstack
 %{_mandir}/*/pstack.1*
 %{_datadir}/gdb
-%{_includedir}/gdb
-# Provide jit-reader.h so that users are able to write their own GDB JIT
+# Provide gdb/jit-reader.h so that users are able to write their own GDB JIT
 # plugins.
-%{_includedir}/gdb/jit-reader.h
+%{_includedir}/gdb
 
 # don't include the files in include, they are part of binutils
 
@@ -1334,6 +1321,10 @@ then
 fi
 
 %changelog
+* Thu Jan  8 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.50.20150108-1.fc22
+- Rebase to pre-7.9 snapshot 7.8.50.20150108.
+- Fix jit-reader.h for multi-lib.
+
 * Sun Dec 28 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-36.fc21
 - Rebase to 7.8.1.20141228 for a performance fix (PR binutils/17677).
 
