@@ -21,12 +21,12 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20140611
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-%global tarname gdb-%{version}.20141228
-Version: 7.8.1
+%global tarname gdb-%{version}
+Version: 7.8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?dist}
+Release: 38%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1337,6 +1337,9 @@ then
 fi
 
 %changelog
+* Thu Jan 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.2-38.fc21
+- Rebase to 7.8.2.
+
 * Wed Jan  7 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.1-37.fc21
 - Fix jit-reader.h for multi-lib.
 
