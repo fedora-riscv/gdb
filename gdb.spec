@@ -22,11 +22,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.8.50.20150108
+Version: 7.8.90.20150202
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -520,19 +520,14 @@ Patch925: gdb-fortran-frame-string.patch
 # Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 Patch927: gdb-python-gil.patch
 
-# Fix 'Slow gstack performance' (RH BZ 1103894, Jan Kratochvil).
-Patch973: gdb-slow-gstack-performance.patch
-
-# Fix 'compile' compilation warning/error.
-Patch977: gdb-compile-warn_unused_result.patch
-
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
 # Fix gdb-7.9pre regressions / new FAILs.
 Patch979: gdb-6.8-bz457187-largefile-test-regression-fix.patch
-Patch980: gdb-py-frame-rip-test-fix.patch
-Patch981: gdb-tekhex-regression-revert.patch
+
+# Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
+Patch982: gdb-no-dg-extract-results-py.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -815,12 +810,9 @@ find -name "*.info*"|xargs rm -f
 %patch918 -p1
 %patch925 -p1
 %patch927 -p1
-%patch973 -p1
-%patch977 -p1
 %patch978 -p1
 %patch979 -p1
-%patch980 -p1
-%patch981 -p1
+%patch982 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1321,6 +1313,10 @@ then
 fi
 
 %changelog
+* Mon Feb  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-2.fc22
+- Rebase to 7.9-branch snapshot 7.8.90.20150202.
+- Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
+
 * Thu Jan  8 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.50.20150108-1.fc22
 - Rebase to pre-7.9 snapshot 7.8.50.20150108.
 - Fix jit-reader.h for multi-lib.
