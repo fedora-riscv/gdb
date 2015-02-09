@@ -26,7 +26,7 @@ Version: 7.8.90.20150202
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -67,6 +67,8 @@ Provides: bundled(gnulib) = %{snapgnulib}
 Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
+
+Requires: gcc-gdb-plugin%{?_isa}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -584,6 +586,7 @@ BuildRequires: libbabeltrace-devel%{?_isa}
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
+BuildRequires: gcc-gdb-plugin%{?_isa}
 %if 0%{?rhel:1} && 0%{?rhel} < 7
 BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 # for gcc-java linkage:
@@ -1313,6 +1316,9 @@ then
 fi
 
 %changelog
+* Mon Feb  9 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-3.fc22
+- Require gcc-gdb-plugin.
+
 * Mon Feb  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-2.fc22
 - Rebase to 7.9-branch snapshot 7.8.90.20150202.
 - Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
