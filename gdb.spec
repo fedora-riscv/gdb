@@ -26,7 +26,7 @@ Version: 7.8.90.20150202
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -221,7 +221,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -509,6 +509,7 @@ Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
 # VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
 Patch888: gdb-vla-intel.patch
+Patch983: gdb-vla-intel-logical-not.patch
 Patch889: gdb-vla-intel-stringbt-fix.patch
 Patch912: gdb-vla-intel-04of23-fix.patch
 Patch887: gdb-archer-vla-tests.patch
@@ -707,9 +708,10 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch888 -p1
+%patch983 -p1
 %patch889 -p1
 %patch912 -p1
 %patch1 -p1
@@ -1316,6 +1318,9 @@ then
 fi
 
 %changelog
+* Wed Feb 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-4.fc22
+- Fix gcc5 compilation errors (RH BZ 1190649).
+
 * Mon Feb  9 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-3.fc22
 - Require gcc-gdb-plugin.
 
