@@ -26,7 +26,7 @@ Version: 7.8.90.20150202
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -566,6 +566,7 @@ BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1}
 BuildRequires: libbabeltrace-devel%{?_isa}
 %endif
+BuildRequires: guile-devel%{?_isa}
 
 %if 0%{?_with_testsuite:1}
 
@@ -904,7 +905,7 @@ export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-	--without-guile						\
+	--with-guile						\
 %if 0%{!?rhel:1}
 	--with-babeltrace					\
 %else
@@ -1216,10 +1217,6 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
-# /usr/share/gdb/guile/ gets installed even --without-guile
-# https://sourceware.org/bugzilla/show_bug.cgi?id=17105
-rm -rf $RPM_BUILD_ROOT%{_datadir}/gdb/guile
-
 # These files are unrelated to Fedora Linux.
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
@@ -1318,6 +1315,9 @@ then
 fi
 
 %changelog
+* Wed Feb 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-5.fc22
+- Enable guile support.
+
 * Wed Feb 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-4.fc22
 - Fix gcc5 compilation errors (RH BZ 1190649).
 
