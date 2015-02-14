@@ -22,11 +22,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.8.90.20150202
+Version: 7.8.90.20150214
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1315,6 +1315,9 @@ then
 fi
 
 %changelog
+* Sat Feb 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150214-6.fc22
+- Rebase to 7.9-branch snapshot 7.8.90.20150214.
+
 * Wed Feb 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-5.fc22
 - Enable guile support.
 
