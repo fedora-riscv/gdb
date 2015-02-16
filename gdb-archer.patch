@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit ef5e5e4d5bfedecf54ef7f1380eaf89662b617d0
+commit d1a09bf2f8e7e3f752a1bbeba135bc080bf0c865
 
 tromey/python
 
@@ -304,7 +304,7 @@ index 0000000..6fa48ff
 +IgnoreErrorsCommand ()
 diff --git a/gdb/python/lib/gdb/command/pahole.py b/gdb/python/lib/gdb/command/pahole.py
 new file mode 100644
-index 0000000..636f99d
+index 0000000..dee04f5
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/pahole.py
 @@ -0,0 +1,81 @@
@@ -339,7 +339,7 @@ index 0000000..636f99d
 +    def maybe_print_hole(self, bitpos, field_bitpos):
 +        if bitpos != field_bitpos:
 +            hole = field_bitpos - bitpos
-+            print '  /* XXX %d bit hole, try to pack */' % hole
++            print ('  /* XXX %d bit hole, try to pack */' % hole)
 +
 +    def pahole (self, type, level, name):
 +        if name is None:
@@ -347,7 +347,7 @@ index 0000000..636f99d
 +        tag = type.tag
 +        if tag is None:
 +            tag = ''
-+        print '%sstruct %s {' % (' ' * (2 * level), tag)
++        print ('%sstruct %s {' % (' ' * (2 * level), tag))
 +        bitpos = 0
 +        for field in type.fields ():
 +            # Skip static fields.
@@ -365,33 +365,33 @@ index 0000000..636f99d
 +                fieldsize = 8 * ftype.sizeof
 +
 +            # TARGET_CHAR_BIT
-+            print ' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)),
++            print (' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)))
 +            bitpos = bitpos + fieldsize
 +
 +            if ftype.code == gdb.TYPE_CODE_STRUCT:
 +                self.pahole (ftype, level + 1, field.name)
 +            else:
-+                print ' ' * (2 + 2 * level),
-+                print '%s %s' % (str (ftype), field.name)
++                print (' ' * (2 + 2 * level))
++                print ('%s %s' % (str (ftype), field.name))
 +
 +        if level == 0:
 +            self.maybe_print_hole(bitpos, 8 * type.sizeof)
 +
-+        print ' ' * (14 + 2 * level),
-+        print '} %s' % name
++        print (' ' * (14 + 2 * level))
++        print ('} %s' % name)
 +
 +    def invoke (self, arg, from_tty):
 +        type = gdb.lookup_type (arg)
 +        type = type.strip_typedefs ()
 +        if type.code != gdb.TYPE_CODE_STRUCT:
-+            raise TypeError, '%s is not a struct type' % arg
-+        print ' ' * 14,
++            raise (TypeError, '%s is not a struct type' % arg)
++        print (' ' * 14)
 +        self.pahole (type, 0, '')
 +
 +Pahole()
 diff --git a/gdb/python/lib/gdb/function/in_scope.py b/gdb/python/lib/gdb/function/in_scope.py
 new file mode 100644
-index 0000000..debb3bb
+index 0000000..8742680
 --- /dev/null
 +++ b/gdb/python/lib/gdb/function/in_scope.py
 @@ -0,0 +1,47 @@
@@ -419,31 +419,31 @@ index 0000000..debb3bb
 +Takes one argument for each variable name to be checked."""
 +
 +    def __init__ (self):
-+	super (InScope, self).__init__ ("in_scope")
++        super (InScope, self).__init__ ("in_scope")
 +
 +    def invoke (self, *vars):
 +        if len (vars) == 0:
-+	    raise TypeError, "in_scope takes at least one argument"
++            raise (TypeError, "in_scope takes at least one argument")
 +
 +        # gdb.Value isn't hashable so it can't be put in a map.
-+	# Convert to string first.
-+	wanted = set (map (lambda x: x.string (), vars))
-+	found = set ()
-+	block = gdb.selected_frame ().block ()
-+	while block:
-+	    for sym in block:
-+		if (sym.is_argument or sym.is_constant
-+		      or sym.is_function or sym.is_variable):
-+		    if sym.name in wanted:
-+			found.add (sym.name)
++        # Convert to string first.
++        wanted = set (map (lambda x: x.string (), vars))
++        found = set ()
++        block = gdb.selected_frame ().block ()
++        while block:
++            for sym in block:
++                if (sym.is_argument or sym.is_constant
++                      or sym.is_function or sym.is_variable):
++                    if sym.name in wanted:
++                        found.add (sym.name)
 +
-+	    block = block.superblock
++            block = block.superblock
 +
-+	return wanted == found
++        return wanted == found
 +
 +InScope ()
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index b1d8283..8eb8afe 100644
+index b1d8283..54a2d9b 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
 @@ -93,6 +93,8 @@ const struct extension_language_defn extension_language_python =
@@ -455,7 +455,7 @@ index b1d8283..8eb8afe 100644
  #include "target.h"
  #include "gdbthread.h"
  #include "interps.h"
-@@ -1220,6 +1222,56 @@ gdbpy_print_stack (void)
+@@ -1220,6 +1222,83 @@ gdbpy_print_stack (void)
  
  /* Return the current Progspace.
     There always is one.  */
@@ -495,7 +495,34 @@ index b1d8283..8eb8afe 100644
 +  ensure_python_env (get_current_arch (), current_language);
 +
 +  running_python_script = 1;
++
++#if PYTHON_ABI_VERSION < 3
 +  PySys_SetArgv (argc - 1, argv + 1);
++#else
++  {
++    wchar_t **wargv = alloca (sizeof (*wargv) * (argc + 1));
++    int i;
++
++    for (i = 1; i < argc; i++)
++      {
++	size_t len = mbstowcs (NULL, argv[i], 0);
++	size_t len2;
++
++	if (len == (size_t) -1)
++	  {
++	    fprintf (stderr, "Invalid multibyte argument #%d \"%s\"\n",
++		     i, argv[i]);
++	    exit (1);
++	  }
++	wargv[i] = alloca (sizeof (**wargv) * (len + 1));
++	len2 = mbstowcs (wargv[i], argv[i], len + 1);
++	assert (len2 == len);
++      }
++    wargv[argc] = NULL;
++    PySys_SetArgv (argc - 1, wargv + 1);
++  }
++#endif
++
 +  input = fopen (argv[0], "r");
 +  if (! input)
 +    {
@@ -512,7 +539,7 @@ index b1d8283..8eb8afe 100644
  
  static PyObject *
  gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
-@@ -1913,6 +1965,8 @@ static PyMethodDef GdbMethods[] =
+@@ -1913,6 +1992,8 @@ static PyMethodDef GdbMethods[] =
  Evaluate command, a string, as a gdb CLI command.  Optionally returns\n\
  a Python String containing the output of the command if to_string is\n\
  set to True." },
@@ -561,7 +588,7 @@ index e47f340..a7e0a52 100644
  gdb_test "python print ('result = %s' % (gdb.selected_frame ().read_register ('sp') == gdb.parse_and_eval ('\$sp')))" \
    " = True" \
 diff --git a/gdb/testsuite/gdb.python/py-value.exp b/gdb/testsuite/gdb.python/py-value.exp
-index f081ff0..31b5910 100644
+index f081ff0..58cce09 100644
 --- a/gdb/testsuite/gdb.python/py-value.exp
 +++ b/gdb/testsuite/gdb.python/py-value.exp
 @@ -388,6 +388,15 @@ proc test_value_after_death {} {
@@ -574,7 +601,7 @@ index f081ff0..31b5910 100644
 +proc test_cast_regression {} {
 +  gdb_test "python v = gdb.Value(5)" "" "create value for cast test"
 +  gdb_test "python v = v.cast(v.type)" "" "cast value for cast test"
-+  gdb_test "python print v" "5" "print value for cast test"
++  gdb_test "python print(v)" "5" "print value for cast test"
 +}
 +
  # Regression test for invalid subscript operations.  The bug was that

@@ -1,0 +1,175 @@
+http://sourceware.org/ml/gdb-patches/2015-02/msg00091.html
+Subject: [patch] Fix Python 3 build error on 32-bit hosts
+
+
+--ZPt4rx8FFjLCG7dd
+Content-Type: text/plain; charset=iso-2022-jp
+Content-Disposition: inline
+
+Hi,
+
+on Fedora Rawhide (==22) i686 using --with-python=/usr/bin/python3 one gets:
+
+gcc -g   -I. -I. -I./common -I./config -DLOCALEDIR="\"/usr/local/share/locale\"" -DHAVE_CONFIG_H -I./../include/opcode -I./../opcodes/.. -I./../readline/.. -I../bfd -I./../bfd -I./../include -I../libdecnumber -I./../libdecnumber  -I./gnulib/import -Ibuild-gnulib/import   -DTUI=1   -pthread -I/usr/include/guile/2.0  -I/usr/include/python3.4m -I/usr/include/python3.4m -Wall -Wdeclaration-after-statement -Wpointer-arith -Wpointer-sign -Wno-unused -Wunused-value -Wunused-function -Wno-switch -Wno-char-subscripts -Wmissing-prototypes -Wdeclaration-after-statement -Wempty-body -Wmissing-parameter-type -Wold-style-declaration -Wold-style-definition -Wformat-nonliteral -Werror -c -o py-value.o -MT py-value.o -MMD -MP -MF .deps/py-value.Tpo -fno-strict-aliasing -DNDEBUG -fwrapv ./python/py-value.c
+./python/py-value.c:1696:3: error: initialization from incompatible pointer type [-Werror]
+   valpy_hash,            /*tp_hash*/
+   ^
+./python/py-value.c:1696:3: error: (near initialization for ‘value_object_type.tp_hash’) [-Werror]
+cc1: all warnings being treated as errors
+Makefile:2628: recipe for target 'py-value.o' failed
+
+This is because in Python 2 tp_hash was:
+	typedef long (*hashfunc)(PyObject *);
+while in Python 3 tp_hash is:
+	typedef Py_hash_t (*hashfunc)(PyObject *);
+
+Py_hash_t is int for 32-bit hosts and long for 64-bit hosts.  While on 32-bit
+hosts sizeof(long)==sizeof(int) still the hashfunc type is formally
+incompatible.  As this patch should have no compiled code change it is not
+really necessary for gdb-7.9, it would fix there just this non-fatal
+compilation warning:
+	./python/py-value.c:1696:3: warning: initialization from incompatible pointer type
+	   valpy_hash,            /*tp_hash*/
+	   ^
+	./python/py-value.c:1696:3: warning: (near initialization for ‘value_object_type.tp_hash’)
+
+A question is whether the autoconf test isn't an overkill.  One could use
+instead just:
+	#if PYTHON_ABI_VERSION >= 3
+Also one could use that #if either just at the valpy_hash() definition or one
+could provide Py_hash_t in gdb/defs.h or one could provide some GDB_Py_hash_t
+in gdb/defs.h.
+
+Tested compilation with:
+	python-devel-2.7.9-4.fc22.x86_64
+	python-devel-2.7.9-4.fc22.i686
+	python3-devel-3.4.2-4.fc22.x86_64
+	python3-devel-3.4.2-4.fc22.i686
+
+
+Jan
+
+--ZPt4rx8FFjLCG7dd
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+gdb/
+2015-02-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.ac <"${have_libpython}" != no>: Define Py_hash_t.
+	* python/py-value.c (valpy_fetch_lazy): Use it.  Remove cast to the
+	return type.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+
+diff --git a/gdb/config.in b/gdb/config.in
+index 806cbac..44acfac 100644
+--- a/gdb/config.in
++++ b/gdb/config.in
+@@ -617,6 +617,9 @@
+ /* Define if the python directory should be relocated when GDB is moved. */
+ #undef PYTHON_PATH_RELOCATABLE
+ 
++/* Provide Python 3 Py_hash_t for Python 2. */
++#undef Py_hash_t
++
+ /* Relocated directory for source files. */
+ #undef RELOC_SRCDIR
+ 
+diff --git a/gdb/configure b/gdb/configure
+index 9632f9a..65f5b2c 100755
+--- a/gdb/configure
++++ b/gdb/configure
+@@ -8749,6 +8749,45 @@ rm -f conftest.err conftest.$ac_ext
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${python_has_threads}" >&5
+ $as_echo "${python_has_threads}" >&6; }
+   CPPFLAGS="${saved_CPPFLAGS}"
++
++  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Py_hash_t" >&5
++$as_echo_n "checking for Py_hash_t... " >&6; }
++if test "${gdb_cv_Py_hash_t+set}" = set; then :
++  $as_echo_n "(cached) " >&6
++else
++  old_CFLAGS="$CFLAGS"
++    CFLAGS="$CFLAGS $PYTHON_CFLAGS"
++    old_CPPFLAGS="$CPPFLAGS"
++    CPPFLAGS="$CPPFLAGS $PYTHON_CPPFLAGS"
++    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++#include <Python.h>
++int
++main ()
++{
++Py_hash_t var;
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_compile "$LINENO"; then :
++  gdb_cv_Py_hash_t=yes
++else
++  gdb_cv_Py_hash_t=no
++
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
++    CPPFLAGS="$old_CPPFLAGS"
++    CFLAGS="$old_CFLAGS"
++
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_Py_hash_t" >&5
++$as_echo "$gdb_cv_Py_hash_t" >&6; }
++  if test "x$gdb_cv_Py_hash_t" = "xno"; then
++
++$as_echo "#define Py_hash_t long" >>confdefs.h
++
++  fi
+ else
+   # Even if Python support is not compiled in, we need to have this file
+   # included so that the "python" command, et.al., still exists.
+diff --git a/gdb/configure.ac b/gdb/configure.ac
+index dfc6947..f335b7b 100644
+--- a/gdb/configure.ac
++++ b/gdb/configure.ac
+@@ -1016,6 +1016,25 @@ if test "${have_libpython}" != no; then
+   ]]), [python_has_threads=no], [python_has_threads=yes])
+   AC_MSG_RESULT(${python_has_threads})
+   CPPFLAGS="${saved_CPPFLAGS}"
++
++  AC_CACHE_CHECK([for Py_hash_t], gdb_cv_Py_hash_t,
++    old_CFLAGS="$CFLAGS"
++    CFLAGS="$CFLAGS $PYTHON_CFLAGS"
++    old_CPPFLAGS="$CPPFLAGS"
++    CPPFLAGS="$CPPFLAGS $PYTHON_CPPFLAGS"
++    AC_TRY_COMPILE(
++      [#include <Python.h>],
++      [Py_hash_t var;],
++      gdb_cv_Py_hash_t=yes,
++      gdb_cv_Py_hash_t=no
++    )
++    CPPFLAGS="$old_CPPFLAGS"
++    CFLAGS="$old_CFLAGS"
++  )
++  if test "x$gdb_cv_Py_hash_t" = "xno"; then
++    AC_DEFINE(Py_hash_t, long,
++	      [Provide Python 3 Py_hash_t for Python 2.])
++  fi
+ else
+   # Even if Python support is not compiled in, we need to have this file
+   # included so that the "python" command, et.al., still exists.
+diff --git a/gdb/python/py-value.c b/gdb/python/py-value.c
+index 4c4d36e..5a13777 100644
+--- a/gdb/python/py-value.c
++++ b/gdb/python/py-value.c
+@@ -895,10 +895,10 @@ valpy_fetch_lazy (PyObject *self, PyObject *args)
+ 
+ /* Calculate and return the address of the PyObject as the value of
+    the builtin __hash__ call.  */
+-static long
++static Py_hash_t
+ valpy_hash (PyObject *self)
+ {
+-  return (long) (intptr_t) self;
++  return (intptr_t) self;
+ }
+ 
+ enum valpy_opcode

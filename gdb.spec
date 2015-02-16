@@ -26,7 +26,7 @@ Version: 7.8.90.20150214
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -532,6 +532,12 @@ Patch979: gdb-6.8-bz457187-largefile-test-regression-fix.patch
 # Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
 Patch982: gdb-no-dg-extract-results-py.patch
 
+# Fix Python 3 build error on 32-bit hosts.
+Patch984: gdb-python3-py_hash_t-32bit.patch
+
+# Fix Python 3 testsuite regressions.
+Patch985: gdb-python3-testsuite.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -548,7 +554,8 @@ BuildRequires: xz-devel%{?_isa}
 BuildRequires: rpm-devel%{?_isa}
 BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
 %if 0%{!?_without_python:1}
-BuildRequires: python-devel%{?_isa}
+%global __python %{__python3}
+BuildRequires: python3-devel%{?_isa}
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily before python files get moved to libstdc++.rpm
 # libstdc++%{bits_other} is not present in Koji, the .spec script generating
@@ -819,6 +826,8 @@ find -name "*.info*"|xargs rm -f
 %patch978 -p1
 %patch979 -p1
 %patch982 -p1
+%patch984 -p1
+%patch985 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -921,7 +930,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--without-libexpat-prefix				\
 	--enable-tui						\
 %if 0%{!?_without_python:1}
-	--with-python						\
+	--with-python=%{__python}				\
 %else
 	--without-python					\
 %endif
@@ -1315,6 +1324,9 @@ then
 fi
 
 %changelog
+* Mon Feb 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150214-7.fc22
+- Switch Python 2->3 (RH BZ 1014549).
+
 * Sat Feb 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150214-6.fc22
 - Rebase to 7.9-branch snapshot 7.8.90.20150214.
 
