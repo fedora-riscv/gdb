@@ -26,7 +26,7 @@ Version: 7.8.90.20150214
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1324,6 +1324,10 @@ then
 fi
 
 %changelog
+* Sat Feb 21 2015 Till Maas <opensource@till.name> - 7.8.90.20150214-8
+- Rebuilt for Fedora 23 Change
+  https://fedoraproject.org/wiki/Changes/Harden_all_packages_with_position-independent_code
+
 * Mon Feb 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150214-7.fc22
 - Switch Python 2->3 (RH BZ 1014549).
 
