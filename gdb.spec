@@ -22,17 +22,17 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.8.90.20150214
+Version: 7.9
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
-# ftp://sourceware.org/pub/gdb/releases/gdb-%{version}.tar.xz
-Source: %{tarname}.tar.xz
+# ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -526,9 +526,6 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
-# Fix gdb-7.9pre regressions / new FAILs.
-Patch979: gdb-6.8-bz457187-largefile-test-regression-fix.patch
-
 # Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
 Patch982: gdb-no-dg-extract-results-py.patch
 
@@ -824,7 +821,6 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch979 -p1
 %patch982 -p1
 %patch984 -p1
 %patch985 -p1
@@ -1324,6 +1320,9 @@ then
 fi
 
 %changelog
+* Sun Feb 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9-10.fc22
+- Rebase to the final 7.9 release.
+
 * Sun Feb 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.90.20150202-9.fc22
 - Change Require->Recommends for gcc-gdb-plugin (RH BZ 1195005).
 
