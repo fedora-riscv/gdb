@@ -26,7 +26,7 @@ Version: 7.9
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -892,6 +892,10 @@ cd %{gdb_build}$fprofile
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
+%endif
+
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
 	--prefix=%{_prefix}					\
@@ -1320,6 +1324,9 @@ then
 fi
 
 %changelog
+* Thu Apr  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9-11.fc22
+- Suggest s/debuginfo-install/dnf debuginfo-install/ (BZ 1208650, Omair Majid).
+
 * Sun Feb 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9-10.fc22
 - Rebase to the final 7.9 release.
 
