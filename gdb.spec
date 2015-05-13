@@ -22,11 +22,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.9
+Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -68,7 +68,14 @@ Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
 
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: gcc-gdb-plugin%{?_isa}
+
+# /usr/lib/python2.7/site-packages/dnf-plugins/debuginfo-install.py
+# [RFE] Define virtual provides for DNF commands and suggest installing the appropriate one if a command was not found
+# https://bugzilla.redhat.com/show_bug.cgi?id=1208773
+Recommends: dnf-plugins-core
+%endif
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -1324,6 +1331,10 @@ then
 fi
 
 %changelog
+* Wed May 13 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-12.fc22
+- Rebase to FSF GDB 7.9.1 (7.9 stable branch).
+- Add 'Recommends: dnf-plugins-core' for 'dnf debuginfo-install'.
+
 * Thu Apr  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9-11.fc22
 - Suggest s/debuginfo-install/dnf debuginfo-install/ (BZ 1208650, Omair Majid).
 
