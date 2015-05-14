@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -70,11 +70,7 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: gcc-gdb-plugin%{?_isa}
-
-# /usr/lib/python2.7/site-packages/dnf-plugins/debuginfo-install.py
-# [RFE] Define virtual provides for DNF commands and suggest installing the appropriate one if a command was not found
-# https://bugzilla.redhat.com/show_bug.cgi?id=1208773
-Recommends: dnf-plugins-core
+Recommends: dnf-command(debuginfo-install)
 %endif
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
@@ -1331,6 +1327,9 @@ then
 fi
 
 %changelog
+* Thu May 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-13.fc22
+- Change 'Recommends: dnf-plugins-core' to 'dnf-command(debuginfo-install)'.
+
 * Wed May 13 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-12.fc22
 - Rebase to FSF GDB 7.9.1 (7.9 stable branch).
 - Add 'Recommends: dnf-plugins-core' for 'dnf debuginfo-install'.
