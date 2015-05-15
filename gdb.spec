@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -680,6 +680,8 @@ Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
 BuildArch: noarch
+Requires(post): /sbin/install-info
+Requires(preun): /sbin/install-info
 
 %if "%{scl}" == "devtoolset-1.1"
 Obsoletes: devtoolset-1.0-%{pkg_name}-doc
@@ -691,9 +693,6 @@ Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 
 This package provides INFO, HTML and PDF user manual for GDB.
-
-Requires(post): /sbin/install-info
-Requires(preun): /sbin/install-info
 
 %prep
 %setup -q -n %{gdb_src}
@@ -1327,6 +1326,9 @@ then
 fi
 
 %changelog
+* Fri May 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-14.fc22
+- Fix ignored Requires for gdb-doc (RH BZ 1221814).
+
 * Thu May 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-13.fc22
 - Change 'Recommends: dnf-plugins-core' to 'dnf-command(debuginfo-install)'.
 
