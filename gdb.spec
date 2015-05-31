@@ -18,15 +18,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20140611
+%global snapsrc    20150531
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.9.1
+Version: 7.9.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -120,9 +120,6 @@ Patch105: gdb-6.3-ppc64syscall-20040622.patch
 #=maybepush: Write new testcase.
 Patch111: gdb-6.3-ppc64displaysymbol-20041124.patch
 
-# Fix upstream `set scheduler-locking step' vs. upstream PPC atomic seqs.
-#=push+work: It is a bit difficult patch, a part is ppc specific.
-Patch112: gdb-6.6-scheduler_locking-step-sw-watchpoints2.patch
 # Make upstream `set scheduler-locking step' as default.
 #=push+work: How much is scheduler-locking relevant after non-stop?
 Patch260: gdb-6.6-scheduler_locking-step-is-default.patch
@@ -181,11 +178,6 @@ Patch194: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 #=fedoratest+work: One should recheck if it is really fixed upstream.
 Patch196: gdb-6.5-sharedlibrary-path.patch
 
-# Suggest fixing your target architecture for gdbserver(1) (BZ 190810).
-# FIXME: It could be autodetected.
-#=push+work: There are more such error cases that can happen.
-Patch199: gdb-6.5-bz190810-gdbserver-arch-advice.patch
-
 # Testcase for deadlocking on last address space byte; for corrupted backtraces.
 #=fedoratest
 Patch211: gdb-6.5-last-address-space-byte-test.patch
@@ -224,7 +216,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -354,11 +346,6 @@ Patch348: gdb-6.8-bz466901-backtrace-full-prelinked.patch
 # http://sourceware.org/gdb/wiki/ProjectArcher
 #=push+work
 Patch349: gdb-archer.patch
-
-# Fix parsing elf64-i386 files for kdump PAE vmcore dumps (BZ 457187).
-# - Turn on 64-bit BFD support, globally enable AC_SYS_LARGEFILE.
-#=fedoratest
-Patch360: gdb-6.8-bz457187-largefile-test.patch
 
 # New test for step-resume breakpoint placed in multiple threads at once.
 #=fedoratest
@@ -501,9 +488,6 @@ Patch818: gdb-rhbz795424-bitpos-lazyvalue.patch
 #=fedoratest
 Patch832: gdb-rhbz947564-findvar-assertion-frame-failed-testcase.patch
 
-# Fix crash on 'enable count' (Simon Marchi, BZ 993118).
-Patch843: gdb-enable-count-crash.patch
-
 # [rhel6] DTS backward Python compatibility API (BZ 1020004, Phil Muldoon).
 Patch848: gdb-dts-rhel6-python-compat.patch
 
@@ -528,15 +512,6 @@ Patch927: gdb-python-gil.patch
 
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
-
-# Temporarily disable dg-extract-results.py to fix gdb.sum sorting.
-Patch982: gdb-no-dg-extract-results-py.patch
-
-# Fix Python 3 build error on 32-bit hosts.
-Patch984: gdb-python3-py_hash_t-32bit.patch
-
-# Fix Python 3 testsuite regressions.
-Patch985: gdb-python3-testsuite.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -715,7 +690,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -725,7 +700,6 @@ find -name "*.info*"|xargs rm -f
 
 %patch105 -p1
 %patch111 -p1
-%patch112 -p1
 %patch118 -p1
 %patch122 -p1
 %patch125 -p1
@@ -738,7 +712,6 @@ find -name "*.info*"|xargs rm -f
 %patch188 -p1
 %patch194 -p1
 %patch196 -p1
-%patch199 -p1
 %patch208 -p1
 %patch211 -p1
 %patch213 -p1
@@ -775,7 +748,6 @@ find -name "*.info*"|xargs rm -f
 %patch330 -p1
 %patch343 -p1
 %patch348 -p1
-%patch360 -p1
 %patch381 -p1
 %patch382 -p1
 %patch391 -p1
@@ -815,7 +787,6 @@ find -name "*.info*"|xargs rm -f
 %patch817 -p1
 %patch818 -p1
 %patch832 -p1
-%patch843 -p1
 %patch852 -p1
 %patch863 -p1
 %patch887 -p1
@@ -823,9 +794,6 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch982 -p1
-%patch984 -p1
-%patch985 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -876,6 +844,8 @@ mv -f readline/doc readline-doc
 rm -rf readline/*
 mv -f readline-doc readline/doc
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+
+rm -rf zlib
 
 %build
 rm -rf %{buildroot}
@@ -956,6 +926,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--disable-inprocess-agent				\
 %endif
+	--with-system-zlib					\
 	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
@@ -1025,8 +996,6 @@ cd %{gdb_build}
 
 make %{?_smp_mflags} \
      -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
-
-grep '#define HAVE_ZLIB_H 1' gdb/config.h
 
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
@@ -1326,6 +1295,9 @@ then
 fi
 
 %changelog
+* Sun May 31 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-1.fc23
+- Rebase to FSF GDB 7.9.50.20150531 (pre-7.10 trunk snapshot).
+
 * Fri May 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-14.fc22
 - Fix ignored Requires for gdb-doc (RH BZ 1221814).
 
