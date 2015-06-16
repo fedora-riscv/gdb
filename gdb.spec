@@ -26,7 +26,7 @@ Version: 7.9.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -513,6 +513,9 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
+# Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
+Patch991: gdb-cxx-enum-tag.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -794,6 +797,7 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
+%patch991 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1295,6 +1299,9 @@ then
 fi
 
 %changelog
+* Tue Jun 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-2.fc23
+- Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
+
 * Sun May 31 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-1.fc23
 - Rebase to FSF GDB 7.9.50.20150531 (pre-7.10 trunk snapshot).
 
