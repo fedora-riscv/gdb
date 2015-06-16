@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -538,6 +538,9 @@ Patch984: gdb-python3-py_hash_t-32bit.patch
 # Fix Python 3 testsuite regressions.
 Patch985: gdb-python3-testsuite.patch
 
+# Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
+Patch991: gdb-cxx-enum-tag.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -826,6 +829,7 @@ find -name "*.info*"|xargs rm -f
 %patch982 -p1
 %patch984 -p1
 %patch985 -p1
+%patch991 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1326,6 +1330,9 @@ then
 fi
 
 %changelog
+* Tue Jun 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-15.fc22
+- Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
+
 * Fri May 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-14.fc22
 - Fix ignored Requires for gdb-doc (RH BZ 1221814).
 
