@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1330,6 +1330,9 @@ then
 fi
 
 %changelog
+* Fri Jun 19 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-16.fc22
+- Backport 'thread apply all' option '-ascending' for ABRT.
+
 * Tue Jun 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-15.fc22
 - Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
 
