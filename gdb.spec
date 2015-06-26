@@ -26,7 +26,7 @@ Version: 7.9.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -516,6 +516,9 @@ Patch978: gdb-jit-reader-multilib.patch
 # Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
 Patch991: gdb-cxx-enum-tag.patch
 
+# Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
+Patch992: gdb-type-printers-error.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -798,6 +801,7 @@ find -name "*.info*"|xargs rm -f
 %patch927 -p1
 %patch978 -p1
 %patch991 -p1
+%patch992 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1299,6 +1303,9 @@ then
 fi
 
 %changelog
+* Fri Jun 26 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-3.fc23
+- Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
+
 * Tue Jun 16 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-2.fc23
 - Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
 
