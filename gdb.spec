@@ -26,7 +26,7 @@ Version: 7.8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -547,6 +547,9 @@ Patch976: gdb-rhbz1163339-add-auto-load-scripts-directory.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
+# Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
+Patch992: gdb-type-printers-error.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -837,6 +840,7 @@ find -name "*.info*"|xargs rm -f
 %patch975 -p1
 %patch976 -p1
 %patch978 -p1
+%patch992 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1337,6 +1341,9 @@ then
 fi
 
 %changelog
+* Thu Jan 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.2-39.fc21
+- Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
+
 * Thu Jan 15 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.8.2-38.fc21
 - Rebase to 7.8.2.
 
