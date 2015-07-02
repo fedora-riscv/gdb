@@ -26,7 +26,7 @@ Version: 7.9.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -216,7 +216,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -535,8 +535,12 @@ BuildRequires: xz-devel%{?_isa}
 BuildRequires: rpm-devel%{?_isa}
 BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
 %if 0%{!?_without_python:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
+BuildRequires: python-devel%{?_isa}
+%else
 %global __python %{__python3}
 BuildRequires: python3-devel%{?_isa}
+%endif
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # Temporarily before python files get moved to libstdc++.rpm
 # libstdc++%{bits_other} is not present in Koji, the .spec script generating
@@ -553,8 +557,8 @@ BuildRequires: texlive-collection-latexrecommended
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1}
 BuildRequires: libbabeltrace-devel%{?_isa}
-%endif
 BuildRequires: guile-devel%{?_isa}
+%endif
 
 %if 0%{?_with_testsuite:1}
 
@@ -696,7 +700,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -894,11 +898,12 @@ CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-	--with-guile						\
 %if 0%{!?rhel:1}
 	--with-babeltrace					\
+	--with-guile						\
 %else
 	--without-babeltrace					\
+	--without-guile						\
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
@@ -1205,6 +1210,12 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
+%if 0%{?rhel:1}
+# /usr/share/gdb/guile/ gets installed even --without-guile
+# https://sourceware.org/bugzilla/show_bug.cgi?id=17105
+rm -rf $RPM_BUILD_ROOT%{_datadir}/gdb/guile
+%endif
+
 # These files are unrelated to Fedora Linux.
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
@@ -1303,6 +1314,9 @@ then
 fi
 
 %changelog
+* Thu Jul  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-4.fc23
+- [RHEL] Use Python2, disable Guile.
+
 * Fri Jun 26 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-3.fc23
 - Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
 
