@@ -26,7 +26,7 @@ Version: 7.9.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -96,9 +96,9 @@ Source3: gdb-gstack.man
 #=fedora
 Source4: gdbinit
 
-# libstdc++ pretty printers from GCC SVN HEAD (4.5 experimental).
-%global libstdcxxpython gdb-libstdc++-v3-python-r155978
-Source5: %{libstdcxxpython}.tar.bz2
+# libstdc++ pretty printers from GCC SVN.
+%global libstdcxxpython gdb-libstdc++-v3-python-r225521
+Source5: %{libstdcxxpython}.tar.xz
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
 Source6: gdbtui
@@ -684,7 +684,7 @@ This package provides INFO, HTML and PDF user manual for GDB.
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 # libstdc++ pretty printers.
-tar xjf %{SOURCE5}
+tar xJf %{SOURCE5}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
@@ -1314,6 +1314,9 @@ then
 fi
 
 %changelog
+* Tue Jul  7 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-5.fc23
+- Upgrade libstdc++-v3-python to r225521 (RH BZ 1239290).
+
 * Thu Jul  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-4.fc23
 - [RHEL] Use Python2, disable Guile.
 
