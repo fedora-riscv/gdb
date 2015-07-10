@@ -18,15 +18,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20150531
+%global snapsrc    20150709
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.9.50.%{snapsrc}
+Version: 7.9.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -216,7 +216,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -513,9 +513,6 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
-# Fix enum e e 'Attempt to use a type name as an expr.' (Keith Seitz, PR 16253).
-Patch991: gdb-cxx-enum-tag.patch
-
 # Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
 Patch992: gdb-type-printers-error.patch
 
@@ -700,7 +697,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -804,7 +801,6 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch991 -p1
 %patch992 -p1
 
 %patch848 -p1
@@ -1314,6 +1310,9 @@ then
 fi
 
 %changelog
+* Fri Jul 10 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150709-6.fc23
+- Rebase to FSF GDB 7.9.90.20150709 (7.10 branch snapshot).
+
 * Tue Jul  7 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.50.20150531-5.fc23
 - Upgrade libstdc++-v3-python to r225521 (RH BZ 1239290).
 
