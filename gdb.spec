@@ -18,20 +18,20 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20150717
+%global snapsrc    20150706
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
 %global tarname gdb-%{version}
-Version: 7.9.90.%{snapsrc}
+Version: 7.9.90.20150717
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
-# ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+# ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
 Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
@@ -72,6 +72,16 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 Recommends: gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
 %endif
+
+%if 0%{?el6:1}
+%global librpmver 1
+%elif 0%{?el7:1}
+%global librpmver 3
+%else
+%global librpmver 7
+%endif
+BuildRequires: %{_libdir}/librpm.so.%{librpmver}
+Recommends: rpm-libs%{?_isa}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -528,7 +538,7 @@ BuildRequires: expat-devel%{?_isa}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz-devel%{?_isa}
 %endif
-# dlopen() no longer makes rpm-libs%{?_isa} (it's .so) a mandatory dependency.
+# dlopen() no longer makes rpm-libsFIXME{?_isa} (it's .so) a mandatory dependency.
 BuildRequires: rpm-devel%{?_isa}
 BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
 %if 0%{!?_without_python:1}
@@ -915,11 +925,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-python					\
 %endif
-%if 0%{?el6:1}
-	--with-rpm=librpm.so.1					\
-%else
-	--with-rpm=librpm.so.3					\
-%endif
+	--with-rpm=librpm.so.%{librpmver}			\
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-lzma						\
 %else
@@ -1310,6 +1316,12 @@ then
 fi
 
 %changelog
+* Sat Aug  1 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-8.fc23
+- Fix librpm version 3->7 for Rawhide
+  (RH BZ 1249325, bugreport by Zbigniew Jędrzejewski-Szmek).
+- Fix yum vs. dnf message suggestion for Rawhide
+  (RH BZ 1249326, bugreport by Zbigniew Jędrzejewski-Szmek).
+
 * Fri Jul 17 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-7.fc23
 - Rebase to FSF GDB 7.9.90.20150717 (7.10 branch snapshot).
 
