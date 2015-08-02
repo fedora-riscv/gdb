@@ -26,7 +26,7 @@ Version: 7.9.90.20150717
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -80,7 +80,7 @@ Recommends: dnf-command(debuginfo-install)
 %else
 %global librpmver 7
 %endif
-%if %{__isa_bits} == 64
+%if 0%{?__isa_bits} == 64
 %global librpmname librpm.so.%{librpmver}()(64bit)
 %else
 %global librpmname librpm.so.%{librpmver}
@@ -700,8 +700,7 @@ tar xJf %{SOURCE5}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
-rm -f gdb/ada-exp.c gdb/ada-lex.c gdb/c-exp.c gdb/cp-name-parser.c gdb/f-exp.c
-rm -f gdb/jv-exp.c gdb/m2-exp.c gdb/objc-exp.c gdb/p-exp.c gdb/go-exp.c
+(cd gdb;rm -fv $(perl -pe 's/\\\n/ /' <Makefile.in|sed -n 's/^YYFILES = //p'))
 
 # *.info* is needlessly split in the distro tar; also it would not get used as
 # we build in %{gdb_build}, just to be sure.
@@ -1321,6 +1320,10 @@ then
 fi
 
 %changelog
+* Sun Aug  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-10.fc23
+- Fix unpackaged d-exp.c source for the debuginfo rpm.
+- Fix librpm version dependency Koji build failure (for RH BZ 1249325).
+
 * Sun Aug  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-9.fc23
 - Fix librpm version dependency (for RH BZ 1249325, from Igor Gnatenko).
 
