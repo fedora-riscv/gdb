@@ -26,7 +26,7 @@ Version: 7.9.90.20150717
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -80,8 +80,13 @@ Recommends: dnf-command(debuginfo-install)
 %else
 %global librpmver 7
 %endif
-BuildRequires: %{_libdir}/librpm.so.%{librpmver}
-Recommends: rpm-libs%{?_isa}
+%if %{__isa_bits} == 64
+%global librpmname librpm.so.%{librpmver}()(64bit)
+%else
+%global librpmname librpm.so.%{librpmver}
+%endif
+BuildRequires: %{librpmname}
+Recommends: %{librpmname}
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -1316,6 +1321,9 @@ then
 fi
 
 %changelog
+* Sun Aug  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-9.fc23
+- Fix librpm version dependency (for RH BZ 1249325, from Igor Gnatenko).
+
 * Sat Aug  1 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-8.fc23
 - Fix librpm version 3->7 for Rawhide
   (RH BZ 1249325, bugreport by Zbigniew Jędrzejewski-Szmek).
