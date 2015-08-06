@@ -26,7 +26,7 @@ Version: 7.9.90.20150717
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -68,12 +68,11 @@ Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
 
-# https://bugzilla.redhat.com/show_bug.cgi?id=1209492
-Recommends: default-yama-scope
-
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
+# https://bugzilla.redhat.com/show_bug.cgi?id=1209492
+Recommends: default-yama-scope
 %endif
 
 %if 0%{?el6:1}
@@ -1326,6 +1325,9 @@ then
 fi
 
 %changelog
+* Thu Aug  6 2015 Sergio Durigan Junior <sergiodj@redhat.com> - 7.9.90.20150717-12.fc23
+- Add "Recommends: default-yama-scope" (for RH BZ 1209492).
+
 * Thu Aug  6 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-11.fc23
 - Fix librpm version for f23.
 
