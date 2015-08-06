@@ -68,6 +68,9 @@ Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
 
+# https://bugzilla.redhat.com/show_bug.cgi?id=1209492
+Recommends: default-yama-scope
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
