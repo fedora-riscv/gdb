@@ -26,7 +26,7 @@ Version: 7.9.90.20150717
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -75,10 +75,13 @@ Recommends: dnf-command(debuginfo-install)
 
 %if 0%{?el6:1}
 %global librpmver 1
-%elif 0%{?el7:1}
+%else
+# FIXME: %elif does not work.
+%if 0%{?el7:1} || 0%{?fc23:1}
 %global librpmver 3
 %else
 %global librpmver 7
+%endif
 %endif
 %if 0%{?__isa_bits} == 64
 %global librpmname librpm.so.%{librpmver}()(64bit)
@@ -1320,6 +1323,9 @@ then
 fi
 
 %changelog
+* Thu Aug  6 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-11.fc23
+- Fix librpm version for f23.
+
 * Sun Aug  2 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.90.20150717-10.fc23
 - Fix unpackaged d-exp.c source for the debuginfo rpm.
 - Fix librpm version dependency Koji build failure (for RH BZ 1249325).
