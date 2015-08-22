@@ -21,12 +21,13 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20150706
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20121213
-%global tarname gdb-%{version}
-Version: 7.9.90.20150717
+#global tarname gdb-%{version}
+%global tarname gdb-7.9.90.20150822
+Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -533,9 +534,6 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
-# Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
-Patch992: gdb-type-printers-error.patch
-
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -611,14 +609,6 @@ BuildRequires: gcc-go
 %endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
-# Copied from prelink-0.4.2-3.fc13.
-# Prelink is not yet ported to ppc64le.
-%ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
-# Prelink is broken on sparcv9/sparc64.
-%ifnarch sparc sparcv9 sparc64
-BuildRequires: prelink
-%endif
-%endif
 %if 0%{!?rhel:1}
 # Fedora arm+ppc64le do not yet have fpc built.
 %ifnarch %{arm} ppc64le
@@ -820,7 +810,6 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch992 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1325,6 +1314,10 @@ then
 fi
 
 %changelog
+* Sat Aug 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-13.fc23
+- Rebase to FSF GDB 7.9.90.20150822 (7.10 branch snapshot).
+- Remove --with testsuite BuildRequires: prelink (prelink is orphaned in F-23+).
+
 * Thu Aug  6 2015 Sergio Durigan Junior <sergiodj@redhat.com> - 7.9.90.20150717-12.fc23
 - Add "Recommends: default-yama-scope" (for RH BZ 1209492).
 
