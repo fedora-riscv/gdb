@@ -27,7 +27,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -609,6 +609,16 @@ BuildRequires: gcc-go
 %endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
+# Copied from prelink-0.4.2-3.fc13.
+# Prelink is not yet ported to ppc64le.
+%ifarch %{ix86} alpha sparc sparcv9 sparc64 s390 s390x x86_64 ppc ppc64
+# Prelink is broken on sparcv9/sparc64.
+%ifnarch sparc sparcv9 sparc64
+BuildRequires: prelink
+%endif
+%endif
+%endif
 %if 0%{!?rhel:1}
 # Fedora arm+ppc64le do not yet have fpc built.
 %ifnarch %{arm} ppc64le
@@ -1314,6 +1324,9 @@ then
 fi
 
 %changelog
+* Sat Aug 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-14.fc23
+- Re-enable --with testsuite BuildRequires: prelink for RHELs.
+
 * Sat Aug 22 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-13.fc23
 - Rebase to FSF GDB 7.9.90.20150822 (7.10 branch snapshot).
 - Remove --with testsuite BuildRequires: prelink (prelink is orphaned in F-23+).
