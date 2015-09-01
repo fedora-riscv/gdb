@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -91,7 +91,9 @@ Recommends: default-yama-scope
 %global librpmname librpm.so.%{librpmver}
 %endif
 BuildRequires: %{librpmname}
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: %{librpmname}
+%endif
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -1323,6 +1325,9 @@ then
 fi
 
 %changelog
+* Tue Sep  1 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-16.fc23
+- [RHEL] Fix librpm Recommends compatibility.
+
 * Sat Aug 29 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-15.fc23
 - Rebase to FSF GDB 7.10 final.
 
