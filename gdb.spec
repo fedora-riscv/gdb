@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -544,6 +544,11 @@ Patch991: gdb-cxx-enum-tag.patch
 # Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
 Patch992: gdb-type-printers-error.patch
 
+# Fix 'Make the probes-based dynamic linker interface more robust to
+# errors' (Sergio Durigan Junior, RH BZ 1259132).
+Patch1031: gdb-probes-based-interface-robust-1of2.patch
+Patch1032: gdb-probes-based-interface-robust-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -834,6 +839,8 @@ find -name "*.info*"|xargs rm -f
 %patch985 -p1
 %patch991 -p1
 %patch992 -p1
+%patch1031 -p1
+%patch1032 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1334,6 +1341,10 @@ then
 fi
 
 %changelog
+* Wed Sep  2 2015 Sergio Durigan Junior <sergiodj@redhat.com> - 7.9.1-18.fc22
+- Fix 'Make the probes-based dynamic linker interface more robust to
+  errors' (Sergio Durigan Junior, RH BZ 1259132).
+
 * Fri Jun 26 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-17.fc22
 - Fix 'info type-printers' Python error (Clem Dickey, RH BZ 1085576).
 
