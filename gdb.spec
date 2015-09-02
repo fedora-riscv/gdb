@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -535,6 +535,11 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
+# Fix 'Make the probes-based dynamic linker interface more robust to
+# errors' (Sergio Durigan Junior, RH BZ 1259132).
+Patch1029: gdb-probes-based-interface-robust-1of2.patch
+Patch1030: gdb-probes-based-interface-robust-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -821,6 +826,8 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
+%patch1029 -p1
+%patch1030 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1325,6 +1332,10 @@ then
 fi
 
 %changelog
+* Wed Sep  2 2015 Sergio Durigan Junior <sergiodj@redhat.com> - 7.10-17.fc23
+- Fix 'Make the probes-based dynamic linker interface more robust to
+  errors' (Sergio Durigan Junior, RH BZ 1259132).
+
 * Tue Sep  1 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-16.fc23
 - [RHEL] Fix librpm Recommends compatibility.
 
