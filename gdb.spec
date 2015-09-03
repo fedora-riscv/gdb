@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -580,6 +580,13 @@ BuildRequires: /usr/bin/pod2man
 BuildRequires: libbabeltrace-devel%{?_isa}
 BuildRequires: guile-devel%{?_isa}
 %endif
+%global have_libipt 0
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%ifarch %{ix86} x86_64
+%global have_libipt 1
+BuildRequires: libipt-devel%{?_isa}
+%endif
+%endif
 
 %if 0%{?_with_testsuite:1}
 
@@ -958,6 +965,11 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--disable-inprocess-agent				\
 %endif
 	--with-system-zlib					\
+%if %{have_libipt}
+	--with-intel-pt						\
+%else
+	--without-intel-pt					\
+%endif
 	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
@@ -1332,6 +1344,9 @@ then
 fi
 
 %changelog
+* Thu Sep  3 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-18.fc23
+- Enable libipt (Intel Processor Trace Decoder Library).
+
 * Wed Sep  2 2015 Sergio Durigan Junior <sergiodj@redhat.com> - 7.10-17.fc23
 - Fix 'Make the probes-based dynamic linker interface more robust to
   errors' (Sergio Durigan Junior, RH BZ 1259132).
