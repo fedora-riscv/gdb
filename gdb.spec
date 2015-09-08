@@ -79,11 +79,7 @@ Recommends: default-yama-scope
 %global librpmver 1
 %else
 # FIXME: %elif does not work.
-%if 0%{?el7:1} || 0%{?fc23:1}
-%global librpmver 3
-%else
 %global librpmver 7
-%endif
 %endif
 %if 0%{?__isa_bits} == 64
 %global librpmname librpm.so.%{librpmver}()(64bit)
