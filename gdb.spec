@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -79,7 +79,11 @@ Recommends: default-yama-scope
 %global librpmver 1
 %else
 # FIXME: %elif does not work.
+%if 0%{?el7:1}
+%global librpmver 3
+%else
 %global librpmver 7
+%endif
 %endif
 %if 0%{?__isa_bits} == 64
 %global librpmname librpm.so.%{librpmver}()(64bit)
@@ -1340,6 +1344,9 @@ then
 fi
 
 %changelog
+* Thu Sep 10 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-19.fc23
+- Add changelog entry and fix librpm dependency broken by Peter Robinson.
+
 * Thu Sep  3 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-18.fc23
 - Enable libipt (Intel Processor Trace Decoder Library).
 
