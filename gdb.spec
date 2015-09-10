@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -540,6 +540,9 @@ Patch978: gdb-jit-reader-multilib.patch
 Patch1029: gdb-probes-based-interface-robust-1of2.patch
 Patch1030: gdb-probes-based-interface-robust-2of2.patch
 
+# [ppc64le] Use skip_entrypoint for skip_trampoline_code (RH BZ 1260558).
+Patch1031: gdb-rhbz1260558-ppc64le-skip_trampoline_code.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -835,6 +838,7 @@ find -name "*.info*"|xargs rm -f
 %patch978 -p1
 %patch1029 -p1
 %patch1030 -p1
+%patch1031 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1344,6 +1348,9 @@ then
 fi
 
 %changelog
+* Thu Sep 10 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-20.fc23
+- [ppc64le] Use skip_entrypoint for skip_trampoline_code (RH BZ 1260558).
+
 * Thu Sep 10 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-19.fc23
 - Add changelog entry and fix librpm dependency broken by Peter Robinson.
 
