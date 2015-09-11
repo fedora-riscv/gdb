@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -611,15 +611,17 @@ BuildRequires: libipt-devel%{?_isa}
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
 BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: gcc-gdb-plugin%{?_isa}
+%endif
 %if 0%{?rhel:1} && 0%{?rhel} < 7
 BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-# Fedora ppc64le does not yet have gcc-go built.
-%ifnarch ppc64le
+# These Fedoras do not yet have gcc-go built.
+%ifnarch ppc64le aarch64
 BuildRequires: gcc-go
 %endif
 %endif
@@ -651,8 +653,8 @@ BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-# Fedora ppc64le does not yet have gcc-go built.
-%ifnarch ppc64le
+# These Fedoras do not yet have gcc-go built.
+%ifnarch ppc64le aarch64
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 %endif
@@ -1348,6 +1350,9 @@ then
 fi
 
 %changelog
+* Fri Sep 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-21.fc23
+- [testsuite] Fix gcc-gdb-plugin and gcc-go BuildRequires for --with testsuite.
+
 * Thu Sep 10 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-20.fc23
 - [ppc64le] Use skip_entrypoint for skip_trampoline_code (RH BZ 1260558).
 
