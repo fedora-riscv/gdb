@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1350,6 +1350,9 @@ then
 fi
 
 %changelog
+* Sun Sep 13 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-22.fc23
+- Fix gstack to use gdb from $PATH (bugreport by Frank Hirtz, RH BZ 1262589).
+
 * Fri Sep 11 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-21.fc23
 - [testsuite] Fix gcc-gdb-plugin and gcc-go BuildRequires for --with testsuite.
 
