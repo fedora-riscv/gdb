@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -543,6 +543,9 @@ Patch1030: gdb-probes-based-interface-robust-2of2.patch
 # [ppc64le] Use skip_entrypoint for skip_trampoline_code (RH BZ 1260558).
 Patch1031: gdb-rhbz1260558-ppc64le-skip_trampoline_code.patch
 
+# Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
+Patch1044: gdb-pahole-python3fix.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -841,6 +844,7 @@ find -name "*.info*"|xargs rm -f
 %patch1029 -p1
 %patch1030 -p1
 %patch1031 -p1
+%patch1044 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1350,6 +1354,9 @@ then
 fi
 
 %changelog
+* Fri Sep 18 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-23.fc23
+- Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
+
 * Sun Sep 13 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-22.fc23
 - Fix gstack to use gdb from $PATH (bugreport by Frank Hirtz, RH BZ 1262589).
 
