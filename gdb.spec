@@ -14,6 +14,8 @@
  %global _root_bindir %{_bindir}
 }
 
+%global _without_python 1
+
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
@@ -26,7 +28,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1354,6 +1356,9 @@ then
 fi
 
 %changelog
+* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-24.fc24
+- Python3.5 Rebuild: Rebuild without python3 support 
+
 * Fri Sep 18 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-23.fc23
 - Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 
