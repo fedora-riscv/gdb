@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -568,12 +568,12 @@ BuildRequires: python-devel%{?_isa}
 %global __python %{__python3}
 BuildRequires: python3-devel%{?_isa}
 %endif
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
 # Temporarily before python files get moved to libstdc++.rpm
 # libstdc++%{bits_other} is not present in Koji, the .spec script generating
 # gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
 BuildRequires: libstdc++%{?_isa}
-%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 7
 %endif # 0%{!?_without_python:1}
 # gdb-doc in PDF, see: https://bugzilla.redhat.com/show_bug.cgi?id=919891#c10
 BuildRequires: texinfo-tex
@@ -720,10 +720,10 @@ This package provides INFO, HTML and PDF user manual for GDB.
 %prep
 %setup -q -n %{gdb_src}
 
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
 # libstdc++ pretty printers.
 tar xJf %{SOURCE5}
-%endif # 0%{?rhel:1} && 0%{?rhel} <= 6
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 7
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 (cd gdb;rm -fv $(perl -pe 's/\\\n/ /' <Makefile.in|sed -n 's/^YYFILES = //p'))
@@ -1170,10 +1170,18 @@ done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
 %if 0%{!?_without_python:1}
-mkdir $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+# BZ 999645: /usr/share/gdb/auto-load/ needs filesystem symlinks
+for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
+  # mkdir to satisfy dangling symlinks build check.
+  mkdir -p $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/%{_root_prefix}/$i
+  ln -s $(echo %{_root_prefix}|sed 's#^/*##')/$i \
+        $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/$i
+done
+%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
 # Temporarily now:
-for LIB in lib lib64;do
+for LIB in $(echo lib $(basename %{_libdir})|tr ' ' '\n'|sort -u);do
   LIBPATH="$RPM_BUILD_ROOT%{_datadir}/gdb/auto-load%{_root_prefix}/$LIB"
   mkdir -p $LIBPATH
   # basename is being run only for the native (non-biarch) file.
@@ -1187,15 +1195,7 @@ done
 test ! -e $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
 cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
       $RPM_BUILD_ROOT%{_datadir}/gdb/python/libstdcxx
-%else # 0%{!?rhel:1} || 0%{?rhel} > 6
-# BZ 999645: /usr/share/gdb/auto-load/ needs filesystem symlinks
-for i in $(echo bin lib $(basename %{_libdir}) sbin|tr ' ' '\n'|sort -u);do
-  # mkdir to satisfy dangling symlinks build check.
-  mkdir -p $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/%{_root_prefix}/$i
-  ln -s $(echo %{_root_prefix}|sed 's#^/*##')/$i \
-        $RPM_BUILD_ROOT%{_datadir}/gdb/auto-load/$i
-done
-%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+%endif # 0%{?rhel:1} && 0%{?rhel} <= 7
 for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb -name "*.py"`; do
   # Files are installed by install(1) not preserving the timestamps.
   touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
@@ -1260,6 +1260,13 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/gdb/guile
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
 rmdir $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit
+
+%if 0%{!?_without_python:1}
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
+# python2? /usr/lib/rpm/brp-python-bytecompile /usr/bin/python 1
+rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/pahole.py*
+%endif
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -1354,10 +1361,15 @@ then
 fi
 
 %changelog
-* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-25.fc24
+* Wed Sep 23 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-26.fc23
+- [rhel7] Provide libstdc++-v3-python with C++11 even on RHEL-7 (RH BZ 1239290).
+- Do not provide libstdc++-v3-python lib64 files on 32-bit archs.
+- [rhel6,rhel7] Delete pahole.py on Python2 systems.
+
+* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-25.fc23
 - Python3.5 Rebuild: Rebuild wit python3 support 
 
-* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-24.fc24
+* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-24.fc23
 - Python3.5 Rebuild: Rebuild without python3 support 
 
 * Fri Sep 18 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-23.fc23
