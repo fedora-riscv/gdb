@@ -14,8 +14,6 @@
  %global _root_bindir %{_bindir}
 }
 
-%global _without_python 1
-
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
@@ -28,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1356,6 +1354,9 @@ then
 fi
 
 %changelog
+* Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-25.fc24
+- Python3.5 Rebuild: Rebuild wit python3 support 
+
 * Wed Sep 23 2015 Robert Kuska <rkuska@redhat.com> - 7.10-24.fc24
 - Python3.5 Rebuild: Rebuild without python3 support 
 
