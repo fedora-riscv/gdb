@@ -26,7 +26,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -544,7 +544,7 @@ Patch1030: gdb-probes-based-interface-robust-2of2.patch
 Patch1031: gdb-rhbz1260558-ppc64le-skip_trampoline_code.patch
 
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
-Patch1044: gdb-pahole-python3fix.patch
+Patch1044: gdb-pahole-python2.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -844,7 +844,6 @@ find -name "*.info*"|xargs rm -f
 %patch1029 -p1
 %patch1030 -p1
 %patch1031 -p1
-%patch1044 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -865,6 +864,10 @@ find -name "*.info*"|xargs rm -f
 %patch335 -p1 -R
 %patch331 -p1 -R
 %patch337 -p1 -R
+%endif
+%patch1044 -p1
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%patch1044 -p1 -R
 %endif
 
 find -name "*.orig" | xargs rm -f
@@ -1261,13 +1264,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
 rmdir $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit
 
-%if 0%{!?_without_python:1}
-%if 0%{?rhel:1} && 0%{?rhel} <= 7
-# python2? /usr/lib/rpm/brp-python-bytecompile /usr/bin/python 1
-rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/pahole.py*
-%endif
-%endif
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -1361,6 +1357,9 @@ then
 fi
 
 %changelog
+* Thu Sep 24 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-27.fc23
+- [rhel6,rhel7] Keep pahole.py and make it Python2 compatible.
+
 * Wed Sep 23 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-26.fc23
 - [rhel7] Provide libstdc++-v3-python with C++11 even on RHEL-7 (RH BZ 1239290).
 - Do not provide libstdc++-v3-python lib64 files on 32-bit archs.
