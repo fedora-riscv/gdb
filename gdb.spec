@@ -1,5 +1,6 @@
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
+# --with buildisa: Use %%{?_isa} for BuildRequires
 # --with asan: gcc -fsanitize=address
 # --without python: No python support.
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
@@ -11,7 +12,7 @@
  %global pkg_name %{name}
  %global _root_prefix %{_prefix}
  %global _root_datadir %{_datadir}
- %global _root_bindir %{_bindir}
+ %global _root_libdir %{_libdir}
 }
 
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
@@ -26,7 +27,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -68,6 +69,9 @@ Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
 
+# https://fedoraproject.org/wiki/Packaging:Guidelines#BuildRequires_and_.25.7B_isa.7D
+%global buildisa %{?_with_buildisa:%{?_isa}}
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
@@ -90,7 +94,10 @@ Recommends: default-yama-scope
 %else
 %global librpmname librpm.so.%{librpmver}
 %endif
+BuildRequires: rpm-libs%{buildisa}
+%if 0%{?_with_buildisa:1}
 BuildRequires: %{librpmname}
+%endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: %{librpmname}
 %endif
@@ -550,29 +557,29 @@ Patch1044: gdb-pahole-python2.patch
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
 # --with-system-readline
-BuildRequires: readline-devel%{?_isa} >= 6.2-4
+BuildRequires: readline-devel%{buildisa} >= 6.2-4
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
-BuildRequires: ncurses-devel%{?_isa} texinfo gettext flex bison
-BuildRequires: expat-devel%{?_isa}
+BuildRequires: ncurses-devel%{buildisa} texinfo gettext flex bison
+BuildRequires: expat-devel%{buildisa}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-BuildRequires: xz-devel%{?_isa}
+BuildRequires: xz-devel%{buildisa}
 %endif
 # dlopen() no longer makes rpm-libsFIXME{?_isa} (it's .so) a mandatory dependency.
-BuildRequires: rpm-devel%{?_isa}
-BuildRequires: zlib-devel%{?_isa} libselinux-devel%{?_isa}
+BuildRequires: rpm-devel%{buildisa}
+BuildRequires: zlib-devel%{buildisa} libselinux-devel%{buildisa}
 %if 0%{!?_without_python:1}
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
-BuildRequires: python-devel%{?_isa}
+BuildRequires: python-devel%{buildisa}
 %else
 %global __python %{__python3}
-BuildRequires: python3-devel%{?_isa}
+BuildRequires: python3-devel%{buildisa}
 %endif
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 # Temporarily before python files get moved to libstdc++.rpm
 # libstdc++%{bits_other} is not present in Koji, the .spec script generating
 # gdb/python/libstdcxx/ also does not depend on the %{bits_other} files.
-BuildRequires: libstdc++%{?_isa}
+BuildRequires: libstdc++%{buildisa}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 7
 %endif # 0%{!?_without_python:1}
 # gdb-doc in PDF, see: https://bugzilla.redhat.com/show_bug.cgi?id=919891#c10
@@ -583,14 +590,14 @@ BuildRequires: texlive-collection-latexrecommended
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1}
-BuildRequires: libbabeltrace-devel%{?_isa}
-BuildRequires: guile-devel%{?_isa}
+BuildRequires: libbabeltrace-devel%{buildisa}
+BuildRequires: guile-devel%{buildisa}
 %endif
 %global have_libipt 0
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 %ifarch %{ix86} x86_64
 %global have_libipt 1
-BuildRequires: libipt-devel%{?_isa}
+BuildRequires: libipt-devel%{buildisa}
 %endif
 %endif
 
@@ -903,6 +910,8 @@ rm -rf zlib
 
 %build
 rm -rf %{buildroot}
+
+test -e %{_root_libdir}/librpm.so.%{librpmver}
 
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
@@ -1357,6 +1366,10 @@ then
 fi
 
 %changelog
+* Mon Sep 28 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-28.fc23
+- Add --with buildisa, remove %%{?_isa} from BuildRequires by default:
+  https://github.com/msimacek/koschei/issues/54
+
 * Thu Sep 24 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-27.fc23
 - [rhel6,rhel7] Keep pahole.py and make it Python2 compatible.
 
