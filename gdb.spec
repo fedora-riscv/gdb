@@ -26,7 +26,7 @@ Version: 7.9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 19%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -552,6 +552,9 @@ Patch1032: gdb-probes-based-interface-robust-2of2.patch
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 Patch1044: gdb-pahole-python3fix.patch
 
+# Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
+Patch1052: gdb-rhbz1270564-invalid-dwarf-regno.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -845,6 +848,7 @@ find -name "*.info*"|xargs rm -f
 %patch1031 -p1
 %patch1032 -p1
 %patch1044 -p1
+%patch1052 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1345,6 +1349,9 @@ then
 fi
 
 %changelog
+* Mon Oct 12 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-20.fc22
+- Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
+
 * Fri Sep 18 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.9.1-19.fc22
 - Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 

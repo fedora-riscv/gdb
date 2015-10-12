@@ -1,0 +1,220 @@
+http://sourceware.org/ml/gdb-patches/2015-10/msg00166.html
+Subject: [patch] Fix internal error on DW_OP_bregx(-1)
+
+
+--ibTvN161/egqYuK8
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+Hi,
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1270564#c15
+https://bugzilla.redhat.com/attachment.cgi?id=1081772
+
+clang-3.5.0-9.fc22.x86_64
+ <3><22b2>: Abbrev Number: 69 (DW_TAG_variable)
+    <22b3>   DW_AT_location    : 7 byte block: 92 ff ff ff ff f 0       (DW_OP_bregx: 4294967295 (r-1) 0)
+    <22bb>   DW_AT_name        : (indirect string, offset: 0x2a36): texture_data
+    <22c1>   DW_AT_type        : <0x1d3>
+
+(gdb) p variable
+warning: Unmapped DWARF Register #-1 encountered.
+regcache.c:177: internal-error: register_size: Assertion `regnum >= 0 && regnum < (gdbarch_num_regs (gdbarch) + gdbarch_num_pseudo_regs (gdbarch))' failed.
+[...]
+Quit this debugging session? (y or n) FAIL: gdb.dwarf2/dw2-regno-invalid.exp: p variable (GDB internal error)
+
+-> (x86_64)
+(gdb) p variable
+warning: Unmapped DWARF Register #-1 encountered.
+Invalid register #-1, expecting 0 <= # < 220
+(gdb) PASS: gdb.dwarf2/dw2-regno-invalid.exp: p variable
+-> (i386)
+(gdb) p variable
+Invalid register #104, expecting 0 <= # < 104
+(gdb) PASS: gdb.dwarf2/dw2-regno-invalid.exp: p variable
+
+GDB calls gdbarch_dwarf2_reg_to_regnum() first which returns -1 in the x86_64
+case
+  if (regnum == -1)
+    warning (_("Unmapped DWARF Register #%d encountered."), reg);
+but in i386 case it does:
+  /* This will hopefully provoke a warning.  */
+  return gdbarch_num_regs (gdbarch) + gdbarch_num_pseudo_regs (gdbarch);
+and the default implementation is a nop, leaving whatever register number
+the DWARF specified.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedorarawhide-linux-gnu.
+
+
+Jan
+
+--ibTvN161/egqYuK8
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename="undefreg.patch"
+
+gdb/ChangeLog
+2015-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* findvar.c (address_from_register): Check REGNUM validity.
+
+gdb/testsuite/ChangeLog
+2015-10-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-regno-invalid.S: New file.
+	* gdb.dwarf2/dw2-regno-invalid.exp: New file.
+
+diff --git a/gdb/findvar.c b/gdb/findvar.c
+index 0f46e53..855947d 100644
+--- a/gdb/findvar.c
++++ b/gdb/findvar.c
+@@ -927,6 +927,12 @@ address_from_register (int regnum, struct frame_info *frame)
+   struct type *type = builtin_type (gdbarch)->builtin_data_ptr;
+   struct value *value;
+   CORE_ADDR result;
++  int regnum_max_excl = (gdbarch_num_regs (gdbarch)
++			 + gdbarch_num_pseudo_regs (gdbarch));
++
++  if (regnum < 0 || regnum >= regnum_max_excl)
++    error (_("Invalid register #%d, expecting 0 <= # < %d"), regnum,
++	   regnum_max_excl);
+ 
+   /* This routine may be called during early unwinding, at a time
+      where the ID of FRAME is not yet known.  Calling value_from_register
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.S b/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.S
+new file mode 100644
+index 0000000..075bfd6
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.S
+@@ -0,0 +1,91 @@
++/* Copyright 2015 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++	.section	.debug_info
++debug_start:
++	.4byte	debug_end - 1f	/* Length of Compilation Unit Info */
++1:
++	.2byte	0x3	/* DWARF version number */
++	.4byte	.Ldebug_abbrev0	/* Offset Into Abbrev. Section */
++	.byte	0x4	/* Pointer Size (in bytes) */
++	.uleb128 0x1	/* (DIE (0xb) DW_TAG_compile_unit) */
++	.ascii "clang-3.5.0-9.fc22.x86_64\0"	/* DW_AT_producer */
++	.byte	0x1	/* DW_AT_language */
++	.ascii "1.c\0"	/* DW_AT_name */
++	.4byte	main_label		/* DW_AT_low_pc */
++	.4byte	main_label+0x10000	/* DW_AT_high_pc */
++
++	.uleb128	2			/* Abbrev: DW_TAG_subprogram */
++	.byte		1			/* DW_AT_external */
++	.ascii		"main\0"		/* DW_AT_name */
++	.4byte	main_label		/* DW_AT_low_pc */
++	.4byte	main_label+0x10000	/* DW_AT_high_pc */
++
++	.uleb128 0x4	/* (DW_TAG_variable) */
++	.ascii "variable\0"	/* DW_AT_name */
++	.2byte	2f - 1f	/* DW_AT_location: DW_FORM_block2 */
++1:
++	.byte	0x92	/* DW_OP_bregx */
++	.uleb128	0xffffffff
++	.sleb128 0
++2:
++
++	.byte	0x0	/* end of children of main */
++	.byte	0x0	/* end of children of CU */
++debug_end:
++
++	.section	.debug_abbrev
++.Ldebug_abbrev0:
++	.uleb128 0x1	/* (abbrev code) */
++	.uleb128 0x11	/* (TAG: DW_TAG_compile_unit) */
++	.byte	0x1	/* DW_children_yes */
++	.uleb128 0x25	/* (DW_AT_producer) */
++	.uleb128 0x8	/* (DW_FORM_string) */
++	.uleb128 0x13	/* (DW_AT_language) */
++	.uleb128 0xb	/* (DW_FORM_data1) */
++	.uleb128 0x3	/* (DW_AT_name) */
++	.uleb128 0x8	/* (DW_FORM_string) */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte	0x0
++	.byte	0x0
++
++	.uleb128	2			/* Abbrev code */
++	.uleb128	0x2e			/* DW_TAG_subprogram */
++	.byte		1			/* has_children */
++	.uleb128	0x3f			/* DW_AT_external */
++	.uleb128	0xc			/* DW_FORM_flag */
++	.uleb128	0x3			/* DW_AT_name */
++	.uleb128	0x8			/* DW_FORM_string */
++	.uleb128	0x11			/* DW_AT_low_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.uleb128	0x12			/* DW_AT_high_pc */
++	.uleb128	0x1			/* DW_FORM_addr */
++	.byte		0x0			/* Terminator */
++	.byte		0x0			/* Terminator */
++
++
++	.uleb128 0x4	/* (abbrev code) */
++	.uleb128 0x34	/* (TAG: DW_TAG_variable) */
++	.byte	0x0	/* DW_children_yes */
++	.uleb128 0x3	/* (DW_AT_name) */
++	.uleb128 0x8	/* (DW_FORM_string) */
++	.uleb128 0x02	/* (DW_AT_location) */
++	.uleb128 0x3	/* (DW_FORM_block2) */
++	.byte	0x0
++	.byte	0x0
++	.byte	0x0
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.exp b/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.exp
+new file mode 100644
+index 0000000..7c3a404
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-regno-invalid.exp
+@@ -0,0 +1,32 @@
++# Copyright 2015 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++load_lib dwarf.exp
++
++# This test can only be run on targets which support DWARF-2 and use gas.
++if {![dwarf2_support]} {
++    return 0  
++}
++
++standard_testfile .S main.c
++
++if { [gdb_compile "${srcdir}/${subdir}/${srcfile} ${srcdir}/${subdir}/${srcfile2}" \
++		  "${binfile}" executable {}] != "" } {
++    return -1
++}
++
++clean_restart ${binfile}
++runto_main
++
++gdb_test "p variable"
+
+--ibTvN161/egqYuK8--
+
