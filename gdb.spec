@@ -27,7 +27,7 @@ Version: 7.10
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -553,6 +553,9 @@ Patch1031: gdb-rhbz1260558-ppc64le-skip_trampoline_code.patch
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 Patch1044: gdb-pahole-python2.patch
 
+# Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
+Patch1052: gdb-rhbz1270564-invalid-dwarf-regno.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -851,6 +854,7 @@ find -name "*.info*"|xargs rm -f
 %patch1029 -p1
 %patch1030 -p1
 %patch1031 -p1
+%patch1052 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1366,6 +1370,9 @@ then
 fi
 
 %changelog
+* Mon Oct 12 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-29.fc23
+- Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
+
 * Mon Sep 28 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-28.fc23
 - Add --with buildisa, remove %%{?_isa} from BuildRequires by default:
   https://github.com/msimacek/koschei/issues/54
