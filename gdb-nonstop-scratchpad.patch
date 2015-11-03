@@ -1,0 +1,268 @@
+http://sourceware.org/ml/gdb-patches/2015-10/msg00601.html
+Subject: [PATCH] [PATCH] Don't displaced step when there's a breakpoint in the scratch pad range
+
+Assuming displaced stepping is enabled, and a breakpoint is set in the
+memory region of the scratch pad, things break.  One of two cases can
+happen:
+
+#1 - The breakpoint wasn't inserted yet (all threads were stopped), so
+     after setting up the displaced stepping scratch pad with the
+     adjusted copy of the instruction we're trying to single-step, we
+     insert the breakpoint, which corrupts the scratch pad, and the
+     inferior executes the wrong instruction.  (Example below.)
+     This is clearly unacceptable.
+
+#2 - The breakpoint was already inserted, so setting up the displaced
+     stepping scratch pad overwrites the breakpoint.  This is OK in
+     the sense that we already assume that no thread is going to
+     executes the code in the scratch pad range (after initial
+     startup) anyway.
+
+This commit addresses both cases by simply punting on displaced
+stepping if we have a breakpoint in the scratch pad range.
+
+The #1 case above explains a few regressions exposed by the AS/NS
+series on x86:
+
+ Running ./gdb.dwarf2/callframecfa.exp ...
+ FAIL: gdb.dwarf2/callframecfa.exp: set display for call-frame-cfa
+ FAIL: gdb.dwarf2/callframecfa.exp: step 1 for call-frame-cfa
+ FAIL: gdb.dwarf2/callframecfa.exp: step 2 for call-frame-cfa
+ FAIL: gdb.dwarf2/callframecfa.exp: step 3 for call-frame-cfa
+ FAIL: gdb.dwarf2/callframecfa.exp: step 4 for call-frame-cfa
+ Running ./gdb.dwarf2/typeddwarf.exp ...
+ FAIL: gdb.dwarf2/typeddwarf.exp: continue to breakpoint: continue to typeddwarf.c:53
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of x at typeddwarf.c:53
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of y at typeddwarf.c:53
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of z at typeddwarf.c:53
+ FAIL: gdb.dwarf2/typeddwarf.exp: continue to breakpoint: continue to typeddwarf.c:73
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of w at typeddwarf.c:73
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of x at typeddwarf.c:73
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of y at typeddwarf.c:73
+ FAIL: gdb.dwarf2/typeddwarf.exp: check value of z at typeddwarf.c:73
+
+Enabling "maint set target-non-stop on" implies displaced stepping
+enabled as well, and it's the latter that's to blame here.  We can see
+the same failures with "maint set target-non-stop off + set displaced
+on".
+
+Diffing (good/bad) gdb.log for callframecfa.exp shows:
+
+ @@ -99,29 +99,29 @@ Breakpoint 2 at 0x80481b0: file q.c, lin
+  continue
+  Continuing.
+
+ -Breakpoint 2, func (arg=77) at q.c:2
+ +Breakpoint 2, func (arg=52301) at q.c:2
+  2      in q.c
+  (gdb) PASS: gdb.dwarf2/callframecfa.exp: continue to breakpoint: continue to breakpoint for call-frame-cfa
+  display arg
+ -1: arg = 77
+ -(gdb) PASS: gdb.dwarf2/callframecfa.exp: set display for call-frame-cfa
+ +1: arg = 52301
+ +(gdb) FAIL: gdb.dwarf2/callframecfa.exp: set display for call-frame-cfa
+
+The problem is here, when setting up the func call:
+
+ Breakpoint 1, main (argc=-13345, argv=0x0) at q.c:7
+ 7       in q.c
+
+ (gdb) disassemble
+ Dump of assembler code for function main:
+    0x080481bb <+0>:     push   %ebp
+    0x080481bc <+1>:     mov    %esp,%ebp
+    0x080481be <+3>:     sub    $0x4,%esp
+ => 0x080481c1 <+6>:     movl   $0x4d,(%esp)
+    0x080481c8 <+13>:    call   0x80481b0 <func>
+    0x080481cd <+18>:    leave
+    0x080481ce <+19>:    ret
+ End of assembler dump.
+ (gdb) disassemble /r
+ Dump of assembler code for function main:
+    0x080481bb <+0>:     55      push   %ebp
+    0x080481bc <+1>:     89 e5   mov    %esp,%ebp
+    0x080481be <+3>:     83 ec 04        sub    $0x4,%esp
+ => 0x080481c1 <+6>:     c7 04 24 4d 00 00 00    movl   $0x4d,(%esp)
+    0x080481c8 <+13>:    e8 e3 ff ff ff  call   0x80481b0 <func>
+    0x080481cd <+18>:    c9      leave
+    0x080481ce <+19>:    c3      ret
+ End of assembler dump.
+
+Note the breakpoint at main is set at 0x080481c1.  Right at the
+instruction that sets up func's argument.  Executing that instruction
+should write 0x4d to the address pointed at by $esp.  However, if we
+stepi, the program manages to write 52301/0xcc4d there instead (0xcc
+is int3, the x86 breakpoint instruction), because the breakpoint
+address is 4 bytes inside the scratch pad location, which is
+0x080481bd:
+
+ (gdb) p 0x080481c1 - 0x080481bd
+ $1 = 4
+
+IOW, instead of executing:
+
+  "c7 04 24 4d 00 00 00" [ movl $0x4d,(%esp) ]
+
+the inferior executes:
+
+  "c7 04 24 4d cc 00 00" [movl $0xcc4d,(%esp) ]
+
+gdb/ChangeLog:
+2015-10-26  Pedro Alves  <palves@redhat.com>
+
+	* breakpoint.c (breakpoint_in_range_p)
+	(breakpoint_location_address_range_overlap): New functions.
+	* breakpoint.h (breakpoint_in_range_p): New declaration.
+	* infrun.c (displaced_step_prepare_throw): If there's a breakpoint
+	in the scratch pad range, don't displaced step.
+---
+ gdb/breakpoint.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ gdb/breakpoint.h |  5 +++++
+ gdb/infrun.c     | 23 ++++++++++++++++++++++
+ 3 files changed, 88 insertions(+)
+
+diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
+index 2c901ff..5863573 100644
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -173,6 +173,10 @@ static int breakpoint_location_address_match (struct bp_location *bl,
+ 					      struct address_space *aspace,
+ 					      CORE_ADDR addr);
+ 
++static int breakpoint_location_address_range_overlap (struct bp_location *,
++						      struct address_space *,
++						      CORE_ADDR, int);
++
+ static void breakpoints_info (char *, int);
+ 
+ static void watchpoints_info (char *, int);
+@@ -4243,6 +4247,40 @@ breakpoint_here_p (struct address_space *aspace, CORE_ADDR pc)
+   return any_breakpoint_here ? ordinary_breakpoint_here : no_breakpoint_here;
+ }
+ 
++/* See breakpoint.h.  */
++
++int
++breakpoint_in_range_p (struct address_space *aspace,
++		       CORE_ADDR addr, ULONGEST len)
++{
++  struct bp_location *bl, **blp_tmp;
++
++  ALL_BP_LOCATIONS (bl, blp_tmp)
++    {
++      if (bl->loc_type != bp_loc_software_breakpoint
++	  && bl->loc_type != bp_loc_hardware_breakpoint)
++	continue;
++
++      if ((breakpoint_enabled (bl->owner)
++	   || bl->permanent)
++	  && breakpoint_location_address_range_overlap (bl, aspace,
++							addr, len))
++	{
++	  if (overlay_debugging
++	      && section_is_overlay (bl->section)
++	      && !section_is_mapped (bl->section))
++	    {
++	      /* Unmapped overlay -- can't be a match.  */
++	      continue;
++	    }
++
++	  return 1;
++	}
++    }
++
++  return 0;
++}
++
+ /* Return true if there's a moribund breakpoint at PC.  */
+ 
+ int
+@@ -7079,6 +7117,28 @@ breakpoint_location_address_match (struct bp_location *bl,
+ 						 aspace, addr)));
+ }
+ 
++/* Returns true if the [ADDR,ADDR+LEN) range in ASPACE overlaps
++   breakpoint BL.  BL may be a ranged breakpoint.  In most targets, a
++   match happens only if ASPACE matches the breakpoint's address
++   space.  On targets that have global breakpoints, the address space
++   doesn't really matter.  */
++
++static int
++breakpoint_location_address_range_overlap (struct bp_location *bl,
++					   struct address_space *aspace,
++					   CORE_ADDR addr, int len)
++{
++  if (gdbarch_has_global_breakpoints (target_gdbarch ())
++      || bl->pspace->aspace == aspace)
++    {
++      int bl_len = bl->length != 0 ? bl->length : 1;
++
++      if (mem_ranges_overlap (addr, len, bl->address, bl_len))
++	return 1;
++    }
++  return 0;
++}
++
+ /* If LOC1 and LOC2's owners are not tracepoints, returns false directly.
+    Then, if LOC1 and LOC2 represent the same tracepoint location, returns
+    true, otherwise returns false.  */
+diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
+index 896d3eb..ee8b2e0 100644
+--- a/gdb/breakpoint.h
++++ b/gdb/breakpoint.h
+@@ -1146,6 +1146,11 @@ extern int program_breakpoint_here_p (struct gdbarch *gdbarch, CORE_ADDR address
+ extern enum breakpoint_here breakpoint_here_p (struct address_space *, 
+ 					       CORE_ADDR);
+ 
++/* Return true if an enabled breakpoint exists in the range defined by
++   ADDR and LEN, in ASPACE.  */
++extern int breakpoint_in_range_p (struct address_space *aspace,
++				  CORE_ADDR addr, ULONGEST len);
++
+ extern int moribund_breakpoint_here_p (struct address_space *, CORE_ADDR);
+ 
+ extern int breakpoint_inserted_here_p (struct address_space *, CORE_ADDR);
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index 917f9be..ef4ccb4 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -1729,6 +1729,7 @@ displaced_step_prepare_throw (ptid_t ptid)
+   struct thread_info *tp = find_thread_ptid (ptid);
+   struct regcache *regcache = get_thread_regcache (ptid);
+   struct gdbarch *gdbarch = get_regcache_arch (regcache);
++  struct address_space *aspace = get_regcache_aspace (regcache);
+   CORE_ADDR original, copy;
+   ULONGEST len;
+   struct displaced_step_closure *closure;
+@@ -1784,6 +1785,28 @@ displaced_step_prepare_throw (ptid_t ptid)
+   copy = gdbarch_displaced_step_location (gdbarch);
+   len = gdbarch_max_insn_length (gdbarch);
+ 
++  if (breakpoint_in_range_p (aspace, copy, len))
++    {
++      /* There's a breakpoint set in the scratch pad location range
++	 (which is usually around the entry point).  We'd either
++	 install it before resuming, which would overwrite/corrupt the
++	 scratch pad, or if it was already inserted, this displaced
++	 step would overwrite it.  The latter is OK in the sense that
++	 we already assume that no thread is going to execute the code
++	 in the scratch pad range (after initial startup) anyway, but
++	 the former is unacceptable.  Simply punt and fallback to
++	 stepping over this breakpoint in-line.  */
++      if (debug_displaced)
++	{
++	  fprintf_unfiltered (gdb_stdlog,
++			      "displaced: breakpoint set in scratch pad.  "
++			      "Stepping over breakpoint in-line instead.\n");
++	}
++
++      do_cleanups (old_cleanups);
++      return -1;
++    }
++
+   /* Save the original contents of the copy area.  */
+   displaced->step_saved_copy = (gdb_byte *) xmalloc (len);
+   ignore_cleanups = make_cleanup (free_current_contents,
+-- 
+1.9.3
+

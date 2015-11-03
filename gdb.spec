@@ -19,15 +19,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20150706
+%global snapsrc    20151027
 # See timestamp of source gnulib installed into gdb/gnulib/ .
-%global snapgnulib 20121213
+%global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.10
+Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,7 +245,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -542,19 +542,14 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
-# Fix 'Make the probes-based dynamic linker interface more robust to
-# errors' (Sergio Durigan Junior, RH BZ 1259132).
-Patch1029: gdb-probes-based-interface-robust-1of2.patch
-Patch1030: gdb-probes-based-interface-robust-2of2.patch
-
-# [ppc64le] Use skip_entrypoint for skip_trampoline_code (RH BZ 1260558).
-Patch1031: gdb-rhbz1260558-ppc64le-skip_trampoline_code.patch
-
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 Patch1044: gdb-pahole-python2.patch
 
-# Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
-Patch1052: gdb-rhbz1270564-invalid-dwarf-regno.patch
+# Fix callframecfa.exp and typeddwarf.exp rebase regression.
+Patch1054: gdb-nonstop-scratchpad.patch
+
+# testsuite: Fortran: allocate()d memory is uninitialized.
+Patch1056: gdb-fortran-allocate-not-inited.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -747,7 +742,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -851,10 +846,8 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch1029 -p1
-%patch1030 -p1
-%patch1031 -p1
-%patch1052 -p1
+%patch1054 -p1
+%patch1056 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1370,6 +1363,9 @@ then
 fi
 
 %changelog
+* Tue Nov  3 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20151027-30.fc24
+- Rebase to FSF GDB 7.10.50.20151027 (trunk snapshot).
+
 * Mon Oct 12 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-29.fc23
 - Fix internal error on DW_OP_bregx(-1) (RH BZ 1270564).
 
