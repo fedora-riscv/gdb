@@ -19,7 +19,7 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20151027
+%global snapsrc    20151113
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,15 +245,11 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
 Patch234: gdb-6.6-bz230000-power6-disassembly-test.patch
-
-# Temporary support for shared libraries >2GB on 64bit hosts. (BZ 231832)
-#=push+work: Upstream should have backward compat. API: libc-alpha: <20070127104539.GA9444@.*>
-Patch235: gdb-6.3-bz231832-obstack-2gb.patch
 
 # Allow running `/usr/bin/gcore' with provided but inaccessible tty (BZ 229517).
 #=fedoratest
@@ -545,11 +541,8 @@ Patch978: gdb-jit-reader-multilib.patch
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 Patch1044: gdb-pahole-python2.patch
 
-# Fix callframecfa.exp and typeddwarf.exp rebase regression.
-Patch1054: gdb-nonstop-scratchpad.patch
-
-# testsuite: Fortran: allocate()d memory is uninitialized.
-Patch1056: gdb-fortran-allocate-not-inited.patch
+# Force libncursesw over libncurses to match the includes (RH BZ 1270534).
+Patch1056: gdb-fedora-libncursesw.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -644,6 +637,9 @@ BuildRequires: systemtap-sdt-devel
 BuildRequires: prelink
 %endif
 %endif
+%endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+BuildRequires: libmpx%{bits_local} libmpx%{bits_other}
 %endif
 %if 0%{!?rhel:1}
 # Fedora arm+ppc64le do not yet have fpc built.
@@ -742,7 +738,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -774,7 +770,6 @@ find -name "*.info*"|xargs rm -f
 %patch229 -p1
 %patch231 -p1
 %patch234 -p1
-%patch235 -p1
 %patch245 -p1
 %patch247 -p1
 %patch254 -p1
@@ -846,7 +841,6 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
-%patch1054 -p1
 %patch1056 -p1
 
 %patch848 -p1
@@ -1363,7 +1357,12 @@ then
 fi
 
 %changelog
-* Thu Nov 12 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.10.50.20151027-32
+* Sat Nov 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20151113-33.fc24
+- Rebase to FSF GDB 7.10.50.20151113 (trunk snapshot).
+- [testsuite] BuildRequire libmpx for --with testsuite.
+- Force libncursesw over libncurses to match the includes (RH BZ 1270534).
+
+* Thu Nov 12 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.10.50.20151027-32.fc24
 - Rebuilt for https://fedoraproject.org/wiki/Changes/python3.5
 
 * Sun Nov  8 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20151027-31.fc24
