@@ -1,0 +1,945 @@
+http://sourceware.org/ml/gdb-patches/2016-01/msg00141.html
+Subject: Regression for gdb.threads/fork-plus-threads.exp  [Re: [PATCH 3/6] List inferiors/threads/pspaces in ascending order]
+
+On Thu, 22 Oct 2015 11:59:01 +0200, Pedro Alves wrote:
+
+7e0aa6aa9983c745aedc203db0cc360a0ad47cac is the first bad commit
+commit 7e0aa6aa9983c745aedc203db0cc360a0ad47cac
+Author: Pedro Alves <palves@redhat.com>
+Date:   Tue Nov 24 18:11:21 2015 +0000
+    List inferiors/threads/pspaces in ascending order
+
+PASS->FAIL:
+FAIL: gdb.threads/fork-plus-threads.exp: detach-on-fork=off: inferior 1 exited
+FAIL: gdb.threads/fork-plus-threads.exp: detach-on-fork=off: no threads left (timeout)
+FAIL: gdb.threads/fork-plus-threads.exp: detach-on-fork=off: only inferior 1 left (the program exited)
+
+-PASS: gdb.threads/fork-plus-threads.exp: detach-on-fork=off: inferior 1 exited
++warning: Error removing breakpoint 1^M
++Error in re-setting breakpoint 1: Warning:^M
++Cannot insert breakpoint 1.^M
++Cannot access memory at address 0x8048700^M
++^M
++Warning:^M
++Cannot insert breakpoint 1.^M
++Cannot access memory at address 0x8048700^M
++^M
++(gdb) FAIL: gdb.threads/fork-plus-threads.exp: detach-on-fork=off: inferior 1 exited
+
+I haven't tried to debug it.
+
+It happens on Fedora 23 x86_64 with -m32 for the testsuite.
+
+
+Jan
+
+REVERT:
+
+commit 7e0aa6aa9983c745aedc203db0cc360a0ad47cac
+Author: Pedro Alves <palves@redhat.com>
+Date:   Tue Nov 24 18:11:21 2015 +0000
+
+    List inferiors/threads/pspaces in ascending order
+    
+    Before:
+      (gdb) info threads
+        Id   Target Id         Frame
+        3    Thread 0x7ffff77c3700 (LWP 29035) callme () at foo.c:30
+        2    Thread 0x7ffff7fc4700 (LWP 29034) 0x000000000040087b in child_function_2 (arg=0x0) at foo.c:60
+      * 1    Thread 0x7ffff7fc5740 (LWP 29030) 0x0000003b37209237 in pthread_join (threadid=140737353893632, thread_return=0x0) at pthread_join.c:92
+    
+    After:
+      (gdb) info threads
+        Id   Target Id         Frame
+      * 1    Thread 0x7ffff7fc5740 (LWP 29030) 0x0000003b37209237 in pthread_join (threadid=140737353893632, thread_return=0x0) at pthread_join.c:92
+        2    Thread 0x7ffff7fc4700 (LWP 29034) 0x000000000040087b in child_function_2 (arg=0x0) at foo.c:60
+        3    Thread 0x7ffff77c3700 (LWP 29035) callme () at foo.c:30
+    
+    gdb/doc/ChangeLog:
+    2015-11-24  Pedro Alves  <palves@redhat.com>
+    
+    	PR 17539
+    	* gdb.texinfo (Inferiors and Programs): Adjust "maint info
+    	program-spaces" example to ascending order listing.
+    	(Threads): Adjust "info threads" example to ascending order
+    	listing.
+    	(Forks): Adjust "info inferiors" example to ascending order
+    	listing.
+    
+    gdb/ChangeLog:
+    2015-11-24  Pedro Alves  <palves@redhat.com>
+    
+    	PR 17539
+    	* inferior.c (add_inferior_silent): Append the new inferior to the
+    	end of the list.
+    	* progspace.c (add_program_space): Append the new pspace to the
+    	end of the list.
+    	* thread.c (new_thread): Append the new thread to the end of the
+    	list.
+    
+    gdb/testsuite/ChangeLog:
+    2015-11-24  Pedro Alves  <palves@redhat.com>
+    
+    	PR 17539
+    	* gdb.base/foll-exec-mode.exp: Adjust to GDB listing inferiors and
+    	threads in ascending order.
+    	* gdb.base/foll-fork.exp: Likewise.
+    	* gdb.base/foll-vfork.exp: Likewise.
+    	* gdb.base/multi-forks.exp: Likewise.
+    	* gdb.mi/mi-nonstop.exp: Likewise.
+    	* gdb.mi/mi-nsintrall.exp: Likewise.
+    	* gdb.multi/base.exp: Likewise.
+    	* gdb.multi/multi-arch.exp: Likewise.
+    	* gdb.python/py-inferior.exp: Likewise.
+    	* gdb.threads/break-while-running.exp: Likewise.
+    	* gdb.threads/execl.exp: Likewise.
+    	* gdb.threads/gcore-thread.exp: Likewise.
+    	* gdb.threads/info-threads-cur-sal.exp: Likewise.
+    	* gdb.threads/kill.exp: Likewise.
+    	* gdb.threads/linux-dp.exp: Likewise.
+    	* gdb.threads/multiple-step-overs.exp: Likewise.
+    	* gdb.threads/next-bp-other-thread.exp: Likewise.
+    	* gdb.threads/step-bg-decr-pc-switch-thread.exp: Likewise.
+    	* gdb.threads/step-over-lands-on-breakpoint.exp: Likewise.
+    	* gdb.threads/step-over-trips-on-watchpoint.exp: Likewise.
+    	* gdb.threads/thread-find.exp: Likewise.
+    	* gdb.threads/tls.exp: Likewise.
+    	* lib/mi-support.exp (mi_reverse_list): Delete.
+    	(mi_check_thread_states): No longer reverse list.
+
+diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
+index 0778383..fe9481d 100644
+--- a/gdb/doc/gdb.texinfo
++++ b/gdb/doc/gdb.texinfo
+@@ -2791,9 +2791,9 @@ example, the list of inferiors bound to the program space.
+ @smallexample
+ (@value{GDBP}) maint info program-spaces
+   Id   Executable
+-* 1    hello
+   2    goodbye
+         Bound inferiors: ID 1 (process 21561)
++* 1    hello
+ @end smallexample
+ 
+ Here we can see that no inferior is running the program @code{hello},
+@@ -2924,9 +2924,9 @@ For example,
+ @smallexample
+ (@value{GDBP}) info threads
+   Id   Target Id         Frame
+-* 1    process 35 thread 13  main (argc=1, argv=0x7ffffff8)
+-  2    process 35 thread 23  0x34e5 in sigpause ()
+   3    process 35 thread 27  0x34e5 in sigpause ()
++  2    process 35 thread 23  0x34e5 in sigpause ()
++* 1    process 35 thread 13  main (argc=1, argv=0x7ffffff8)
+     at threadtest.c:68
+ @end smallexample
+ 
+@@ -3241,8 +3241,8 @@ process 12020 is executing new program: prog2
+ Program exited normally.
+ (@value{GDBP}) info inferiors
+   Id   Description   Executable
+-  1    <null>        prog1
+ * 2    <null>        prog2
++  1    <null>        prog1
+ @end smallexample
+ 
+ @item same
+diff --git a/gdb/inferior.c b/gdb/inferior.c
+index e71104d..515268f 100644
+--- a/gdb/inferior.c
++++ b/gdb/inferior.c
+@@ -135,17 +135,8 @@ add_inferior_silent (int pid)
+   inf->control.stop_soon = NO_STOP_QUIETLY;
+ 
+   inf->num = ++highest_inferior_num;
+-
+-  if (inferior_list == NULL)
+-    inferior_list = inf;
+-  else
+-    {
+-      struct inferior *last;
+-
+-      for (last = inferior_list; last->next != NULL; last = last->next)
+-	;
+-      last->next = inf;
+-    }
++  inf->next = inferior_list;
++  inferior_list = inf;
+ 
+   inf->environment = make_environ ();
+   init_environ (inf->environment);
+diff --git a/gdb/progspace.c b/gdb/progspace.c
+index 59a7846..9a622ed 100644
+--- a/gdb/progspace.c
++++ b/gdb/progspace.c
+@@ -133,16 +133,8 @@ add_program_space (struct address_space *aspace)
+ 
+   program_space_alloc_data (pspace);
+ 
+-  if (program_spaces == NULL)
+-    program_spaces = pspace;
+-  else
+-    {
+-      struct program_space *last;
+-
+-      for (last = program_spaces; last->next != NULL; last = last->next)
+-	;
+-      last->next = pspace;
+-    }
++  pspace->next = program_spaces;
++  program_spaces = pspace;
+ 
+   return pspace;
+ }
+diff --git a/gdb/testsuite/gdb.base/foll-exec-mode.exp b/gdb/testsuite/gdb.base/foll-exec-mode.exp
+index 41d788b..ad23cb5 100644
+--- a/gdb/testsuite/gdb.base/foll-exec-mode.exp
++++ b/gdb/testsuite/gdb.base/foll-exec-mode.exp
+@@ -150,7 +150,7 @@ proc do_follow_exec_mode_tests { mode cmd infswitch } {
+ 	if {$mode == "same"} {
+ 	    set expected_re "\\* 1.*process.*"
+ 	} else {
+-	    set expected_re "  1.*null.*$testfile.*\r\n\\* 2.*process.*$testfile2 .*"
++	    set expected_re "\\* 2.*process.*$testfile2 \r\n  1.*null.*$testfile.*"
+ 	}
+ 
+ 	# Check that the inferior list is correct:
+diff --git a/gdb/testsuite/gdb.base/foll-fork.exp b/gdb/testsuite/gdb.base/foll-fork.exp
+index 61aefc1..bd1df14 100644
+--- a/gdb/testsuite/gdb.base/foll-fork.exp
++++ b/gdb/testsuite/gdb.base/foll-fork.exp
+@@ -139,7 +139,7 @@ proc test_follow_fork { who detach cmd } {
+ 
+ 	    # Follow parent / keep child: two inferiors under debug, the
+ 	    # parent is the current inferior.
+-	    gdb_test "info inferiors" "\\* 1 .*process.* 2 .*process.*" \
++	    gdb_test "info inferiors" " 2 .*process.*\\* 1 .*process.*" \
+ 		     "info inferiors"
+ 
+ 	    gdb_test "inferior 2" "Switching to inferior 2 .*"
+@@ -150,14 +150,14 @@ proc test_follow_fork { who detach cmd } {
+ 	    # Follow child / detach parent: the child is under debug and is
+ 	    # the current inferior.  The parent is listed but is not under
+ 	    # debug.
+-	    gdb_test "info inferiors" " 1 .*<null>.*\\* 2 .*process.*" \
++	    gdb_test "info inferiors" "\\* 2 .*process.* 1 .*<null>.*" \
+ 		     "info inferiors"
+ 
+ 	} elseif {$who == "child" && $detach == "off"} {
+ 
+ 	    # Follow child / keep parent: two inferiors under debug, the
+ 	    # child is the current inferior.
+-	    gdb_test "info inferiors" " 1 .*process.*\\* 2 .*process.*" \
++	    gdb_test "info inferiors" "\\* 2 .*process.* 1 .*process.*" \
+ 		     "info inferiors"
+ 
+ 	    gdb_test "inferior 1" "Switching to inferior 1 .*"
+diff --git a/gdb/testsuite/gdb.base/foll-vfork.exp b/gdb/testsuite/gdb.base/foll-vfork.exp
+index efa1b39..ed25487 100644
+--- a/gdb/testsuite/gdb.base/foll-vfork.exp
++++ b/gdb/testsuite/gdb.base/foll-vfork.exp
+@@ -330,7 +330,7 @@ proc vfork_relations_in_info_inferiors { variant } {
+    }
+ 
+    gdb_test "info inferiors" \
+-       ".*is vfork parent of inferior 2.*is vfork child of inferior 1" \
++       ".*is vfork child of inferior 1.*is vfork parent of inferior 2" \
+        "info inferiors shows vfork parent/child relation"
+ 
+    if { $variant == "exec" } {
+diff --git a/gdb/testsuite/gdb.base/multi-forks.exp b/gdb/testsuite/gdb.base/multi-forks.exp
+index 1eaaa71..2f3dd86 100644
+--- a/gdb/testsuite/gdb.base/multi-forks.exp
++++ b/gdb/testsuite/gdb.base/multi-forks.exp
+@@ -150,13 +150,13 @@ gdb_test_no_output "set detach off" "set detach off"
+ 
+ for {set i 1} {$i <= 15} {incr i} {
+   gdb_test "continue" "Breakpoint .* main .*exit.*" "Run to exit $i"
+-  gdb_test "info inferior" " 2 .* 3 .* 4 .* 5 .*" "info inferior $i"
++  gdb_test "info inferior" " 5 .* 4 .* 3 .* 2 .*" "info inferior $i"
+   gdb_test "inferior $i + 1" "(_dl_sysinfo_int80|fork|__kernel_(v|)syscall).*" \
+       "inferior $i"
+ }
+ 
+ gdb_test "continue" "Breakpoint .* main .*exit.*" "Run to exit 16"
+-gdb_test "info inferior" " 2 .* 3 .* 4 .* 5 .*" "info inferior 16"
++gdb_test "info inferiors" " 5 .* 4 .* 3 .* 2 .*" "info inferior 16"
+ gdb_test "inferior 2" " main .*" "restart final"
+ 
+ #
+@@ -177,9 +177,27 @@ gdb_test "detach inferior 5" "Detaching .*" "Detach 5"
+ # Test kill inferior
+ #
+ 
+-for {set i 6} { $i <= 16} {incr i} {
+-    gdb_test_no_output "kill inferior $i" "Kill $i"
+-    gdb_test "info inferior $i" "<null>.*" "Did kill $i"
+-}
++gdb_test_no_output "kill inferior 6" "Kill 6"
++gdb_test "info inferior 6" "<null>.*" "Did kill 6"
++gdb_test_no_output "kill inferior 7" "Kill 7"
++gdb_test "info inferior 7" "<null>.*" "Did kill 7"
++gdb_test_no_output "kill inferior 8" "Kill 8"
++gdb_test "info inferior 8" "<null>.*" "Did kill 8"
++gdb_test_no_output "kill inferior 9" "Kill 9"
++gdb_test "info inferior 9" "<null>.*" "Did kill 9"
++gdb_test_no_output "kill inferior 10" "Kill 10"
++gdb_test "info inferior 10" "<null>.*" "Did kill 10"
++gdb_test_no_output "kill inferior 11" "Kill 11"
++gdb_test "info inferior 11" "<null>.*" "Did kill 11"
++gdb_test_no_output "kill inferior 12" "Kill 12"
++gdb_test "info inferior 12" "<null>.*" "Did kill 12"
++gdb_test_no_output "kill inferior 13" "Kill 13"
++gdb_test "info inferior 13" "<null>.*" "Did kill 13"
++gdb_test_no_output "kill inferior 14" "Kill 14"
++gdb_test "info inferior 14" "<null>.*" "Did kill 14"
++gdb_test_no_output "kill inferior 15" "Kill 15"
++gdb_test "info inferior 15" "<null>.*" "Did kill 15"
++gdb_test_no_output "kill inferior 16" "Kill 16"
++gdb_test "info inferior 16" "<null>.*" "Did kill 16"
+ 
+ return 0
+diff --git a/gdb/testsuite/gdb.mi/mi-nonstop.exp b/gdb/testsuite/gdb.mi/mi-nonstop.exp
+index 5e11f8d..cad9901 100644
+--- a/gdb/testsuite/gdb.mi/mi-nonstop.exp
++++ b/gdb/testsuite/gdb.mi/mi-nonstop.exp
+@@ -97,7 +97,7 @@ mi_expect_interrupt "got interrupt"
+ sleep 1
+ mi_check_thread_states {"stopped" "stopped" "stopped"} "thread state, stop 4"
+ 
+-mi_gdb_test "-exec-continue --all" ".*\\*running,thread-id=\"1\"\r\n\\*running,thread-id=\"2\"\r\n\\*running,thread-id=\"3\"" \
++mi_gdb_test "-exec-continue --all" ".*\\*running,thread-id=\"3\"\r\n\\*running,thread-id=\"2\"\r\n\\*running,thread-id=\"1\"" \
+     "resume all"
+ 
+ mi_expect_stop "breakpoint-hit" "break_at_me" "\[^\n\]*" "non-stop.c" "\[0-9\]*" {"" "disp=\"keep\""} "w0,i2 stop"
+diff --git a/gdb/testsuite/gdb.mi/mi-nsintrall.exp b/gdb/testsuite/gdb.mi/mi-nsintrall.exp
+index 378c729..061a6f3 100644
+--- a/gdb/testsuite/gdb.mi/mi-nsintrall.exp
++++ b/gdb/testsuite/gdb.mi/mi-nsintrall.exp
+@@ -67,10 +67,10 @@ mi_delete_breakpoints
+ # Here we create a response string.  Note we don't want \r\n at the end,
+ # since mi_gdb_test will append this itself.
+ set running_re ""
+-for {set i 1} {$i < 6} {incr i} {
++for {set i 6} {$i > 1} {incr i -1} {
+     set running_re "$running_re\\*running,thread-id=\"$i\"\r\n"
+ }
+-set running_re "$running_re\\*running,thread-id=\"6\""
++set running_re "$running_re\\*running,thread-id=\"1\""
+ 
+ mi_gdb_test "-exec-continue --all" "\[^\n\]*\r\n$running_re" \
+     "resume all, no breakpoint"
+diff --git a/gdb/testsuite/gdb.multi/base.exp b/gdb/testsuite/gdb.multi/base.exp
+index 6f0bc63..e02f95f 100644
+--- a/gdb/testsuite/gdb.multi/base.exp
++++ b/gdb/testsuite/gdb.multi/base.exp
+@@ -59,7 +59,7 @@ gdb_test "add-inferior -exec ${binfile3}" \
+ # Check that we have multiple inferiors.
+ 
+ gdb_test "info inferiors" \
+-    "Executable.*${exec1}.*${exec2}.*${exec3}.*"
++    "Executable.*${exec3}.*${exec2}.*${exec1}.*"
+ 
+ # Test info inferiors with args
+ 
+@@ -68,16 +68,16 @@ set see2 0
+ set see3 0
+ 
+ gdb_test_multiple "info inferior 2 3" "info inferior 2 3" {
+-    -re ". 1 \[^\r\n\]*${exec1}" {
+-	set see1 1
++    -re ". 3 \[^\r\n\]*${exec3}" {
++	set see3 1
+ 	exp_continue
+     }
+     -re ". 2 \[^\r\n\]*${exec2}" {
+ 	set see2 1
+ 	exp_continue
+     }
+-    -re ". 3 \[^\r\n\]*${exec3}" {
+-	set see3 1
++    -re ". 1 \[^\r\n\]*${exec1}" {
++	set see1 1
+ 	exp_continue
+     }
+     -re "$gdb_prompt $" {
+@@ -94,16 +94,16 @@ set see2 0
+ set see3 0
+ 
+ gdb_test_multiple "info inferior 1-2" "info inferior 1-2" {
+-    -re ". 1 \[^\r\n\]*${exec1}" {
+-	set see1 1
++    -re ". 3 \[^\r\n\]*${exec3}" {
++	set see3 1
+ 	exp_continue
+     }
+     -re ". 2 \[^\r\n\]*${exec2}" {
+ 	set see2 1
+ 	exp_continue
+     }
+-    -re ". 3 \[^\r\n\]*${exec3}" {
+-	set see3 1
++    -re ". 1 \[^\r\n\]*${exec1}" {
++	set see1 1
+ 	exp_continue
+     }
+     -re "$gdb_prompt $" {
+diff --git a/gdb/testsuite/gdb.multi/multi-arch.exp b/gdb/testsuite/gdb.multi/multi-arch.exp
+index b114a2f..5922d70 100644
+--- a/gdb/testsuite/gdb.multi/multi-arch.exp
++++ b/gdb/testsuite/gdb.multi/multi-arch.exp
+@@ -95,4 +95,4 @@ if ![runto_main] then {
+ # Check we do have two inferiors loaded.
+ 
+ gdb_test "info inferiors" \
+-    "Executable.*${exec1}.*${exec2}.*"
++    "Executable.*${exec2}.*${exec1}.*"
+diff --git a/gdb/testsuite/gdb.python/py-inferior.exp b/gdb/testsuite/gdb.python/py-inferior.exp
+index 9b90d0b..7e6f91d 100644
+--- a/gdb/testsuite/gdb.python/py-inferior.exp
++++ b/gdb/testsuite/gdb.python/py-inferior.exp
+@@ -230,10 +230,10 @@ with_test_prefix "is_valid" {
+ 	"check inferior validity 3"
+ 
+     gdb_test_no_output "remove-inferiors 2" "remove-inferiors 3"
+-    gdb_test "python print (inf_list\[0\].is_valid())" "True" \
++    gdb_test "python print (inf_list\[0\].is_valid())" "False" \
+ 	"check inferior validity 4"
+ 
+-    gdb_test "python print (inf_list\[1\].is_valid())" "False" \
++    gdb_test "python print (inf_list\[1\].is_valid())" "True" \
+ 	"check inferior validity 5"
+ }
+ 
+diff --git a/gdb/testsuite/gdb.threads/break-while-running.exp b/gdb/testsuite/gdb.threads/break-while-running.exp
+index 8a197e4..05860bc 100644
+--- a/gdb/testsuite/gdb.threads/break-while-running.exp
++++ b/gdb/testsuite/gdb.threads/break-while-running.exp
+@@ -78,7 +78,7 @@ proc test { update_thread_list always_inserted non_stop } {
+     # without the user explicitly fetching the thread list.
+     if {$update_thread_list} {
+ 	gdb_test "info threads" \
+-	    "main .*\\\(running\\\).*\\\(running\\\).*" \
++	    "\\\(running\\\).*\\\(running\\\).* main .*" \
+ 	    "only main stopped"
+     }
+ 
+@@ -107,7 +107,7 @@ proc test { update_thread_list always_inserted non_stop } {
+ 
+     if {$non_stop == "on"} {
+ 	gdb_test "info threads" \
+-	    "main .* breakpoint_function .*\\\(running\\\)" \
++	    "\\\(running\\\).* breakpoint_function .* main .*" \
+ 	    "one thread running"
+ 
+ 	# Unblock the other thread, which should then trip on the same
+@@ -131,7 +131,7 @@ proc test { update_thread_list always_inserted non_stop } {
+ 	}
+ 
+ 	gdb_test "info threads" \
+-	    " main .* breakpoint_function .* breakpoint_function .*" \
++	    " breakpoint_function .* breakpoint_function .* main .*" \
+ 	    "all threads stopped"
+     } else {
+ 	# This test is not merged with the non-stop one because in
+@@ -142,7 +142,7 @@ proc test { update_thread_list always_inserted non_stop } {
+ 	    -re "\\\(running\\\).*$gdb_prompt $" {
+ 		fail $test
+ 	    }
+-	    -re "main .* breakpoint_function .*$gdb_prompt $" {
++	    -re "breakpoint_function .* main .*$gdb_prompt $" {
+ 		pass $test
+ 	    }
+ 	}
+diff --git a/gdb/testsuite/gdb.threads/execl.exp b/gdb/testsuite/gdb.threads/execl.exp
+index 8538fd7..14e3e68 100644
+--- a/gdb/testsuite/gdb.threads/execl.exp
++++ b/gdb/testsuite/gdb.threads/execl.exp
+@@ -40,7 +40,7 @@ gdb_test "b [gdb_get_line_number "breakpoint here"]" \
+ 
+ gdb_test "continue" ".*breakpoint here.*" "continue to exec"
+ 
+-gdb_test "info threads" "1 *Thread.*2 *Thread.*3 *Thread.*" "info threads before exec"
++gdb_test "info threads" ".*3 *Thread.*2 *Thread.*1 *Thread.*" "info threads before exec"
+ 
+ # When continuing from this point we'll hit the breakpoint in main()
+ # again, this time in the exec'd process.
+diff --git a/gdb/testsuite/gdb.threads/gcore-thread.exp b/gdb/testsuite/gdb.threads/gcore-thread.exp
+index f74f147..44fb347 100644
+--- a/gdb/testsuite/gdb.threads/gcore-thread.exp
++++ b/gdb/testsuite/gdb.threads/gcore-thread.exp
+@@ -127,7 +127,7 @@ foreach name { corefile core0file } { with_test_prefix $name {
+     # mapping various OS's may do?  Let's assume that there must
+     # be at least two threads:
+ 
+-    gdb_test "info threads" "\\* 1 ${horiz}${nl}  2 ${horiz}.*" \
++    gdb_test "info threads" ".*${nl}  2 ${horiz}${nl}\\* 1 .*" \
+ 	    "corefile contains at least two threads"
+ 
+     # One thread in the corefile should be in the "thread2" function.
+@@ -137,6 +137,6 @@ foreach name { corefile core0file } { with_test_prefix $name {
+ 
+     # The thread2 thread should be marked as the current thread.
+ 
+-    gdb_test "info threads" "\\* ${horiz} thread2 .*${nl}" \
++    gdb_test "info threads" ".*${nl}\\* ${horiz} thread2 .*" \
+ 	    "thread2 is current thread in corefile"
+ }}
+diff --git a/gdb/testsuite/gdb.threads/info-threads-cur-sal.exp b/gdb/testsuite/gdb.threads/info-threads-cur-sal.exp
+index 23a3c36..603d944 100644
+--- a/gdb/testsuite/gdb.threads/info-threads-cur-sal.exp
++++ b/gdb/testsuite/gdb.threads/info-threads-cur-sal.exp
+@@ -41,20 +41,14 @@ gdb_test "list $line" \
+ # There used to be a bug where "info threads" would set the current
+ # SAL to the location of the last thread displayed.
+ gdb_test "info threads" \
+-    [multi_line \
+-	 "\[ \t\]*Id\[ \t\]+Target\[ \t\]+Id\[ \t\]+Frame\[ \t\]*" \
+-	 "  1 *Thread \[^\r\n\]* .* \[^\r\n\]*" \
+-	 "\\* 2 *Thread \[^\r\n\]* at \[^\r\n\]*"] \
++    "\r\n\[ \t\]*Id\[ \t\]+Target\[ \t\]+Id\[ \t\]+Frame\[ \t\]*\r\n\\* 2 *Thread \[^\r\n\]* at \[^\r\n\]*\r\n  1 *Thread \[^\r\n\]* .* \[^\r\n\]*" \
+     "info threads before break"
+ 
+ # Check that "break" is still operating on the same file by default.
+ gdb_test "break $line" ".*${srcfile2}.*" "break on line"
+ 
+ gdb_test "info threads" \
+-    [multi_line \
+-	 "\[ \t\]*Id\[ \t\]+Target\[ \t\]+Id\[ \t\]+Frame\[ \t\]*" \
+-	 "  1 *Thread \[^\r\n\]* .* \[^\r\n\]*" \
+-	 "\\* 2 *Thread \[^\r\n\]* at \[^\r\n\]*"] \
++    "\r\n\[ \t\]*Id\[ \t\]+Target\[ \t\]+Id\[ \t\]+Frame\[ \t\]*\r\n\\* 2 *Thread \[^\r\n\]* at \[^\r\n\]*\r\n  1 *Thread \[^\r\n\]* .* \[^\r\n\]*" \
+     "info threads before list"
+ 
+ # And that so is "list".
+diff --git a/gdb/testsuite/gdb.threads/kill.exp b/gdb/testsuite/gdb.threads/kill.exp
+index a6d8382..741ebd5 100644
+--- a/gdb/testsuite/gdb.threads/kill.exp
++++ b/gdb/testsuite/gdb.threads/kill.exp
+@@ -48,7 +48,7 @@ proc test {threaded} {
+ 	gdb_continue_to_breakpoint "break here" ".*break here.*"
+ 
+ 	if {$threaded} {
+-	    gdb_test "info threads" "1.*2.*3.*4.*5.*6.*" "all threads started"
++	    gdb_test "info threads" "6.*5.*4.*3.*2.*1.*" "all threads started"
+ 	}
+ 
+ 	# This kills and ensures no output other than the prompt comes out,
+diff --git a/gdb/testsuite/gdb.threads/linux-dp.exp b/gdb/testsuite/gdb.threads/linux-dp.exp
+index 6365f7d..7b5c706 100644
+--- a/gdb/testsuite/gdb.threads/linux-dp.exp
++++ b/gdb/testsuite/gdb.threads/linux-dp.exp
+@@ -168,7 +168,7 @@ set nthreads 6
+ gdb_breakpoint [gdb_get_line_number "linuxthreads.exp: info threads 2"]
+ gdb_continue_to_breakpoint "main thread's sleep"
+ set info_threads_ptn ".*"
+-for {set i 1} {$i <  $nthreads} {incr i} {
++for {set i $nthreads} {$i > 0} {incr i -1} {
+     append info_threads_ptn "$i *Thread .*"
+ }
+ append info_threads_ptn "\[\r\n\]+$gdb_prompt $"
+diff --git a/gdb/testsuite/gdb.threads/multiple-step-overs.exp b/gdb/testsuite/gdb.threads/multiple-step-overs.exp
+index cf7728b..6a38192 100644
+--- a/gdb/testsuite/gdb.threads/multiple-step-overs.exp
++++ b/gdb/testsuite/gdb.threads/multiple-step-overs.exp
+@@ -46,7 +46,7 @@ proc setup {} {
+ 
+ 	gdb_breakpoint [gdb_get_line_number "set wait-threads breakpoint here"]
+ 	gdb_continue_to_breakpoint "run to breakpoint"
+-	gdb_test "info threads" "\\\* 1 .* 2 .* 3 .*" "info threads shows all threads"
++	gdb_test "info threads" "3 .* 2 .*\\\* 1.*" "info threads shows all threads"
+ 
+ 	gdb_test_no_output "set scheduler-locking on"
+ 
+diff --git a/gdb/testsuite/gdb.threads/next-bp-other-thread.exp b/gdb/testsuite/gdb.threads/next-bp-other-thread.exp
+index 4de3bf9..25791be 100644
+--- a/gdb/testsuite/gdb.threads/next-bp-other-thread.exp
++++ b/gdb/testsuite/gdb.threads/next-bp-other-thread.exp
+@@ -35,7 +35,7 @@ foreach schedlock {"off" "step" "on" } {
+ 
+ 	gdb_breakpoint [gdb_get_line_number "set wait-thread breakpoint here"]
+ 	gdb_continue_to_breakpoint "run to wait-thread breakpoint"
+-	gdb_test "info threads" "\\\* 1 .*  2 .*" "info threads shows all threads"
++	gdb_test "info threads" "2 .*\\\* 1.*" "info threads shows all threads"
+ 
+ 	delete_breakpoints
+ 
+diff --git a/gdb/testsuite/gdb.threads/step-bg-decr-pc-switch-thread.exp b/gdb/testsuite/gdb.threads/step-bg-decr-pc-switch-thread.exp
+index 4f5c05c..1354d03 100644
+--- a/gdb/testsuite/gdb.threads/step-bg-decr-pc-switch-thread.exp
++++ b/gdb/testsuite/gdb.threads/step-bg-decr-pc-switch-thread.exp
+@@ -48,7 +48,7 @@ delete_breakpoints
+ 
+ gdb_breakpoint [gdb_get_line_number "set breakpoint here"]
+ gdb_continue_to_breakpoint "run to nop breakpoint"
+-gdb_test "info threads" "  1 .*\\\* 2 .*" "info threads shows all threads"
++gdb_test "info threads" "\\\* 2 .* 1.*" "info threads shows all threads"
+ 
+ gdb_test "next" "while.*" "next over nop"
+ 
+diff --git a/gdb/testsuite/gdb.threads/step-over-lands-on-breakpoint.exp b/gdb/testsuite/gdb.threads/step-over-lands-on-breakpoint.exp
+index a7273d4..aa91e29 100644
+--- a/gdb/testsuite/gdb.threads/step-over-lands-on-breakpoint.exp
++++ b/gdb/testsuite/gdb.threads/step-over-lands-on-breakpoint.exp
+@@ -40,7 +40,7 @@ proc do_test {displaced command} {
+ 
+ 	gdb_breakpoint [gdb_get_line_number "set wait-thread breakpoint here"]
+ 	gdb_continue_to_breakpoint "run to wait-thread breakpoint"
+-	gdb_test "info threads" "\\\* 1 .*  2 .*" "info threads shows all threads"
++	gdb_test "info threads" "2 .*\\\* 1.*" "info threads shows all threads"
+ 
+ 	gdb_test_no_output "set scheduler-locking on"
+ 
+diff --git a/gdb/testsuite/gdb.threads/step-over-trips-on-watchpoint.exp b/gdb/testsuite/gdb.threads/step-over-trips-on-watchpoint.exp
+index 2f0be50..b0a7e4a 100644
+--- a/gdb/testsuite/gdb.threads/step-over-trips-on-watchpoint.exp
++++ b/gdb/testsuite/gdb.threads/step-over-trips-on-watchpoint.exp
+@@ -59,7 +59,7 @@ proc do_test { displaced with_bp } {
+ 
+ 		gdb_breakpoint [gdb_get_line_number "set wait-thread breakpoint here"]
+ 		gdb_continue_to_breakpoint "run to wait-thread breakpoint"
+-		gdb_test "info threads" "\\\* 1 .*  2 .*" "info threads shows all threads"
++		gdb_test "info threads" "2 .*\\\* 1.*" "info threads shows all threads"
+ 
+ 		gdb_test_no_output "set scheduler-locking on"
+ 
+diff --git a/gdb/testsuite/gdb.threads/thread-find.exp b/gdb/testsuite/gdb.threads/thread-find.exp
+index bd90c57..57d58a2 100644
+--- a/gdb/testsuite/gdb.threads/thread-find.exp
++++ b/gdb/testsuite/gdb.threads/thread-find.exp
+@@ -55,11 +55,29 @@ gdb_test "thread apply 6 thread name threadname_6" \
+     "name thread 6"
+ 
+ # Collect thread ids, if any.
+-
+ gdb_test_multiple "info threads" "collect thread id" {
+-    -re ". (\[0-9\]+) \[^\r\n\]*\[Tt\]hread (\[0-9a-fA-Fx\]+)\[^\r\n\]* \"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set thread$thr_num $expect_out(2,string)
++    -re ". 6 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_6\" \[^\r\n\]*" {
++	set thread6 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 5 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_5\" \[^\r\n\]*" {
++	set thread5 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 4 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_4\" \[^\r\n\]*" {
++	set thread4 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 3 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_3\" \[^\r\n\]*" {
++	set thread3 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 2 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_2\" \[^\r\n\]*" {
++	set thread2 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 1 .*\[Tt\]hread (\[0-9a-fA-Fx\]+).* \"threadname_1\" \[^\r\n\]*" {
++	set thread1 $expect_out(1,string)
+ 	exp_continue
+     }
+     -re ".*$gdb_prompt $" {
+@@ -72,11 +90,29 @@ if { [info exists thread6] } then {
+ }
+ 
+ # Collect process ids, if any.
+-
+ gdb_test_multiple "info threads" "collect thread id" {
+-    -re ". (\[0-9\]+) \[^\r\n\]*\[Pp\]rocess (\[0-9a-fA-Fx\]+)\[^\r\n\]* \"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set process$thr_num $expect_out(2,string)
++    -re ". 6 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_6\" \[^\r\n\]*" {
++	set process6 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 5 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_5\" \[^\r\n\]*" {
++	set process5 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 4 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_4\" \[^\r\n\]*" {
++	set process4 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 3 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_3\" \[^\r\n\]*" {
++	set process3 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 2 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_2\" \[^\r\n\]*" {
++	set process2 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 1 .*\[Pp\]rocess (\[0-9a-fA-Fx\]+).* \"threadname_1\" \[^\r\n\]*" {
++	set process1 $expect_out(1,string)
+ 	exp_continue
+     }
+     -re ".*$gdb_prompt $" {
+@@ -89,11 +125,29 @@ if { [info exists process6] } then {
+ }
+ 
+ # Collect lwp ids, if any.
+-
+ gdb_test_multiple "info threads" "collect thread id" {
+-    -re ". (\[0-9\]+) \[^\r\n\]*LWP (\[0-9a-fA-Fx\]+)\[^\r\n\]* \"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set lwp$thr_num $expect_out(2,string)
++    -re ". 6 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_6\" \[^\r\n\]*" {
++	set lwp6 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 5 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_5\" \[^\r\n\]*" {
++	set lwp5 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 4 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_4\" \[^\r\n\]*" {
++	set lwp4 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 3 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_3\" \[^\r\n\]*" {
++	set lwp3 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 2 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_2\" \[^\r\n\]*" {
++	set lwp2 $expect_out(1,string)
++	exp_continue
++    }
++    -re ". 1 .*LWP (\[0-9a-fA-Fx\]+).* \"threadname_1\" \[^\r\n\]*" {
++	set lwp1 $expect_out(1,string)
+ 	exp_continue
+     }
+     -re ".*$gdb_prompt $" {
+@@ -187,13 +241,36 @@ gdb_test "thread find foobarbaz" "No threads match .*" "no thread"
+ # Test regular expression
+ #
+ 
+-for {set i 1} {$i <= 6} {incr i} {
+-    set see$i 0
+-}
++set see1 0
++set see2 0
++set see3 0
++set see4 0
++set see5 0
++set see6 0
++
+ gdb_test_multiple "thread find threadname_\[345\]" "test regular exp" {
+-    -re "Thread (\[0-9\]+) has name \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set see$thr_num 1
++    -re "Thread 6 has name \[^\r\n\]*" {
++	set see6 1
++	exp_continue
++    }
++    -re "Thread 5 has name \[^\r\n\]*" {
++	set see5 1
++	exp_continue
++    }
++    -re "Thread 4 has name \[^\r\n\]*" {
++	set see4 1
++	exp_continue
++    }
++    -re "Thread 3 has name \[^\r\n\]*" {
++	set see3 1
++	exp_continue
++    }
++    -re "Thread 2 has name \[^\r\n\]*" {
++	set see2 1
++	exp_continue
++    }
++    -re "Thread 1 has name \[^\r\n\]*" {
++	set see1 1
+ 	exp_continue
+     }
+     -re ".*$gdb_prompt $" {
+@@ -209,13 +286,36 @@ gdb_test_multiple "thread find threadname_\[345\]" "test regular exp" {
+ # Test info threads on a subset of threads
+ #
+ 
+-for {set i 1} {$i <= 6} {incr i} {
+-    set see$i 0
+-}
++set see1 0
++set see2 0
++set see3 0
++set see4 0
++set see5 0
++set see6 0
++
+ gdb_test_multiple "info threads 2 4 6" "info threads 2 4 6" {
+-    -re ". (\[0-9\]+) \[^\r\n\]*\"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set see$thr_num 1
++    -re ". 6 \[^\r\n\]*\"threadname_6\" \[^\r\n\]*" {
++	set see6 1
++	exp_continue
++    }
++    -re ". 5 \[^\r\n\]*\"threadname_5\" \[^\r\n\]*" {
++	set see5 1
++	exp_continue
++    }
++    -re ". 4 \[^\r\n\]*\"threadname_4\" \[^\r\n\]*" {
++	set see4 1
++	exp_continue
++    }
++    -re ". 3 \[^\r\n\]*\"threadname_3\" \[^\r\n\]*" {
++	set see3 1
++	exp_continue
++    }
++    -re ". 2 \[^\r\n\]*\"threadname_2\" \[^\r\n\]*" {
++	set see2 1
++	exp_continue
++    }
++    -re ". 1 \[^\r\n\]*\"threadname_1\" \[^\r\n\]*" {
++	set see1 1
+ 	exp_continue
+     }
+     -re "$gdb_prompt $" {
+@@ -231,13 +331,36 @@ gdb_test_multiple "info threads 2 4 6" "info threads 2 4 6" {
+ # Test info threads on a range
+ #
+ 
+-for {set i 1} {$i <= 6} {incr i} {
+-    set see$i 0
+-}
++set see1 0
++set see2 0
++set see3 0
++set see4 0
++set see5 0
++set see6 0
++
+ gdb_test_multiple "info threads 3-5" "info threads 3-5" {
+-    -re ". (\[0-9\]+) \[^\r\n\]*\"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set see$thr_num 1
++    -re ". 6 .*\"threadname_6\" \[^\r\n\]*" {
++	set see6 1
++	exp_continue
++    }
++    -re ". 5 .*\"threadname_5\" \[^\r\n\]*" {
++	set see5 1
++	exp_continue
++    }
++    -re ". 4 .*\"threadname_4\" \[^\r\n\]*" {
++	set see4 1
++	exp_continue
++    }
++    -re ". 3 .*\"threadname_3\" \[^\r\n\]*" {
++	set see3 1
++	exp_continue
++    }
++    -re ". 2 .*\"threadname_2\" \[^\r\n\]*" {
++	set see2 1
++	exp_continue
++    }
++    -re ". 1 .*\"threadname_1\" \[^\r\n\]*" {
++	set see1 1
+ 	exp_continue
+     }
+     -re "$gdb_prompt $" {
+@@ -255,13 +378,36 @@ gdb_test "info threads 5-3" "inverted range" "test inverted range"
+ 
+ # Test degenerate range
+ 
+-for {set i 1} {$i <= 6} {incr i} {
+-    set see$i 0
+-}
++set see1 0
++set see2 0
++set see3 0
++set see4 0
++set see5 0
++set see6 0
++
+ gdb_test_multiple "info threads 3-3" "info threads 3-3" {
+-    -re ". (\[0-9\]+) .*\"threadname_\[0-9\]+\" \[^\r\n\]*" {
+-	set thr_num $expect_out(1,string)
+-	set see$thr_num 1
++    -re ". 6 .*\"threadname_6\" \[^\r\n\]*" {
++	set see6 1
++	exp_continue
++    }
++    -re ". 5 .*\"threadname_5\" \[^\r\n\]*" {
++	set see5 1
++	exp_continue
++    }
++    -re ". 4 .*\"threadname_4\" \[^\r\n\]*" {
++	set see4 1
++	exp_continue
++    }
++    -re ". 3 .*\"threadname_3\" \[^\r\n\]*" {
++	set see3 1
++	exp_continue
++    }
++    -re ". 2 .*\"threadname_2\" \[^\r\n\]*" {
++	set see2 1
++	exp_continue
++    }
++    -re ". 1 .*\"threadname_1\" \[^\r\n\]*" {
++	set see1 1
+ 	exp_continue
+     }
+     -re ".*$gdb_prompt $" {
+diff --git a/gdb/testsuite/gdb.threads/tls.exp b/gdb/testsuite/gdb.threads/tls.exp
+index 4d0a235..cd7fc0a 100644
+--- a/gdb/testsuite/gdb.threads/tls.exp
++++ b/gdb/testsuite/gdb.threads/tls.exp
+@@ -205,7 +205,7 @@ gdb_test "continue" ".*Breakpoint 3.*still alive.*" "continue to synch point"
+ set no_of_threads 0
+ send_gdb "info thread\n"
+ gdb_expect {
+-    -re "^info thread\[ \t\r\n\]+ *Id .*Frame\[ \t\r\n\]+.*(\[0-9\]+) *Thread\[^\r\n\]+\r\n$gdb_prompt $" {
++    -re "^info thread\[ \t\r\n\]+ *Id .*Frame\[ \t\r\n\]+(\[0-9\]+) *Thread.*$gdb_prompt $" {
+ 	   set no_of_threads $expect_out(1,string)
+ 	   pass "get number of threads"
+         }
+diff --git a/gdb/testsuite/lib/mi-support.exp b/gdb/testsuite/lib/mi-support.exp
+index 7f9a3f5..cb8227d 100644
+--- a/gdb/testsuite/lib/mi-support.exp
++++ b/gdb/testsuite/lib/mi-support.exp
+@@ -1968,8 +1968,19 @@ proc mi_load_shlibs { args } {
+     mi_gdb_test "set solib-search-path [file dirname [lindex $args 0]]" "\^done" ""
+ }
+ 
+-proc mi_check_thread_states { states test } {
++proc mi_reverse_list { list } {
++    if { [llength $list] <= 1 } {
++	return $list
++    }
++    set tail [lrange $list 1 [llength $list]]
++    set rtail [mi_reverse_list $tail]
++    lappend rtail [lindex $list 0]
++    return $rtail
++}
++
++proc mi_check_thread_states { xstates test } {
+     global expect_out
++    set states [mi_reverse_list $xstates]
+     set pattern ".*\\^done,threads=\\\["
+     foreach s $states {
+ 	set pattern "${pattern}(.*)state=\"$s\""
+diff --git a/gdb/thread.c b/gdb/thread.c
+index 4c2259f..29fc610 100644
+--- a/gdb/thread.c
++++ b/gdb/thread.c
+@@ -236,17 +236,8 @@ new_thread (ptid_t ptid)
+ 
+   tp->ptid = ptid;
+   tp->num = ++highest_thread_num;
+-
+-  if (thread_list == NULL)
+-    thread_list = tp;
+-  else
+-    {
+-      struct thread_info *last;
+-
+-      for (last = thread_list; last->next != NULL; last = last->next)
+-	;
+-      last->next = tp;
+-    }
++  tp->next = thread_list;
++  thread_list = tp;
+ 
+   /* Nothing to follow yet.  */
+   tp->pending_follow.kind = TARGET_WAITKIND_SPURIOUS;

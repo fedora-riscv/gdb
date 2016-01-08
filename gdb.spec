@@ -19,7 +19,7 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20151113
+%global snapsrc    20160106
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -544,6 +544,18 @@ Patch1044: gdb-pahole-python2.patch
 # Force libncursesw over libncurses to match the includes (RH BZ 1270534).
 Patch1056: gdb-fedora-libncursesw.patch
 
+# Fix gdb.multi/base.exp testsuite regression.
+Patch1064: gdb-testsuite-multi-base-warnings.patch
+
+# Fix i386 regression for funcargs.exp.
+Patch1065: gdb-testsuite-funcargs-m32.patch
+
+# Regression for foll-vfork.exp.
+Patch1066: gdb-testsuite-foll-vfork.patch
+
+# Regression for gdb.threads/fork-plus-threads.exp - revert.
+Patch1067: gdb-fork-plus-threads-ascending-revert.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -842,6 +854,10 @@ find -name "*.info*"|xargs rm -f
 %patch927 -p1
 %patch978 -p1
 %patch1056 -p1
+%patch1064 -p1
+%patch1065 -p1
+%patch1066 -p1
+%patch1067 -p1
 
 %patch848 -p1
 %if 0%{!?el6:1}
@@ -1357,6 +1373,9 @@ then
 fi
 
 %changelog
+* Fri Jan  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-34.fc24
+- Rebase to FSF GDB 7.10.50.20160106 (trunk snapshot).
+
 * Sat Nov 14 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20151113-33.fc24
 - Rebase to FSF GDB 7.10.50.20151113 (trunk snapshot).
 - [testsuite] BuildRequire libmpx for --with testsuite.

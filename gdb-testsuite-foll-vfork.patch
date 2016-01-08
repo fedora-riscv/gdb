@@ -1,0 +1,128 @@
+http://sourceware.org/ml/gdb-patches/2016-01/msg00142.html
+Subject: [testsuite patch] Regression for foll-vfork.exp  [Re: [PATCH] Remove HP-UX reference in foll-vfork.exp]
+
+
+--PEIAKu/WMn1b1Hv9
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Tue, 22 Dec 2015 16:53:23 +0100, Simon Marchi wrote:
+> Thanks, pushed.
+
+fe33faff35a8ee19db823149e764e3373e603bb9 is the first bad commit
+commit fe33faff35a8ee19db823149e764e3373e603bb9
+Author: Simon Marchi <simon.marchi@ericsson.com>
+Date:   Tue Dec 22 10:52:31 2015 -0500
+    Remove HP-UX reference in foll-vfork.exp
+
+FAIL: gdb.base/foll-vfork.exp: exec: vfork parent follow, finish after tcatch vfork: continue to vfork
+FAIL: gdb.base/foll-vfork.exp: exec: vfork child follow, finish after tcatch vfork: continue to vfork
+FAIL: gdb.base/foll-vfork.exp: exit: vfork parent follow, finish after tcatch vfork: continue to vfork
+FAIL: gdb.base/foll-vfork.exp: exit: vfork child follow, finish after tcatch vfork: continue to vfork
+
+It happens for plain gdb.base/foll-vfork.exp runtest on Fedora 23 x86_64.
+
+-Temporary catchpoint 2 (vforked process 24562), vfork () at ../sysdeps/unix/sysv/linux/x86_64/vfork.S:52^M
++Temporary catchpoint 2 (vforked process 25345), vfork () at ../sysdeps/unix/sysv/linux/x86_64/vfork.S:52^M
+ 52             pushq   %rdi^M
+ Current language:  auto^M
+ The current source language is "auto; currently asm".^M
+-(gdb) PASS: gdb.base/foll-vfork.exp: exec: vfork parent follow, finish after tcatch vfork: continue to vfork
++(gdb) FAIL: gdb.base/foll-vfork.exp: exec: vfork parent follow, finish after tcatch vfork: continue to vfork
+
+-Temporary catchpoint 2 (vforked process 24629), vfork () at ../sysdeps/unix/sysv/linux/x86_64/vfork.S:52^M
++Temporary catchpoint 2 (vforked process 25411), vfork () at ../sysdeps/unix/sysv/linux/x86_64/vfork.S:52^M
+ 52             pushq   %rdi^M
+ Current language:  auto^M
+ The current source language is "auto; currently asm".^M
+-(gdb) PASS: gdb.base/foll-vfork.exp: exec: vfork child follow, finish after tcatch vfork: continue to vfork
++(gdb) FAIL: gdb.base/foll-vfork.exp: exec: vfork child follow, finish after tcatch vfork: continue to vfork
+
+
+So I have reverted it and just simplified the comment, OK for check-in?
+
+The third case is not necessary during testing but I have changed back all the
+3 cases.
+
+
+Jan
+
+--PEIAKu/WMn1b1Hv9
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+gdb/testsuite/ChangeLog
+2016-01-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/foll-vfork.exp (tcatch_vfork_then_parent_follow)
+	(tcatch_vfork_then_child_follow_exec)
+	(tcatch_vfork_then_child_follow_exit): Revert back DWARF vfork
+	identification.
+
+diff --git a/gdb/testsuite/gdb.base/foll-vfork.exp b/gdb/testsuite/gdb.base/foll-vfork.exp
+index efa1b39..ebbe4ad 100644
+--- a/gdb/testsuite/gdb.base/foll-vfork.exp
++++ b/gdb/testsuite/gdb.base/foll-vfork.exp
+@@ -222,8 +222,17 @@ proc tcatch_vfork_then_parent_follow {} {
+    gdb_test_no_output "set follow-fork parent"
+ 
+    gdb_test "tcatch vfork" "Catchpoint .*(vfork).*"
+-   gdb_test "continue" "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*" \
+-	"continue to vfork"
++
++   # It may stop in either "vfork" or "_vfork".
++   set test "continue to vfork"
++   gdb_test_multiple "continue" $test {
++      -re "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*$gdb_prompt " {
++	  pass $test
++      }
++      -re "vfork \\(\\) at.*$gdb_prompt " {
++	  pass $test
++      }
++   }
+ 
+    set linenum [gdb_get_line_number "pid = vfork ();"]
+    set test "finish"
+@@ -254,8 +263,17 @@ proc tcatch_vfork_then_child_follow_exec {} {
+    gdb_test_no_output "set follow-fork child"
+ 
+    gdb_test "tcatch vfork" "Catchpoint .*(vfork).*"
+-   gdb_test "continue" "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*" \
+-	"continue to vfork"
++
++   # It may stop in either "vfork" or "_vfork".
++   set test "continue to vfork"
++   gdb_test_multiple "continue" $test {
++      -re "vfork \\(\\) at .*$gdb_prompt $" {
++	  pass $test
++      }
++      -re "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*$gdb_prompt " {
++	  pass $test
++      }
++   }
+ 
+    set linenum1 [gdb_get_line_number "pid = vfork ();"]
+    set linenum2 [gdb_get_line_number "printf(\"Hello from vforked-prog" ${srcfile2}]
+@@ -290,8 +308,17 @@ proc tcatch_vfork_then_child_follow_exit {} {
+    gdb_test_no_output "set follow-fork child"
+ 
+    gdb_test "tcatch vfork" "Catchpoint .*(vfork).*"
+-   gdb_test "continue" "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*" \
+-	"continue to vfork"
++
++   # It may stop in either "vfork" or "_vfork".
++   set test "continue to vfork"
++   gdb_test_multiple "continue" $test {
++      -re "vfork \\(\\) at .*$gdb_prompt $" {
++	  pass $test
++      }
++      -re "0x\[0-9a-fA-F\]*.*(vfork|__kernel_v?syscall).*$gdb_prompt " {
++	  pass $test
++      }
++   }
+ 
+    set test "finish"
+    gdb_test_multiple "finish" $test {
+
+--PEIAKu/WMn1b1Hv9--
+
