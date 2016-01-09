@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?dist}
+Release: 42%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -881,9 +881,8 @@ find -name "*.info*"|xargs rm -f
 %patch337 -p1
 %patch331 -p1
 
+%if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1044 -p1
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
-%patch1044 -p1 -R
 %endif
 
 find -name "*.orig" | xargs rm -f
@@ -1398,6 +1397,9 @@ then
 fi
 
 %changelog
+* Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-42.fc24
+- Simplify .spec: Remove conditional revert of: gdb-pahole-python2.patch
+
 * Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-41.fc24
 - Simplify .spec: Remove conditional revert of: gdb-6.8-attach-signalled-detach-stopped.patch
 - Simplify .spec: Remove conditional revert of: gdb-6.8-quit-never-aborts.patch
