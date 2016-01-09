@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?dist}
+Release: 41%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -878,13 +878,9 @@ find -name "*.info*"|xargs rm -f
 %patch848 -p1
 %patch833 -p1
 %patch642 -p1
-
 %patch337 -p1
 %patch331 -p1
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-%patch331 -p1 -R
-%patch337 -p1 -R
-%endif
+
 %patch1044 -p1
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 %patch1044 -p1 -R
@@ -952,6 +948,12 @@ CFLAGS="$CFLAGS -DGDB_INDEX_VERIFY_VENDOR"
 # Patch642: gdb-readline62-ask-more-rh.patch
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
+%endif
+
+# Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
+# Patch331: gdb-6.8-quit-never-aborts.patch
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
+CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 %endif
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
@@ -1396,6 +1398,10 @@ then
 fi
 
 %changelog
+* Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-41.fc24
+- Simplify .spec: Remove conditional revert of: gdb-6.8-attach-signalled-detach-stopped.patch
+- Simplify .spec: Remove conditional revert of: gdb-6.8-quit-never-aborts.patch
+
 * Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-40.fc24
 - Merge gdb-rhel5-compat.patch into: gdb-6.8-attach-signalled-detach-stopped.patch
 
