@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -880,11 +880,8 @@ find -name "*.info*"|xargs rm -f
 %patch1070 -p1
 %patch848 -p1
 %patch833 -p1
-
 %patch642 -p1
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
-%patch642 -p1 -R
-%endif
+
 %patch337 -p1
 %patch331 -p1
 %patch335 -p1
@@ -955,6 +952,11 @@ CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
 # Patch833: gdb-6.6-buildid-locate-rpm-scl.patch
 %if 0%{?el6:1} && 0%{?scl:1}
 CFLAGS="$CFLAGS -DGDB_INDEX_VERIFY_VENDOR"
+%endif
+
+# Patch642: gdb-readline62-ask-more-rh.patch
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
 %endif
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
@@ -1399,6 +1401,9 @@ then
 fi
 
 %changelog
+* Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-39.fc24
+- Simplify .spec: Remove conditional revert of: gdb-readline62-ask-more-rh.patch
+
 * Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-38.fc24
 - Simplify .spec: Remove conditional revert of: gdb-6.6-buildid-locate-rpm-scl.patch
 
