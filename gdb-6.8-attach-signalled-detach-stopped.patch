@@ -20,12 +20,26 @@ Index: gdb-7.9.50.20150531/gdb/linux-nat.c
  
        /* The process is definitely stopped.  It is in a job control
  	 stop, unless the kernel predates the TASK_STOPPED /
-@@ -1468,6 +1472,9 @@ get_pending_status (struct lwp_info *lp,
+@@ -1529,6 +1529,23 @@ get_pending_status (struct lwp_info *lp,
  			    gdb_signal_to_string (signo));
      }
  
-+  if (*status == 0 && ptid_get_pid (lp->ptid) == pid_was_stopped)
-+    *status = W_STOPCODE (SIGSTOP);
++  /* Workaround RHEL-5 kernel which has unreliable PTRACE_DETACH, SIGSTOP (that
++     many TIDs are left unstopped).  See RH Bug 496732.  */
++  if (ptid_get_pid (lp->ptid) == pid_was_stopped)
++    {
++      int err;
++
++      errno = 0;
++      err = kill_lwp (ptid_get_lwp (lp->ptid), SIGSTOP);
++      if (debug_linux_nat)
++	{
++	  fprintf_unfiltered (gdb_stdlog,
++			      "SC:  lwp kill %d %s\n",
++			      err,
++			      errno ? safe_strerror (errno) : "ERRNO-OK");
++	}
++    }
 +
    return 0;
  }
