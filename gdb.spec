@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?dist}
+Release: 43%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -564,6 +564,9 @@ Patch1067: gdb-fork-plus-threads-ascending-revert.patch
 # Fix false FAILs on too long base directory.
 Patch1070: gdb-testsuite-longdirname.patch
 
+# Test clflushopt instruction decode (for RH BZ 1262471).
+Patch1073: gdb-opcodes-clflushopt-test.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -875,6 +878,7 @@ find -name "*.info*"|xargs rm -f
 %patch1066 -p1
 %patch1067 -p1
 %patch1070 -p1
+%patch1073 -p1
 %patch848 -p1
 %patch833 -p1
 %patch642 -p1
@@ -1397,6 +1401,9 @@ then
 fi
 
 %changelog
+* Sat Jan 16 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-43.fc24
+- Test clflushopt instruction decode (for RH BZ 1262471).
+
 * Sat Jan  9 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-42.fc24
 - Simplify .spec: Remove conditional revert of: gdb-pahole-python2.patch
 
