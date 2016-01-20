@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 43%{?dist}
+Release: 44%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1401,6 +1401,9 @@ then
 fi
 
 %changelog
+* Wed Jan 20 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-44.fc24
+- Suppress librpm non-absolute filename warnings for /^remote:/ filenames.
+
 * Sat Jan 16 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-43.fc24
 - Test clflushopt instruction decode (for RH BZ 1262471).
 
