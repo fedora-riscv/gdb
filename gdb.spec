@@ -19,7 +19,7 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20160106
+%global snapsrc    20160121
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?dist}
+Release: 45%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -549,23 +549,11 @@ Patch1044: gdb-pahole-python2.patch
 # Force libncursesw over libncurses to match the includes (RH BZ 1270534).
 Patch1056: gdb-fedora-libncursesw.patch
 
-# Fix gdb.multi/base.exp testsuite regression.
-Patch1064: gdb-testsuite-multi-base-warnings.patch
-
-# Fix i386 regression for funcargs.exp.
-Patch1065: gdb-testsuite-funcargs-m32.patch
-
-# Regression for foll-vfork.exp.
-Patch1066: gdb-testsuite-foll-vfork.patch
-
-# Regression for gdb.threads/fork-plus-threads.exp - revert.
-Patch1067: gdb-fork-plus-threads-ascending-revert.patch
-
-# Fix false FAILs on too long base directory.
-Patch1070: gdb-testsuite-longdirname.patch
-
 # Test clflushopt instruction decode (for RH BZ 1262471).
 Patch1073: gdb-opcodes-clflushopt-test.patch
+
+# Fix testsuite regression with Guile.
+Patch1074: gdb-testsuite-guile.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -873,17 +861,13 @@ find -name "*.info*"|xargs rm -f
 %patch927 -p1
 %patch978 -p1
 %patch1056 -p1
-%patch1064 -p1
-%patch1065 -p1
-%patch1066 -p1
-%patch1067 -p1
-%patch1070 -p1
 %patch1073 -p1
 %patch848 -p1
 %patch833 -p1
 %patch642 -p1
 %patch337 -p1
 %patch331 -p1
+%patch1074 -p1
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1044 -p1
@@ -1401,6 +1385,9 @@ then
 fi
 
 %changelog
+* Fri Jan 22 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160121-45.fc24
+- Rebase to FSF GDB 7.10.50.20160121 (trunk snapshot).
+
 * Wed Jan 20 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160106-44.fc24
 - Suppress librpm non-absolute filename warnings for /^remote:/ filenames.
 
