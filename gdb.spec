@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?dist}
+Release: 47%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -555,6 +555,9 @@ Patch1073: gdb-opcodes-clflushopt-test.patch
 # Fix testsuite regression with Guile.
 Patch1074: gdb-testsuite-guile.patch
 
+# [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
+Patch1075: gdb-testsuite-readline63-sigint.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -867,6 +870,7 @@ find -name "*.info*"|xargs rm -f
 %patch642 -p1
 %patch337 -p1
 %patch331 -p1
+%patch1075 -p1
 %patch1074 -p1
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1385,6 +1389,9 @@ then
 fi
 
 %changelog
+* Sun Jan 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160121-47.fc24
+- [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
+
 * Fri Jan 22 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160121-46.fc24
 - Fix gdb.gdb/selftest.exp false FAIL.
 
