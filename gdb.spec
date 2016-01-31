@@ -27,7 +27,7 @@ Version: 7.10.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 48%{?dist}
+Release: 49%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,7 +245,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -755,7 +755,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1059 -p1
@@ -1393,6 +1393,9 @@ then
 fi
 
 %changelog
+* Sun Jan 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160121-49.fc24
+- Fix another false gcc6 compilation warning (Mark Wielaard).
+
 * Sun Jan 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.50.20160121-48.fc24
 - Fix false gcc6 compilation warning for: bfd/elf64-s390.c
 
