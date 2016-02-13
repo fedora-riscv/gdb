@@ -1,0 +1,1202 @@
+[testsuite 7.11] Regression for i386-biarch-core.exp and others [Re: [PATCH] Always organize test artifacts in a directory hierarchy]
+https://sourceware.org/ml/gdb-patches/2016-02/msg00390.html
+
+commit 2151ccc56c74b55a8f0debf0724a495368f92591
+Author: Simon Marchi <simon.marchi@ericsson.com>
+Date:   Mon Feb 8 14:02:36 2016 -0500
+
+    Always organize test artifacts in a directory hierarchy
+    
+    When running tests in parallel, each test puts its generated files in a
+    different directory, under "outputs".  I think it would be nice if it
+    was always the case, as it would isolate the test cases a bit more.  An
+    artifact created by a test wouldn't get overwritten by another test.
+    
+    Also, it makes it easier to clean up.  A lot of executables are left all
+    over the place because their names do not appear in gdb.*/Makefile.  If
+    everything is in "outputs", then we just have to delete that directory
+    (which we already do).
+    
+    At the same time it makes the gdb.foo directories and their Makefiles
+    useless in the build directory, since they are pretty much only used for
+    cleaning.
+    
+    What do you think?
+    
+    gdb/testsuite/ChangeLog:
+    
+    	* Makefile.in (ALL_SUBDIRS): Remove.
+    	(clean mostlyclean): Do not recurse in ALL_SUBDIRS.
+    	(distclean maintainer-clean realclean): Likewise.
+    	* configure.ac (AC_OUTPUT): Remove gdb.*/Makefile.
+    	* configure: Regenerate.
+    	* gdb.ada/Makefile.in: Delete.
+    	* gdb.arch/Makefile.in: Likewise.
+    	* gdb.asm/Makefile.in: Likewise.
+    	* gdb.base/Makefile.in: Likewise.
+    	* gdb.btrace/Makefile.in: Likewise.
+    	* gdb.cell/Makefile.in: Likewise.
+    	* gdb.compile/Makefile.in: Likewise.
+    	* gdb.cp/Makefile.in: Likewise.
+    	* gdb.disasm/Makefile.in: Likewise.
+    	* gdb.dlang/Makefile.in: Likewise.
+    	* gdb.dwarf2/Makefile.in: Likewise.
+    	* gdb.fortran/Makefile.in: Likewise.
+    	* gdb.gdb/Makefile.in: Likewise.
+    	* gdb.go/Makefile.in: Likewise.
+    	* gdb.guile/Makefile.in: Likewise.
+    	* gdb.java/Makefile.in: Likewise.
+    	* gdb.linespec/Makefile.in: Likewise.
+    	* gdb.mi/Makefile.in: Likewise.
+    	* gdb.modula2/Makefile.in: Likewise.
+    	* gdb.multi/Makefile.in: Likewise.
+    	* gdb.objc/Makefile.in: Likewise.
+    	* gdb.opencl/Makefile.in: Likewise.
+    	* gdb.opt/Makefile.in: Likewise.
+    	* gdb.pascal/Makefile.in: Likewise.
+    	* gdb.perf/Makefile.in: Likewise.
+    	* gdb.python/Makefile.in: Likewise.
+    	* gdb.reverse/Makefile.in: Likewise.
+    	* gdb.server/Makefile.in: Likewise.
+    	* gdb.stabs/Makefile.in: Likewise.
+    	* gdb.threads/Makefile.in: Likewise.
+    	* gdb.trace/Makefile.in: Likewise.
+    	* gdb.xml/Makefile.in: Likewise.
+    	* lib/gdb.exp (make_gdb_parallel_path): Add check for
+    	GDB_PARALLEL.
+    	(standard_output_file): Remove check for GDB_PARALLEL, always
+    	return path in outputs/$subdir/$testname.
+
+diff --git a/gdb/testsuite/Makefile.in b/gdb/testsuite/Makefile.in
+index 38c3052..6597196 100644
+--- a/gdb/testsuite/Makefile.in
++++ b/gdb/testsuite/Makefile.in
+@@ -33,6 +33,12 @@ SHELL = @SHELL@
+ EXEEXT = @EXEEXT@
+ SUBDIRS = @subdirs@
+ RPATH_ENVVAR = @RPATH_ENVVAR@
++ALL_SUBDIRS = gdb.ada gdb.arch gdb.asm gdb.base gdb.btrace gdb.cell gdb.cp \
++	gdb.disasm gdb.dlang gdb.dwarf2 gdb.fortran gdb.gdb gdb.go \
++	gdb.java gdb.linespec gdb.mi gdb.modula2 gdb.multi \
++	gdb.objc gdb.opencl gdb.opt gdb.pascal gdb.python gdb.server \
++	gdb.stabs gdb.reverse gdb.threads gdb.trace gdb.xml \
++	$(SUBDIRS)
+ 
+ EXTRA_RULES = @EXTRA_RULES@
+ 
+@@ -276,11 +282,29 @@ clean mostlyclean:
+ 	-rm -rf outputs temp cache
+ 	-rm -rf gdb.perf/workers gdb.perf/outputs gdb.perf/temp gdb.perf/cache
+ 	-rm -f read1.so expect-read1
++	if [ x"${ALL_SUBDIRS}" != x ] ; then \
++	    for dir in ${ALL_SUBDIRS}; \
++	    do \
++		    echo "$$dir:"; \
++		    if [ -d $$dir ]; then \
++			    (cd $$dir; $(MAKE) clean); \
++		    fi; \
++	    done ; \
++	else true; fi
+ 
+ distclean maintainer-clean realclean: clean
+ 	-rm -f *~ core
+ 	-rm -f Makefile config.status *-init.exp
+ 	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
++	if [ x"${ALL_SUBDIRS}" != x ] ; then \
++	    for dir in ${ALL_SUBDIRS}; \
++	    do \
++		    echo "$$dir:"; \
++		    if [ -d $$dir ]; then \
++			    (cd $$dir; $(MAKE) distclean); \
++		    fi; \
++	    done ; \
++	else true; fi
+ 
+ Makefile : Makefile.in config.status $(host_makefile_frag)
+ 	$(SHELL) config.status
+diff --git a/gdb/testsuite/configure b/gdb/testsuite/configure
+index 976dbe8..162dd22 100755
+--- a/gdb/testsuite/configure
++++ b/gdb/testsuite/configure
+@@ -3511,7 +3511,7 @@ program_transform_name=`$as_echo "$program_transform_name" | sed "$ac_script"`
+ 
+ ac_config_files="$ac_config_files lib/pdtrace"
+ 
+-ac_config_files="$ac_config_files Makefile"
++ac_config_files="$ac_config_files Makefile gdb.ada/Makefile gdb.arch/Makefile gdb.asm/Makefile gdb.base/Makefile gdb.btrace/Makefile gdb.cell/Makefile gdb.compile/Makefile gdb.cp/Makefile gdb.disasm/Makefile gdb.dwarf2/Makefile gdb.dlang/Makefile gdb.fortran/Makefile gdb.gdb/Makefile gdb.go/Makefile gdb.server/Makefile gdb.java/Makefile gdb.guile/Makefile gdb.linespec/Makefile gdb.mi/Makefile gdb.modula2/Makefile gdb.multi/Makefile gdb.objc/Makefile gdb.opencl/Makefile gdb.opt/Makefile gdb.pascal/Makefile gdb.perf/Makefile gdb.python/Makefile gdb.reverse/Makefile gdb.stabs/Makefile gdb.threads/Makefile gdb.trace/Makefile gdb.xml/Makefile"
+ 
+ 
+ cat >confcache <<\_ACEOF
+@@ -4214,6 +4214,38 @@ do
+   case $ac_config_target in
+     "lib/pdtrace") CONFIG_FILES="$CONFIG_FILES lib/pdtrace" ;;
+     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
++    "gdb.ada/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.ada/Makefile" ;;
++    "gdb.arch/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.arch/Makefile" ;;
++    "gdb.asm/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.asm/Makefile" ;;
++    "gdb.base/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.base/Makefile" ;;
++    "gdb.btrace/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.btrace/Makefile" ;;
++    "gdb.cell/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.cell/Makefile" ;;
++    "gdb.compile/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.compile/Makefile" ;;
++    "gdb.cp/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.cp/Makefile" ;;
++    "gdb.disasm/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.disasm/Makefile" ;;
++    "gdb.dwarf2/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.dwarf2/Makefile" ;;
++    "gdb.dlang/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.dlang/Makefile" ;;
++    "gdb.fortran/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.fortran/Makefile" ;;
++    "gdb.gdb/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.gdb/Makefile" ;;
++    "gdb.go/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.go/Makefile" ;;
++    "gdb.server/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.server/Makefile" ;;
++    "gdb.java/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.java/Makefile" ;;
++    "gdb.guile/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.guile/Makefile" ;;
++    "gdb.linespec/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.linespec/Makefile" ;;
++    "gdb.mi/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.mi/Makefile" ;;
++    "gdb.modula2/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.modula2/Makefile" ;;
++    "gdb.multi/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.multi/Makefile" ;;
++    "gdb.objc/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.objc/Makefile" ;;
++    "gdb.opencl/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.opencl/Makefile" ;;
++    "gdb.opt/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.opt/Makefile" ;;
++    "gdb.pascal/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.pascal/Makefile" ;;
++    "gdb.perf/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.perf/Makefile" ;;
++    "gdb.python/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.python/Makefile" ;;
++    "gdb.reverse/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.reverse/Makefile" ;;
++    "gdb.stabs/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.stabs/Makefile" ;;
++    "gdb.threads/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.threads/Makefile" ;;
++    "gdb.trace/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.trace/Makefile" ;;
++    "gdb.xml/Makefile") CONFIG_FILES="$CONFIG_FILES gdb.xml/Makefile" ;;
+ 
+   *) as_fn_error "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
+   esac
+diff --git a/gdb/testsuite/configure.ac b/gdb/testsuite/configure.ac
+index 91e5d22..6701878 100644
+--- a/gdb/testsuite/configure.ac
++++ b/gdb/testsuite/configure.ac
+@@ -104,4 +104,14 @@ GDB_AC_TRANSFORM(nm, NM_TRANSFORM_NAME)
+ AC_CONFIG_FILES([lib/pdtrace], [chmod +x lib/pdtrace])
+ AC_CONFIG_FILES([Makefile])
+ 
+-AC_OUTPUT
++AC_OUTPUT([Makefile \
++  gdb.ada/Makefile \
++  gdb.arch/Makefile gdb.asm/Makefile gdb.base/Makefile gdb.btrace/Makefile \
++  gdb.cell/Makefile gdb.compile/Makefile gdb.cp/Makefile gdb.disasm/Makefile \
++  gdb.dwarf2/Makefile gdb.dlang/Makefile gdb.fortran/Makefile gdb.gdb/Makefile \
++  gdb.go/Makefile gdb.server/Makefile gdb.java/Makefile \
++  gdb.guile/Makefile gdb.linespec/Makefile \
++  gdb.mi/Makefile gdb.modula2/Makefile gdb.multi/Makefile \
++  gdb.objc/Makefile gdb.opencl/Makefile gdb.opt/Makefile gdb.pascal/Makefile \
++  gdb.perf/Makefile gdb.python/Makefile gdb.reverse/Makefile gdb.stabs/Makefile \
++  gdb.threads/Makefile gdb.trace/Makefile gdb.xml/Makefile])
+diff --git a/gdb/testsuite/gdb.ada/Makefile.in b/gdb/testsuite/gdb.ada/Makefile.in
+new file mode 100644
+index 0000000..d9a3c79
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/Makefile.in
+@@ -0,0 +1,66 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = \
++  array_bounds/bar \
++  array_return/p \
++  array_subscript_addr/p \
++  arrayidx/p \
++  arrayparam/foo \
++  arrayptr/foo \
++  atomic_enum/foo \
++  catch_ex/foo \
++  char_param/foo \
++  complete/foo \
++  exec_changed/common \
++  exec_changed/first \
++  exec_changed/second \
++  exprs/p \
++  fixed_cmp/fixed \
++  fixed_points/fixed_points \
++  formatted_ref/formatted_ref \
++  frame_args/foo \
++  fun_addr/foo \
++  fun_in_declare/foo \
++  funcall_param/foo \
++  homonym/homonym_main \
++  info_types \
++  interface/foo \
++  lang_switch/lang_switch \
++  nested/hello \
++  null_array/foo \
++  null_record/null_record \
++  packed_array/pa \
++  packed_tagged/comp_bug \
++  print_chars/foo \
++  start/dummy \
++  ptype_field/foo \
++  ref_param/foo \
++  str_ref_cmp/foo \
++  sym_print_name/foo \
++  taft_type/p \
++  tagged/foo \
++  type_coercion/assign \
++  watch_arg/watch
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-find . -name 'b~*.ad[sb]' -print | xargs rm -f
++	-rm -f *~ a.out xgdb *.x *.ci *.tmp
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
++	-find . -name '*.dwo' -print | xargs rm -f
++	-find . -name '*.dwp' -print | xargs rm -f
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS) twice-tmp.c
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.arch/Makefile.in b/gdb/testsuite/gdb.arch/Makefile.in
+new file mode 100644
+index 0000000..9aaf1ce
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/Makefile.in
+@@ -0,0 +1,20 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = altivec-abi altivec-regs amd64-byte amd64-disp-step amd64-dword \
++	amd64-entry-value amd64-i386-address amd64-word i386-bp_permanent \
++	i386-permbkpt i386-avx i386-avx512 i386-signal i386-sse sparc-sysstep
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out *.x *.ci *.tmp gcore.test system-gcore
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.asm/Makefile.in b/gdb/testsuite/gdb.asm/Makefile.in
+new file mode 100644
+index 0000000..f3e6e8b
+--- /dev/null
++++ b/gdb/testsuite/gdb.asm/Makefile.in
+@@ -0,0 +1,20 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = asm-source
++MISCELLANEOUS = arch.inc
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out *.x *.ci *.tmp
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.base/Makefile.in b/gdb/testsuite/gdb.base/Makefile.in
+new file mode 100644
+index 0000000..dda3169
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/Makefile.in
+@@ -0,0 +1,69 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = a2-run advance all-types annota1 annota1-watch_thread_num \
++	annota3 anon args arrayidx async attach attach-pie-misread \
++	attach2 auxv bang\! bfp-test bigcore bitfields bitfields2 \
++	break break-always break-entry break-interp-test breako2 \
++	breakpoint-shadow break-on-linker-gcd-function \
++	call-ar-st call-rt-st call-sc-t* call-signals \
++	call-strs callexit callfuncs callfwmall charset checkpoint \
++	chng-syms code_elim1 code_elim2 commands compiler completion complex \
++	condbreak consecutive constvars coremaker cursal cvexpr \
++	dbx-test del disasm-end-cu display dprintf-pending dump dup-sect \
++	dup-sect.debug \
++	dup-sect.stripped ending-run execd-prog expand-psymtabs exprs \
++	fileio find finish fixsection float foll-exec foll-fork foll-vfork \
++	frame-args freebpcmd fullname funcargs gcore \
++	gcore-buffer-overflow-012* \
++	gdb1090 gdb11530 gdb11531 gdb1250 gdb1555-main gdb1821 gdbvars \
++	hashline1 hashline2 hashline3 hbreak hook-stop-continue \
++	hook-stop-frame huge included infnan info-target int-type \
++	interrupt jit-main jump label langs lineinc list longjmp long_long \
++	macscp mips_pro miscexprs moribund-step multi-forks nodebug \
++	nofield nostdlib opaque overlays pc-fp pending permission \
++	pie-execl1 pie-execl2 pointers pointers2 pr11022 prelinkt \
++	prelinkt.debug prelinkt.stripped printcmds prologue psymtab \
++	ptr-typedef ptype randomize recurse relational relativedebug \
++	reread reread1 restore return return-nodebug-* return2 run \
++	savedregs scope section_command sep sepdebug sepdebug.stripped \
++	sepdebug2 sepdebug2.debug sepdebug2.stripped sepsymtab \
++	sepsymtab.debug sepsymtab.stripped setshow setvar shmain shreloc \
++	sigall sigaltstack sigbpt sigchld siginfo siginfo-addr \
++	siginfo-infcall siginfo-obj signals signull sigrepeat sigstep \
++	sizeof skip skip-solib solib solib-corrupted solib-display-main \
++	solib-nodir solib-overlap-main-0x40000000 solib-symbol-main solib-weak \
++	solib-weak-lib2 solib_sl so-impl-ld so-indr-cl \
++	stack-checking start step-break step-bt step-line step-resume-infcall \
++	step-test store structs-t* structs2 structs3 \
++	symbol-without-target_section term tui-layout twice-tmp \
++	type-opaque-main ui-redirect unload until unwindonsignal \
++	valgrind-db-attach value-double-free varargs vforked-prog \
++	volatile watch-cond watch-cond-infcall watch-non-mem watch-read \
++	watch-vfork watch_thread_num watchpoint watchpoint-cond-gone \
++	watchpoint-hw watchpoint-hw-hit-once watchpoint-solib watchpoints \
++	wchar whatis whatis-exp catch-syscall \
++	pr10179 gnu_vector
++
++MISCELLANEOUS = coremmap.data dprintf-pendshr.sl ../foobar.baz fixsectshr.sl \
++	pendshr.sl shreloc1.sl shreloc2.sl twice-tmp.c \
++	shr1.sl shr2.sl solib_sl.sl solib1.sl solib2.sl \
++	unloadshr.sl unloadshr2.sl watchpoint-solib-shr.sl \
++	weaklib1.sl weaklib2.sl hashline1.c hashline2.c hashline3.c \
++	auxv.gcore bigcore.corefile *.core *.debug *.stripped \
++	gcore-buffer-overflow.test gcore.test shreloc.txt tmp-fullname.c
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.btrace/Makefile.in b/gdb/testsuite/gdb.btrace/Makefile.in
+new file mode 100644
+index 0000000..c90794f
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/Makefile.in
+@@ -0,0 +1,19 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES   = enable function_call_history instruction_history tailcall \
++  exception unknown_functions record_goto delta step stepi \
++  multi-thread-step rn-dl-bind data
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	rm -f *~ *.o *.x *.ci *.sl a.out core
++	rm -f *.dwo *.dwp
++	rm -f $(EXECUTABLES) $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	rm -f Makefile config.status config.log site.* gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.cell/Makefile.in b/gdb/testsuite/gdb.cell/Makefile.in
+new file mode 100644
+index 0000000..7771d61
+--- /dev/null
++++ b/gdb/testsuite/gdb.cell/Makefile.in
+@@ -0,0 +1,21 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = break bt coremaker data mem-access size
++
++SPU_EXECUTABLES = break-spu bt-spu bt2-spu coremaker-spu data-spu \
++		  ea-cache-spu ea-standalone ea-test mem-access-spu size-spu
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out core corefile gcore.test
++	-rm -f *.dwo *.dwp
++	-rm -f $(EXECUTABLES) $(SPU_EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.compile/Makefile.in b/gdb/testsuite/gdb.compile/Makefile.in
+new file mode 100644
+index 0000000..6a1a895
+--- /dev/null
++++ b/gdb/testsuite/gdb.compile/Makefile.in
+@@ -0,0 +1,21 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = \
++	chan handcall hello integers methods package \
++	strings types unsafe
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-rm -f *~ a.out
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.cp/Makefile.in b/gdb/testsuite/gdb.cp/Makefile.in
+new file mode 100644
+index 0000000..2958e24
+--- /dev/null
++++ b/gdb/testsuite/gdb.cp/Makefile.in
+@@ -0,0 +1,28 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = abstract-origin ambiguous annota2 annota3 anon-union \
++	arg-reference bool breakpoint bs15503 call-c casts class2 \
++	classes converts cpexprs cplusfuncs cttiadd derivation \
++	exception expand-sals extern-c formatted-ref fpointer gdb1355 \
++	gdb2384 hang infcall-dlopen inherit koenig local m-data m-static \
++	mb-ctor mb-inline mb-templates member-ptr method misc namespace \
++	namespace-enum namespace-nested-import nextoverthrow noparam nsdecl \
++	nsimport nsnested nsnoimports nsrecurs nsstress nsusing operator \
++	oranking overload overload-const ovldbreak pass-by-ref pr-1023 pr-1210 \
++	pr-574 pr10728 pr12028 pr9631 printmethod psmang ptype-cv-cp \
++	re-set-overloaded ref-typ ref-typ2 rtti shadow smartp temargs \
++	templates try_catch typedef-operator userdef virtbase virtfunc \
++	ref-types ref-params method2 pr9594 gdb2495 virtfunc2 pr9067 \
++	pr1072 pr10687 pr9167
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.disasm/Makefile.in b/gdb/testsuite/gdb.disasm/Makefile.in
+new file mode 100644
+index 0000000..f4830fa
+--- /dev/null
++++ b/gdb/testsuite/gdb.disasm/Makefile.in
+@@ -0,0 +1,14 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++.PHONY: all clean mostlyclean distclean realclean
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *.o *.diff *~ *.bad core h8300s hppa mn10300 sh3
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.dlang/Makefile.in b/gdb/testsuite/gdb.dlang/Makefile.in
+new file mode 100644
+index 0000000..5527c3e
+--- /dev/null
++++ b/gdb/testsuite/gdb.dlang/Makefile.in
+@@ -0,0 +1,15 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.dwarf2/Makefile.in b/gdb/testsuite/gdb.dwarf2/Makefile.in
+new file mode 100644
+index 0000000..02f6a67
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/Makefile.in
+@@ -0,0 +1,46 @@
++# Makefile for regression testing the GNU debugger.
++# Copyright 1992-2016 Free Software Foundation, Inc.
++
++# This file is part of GDB.
++
++# GDB is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3, or (at your option)
++# any later version.
++
++# GDB is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = *.x pr10770 dw2-cp-infcall-ref-static dw2-inline-param \
++	dw2-noloc dw2-ranges dw2-ref-missing-frame dw2-unresolved gdb-index \
++	dwp-symlink
++
++MISCELLANEOUS = \
++	dwp-symlink.dwp dwp-symlink-thelink dwp-symlink-thelink.dwp \
++	dwp-dir1 dwp-dir2 dwp-dir3
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out *.x *.ci *.tmp
++	-rm -f core core.coremaker coremaker.core corefile
++	-rm -f *.dwo *.dwp
++	-rm -f $(EXECUTABLES)
++	-rm -rf $(MISCELLANEOUS)
++	-rm -f *.gdb-index *.with-index
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.fortran/Makefile.in b/gdb/testsuite/gdb.fortran/Makefile.in
+new file mode 100644
+index 0000000..e9a1f04
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/Makefile.in
+@@ -0,0 +1,34 @@
++# Makefile for regression testing the GNU debugger.
++# Copyright 1992-2016 Free Software Foundation, Inc.
++
++# This file is part of GDB.
++
++# GDB is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3, or (at your option)
++# any later version.
++
++# GDB is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = 
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.gdb/Makefile.in b/gdb/testsuite/gdb.gdb/Makefile.in
+new file mode 100644
+index 0000000..5527c3e
+--- /dev/null
++++ b/gdb/testsuite/gdb.gdb/Makefile.in
+@@ -0,0 +1,15 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.go/Makefile.in b/gdb/testsuite/gdb.go/Makefile.in
+new file mode 100644
+index 0000000..6a1a895
+--- /dev/null
++++ b/gdb/testsuite/gdb.go/Makefile.in
+@@ -0,0 +1,21 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = \
++	chan handcall hello integers methods package \
++	strings types unsafe
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-rm -f *~ a.out
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.guile/Makefile.in b/gdb/testsuite/gdb.guile/Makefile.in
+new file mode 100644
+index 0000000..37f9cb0
+--- /dev/null
++++ b/gdb/testsuite/gdb.guile/Makefile.in
+@@ -0,0 +1,17 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES =
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core $(EXECUTABLES) $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.java/Makefile.in b/gdb/testsuite/gdb.java/Makefile.in
+new file mode 100644
+index 0000000..0b0ae1a
+--- /dev/null
++++ b/gdb/testsuite/gdb.java/Makefile.in
+@@ -0,0 +1,22 @@
++srcdir = @srcdir@
++VPATH = @srcdir@
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++.SUFFIXES: .java .class .o .exe .exp .check
++
++# Do 'make javamisc.check' to run just the javamisc.exp test.
++
++.exp.check:
++	rootme=`pwd`/; export rootme; \
++	cd .. ; \
++	$(MAKE) just-check RUNTESTFLAGS="${RUNTESTFLAGS} $*.exp" \
++	  EXPECT=${EXPECT}
++
++clean mostlyclean:
++	-rm -f *.o ${OBJS}  *.class *.exe *~ core jmain jmisc jnpe jprint
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.linespec/Makefile.in b/gdb/testsuite/gdb.linespec/Makefile.in
+new file mode 100644
+index 0000000..18eadbe
+--- /dev/null
++++ b/gdb/testsuite/gdb.linespec/Makefile.in
+@@ -0,0 +1,15 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = lspec
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core $(EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.mi/Makefile.in b/gdb/testsuite/gdb.mi/Makefile.in
+new file mode 100644
+index 0000000..2ea819d
+--- /dev/null
++++ b/gdb/testsuite/gdb.mi/Makefile.in
+@@ -0,0 +1,30 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++PROGS = basics c_variable cpp_variable var-cmd dw2-ref-missing-frame	\
++	gdb669-pthreads gdb701 gdb792 mi-async mi-basics mi-break	\
++	mi-cli mi-console mi-disassemble mi-dprintf mi-eval mi-file	\
++	mi-file-transfer mi-non-stop mi-non-stop-exit			\
++	mi-ns-stale-regcache mi-nsintrall mi-nsmoribund mi-nsthrexec	\
++	mi-pending mi-pthreads mi-read-memory mi-regs mi-return		\
++	mi-reverse mi-simplerun mi-stack mi-stepi mi-syn-frame		\
++	mi-var-block mi-var-child mi-var-cmd mi-var-cp mi-var-display	\
++	mi-var-invalidate mi-var-invalidate_bis mi-watch		\
++	mi2-amd64-entry-value mi2-basics				\
++	mi2-break mi2-cli mi2-disassemble mi2-eval mi2-file		\
++	mi2-pthreads mi2-regs mi2-return mi2-simplerun mi2-stepi	\
++	mi2-var-block mi2-var-child mi2-var-cmd mi2-var-display		\
++	mi2-watch until
++
++MISCELLANEOUS = mi-pendshr.sl mi-pendshr2.sl
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *.ci *.o $(OBJS) $(PROGS) *~ core
++	-rm -f *.dwo *.dwp
++	-rm -f $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.modula2/Makefile.in b/gdb/testsuite/gdb.modula2/Makefile.in
+new file mode 100644
+index 0000000..39359fc
+--- /dev/null
++++ b/gdb/testsuite/gdb.modula2/Makefile.in
+@@ -0,0 +1,34 @@
++# Makefile for regression testing the GNU debugger.
++# Copyright 2007-2016 Free Software Foundation, Inc.
++
++# This file is part of GDB.
++
++# GDB is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3, or (at your option)
++# any later version.
++
++# GDB is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = unbounded1
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.multi/Makefile.in b/gdb/testsuite/gdb.multi/Makefile.in
+new file mode 100644
+index 0000000..fe26bae
+--- /dev/null
++++ b/gdb/testsuite/gdb.multi/Makefile.in
+@@ -0,0 +1,15 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = hello hangout goodbye bkpt-multi-exec crashme
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core $(EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.objc/Makefile.in b/gdb/testsuite/gdb.objc/Makefile.in
+new file mode 100644
+index 0000000..c9ed32b
+--- /dev/null
++++ b/gdb/testsuite/gdb.objc/Makefile.in
+@@ -0,0 +1,23 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = basicclass
++
++all: 
++	@echo "Nothing to be done for all..."
++
++info:
++install-info:
++dvi:
++install:
++uninstall: force
++installcheck:
++check:
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core ${EXECUTABLES}
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.opencl/Makefile.in b/gdb/testsuite/gdb.opencl/Makefile.in
+new file mode 100644
+index 0000000..decf413
+--- /dev/null
++++ b/gdb/testsuite/gdb.opencl/Makefile.in
+@@ -0,0 +1,18 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = callfuncs datatypes vec_comps convs_casts operators
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out core corefile gcore.test
++	-rm -f *.dwo *.dwp
++	-rm -f $(EXECUTABLES)
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.opt/Makefile.in b/gdb/testsuite/gdb.opt/Makefile.in
+new file mode 100644
+index 0000000..76b305e
+--- /dev/null
++++ b/gdb/testsuite/gdb.opt/Makefile.in
+@@ -0,0 +1,25 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = clobbered-registers-O2 inline-bt inline-cmds inline-locals
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-find . -name 'b~*.ad[sb]' -print | xargs rm -f
++	-rm -f *~ a.out xgdb *.x *.ci *.tmp
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS) twice-tmp.c
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.pascal/Makefile.in b/gdb/testsuite/gdb.pascal/Makefile.in
+new file mode 100644
+index 0000000..d9ad900
+--- /dev/null
++++ b/gdb/testsuite/gdb.pascal/Makefile.in
+@@ -0,0 +1,25 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = hello/hello 
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-find . -name 'b~*.ad[sb]' -print | xargs rm -f
++	-rm -f *~ a.out xgdb *.x *.ci *.tmp
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS) twice-tmp.c
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.perf/Makefile.in b/gdb/testsuite/gdb.perf/Makefile.in
+new file mode 100644
+index 0000000..2071d12
+--- /dev/null
++++ b/gdb/testsuite/gdb.perf/Makefile.in
+@@ -0,0 +1,15 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++.PHONY: all clean mostlyclean distclean realclean
++
++PROGS = 
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *.o *.diff *~ core $(PROGS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.python/Makefile.in b/gdb/testsuite/gdb.python/Makefile.in
+new file mode 100644
+index 0000000..0b81507
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/Makefile.in
+@@ -0,0 +1,22 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = py-type py-value py-prettyprint py-template py-block \
++	py-symbol py-mi py-breakpoint py-inferior py-infthread \
++	py-shared python lib-types py-events py-evthreads py-frame \
++	py-mi py-pp-maint py-progspace py-section-script py-objfile \
++	py-finish-breakpoint py-finish-breakpoint2 py-value-cc py-explore \
++	py-explore-cc py-arch
++
++MISCELLANEOUS = py-shared-sl.sl py-events-shlib.so py-events-shlib-nodebug.so 
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o *.ci
++	-rm -f *.dwo *.dwp
++	-rm -f core $(EXECUTABLES) $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.reverse/Makefile.in b/gdb/testsuite/gdb.reverse/Makefile.in
+new file mode 100644
+index 0000000..adaf7dd
+--- /dev/null
++++ b/gdb/testsuite/gdb.reverse/Makefile.in
+@@ -0,0 +1,21 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES   = break-reverse consecutive-reverse finish-reverse \
++	i386-precsave i386-reverse i386-sse-reverse \
++	machinestate solib-reverse step-reverse until-reverse \
++	watch-reverse sigall-reverse sigall-precsave
++
++MISCELLANEOUS = 
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	rm -f *~ *.o *.x *.ci *.sl a.out core
++	rm -f *.dwo *.dwp
++	rm -f $(EXECUTABLES) $(MISCELLANEOUS)
++
++distclean maintainer-clean realclean: clean
++	rm -f Makefile config.status config.log site.* gdb.log gdb.sum
++
+diff --git a/gdb/testsuite/gdb.server/Makefile.in b/gdb/testsuite/gdb.server/Makefile.in
+new file mode 100644
+index 0000000..509fbd8
+--- /dev/null
++++ b/gdb/testsuite/gdb.server/Makefile.in
+@@ -0,0 +1,26 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = ext-attach ext-run file-transfer server-mon server-run \
++	no-thread-db
++
++MISCELLANEOUS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-find . -name '*.o' -print | xargs rm -f
++	-find . -name '*.ali' -print | xargs rm -f
++	-find . -name 'b~*.ad[sb]' -print | xargs rm -f
++	-rm -f *~ a.out xgdb *.x *.ci *.tmp
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp
++	-rm -f *.dwo *.dwp
++	-rm -f core core.coremaker coremaker.core corefile $(EXECUTABLES)
++	-rm -f $(MISCELLANEOUS) twice-tmp.c
++
++distclean maintainer-clean realclean: clean
++	-rm -f *~ core
++	-rm -f Makefile config.status config.log
++	-rm -f *-init.exp gdb.log gdb.sum
++	-rm -fr *.log summary detail *.plog *.sum *.psum site.*
+diff --git a/gdb/testsuite/gdb.stabs/Makefile.in b/gdb/testsuite/gdb.stabs/Makefile.in
+new file mode 100644
+index 0000000..f1a5913
+--- /dev/null
++++ b/gdb/testsuite/gdb.stabs/Makefile.in
+@@ -0,0 +1,14 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++all: 
++	@echo "Nothing to be done for all..."
++
++#### host, target, and site specific Makefile frags come in here.
++
++clean mostlyclean:
++	-rm -f *.o *~ core tmp.c tmp.s weird.s errs exclfwd gdb11479
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.threads/Makefile.in b/gdb/testsuite/gdb.threads/Makefile.in
+new file mode 100644
+index 0000000..8f9f867
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/Makefile.in
+@@ -0,0 +1,25 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++EXECUTABLES = attach-into-signal-nothr attach-into-signal-thr \
++	attach-stopped attachstop-mt \
++	bp_in_thread current-lwp-dead execl execl1 fork-child-threads \
++	fork-thread-pending gcore-pthreads hand-call-in-threads \
++	ia64-sigill interrupted-hand-call killed linux-dp \
++	local-watch-wrong-thread manythreads multi-create pending-step \
++	print-threads pthreads pthread_cond_wait schedlock sigthread \
++	staticthreads switch-threads thread-execl thread-specific \
++	thread_check thread_events threadapply threxit-hop-specific \
++	tls tls-main tls-nodebug watchthreads watchthreads-reorder \
++	watchthreads2
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *~ *.o a.out xgdb *.x *.ci *.tmp core core.* $(EXECUTABLES) \
++	 *.core gcore.test
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log config.h gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.trace/Makefile.in b/gdb/testsuite/gdb.trace/Makefile.in
+new file mode 100644
+index 0000000..514beab
+--- /dev/null
++++ b/gdb/testsuite/gdb.trace/Makefile.in
+@@ -0,0 +1,19 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++.PHONY: all clean mostlyclean distclean realclean
++
++PROGS = actions-changed ax backtrace deltrace disconnected-tracing \
++	infotrace no-attach-trace packetlen passc-dyn passcount report \
++	save-trace tfile tfind tracecmd tsv unavailable while-dyn while-stepping
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f actions circ collection
++	-rm -f *.o *.diff *~ *.bad core sh3 hppa mn10300 $(PROGS)
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile config.status config.log gdb.log gdb.sum
+diff --git a/gdb/testsuite/gdb.xml/Makefile.in b/gdb/testsuite/gdb.xml/Makefile.in
+new file mode 100644
+index 0000000..b8383ca
+--- /dev/null
++++ b/gdb/testsuite/gdb.xml/Makefile.in
+@@ -0,0 +1,14 @@
++VPATH = @srcdir@
++srcdir = @srcdir@
++
++PROGS =
++
++all info install-info dvi install uninstall installcheck check:
++	@echo "Nothing to be done for $@..."
++
++clean mostlyclean:
++	-rm -f *.ci *.o $(OBJS) $(PROGS) *~ core
++	-rm -f *.dwo *.dwp
++
++distclean maintainer-clean realclean: clean
++	-rm -f Makefile gdb.log gdb.sum
+diff --git a/gdb/testsuite/lib/gdb.exp b/gdb/testsuite/lib/gdb.exp
+index 1fb05c4..66821eb 100644
+--- a/gdb/testsuite/lib/gdb.exp
++++ b/gdb/testsuite/lib/gdb.exp
+@@ -4317,7 +4317,7 @@ proc default_gdb_init { test_file_name } {
+ proc make_gdb_parallel_path { args } {
+     global GDB_PARALLEL objdir
+     set joiner [list "file" "join" $objdir]
+-    if { [info exists GDB_PARALLEL] && $GDB_PARALLEL != "yes" } {
++    if { $GDB_PARALLEL != "yes" } {
+ 	lappend joiner $GDB_PARALLEL
+     }
+     set joiner [concat $joiner $args]
+@@ -4329,11 +4329,15 @@ proc make_gdb_parallel_path { args } {
+ # the directory is returned.
+ 
+ proc standard_output_file {basename} {
+-    global objdir subdir gdb_test_file_name
++    global objdir subdir gdb_test_file_name GDB_PARALLEL
+ 
+-    set dir [make_gdb_parallel_path outputs $subdir $gdb_test_file_name]
+-    file mkdir $dir
+-    return [file join $dir $basename]
++    if {[info exists GDB_PARALLEL]} {
++	set dir [make_gdb_parallel_path outputs $subdir $gdb_test_file_name]
++	file mkdir $dir
++	return [file join $dir $basename]
++    } else {
++	return [file join $objdir $subdir $basename]
++    }
+ }
+ 
+ # Return the name of a file in our standard temporary directory.
