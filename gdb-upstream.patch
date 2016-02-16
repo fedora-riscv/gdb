@@ -1,0 +1,247 @@
+http://sourceware.org/ml/gdb-patches/2016-02/msg00423.html
+Subject: Re: [testsuite 7.11] Regression for i386-biarch-core.exp and others [Re: [PATCH] Always organize test artifacts in a directory hierarchy]
+
+On 16-02-11 04:22 PM, Jan Kratochvil wrote:
+> On Mon, 08 Feb 2016 20:26:41 +0100, Simon Marchi wrote:
+>> Ok, I pushed this patch.  I am now waiting to know what I broke.
+> 
+> Running /home/jkratoch/redhat/gdb-clean/gdb/testsuite/gdb.arch/i386-biarch-core.exp ...
+> PASS: gdb.arch/i386-biarch-core.exp: complete set gnutarget
+> PASS: gdb.arch/i386-biarch-core.exp: core-file
+> PASS: gdb.arch/i386-biarch-core.exp: .text is readable
+> ->
+> Running /home/jkratoch/redhat/gdb-clean/gdb/testsuite/gdb.arch/i386-biarch-core.exp ...
+> PASS: gdb.arch/i386-biarch-core.exp: complete set gnutarget
+> UNTESTED: gdb.arch/i386-biarch-core.exp: failed bzip2
+> 
+> Reproducible with:
+> 	tar xJf gdb-7.10.90.20160211.tar.xz;cd gdb-7.10.90.20160211;./configure;make;make -C gdb check//unix/-m64 RUNTESTFLAGS=gdb.arch/i386-biarch-core.exp
+> 	Running /tmp/gdb-7.10.90.20160211/gdb/testsuite/gdb.arch/i386-biarch-core.exp ...
+> 	sh: /tmp/gdb-7.10.90.20160211/gdb/testsuite.unix.-m64/gdb.arch/i386-biarch-core.core: No such file or directory
+> 			=== gdb Summary ===
+> 	# of expected passes		1
+> 	# of untested testcases		1
+> 
+> I have not debugged it more yet.
+> 
+> 
+> Jan
+
+Hi Jan,
+
+I think this patch should fix it.  It simply makes the test use standard_output_file
+for its output directory.
+
+Simon
+
+
+>From c643fde26ecdc63c399ac4f26fd31920148fae77 Mon Sep 17 00:00:00 2001
+From: Simon Marchi <simon.marchi@ericsson.com>
+Date: Fri, 12 Feb 2016 13:17:32 -0500
+Subject: [PATCH] i386-biarch-core.exp: Use standard_output_file
+Subject: [PATCH] i386-biarch-core.exp: Use standard_output_file
+
+Fix the core file path to use the standard output directory.
+
+gdb/testsuite/ChangeLog:
+
+	* i386-biarch-core.exp: Define corefile using
+	standard_output_file.
+---
+ gdb/testsuite/gdb.arch/i386-biarch-core.exp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gdb/testsuite/gdb.arch/i386-biarch-core.exp b/gdb/testsuite/gdb.arch/i386-biarch-core.exp
+index 607b947..4dc5ba6 100644
+--- a/gdb/testsuite/gdb.arch/i386-biarch-core.exp
++++ b/gdb/testsuite/gdb.arch/i386-biarch-core.exp
+@@ -40,7 +40,7 @@ gdb_test_multiple "complete set gnutarget " $test {
+ }
+
+ set corebz2file ${srcdir}/${subdir}/${testfile}.core.bz2
+-set corefile ${objdir}/${subdir}/${testfile}.core
++set corefile [standard_output_file ${testfile}.core]
+ # Entry point of the original executable.
+ set address 0x400078
+
+-- 
+2.5.1
+
+
+
+http://sourceware.org/ml/gdb-patches/2016-02/msg00468.html
+Subject: [testsuite obv+7.11] Fix more testcases with standard_output_file  [Re: [testsuite 7.11] Regression for i386-biarch-core.exp and others]
+
+
+--AhhlLboLdkugWU4S
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Fri, 12 Feb 2016 19:47:10 +0100, Jan Kratochvil wrote:
+> (gdb.base/corefile.exp gdb.base/execl-update-breakpoints.exp listed there do
+> not reproduce it for me locally now, I will re-check those.)
+
+I have rechecked it and fixed these.
+
+trunk:
+	c99dbb4246fedd500dbdd50514589fc7f95d80c0
+7.11:
+	8b6bd5aca63189590498195a7a2696cde021c9cd
+
+
+Jan
+
+--AhhlLboLdkugWU4S
+Content-Type: message/rfc822
+Content-Disposition: inline
+
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Mon, 15 Feb 2016 18:54:03 +0100
+Subject: [PATCH] Fix more testcases with standard_output_file.
+Subject: [PATCH] Fix more testcases with standard_output_file.
+
+Since
+	commit 2151ccc56c74b55a8f0debf0724a495368f92591
+	Author: Simon Marchi <simon.marchi@ericsson.com>
+	Date:   Mon Feb 8 14:02:36 2016 -0500
+	    Always organize test artifacts in a directory hierarchy
+these testfiles could not build.
+
+gdb/testsuite/ChangeLog
+2016-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.arch/i386-gnu-cfi.exp: Use standard_output_file.
+	* gdb.arch/i386-prologue.exp: Likewise.
+	* gdb.arch/i386-size.exp: Likewise.
+---
+ gdb/testsuite/ChangeLog                  | 6 ++++++
+ gdb/testsuite/gdb.arch/i386-gnu-cfi.exp  | 2 +-
+ gdb/testsuite/gdb.arch/i386-prologue.exp | 2 +-
+ gdb/testsuite/gdb.arch/i386-size.exp     | 2 +-
+ 4 files changed, 9 insertions(+), 3 deletions(-)
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,9 @@
++2016-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* gdb.arch/i386-gnu-cfi.exp: Use standard_output_file.
++	* gdb.arch/i386-prologue.exp: Likewise.
++	* gdb.arch/i386-size.exp: Likewise.
++
+ 2016-02-15  Simon Marchi  <simon.marchi@ericsson.com>
+ 
+ 	* gdb.base/wrong_frame_bt_full.exp: Use standard_output_file to
+--- a/gdb/testsuite/gdb.arch/i386-gnu-cfi.exp
++++ b/gdb/testsuite/gdb.arch/i386-gnu-cfi.exp
+@@ -31,7 +31,7 @@ if { ![is_x86_like_target] } then {
+ set testfile "i386-gnu-cfi"
+ set srcfilec ${testfile}.c
+ set srcfileasm ${testfile}-asm.S
+-set binfile ${objdir}/${subdir}/${testfile}
++set binfile [standard_output_file ${testfile}]
+ 
+ # some targets have leading underscores on assembly symbols.
+ set additional_flags [gdb_target_symbol_prefix_flags]
+--- a/gdb/testsuite/gdb.arch/i386-prologue.exp
++++ b/gdb/testsuite/gdb.arch/i386-prologue.exp
+@@ -28,7 +28,7 @@ if { ![is_x86_like_target] } then {
+ 
+ set testfile "i386-prologue"
+ set srcfile ${testfile}.c
+-set binfile ${objdir}/${subdir}/${testfile}
++set binfile [standard_output_file ${testfile}]
+ 
+ # some targets have leading underscores on assembly symbols.
+ set additional_flags [gdb_target_symbol_prefix_flags]
+--- a/gdb/testsuite/gdb.arch/i386-size.exp
++++ b/gdb/testsuite/gdb.arch/i386-size.exp
+@@ -27,7 +27,7 @@ if { ![is_x86_like_target] } then {
+ 
+ set testfile "i386-size"
+ set srcfile ${testfile}.c
+-set binfile ${objdir}/${subdir}/${testfile}
++set binfile [standard_output_file ${testfile}]
+ 
+ # some targets have leading underscores on assembly symbols.
+ set additional_flags [gdb_target_symbol_prefix_flags]
+-- 
+2.5.0
+
+--AhhlLboLdkugWU4S--
+
+http://sourceware.org/ml/gdb-patches/2016-02/msg00469.html
+Subject: [testsuite obv+7.11] Add missing gdb.arch/i386-prologue.c prototypes
+
+
+--EVF5PPMfhYS0aIcm
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+trunk:
+	a7a0a6a95bc111776129374c46edec3c3c2785cc
+7.11:
+	906c69d06a46cec2f55941f7dc3a5323261796d5
+
+--EVF5PPMfhYS0aIcm
+Content-Type: message/rfc822
+Content-Disposition: inline
+
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Mon, 15 Feb 2016 19:01:03 +0100
+Subject: [PATCH] Add missing gdb.arch/i386-prologue.c prototypes
+Subject: [PATCH] Add missing gdb.arch/i386-prologue.c prototypes
+
+The testfile has not ran because:
+gdb.arch/i386-prologue.c:34:3: warning: implicit declaration of function 'standard' [-Wimplicit-function-declaration]
+   standard ();
+   ^
+gdb.arch/i386-prologue.c:35:3: warning: implicit declaration of function 'stack_align_ecx' [-Wimplicit-function-declaration]
+   stack_align_ecx ();
+   ^
+gdb.arch/i386-prologue.c:36:3: warning: implicit declaration of function 'stack_align_edx' [-Wimplicit-function-declaration]
+   stack_align_edx ();
+   ^
+gdb.arch/i386-prologue.c:37:3: warning: implicit declaration of function 'stack_align_eax' [-Wimplicit-function-declaration]
+   stack_align_eax ();
+   ^
+
+gdb/testsuite/ChangeLog
+2016-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.arch/i386-prologue.c: Add missing prototypes.
+---
+ gdb/testsuite/ChangeLog                | 4 ++++
+ gdb/testsuite/gdb.arch/i386-prologue.c | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,5 +1,9 @@
+ 2016-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
++	* gdb.arch/i386-prologue.c: Add missing prototypes.
++
++2016-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
+ 	* gdb.arch/i386-gnu-cfi.exp: Use standard_output_file.
+ 	* gdb.arch/i386-prologue.exp: Likewise.
+ 	* gdb.arch/i386-size.exp: Likewise.
+--- a/gdb/testsuite/gdb.arch/i386-prologue.c
++++ b/gdb/testsuite/gdb.arch/i386-prologue.c
+@@ -27,6 +27,10 @@ void gdb1253 (void);
+ void gdb1718 (void);
+ void gdb1338 (void);
+ void jump_at_beginning (void);
++void standard (void);
++void stack_align_ecx (void);
++void stack_align_edx (void);
++void stack_align_eax (void);
+ 
+ int
+ main (void)
+-- 
+2.5.0
+
+--EVF5PPMfhYS0aIcm--
+

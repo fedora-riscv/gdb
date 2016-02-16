@@ -19,15 +19,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20160211
+%global snapsrc    20160210
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.10.90.%{snapsrc}
+Version: 7.10.90.20160211
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 52%{?dist}
+Release: 53%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,7 +245,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -555,9 +555,6 @@ Patch1073: gdb-opcodes-clflushopt-test.patch
 # [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
 Patch1075: gdb-testsuite-readline63-sigint.patch
 
-# [testsuite] Revert testsuite rework into subdirectories.
-Patch1077: gdb-testsuite-subdirs-revert.patch
-
 # [testsuite] Fix false Fortran regressions with recent gcc.
 Patch1078: gdb-testsuite-fortran-gcc5.patch
 
@@ -660,6 +657,7 @@ BuildRequires: prelink
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libmpx%{bits_local} libmpx%{bits_other}
+BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1}
 # Fedora arm+ppc64le do not yet have fpc built.
@@ -758,8 +756,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
-%patch1077 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1059 -p1
@@ -1397,6 +1394,9 @@ then
 fi
 
 %changelog
+* Tue Feb 16 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.90.20160211-53.fc24
+- Drop gdb-testsuite-subdirs-revert.patch.
+
 * Sat Feb 13 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10.90.20160211-52.fc24
 - Rebase to FSF GDB 7.10.90.20160211 (pre-7.11 branch snapshot).
 
