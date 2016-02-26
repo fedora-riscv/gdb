@@ -1,7 +1,7 @@
+http://sourceware.org/ml/gdb-patches/2016-02/msg00844.html
+Subject: [PATCH v2 5/6] fortran: calculate subarray with stride values.
+
 From: Christoph Weinmann <christoph.t.weinmann@intel.com>
-[PATCH 5/6] fortran: calculate subarray with stride values.
-https://sourceware.org/ml/gdb-patches/2015-12/msg00011.html
-Message-Id: <1448976075-11456-6-git-send-email-christoph.t.weinmann@intel.com>
 
 Calculate elements of a subarray using a provided stride value
 The stride value can be a positive or negative integer, but may
@@ -30,16 +30,15 @@ $3 = (1, 3, 5, 7, 9)
 	value_slice_1.
 
 
-
 Signed-off-by: Christoph Weinmann <christoph.t.weinmann@intel.com>
 ---
- gdb/eval.c   |  110 +++++++++++++++++++++++++++++++++++++++++++++------------
- gdb/valops.c |   85 ++++++++++++++++++++++++++++++++------------
- gdb/value.h  |    2 +-
- 3 files changed, 150 insertions(+), 47 deletions(-)
+ gdb/eval.c   | 111 ++++++++++++++++++++++++++++++++++++++++++++++-------------
+ gdb/valops.c |  87 +++++++++++++++++++++++++++++++++-------------
+ gdb/value.h  |   2 +-
+ 3 files changed, 152 insertions(+), 48 deletions(-)
 
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 15b2ad4..b8cd080 100644
+index 308ada3..d01b579 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -437,8 +437,8 @@ value_f90_subarray (struct value *array, struct expression *exp,
@@ -215,7 +214,7 @@ index 15b2ad4..b8cd080 100644
        for (i = 0; i < nargs; i++)
  	{
  	  struct subscript_store *index = &subscript_array[i];
-@@ -625,12 +682,19 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -625,12 +682,20 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	  if (index->kind == SUBSCRIPT_RANGE)
  	    {
  	      struct type *range_type, *interim_array_type;
@@ -225,6 +224,7 @@ index 15b2ad4..b8cd080 100644
 +		 bounds plus the start element itself.  It may be modified by
 +		 a user provided stride value.  */
 +	      new_length = index->range.high - index->range.low;
++
 +	      new_length /= index->range.stride;
  
  	      range_type
@@ -239,7 +239,7 @@ index 15b2ad4..b8cd080 100644
  	      interim_array_type = create_array_type (NULL,
  						      temp_type,
 diff --git a/gdb/valops.c b/gdb/valops.c
-index f8d23fb..6c9112f 100644
+index 09ea877..83c8462 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -3759,10 +3759,13 @@ value_of_this_silent (const struct language_defn *lang)
@@ -297,6 +297,15 @@ index f8d23fb..6c9112f 100644
    elt_stride = TYPE_LENGTH (TYPE_INDEX_TYPE (array_type));
  
    elt_offs *= elt_size;
+@@ -3825,7 +3839,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+   if (call_count == 1)
+     {
+       range_type = TYPE_INDEX_TYPE (array_type);
+-      slice_range_size = elem_count;
++      slice_range_size = ary_low_bound + elem_count - 1;
+ 
+       /* Check if the array bounds are valid.  */
+       if (get_discrete_bounds (range_type, &ary_low_bound, &ary_high_bound) < 0)
 @@ -3837,7 +3851,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
    else
      {
@@ -386,7 +395,7 @@ index f8d23fb..6c9112f 100644
        }
  
 diff --git a/gdb/value.h b/gdb/value.h
-index 05939c4..d687468 100644
+index 3400460..c18ef2e 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -1056,7 +1056,7 @@ extern struct value *varying_to_slice (struct value *);
@@ -399,4 +408,5 @@ index 05939c4..d687468 100644
  extern struct value *value_literal_complex (struct value *, struct value *,
  					    struct type *);
 -- 
-1.7.0.7
+2.5.0
+

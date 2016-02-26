@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 57%{?dist}
+Release: 58%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -523,7 +523,6 @@ Patch1060: gdb-fortran-stride-intel-3of6.patch
 Patch1061: gdb-fortran-stride-intel-4of6.patch
 Patch1062: gdb-fortran-stride-intel-5of6.patch
 Patch1063: gdb-fortran-stride-intel-6of6.patch
-Patch1068: gdb-fortran-stride-intel-6of6-testcasefix.patch
 Patch888: gdb-vla-intel.patch
 Patch983: gdb-vla-intel-logical-not.patch
 Patch889: gdb-vla-intel-stringbt-fix.patch
@@ -758,7 +757,6 @@ find -name "*.info*"|xargs rm -f
 %patch1061 -p1
 %patch1062 -p1
 %patch1063 -p1
-%patch1068 -p1
 %patch888 -p1
 %patch983 -p1
 %patch889 -p1
@@ -1386,6 +1384,9 @@ then
 fi
 
 %changelog
+* Fri Feb 26 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-58.fc24
+- Rebase VLA (Fortran dynamic arrays) strides (multi-dim. subarrays) from Intel.
+
 * Thu Feb 25 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-57.fc24
 - Release bump only.
 
