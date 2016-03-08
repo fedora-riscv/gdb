@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 58%{?dist}
+Release: 59%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -554,6 +554,9 @@ Patch1073: gdb-opcodes-clflushopt-test.patch
 # [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
 Patch1075: gdb-testsuite-readline63-sigint.patch
 
+# Fix strict-aliasing rules compilation error (RH BZ 1315191).
+Patch1107: gdb-bfd-aliasing.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -867,6 +870,7 @@ find -name "*.info*"|xargs rm -f
 %patch337 -p1
 %patch331 -p1
 %patch1075 -p1
+%patch1107 -p1
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1044 -p1
@@ -1384,6 +1388,9 @@ then
 fi
 
 %changelog
+* Tue Mar  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-59.fc24
+- Fix strict-aliasing rules compilation error (RH BZ 1315191).
+
 * Fri Feb 26 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-58.fc24
 - Rebase VLA (Fortran dynamic arrays) strides (multi-dim. subarrays) from Intel.
 
