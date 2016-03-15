@@ -1,0 +1,155 @@
+http://sourceware.org/ml/gdb-patches/2016-03/msg00013.html
+Subject: [PATCH 1/2] Fix PR gdb/19676: Disable displaced stepping if /proc not mounted
+
+On GNU/Linux archs that support displaced stepping, if /proc is not
+mounted, GDB gets stuck not able to step past breakpoints:
+
+ (gdb) c
+ Continuing.
+ dl_main (phdr=<optimized out>, phnum=<optimized out>, user_entry=<optimized out>, auxv=<optimized out>) at rtld.c:2163
+ 2163      LIBC_PROBE (init_complete, 2, LM_ID_BASE, r);
+ Cannot find AT_ENTRY auxiliary vector entry.
+ (gdb) c
+ Continuing.
+ dl_main (phdr=<optimized out>, phnum=<optimized out>, user_entry=<optimized out>, auxv=<optimized out>) at rtld.c:2163
+ 2163      LIBC_PROBE (init_complete, 2, LM_ID_BASE, r);
+ Cannot find AT_ENTRY auxiliary vector entry.
+ (gdb)
+
+That's because GDB can't figure out where the scratch pad is.
+
+This is a regression introduced by the earlier changes to make the
+Linux native target always work in non-stop mode.
+
+This commit makes GDB detect the case and fallback to stepping over
+breakpoints in-line.
+
+gdb/ChangeLog:
+2016-03-01  Pedro Alves  <pedro@cascais.lan>
+
+	PR gdb/19676
+	* infrun.c (displaced_step_prepare): Also disable displaced
+	stepping on NOT_SUPPORTED_ERROR.
+	* linux-tdep.c (linux_displaced_step_location): If reading auxv
+	fails, throw NOT_SUPPORTED_ERROR instead of generic error.
+---
+ gdb/infrun.c     | 3 ++-
+ gdb/linux-tdep.c | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index 3e8c9e0..696105d 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -1894,7 +1894,8 @@ displaced_step_prepare (ptid_t ptid)
+     {
+       struct displaced_step_inferior_state *displaced_state;
+ 
+-      if (ex.error != MEMORY_ERROR)
++      if (ex.error != MEMORY_ERROR
++	  && ex.error != NOT_SUPPORTED_ERROR)
+ 	throw_exception (ex);
+ 
+       if (debug_infrun)
+diff --git a/gdb/linux-tdep.c b/gdb/linux-tdep.c
+index 555c302..f197aa7 100644
+--- a/gdb/linux-tdep.c
++++ b/gdb/linux-tdep.c
+@@ -2426,7 +2426,8 @@ linux_displaced_step_location (struct gdbarch *gdbarch)
+      location.  The auxiliary vector gets us the PowerPC-side entry
+      point address instead.  */
+   if (target_auxv_search (&current_target, AT_ENTRY, &addr) <= 0)
+-    error (_("Cannot find AT_ENTRY auxiliary vector entry."));
++    throw_error (NOT_SUPPORTED_ERROR,
++		 _("Cannot find AT_ENTRY auxiliary vector entry."));
+ 
+   /* Make certain that the address points at real code, and not a
+      function descriptor.  */
+-- 
+2.5.0
+
+
+
+http://sourceware.org/ml/gdb-patches/2016-03/msg00014.html
+Subject: [PATCH 2/2] Fix PR gdb/19676: Internal error in linux-thread.db.c if /proc not mounted
+
+If /proc is not mounted, GDB fails an assertion in find_new_threads_once:
+
+ Continuing.
+ /home/pedro/gdb/mygit/src/gdb/linux-thread-db.c:1249: internal-error: find_new_threads_once: Assertion `!target_has_execution' failed.
+ A problem internal to GDB has been detected,
+ further debugging may prove unreliable.
+ Quit this debugging session? (y or n)
+
+That was supposed to catch misuses of td_ta_thr_iter, which is unsafe
+for live debugging.  However, if /proc is not mounted, we still
+fallback to using it.
+
+I didn't bother with a warning, because GDB already prints several
+others related to failing to open /proc files.
+
+gdb/ChangeLog:
+2016-03-01  Pedro Alves  <pedro@cascais.lan>
+
+	PR gdb/19676
+	* linux-thread-db.c (try_thread_db_load_1): Leave
+	info->td_ta_thr_iter_p NULL iff debugging a live process and we
+	have /proc access.
+	(find_new_threads_once): Assert that we have a non-NULL
+	info->td_ta_thr_iter_p instead of checking whether the target has
+	execution.
+---
+ gdb/linux-thread-db.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/gdb/linux-thread-db.c b/gdb/linux-thread-db.c
+index 1eb457d..ce60beb 100644
+--- a/gdb/linux-thread-db.c
++++ b/gdb/linux-thread-db.c
+@@ -564,7 +564,6 @@ try_thread_db_load_1 (struct thread_db_info *info)
+ 
+   /* These are essential.  */
+   CHK (TDB_VERBOSE_DLSYM (info, td_ta_map_lwp2thr));
+-  CHK (TDB_VERBOSE_DLSYM (info, td_ta_thr_iter));
+   CHK (TDB_VERBOSE_DLSYM (info, td_thr_validate));
+   CHK (TDB_VERBOSE_DLSYM (info, td_thr_get_info));
+ 
+@@ -572,10 +571,6 @@ try_thread_db_load_1 (struct thread_db_info *info)
+   TDB_DLSYM (info, td_thr_tls_get_addr);
+   TDB_DLSYM (info, td_thr_tlsbase);
+ 
+-#undef TDB_VERBOSE_DLSYM
+-#undef TDB_DLSYM
+-#undef CHK
+-
+   /* It's best to avoid td_ta_thr_iter if possible.  That walks data
+      structures in the inferior's address space that may be corrupted,
+      or, if the target is running, may change while we walk them.  If
+@@ -587,6 +582,15 @@ try_thread_db_load_1 (struct thread_db_info *info)
+      currently on core targets, as it uses ptrace directly.  */
+   if (target_has_execution
+       && linux_proc_task_list_dir_exists (ptid_get_pid (inferior_ptid)))
++    info->td_ta_thr_iter_p = NULL;
++  else
++    CHK (TDB_VERBOSE_DLSYM (info, td_ta_thr_iter));
++
++#undef TDB_VERBOSE_DLSYM
++#undef TDB_DLSYM
++#undef CHK
++
++  if (info->td_ta_thr_iter_p == NULL)
+     {
+       struct lwp_info *lp;
+       int pid = ptid_get_pid (inferior_ptid);
+@@ -1246,7 +1250,7 @@ find_new_threads_once (struct thread_db_info *info, int iteration,
+   data.new_threads = 0;
+ 
+   /* See comment in thread_db_update_thread_list.  */
+-  gdb_assert (!target_has_execution);
++  gdb_assert (info->td_ta_thr_iter_p != NULL);
+ 
+   TRY
+     {
+-- 
+2.5.0
+
