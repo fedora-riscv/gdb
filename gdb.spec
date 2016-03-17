@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 60%{?dist}
+Release: 61%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1393,6 +1393,9 @@ then
 fi
 
 %changelog
+* Thu Mar 17 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-61.fc24
+- Add message suggesting gdbserver for non-matching PID namespaces.
+
 * Tue Mar 15 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-60.fc24
 - New Fedora GDB testfile: rhbz1261564-aarch64-watchpoint.exp
 - Backport gdb-7.11 stable branch PR gdb/19676 fix (Pedro Alves).
