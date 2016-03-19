@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 62%{?dist}
+Release: 63%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -550,9 +550,6 @@ Patch1073: gdb-opcodes-clflushopt-test.patch
 # [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
 Patch1075: gdb-testsuite-readline63-sigint.patch
 
-# Fix strict-aliasing rules compilation error (RH BZ 1315191).
-Patch1107: gdb-bfd-aliasing.patch
-
 # [aarch64] Fix hardware watchpoints (RH BZ 1261564).
 #=fedoratest
 Patch1113: gdb-rhbz1261564-aarch64-hw-watchpoint-test.patch 
@@ -862,7 +859,6 @@ find -name "*.info*"|xargs rm -f
 %patch337 -p1
 %patch331 -p1
 %patch1075 -p1
-%patch1107 -p1
 %patch1113 -p1
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1381,6 +1377,9 @@ then
 fi
 
 %changelog
+* Sat Mar 19 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-63.fc24
+- .spec cleanup: Drop strict-aliasing GCC bug workaround (from RH BZ 1315191).
+
 * Fri Mar 18 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-62.fc24
 - .spec cleanup: Drop SCL obsoletes of devtoolset-1.1*: *-1.0*
 
