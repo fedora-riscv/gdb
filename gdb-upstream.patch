@@ -286,3 +286,1772 @@ Date:   Wed Apr 6 15:57:08 2016 +0200
  	  return;
  	}
        args.bfd = bfd;
+
+
+
+commit 2ef34d11f61d79dcb152713aa059051d8cd3295d
+Author: Markus Metzger <markus.t.metzger@intel.com>
+Date:   Fri Feb 5 09:32:53 2016 +0100
+
+    btrace: fix PR gdb/19829
+    
+    This is a backport of
+    
+    33b4777ca1b7 btrace, frame: fix crash in get_frame_type
+    a038fa3e14a4 stack: check frame_unwind_caller_id
+    2f3ef606b912 frame: add skip_tailcall_frames
+    
+    In skip_artificial_frames we repeatedly call get_prev_frame_always until we get
+    a non-inline and non-tailcall frame assuming that there must be such a frame
+    eventually.
+    
+    For record targets, however, we may have a frame chain that consists only of
+    artificial frames.  This leads to a crash in get_frame_type when dereferencing a
+    NULL frame pointer.
+    
+    Change skip_artificial_frames and skip_tailcall_frames to return NULL in such a
+    case and modify each caller to cope with a NULL return.
+    
+    In frame_unwind_caller_pc and frame_unwind_caller_arch, we simply assert that
+    the returned value is not NULL.  Their caller was supposed to check
+    frame_unwind_caller_id before calling those functions.
+    
+    In other cases, we thrown an error.
+    
+    In infcmd further move the skip_tailcall_frames call to the forward-stepping
+    case since we don't need a frame for reverse execution and we don't want to fail
+    because of that.  Reverse-finish does make sense for a tailcall frame.
+    
+    gdb/
+    	* frame.h (skip_tailcall_frames): New.
+    	* infcmd.c (finish_command): Call skip_tailcall_frames.
+    	* frame.c (skip_artificial_frames): Return NULL if only artificial frames
+    	are found.  Update comment.
+    	(frame_pop): Call skip_tailcall_frames.
+    	(frame_unwind_caller_id): Handle NULL return.
+    	(frame_unwind_caller_pc, frame_unwind_caller_arch): Assert that
+    	skip_artificial_frames does not return NULL.
+    	(frame_pop): Add an error if only tailcall frames are found.
+    	* infcmd.c (finish_command): Move skip_tailcall_frames call into forward-
+    	execution case.  Add an error if only tailcall frames are found.
+    	* stack.c (frame_info): Check frame_unwind_caller_id.
+    
+    testsuite/
+    	* gdb.btrace/tailcall-only.exp: New.
+    	* gdb.btrace/tailcall-only.c: New.
+    	* gdb.btrace/x86_64-tailcall-only.S: New.
+    	* gdb.btrace/i686-tailcall-only.S: New.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,19 @@
++2016-03-17  Markus Metzger  <markus.t.metzger@intel.com>
++
++	PR gdb/19829
++	* frame.h (skip_tailcall_frames): New.
++	* infcmd.c (finish_command): Call skip_tailcall_frames.
++	* frame.c (skip_artificial_frames): Return NULL if only artificial
++	frames are found.  Update comment.
++	(frame_pop): Call skip_tailcall_frames.
++	(frame_unwind_caller_id): Handle NULL return.
++	(frame_unwind_caller_pc, frame_unwind_caller_arch): Assert that
++	skip_artificial_frames does not return NULL.
++	(frame_pop): Add an error if only tailcall frames are found.
++	* infcmd.c (finish_command): Move skip_tailcall_frames call into
++	forward-execution case.  Add an error if only tailcall frames are found.
++	* stack.c (frame_info): Check frame_unwind_caller_id.
++
+ 2016-03-15  Pedro Alves  <palves@redhat.com>
+ 
+ 	PR gdb/19676
+--- a/gdb/frame.c
++++ b/gdb/frame.c
+@@ -420,7 +420,8 @@ fprint_frame (struct ui_file *file, struct frame_info *fi)
+ 
+ /* Given FRAME, return the enclosing frame as found in real frames read-in from
+    inferior memory.  Skip any previous frames which were made up by GDB.
+-   Return the original frame if no immediate previous frames exist.  */
++   Return FRAME if FRAME is a non-artificial frame.
++   Return NULL if FRAME is the start of an artificial-only chain.  */
+ 
+ static struct frame_info *
+ skip_artificial_frames (struct frame_info *frame)
+@@ -428,12 +429,34 @@ skip_artificial_frames (struct frame_info *frame)
+   /* Note we use get_prev_frame_always, and not get_prev_frame.  The
+      latter will truncate the frame chain, leading to this function
+      unintentionally returning a null_frame_id (e.g., when the user
+-     sets a backtrace limit).  This is safe, because as these frames
+-     are made up by GDB, there must be a real frame in the chain
+-     below.  */
++     sets a backtrace limit).
++
++     Note that for record targets we may get a frame chain that consists
++     of artificial frames only.  */
+   while (get_frame_type (frame) == INLINE_FRAME
+ 	 || get_frame_type (frame) == TAILCALL_FRAME)
+-    frame = get_prev_frame_always (frame);
++    {
++      frame = get_prev_frame_always (frame);
++      if (frame == NULL)
++	break;
++    }
++
++  return frame;
++}
++
++/* See frame.h.  */
++
++struct frame_info *
++skip_tailcall_frames (struct frame_info *frame)
++{
++  while (get_frame_type (frame) == TAILCALL_FRAME)
++    {
++      /* Note that for record targets we may get a frame chain that consists of
++	 tailcall frames only.  */
++      frame = get_prev_frame (frame);
++      if (frame == NULL)
++	break;
++    }
+ 
+   return frame;
+ }
+@@ -496,6 +519,9 @@ frame_unwind_caller_id (struct frame_info *next_frame)
+      requests the frame ID of "main()"s caller.  */
+ 
+   next_frame = skip_artificial_frames (next_frame);
++  if (next_frame == NULL)
++    return null_frame_id;
++
+   this_frame = get_prev_frame_always (next_frame);
+   if (this_frame)
+     return get_frame_id (skip_artificial_frames (this_frame));
+@@ -869,7 +895,14 @@ frame_unwind_pc (struct frame_info *this_frame)
+ CORE_ADDR
+ frame_unwind_caller_pc (struct frame_info *this_frame)
+ {
+-  return frame_unwind_pc (skip_artificial_frames (this_frame));
++  this_frame = skip_artificial_frames (this_frame);
++
++  /* We must have a non-artificial frame.  The caller is supposed to check
++     the result of frame_unwind_caller_id (), which returns NULL_FRAME_ID
++     in this case.  */
++  gdb_assert (this_frame != NULL);
++
++  return frame_unwind_pc (this_frame);
+ }
+ 
+ int
+@@ -972,8 +1005,10 @@ frame_pop (struct frame_info *this_frame)
+ 
+   /* Ignore TAILCALL_FRAME type frames, they were executed already before
+      entering THISFRAME.  */
+-  while (get_frame_type (prev_frame) == TAILCALL_FRAME)
+-    prev_frame = get_prev_frame (prev_frame);
++  prev_frame = skip_tailcall_frames (prev_frame);
++
++  if (prev_frame == NULL)
++    error (_("Cannot find the caller frame."));
+ 
+   /* Make a copy of all the register values unwound from this frame.
+      Save them in a scratch buffer so that there isn't a race between
+@@ -2561,7 +2596,14 @@ frame_unwind_arch (struct frame_info *next_frame)
+ struct gdbarch *
+ frame_unwind_caller_arch (struct frame_info *next_frame)
+ {
+-  return frame_unwind_arch (skip_artificial_frames (next_frame));
++  next_frame = skip_artificial_frames (next_frame);
++
++  /* We must have a non-artificial frame.  The caller is supposed to check
++     the result of frame_unwind_caller_id (), which returns NULL_FRAME_ID
++     in this case.  */
++  gdb_assert (next_frame != NULL);
++
++  return frame_unwind_arch (next_frame);
+ }
+ 
+ /* Gets the language of FRAME.  */
+--- a/gdb/frame.h
++++ b/gdb/frame.h
+@@ -820,5 +820,10 @@ extern int frame_unwinder_is (struct frame_info *fi,
+ 
+ extern enum language get_frame_language (struct frame_info *frame);
+ 
++/* Return the first non-tailcall frame above FRAME or FRAME if it is not a
++   tailcall frame.  Return NULL if FRAME is the start of a tailcall-only
++   chain.  */
++
++extern struct frame_info *skip_tailcall_frames (struct frame_info *frame);
+ 
+ #endif /* !defined (FRAME_H)  */
+--- a/gdb/infcmd.c
++++ b/gdb/infcmd.c
+@@ -2000,11 +2000,6 @@ finish_command (char *arg, int from_tty)
+       return;
+     }
+ 
+-  /* Ignore TAILCALL_FRAME type frames, they were executed already before
+-     entering THISFRAME.  */
+-  while (get_frame_type (frame) == TAILCALL_FRAME)
+-    frame = get_prev_frame (frame);
+-
+   /* Find the function we will return from.  */
+ 
+   sm->function = find_pc_function (get_frame_pc (get_selected_frame (NULL)));
+@@ -2031,7 +2026,16 @@ finish_command (char *arg, int from_tty)
+   if (execution_direction == EXEC_REVERSE)
+     finish_backward (sm);
+   else
+-    finish_forward (sm, frame);
++    {
++      /* Ignore TAILCALL_FRAME type frames, they were executed already before
++	 entering THISFRAME.  */
++      frame = skip_tailcall_frames (frame);
++
++      if (frame == NULL)
++	error (_("Cannot find the caller frame."));
++
++      finish_forward (sm, frame);
++    }
+ }
+ 
+ 
+--- a/gdb/stack.c
++++ b/gdb/stack.c
+@@ -1509,27 +1509,32 @@ frame_info (char *addr_exp, int from_tty)
+   wrap_here ("    ");
+   printf_filtered ("saved %s = ", pc_regname);
+ 
+-  TRY
+-    {
+-      caller_pc = frame_unwind_caller_pc (fi);
+-      caller_pc_p = 1;
+-    }
+-  CATCH (ex, RETURN_MASK_ERROR)
++  if (!frame_id_p (frame_unwind_caller_id (fi)))
++    val_print_unavailable (gdb_stdout);
++  else
+     {
+-      switch (ex.error)
++      TRY
+ 	{
+-	case NOT_AVAILABLE_ERROR:
+-	  val_print_unavailable (gdb_stdout);
+-	  break;
+-	case OPTIMIZED_OUT_ERROR:
+-	  val_print_not_saved (gdb_stdout);
+-	  break;
+-	default:
+-	  fprintf_filtered (gdb_stdout, _("<error: %s>"), ex.message);
+-	  break;
++	  caller_pc = frame_unwind_caller_pc (fi);
++	  caller_pc_p = 1;
+ 	}
++      CATCH (ex, RETURN_MASK_ERROR)
++	{
++	  switch (ex.error)
++	    {
++	    case NOT_AVAILABLE_ERROR:
++	      val_print_unavailable (gdb_stdout);
++	      break;
++	    case OPTIMIZED_OUT_ERROR:
++	      val_print_not_saved (gdb_stdout);
++	      break;
++	    default:
++	      fprintf_filtered (gdb_stdout, _("<error: %s>"), ex.message);
++	      break;
++	    }
++	}
++      END_CATCH
+     }
+-  END_CATCH
+ 
+   if (caller_pc_p)
+     fputs_filtered (paddress (gdbarch, caller_pc), gdb_stdout);
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,11 @@
++2016-03-17  Markus Metzger  <markus.t.metzger@intel.com>
++
++	PR gdb/19829
++	* gdb.btrace/tailcall-only.exp: New.
++	* gdb.btrace/tailcall-only.c: New.
++	* gdb.btrace/x86_64-tailcall-only.S: New.
++	* gdb.btrace/i686-tailcall-only.S: New.
++
+ 2016-02-16  Don Breazeal  <donb@codesourcery.com>
+ 
+ 	PR remote/19496
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/i686-tailcall-only.S
+@@ -0,0 +1,447 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++
++   This file has been generated using:
++   gcc -m32 -march=i686 -S -O2 -dA -g tailcall-only.c -o i686-tailcall-only.S
++ */
++
++	.file	"tailcall-only.c"
++	.text
++.Ltext0:
++	.p2align 4,,15
++	.type	bar_1, @function
++bar_1:
++.LFB0:
++	.file 1 "tailcall-only.c"
++	# tailcall-only.c:22
++	.loc 1 22 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:24
++	.loc 1 24 0
++	movl	$42, %eax
++# SUCC: EXIT [100.0%]
++	ret
++	.cfi_endproc
++.LFE0:
++	.size	bar_1, .-bar_1
++	.p2align 4,,15
++	.type	bar, @function
++bar:
++.LFB1:
++	# tailcall-only.c:28
++	.loc 1 28 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:29
++	.loc 1 29 0
++	jmp	bar_1
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL0:
++	.cfi_endproc
++.LFE1:
++	.size	bar, .-bar
++	.p2align 4,,15
++	.type	foo_1, @function
++foo_1:
++.LFB2:
++	# tailcall-only.c:34
++	.loc 1 34 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:35
++	.loc 1 35 0
++	jmp	bar
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL1:
++	.cfi_endproc
++.LFE2:
++	.size	foo_1, .-foo_1
++	.p2align 4,,15
++	.type	foo, @function
++foo:
++.LFB3:
++	# tailcall-only.c:40
++	.loc 1 40 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:41
++	.loc 1 41 0
++	jmp	foo_1
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL2:
++	.cfi_endproc
++.LFE3:
++	.size	foo, .-foo
++	.section	.text.startup,"ax",@progbits
++	.p2align 4,,15
++	.globl	main
++	.type	main, @function
++main:
++.LFB4:
++	# tailcall-only.c:46
++	.loc 1 46 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:49
++	.loc 1 49 0
++	call	foo
++.LVL3:
++	# tailcall-only.c:50
++	.loc 1 50 0
++	addl	$1, %eax
++.LVL4:
++# SUCC: EXIT [100.0%]
++	# tailcall-only.c:53
++	.loc 1 53 0
++	ret
++	.cfi_endproc
++.LFE4:
++	.size	main, .-main
++	.text
++.Letext0:
++	.section	.debug_info,"",@progbits
++.Ldebug_info0:
++	.long	0xd5	# Length of Compilation Unit Info
++	.value	0x4	# DWARF version number
++	.long	.Ldebug_abbrev0	# Offset Into Abbrev. Section
++	.byte	0x4	# Pointer Size (in bytes)
++	.uleb128 0x1	# (DIE (0xb) DW_TAG_compile_unit)
++	.long	.LASF1	# DW_AT_producer: "GNU C 4.8.3 20140911 (Red Hat 4.8.3-9) -m32 -march=i686 -g -O2"
++	.byte	0x1	# DW_AT_language
++	.long	.LASF2	# DW_AT_name: "tailcall-only.c"
++	.long	.LASF3	# DW_AT_comp_dir: ""
++	.long	.Ldebug_ranges0+0	# DW_AT_ranges
++	.long	0	# DW_AT_low_pc
++	.long	.Ldebug_line0	# DW_AT_stmt_list
++	.uleb128 0x2	# (DIE (0x25) DW_TAG_subprogram)
++	.long	.LASF4	# DW_AT_name: "bar_1"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x15	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x3a	# DW_AT_type
++	.long	.LFB0	# DW_AT_low_pc
++	.long	.LFE0-.LFB0	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.uleb128 0x3	# (DIE (0x3a) DW_TAG_base_type)
++	.byte	0x4	# DW_AT_byte_size
++	.byte	0x5	# DW_AT_encoding
++	.ascii "int\0"	# DW_AT_name
++	.uleb128 0x4	# (DIE (0x41) DW_TAG_subprogram)
++	.ascii "bar\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x1b	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x3a	# DW_AT_type
++	.long	.LFB1	# DW_AT_low_pc
++	.long	.LFE1-.LFB1	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0x64	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0x5a) DW_TAG_GNU_call_site)
++	.long	.LVL0	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x25	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0x41
++	.uleb128 0x6	# (DIE (0x64) DW_TAG_subprogram)
++	.long	.LASF0	# DW_AT_name: "foo_1"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x21	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x3a	# DW_AT_type
++	.long	.LFB2	# DW_AT_low_pc
++	.long	.LFE2-.LFB2	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0x87	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0x7d) DW_TAG_GNU_call_site)
++	.long	.LVL1	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x41	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0x64
++	.uleb128 0x4	# (DIE (0x87) DW_TAG_subprogram)
++	.ascii "foo\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x27	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x3a	# DW_AT_type
++	.long	.LFB3	# DW_AT_low_pc
++	.long	.LFE3-.LFB3	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0xaa	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0xa0) DW_TAG_GNU_call_site)
++	.long	.LVL2	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x64	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0x87
++	.uleb128 0x7	# (DIE (0xaa) DW_TAG_subprogram)
++			# DW_AT_external
++	.long	.LASF5	# DW_AT_name: "main"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x2d	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x3a	# DW_AT_type
++	.long	.LFB4	# DW_AT_low_pc
++	.long	.LFE4-.LFB4	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.uleb128 0x8	# (DIE (0xbf) DW_TAG_variable)
++	.long	.LASF6	# DW_AT_name: "answer"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x2f	# DW_AT_decl_line
++	.long	0x3a	# DW_AT_type
++	.long	.LLST0	# DW_AT_location
++	.uleb128 0x9	# (DIE (0xce) DW_TAG_GNU_call_site)
++	.long	.LVL3	# DW_AT_low_pc
++	.long	0x87	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0xaa
++	.byte	0	# end of children of DIE 0xb
++	.section	.debug_abbrev,"",@progbits
++.Ldebug_abbrev0:
++	.uleb128 0x1	# (abbrev code)
++	.uleb128 0x11	# (TAG: DW_TAG_compile_unit)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x25	# (DW_AT_producer)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x13	# (DW_AT_language)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x1b	# (DW_AT_comp_dir)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x55	# (DW_AT_ranges)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x10	# (DW_AT_stmt_list)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x2	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x6	# (DW_FORM_data4)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.byte	0
++	.byte	0
++	.uleb128 0x3	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.byte	0
++	.byte	0
++	.uleb128 0x4	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x6	# (DW_FORM_data4)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x5	# (abbrev code)
++	.uleb128 0x4109	# (TAG: DW_TAG_GNU_call_site)
++	.byte	0	# DW_children_no
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x2115	# (DW_AT_GNU_tail_call)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x31	# (DW_AT_abstract_origin)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x6	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x6	# (DW_FORM_data4)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x7	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3f	# (DW_AT_external)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x6	# (DW_FORM_data4)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.byte	0
++	.byte	0
++	.uleb128 0x8	# (abbrev code)
++	.uleb128 0x34	# (TAG: DW_TAG_variable)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x2	# (DW_AT_location)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x9	# (abbrev code)
++	.uleb128 0x4109	# (TAG: DW_TAG_GNU_call_site)
++	.byte	0	# DW_children_no
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x31	# (DW_AT_abstract_origin)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.byte	0
++	.section	.debug_loc,"",@progbits
++.Ldebug_loc0:
++.LLST0:
++	.long	.LVL3	# Location list begin address (*.LLST0)
++	.long	.LVL4	# Location list end address (*.LLST0)
++	.value	0x3	# Location expression size
++	.byte	0x70	# DW_OP_breg0
++	.sleb128 1
++	.byte	0x9f	# DW_OP_stack_value
++	.long	.LVL4	# Location list begin address (*.LLST0)
++	.long	.LFE4	# Location list end address (*.LLST0)
++	.value	0x1	# Location expression size
++	.byte	0x50	# DW_OP_reg0
++	.long	0	# Location list terminator begin (*.LLST0)
++	.long	0	# Location list terminator end (*.LLST0)
++	.section	.debug_aranges,"",@progbits
++	.long	0x24	# Length of Address Ranges Info
++	.value	0x2	# DWARF Version
++	.long	.Ldebug_info0	# Offset of Compilation Unit Info
++	.byte	0x4	# Size of Address
++	.byte	0	# Size of Segment Descriptor
++	.value	0	# Pad to 8 byte boundary
++	.value	0
++	.long	.Ltext0	# Address
++	.long	.Letext0-.Ltext0	# Length
++	.long	.LFB4	# Address
++	.long	.LFE4-.LFB4	# Length
++	.long	0
++	.long	0
++	.section	.debug_ranges,"",@progbits
++.Ldebug_ranges0:
++	.long	.Ltext0	# Offset 0
++	.long	.Letext0
++	.long	.LFB4	# Offset 0x8
++	.long	.LFE4
++	.long	0
++	.long	0
++	.section	.debug_line,"",@progbits
++.Ldebug_line0:
++	.section	.debug_str,"MS",@progbits,1
++.LASF4:
++	.string	"bar_1"
++.LASF2:
++	.string	"tailcall-only.c"
++.LASF1:
++	.string	"GNU C 4.8.3 20140911 (Red Hat 4.8.3-9) -m32 -march=i686 -g -O2"
++.LASF6:
++	.string	"answer"
++.LASF5:
++	.string	"main"
++.LASF3:
++	.string	""
++.LASF0:
++	.string	"foo_1"
++	.ident	"GCC: (GNU) 4.8.3 20140911 (Red Hat 4.8.3-9)"
++	.section	.note.GNU-stack,"",@progbits
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/tailcall-only.c
+@@ -0,0 +1,53 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2016 Free Software Foundation, Inc.
++
++   Contributed by Intel Corp. <markus.t.metzger@intel.com>
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++static __attribute__ ((noinline)) int
++bar_1 (void)
++{
++  return 42;
++}
++
++static __attribute__ ((noinline)) int
++bar (void)
++{
++  return bar_1 ();
++}
++
++static __attribute__ ((noinline)) int
++foo_1 (void)
++{
++  return bar ();
++}
++
++static __attribute__ ((noinline)) int
++foo (void)
++{
++  return foo_1 ();
++}
++
++int
++main (void)
++{
++  int answer;
++
++  answer = foo ();
++  answer += 1;
++
++  return answer;
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/tailcall-only.exp
+@@ -0,0 +1,97 @@
++# This testcase is part of GDB, the GNU debugger.
++#
++# Copyright 2016 Free Software Foundation, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++#
++#
++# This is a variant of tailcall.exp where the entire trace contains only tail
++# calls.  This used to cause a crash in get_frame_type.
++#
++
++# check for btrace support
++if { [skip_btrace_tests] } { return -1 }
++
++# This test requires the compiler to generate a tail call.  To guarantee that
++# we always get one, we use an assembly source file.
++#
++# We use different assembly sources based on the target architecture.
++#
++# Luckily, they are similar enough that a single test script can handle
++# both.
++set opts {}
++if [info exists COMPILE] {
++    # make check RUNTESTFLAGS="gdb.btrace/tailcall-only.exp COMPILE=1"
++    standard_testfile tailcall-only.c
++    lappend opts debug optimize=-O2
++} elseif {[istarget "x86_64-*-*"]} {
++	standard_testfile x86_64-tailcall-only.S
++} elseif {[istarget "i?86-*-*"]} {
++	standard_testfile i686-tailcall-only.S
++} else {
++    verbose "Skipping ${testfile}."
++    return
++}
++
++if [prepare_for_testing tailcall-only.exp $testfile $srcfile $opts] {
++    return -1
++}
++if ![runto_main] {
++    return -1
++}
++
++# we want to see the full trace for this test
++gdb_test_no_output "set record function-call-history-size 0"
++
++# trace foo
++gdb_test "step" ".*" "prepare for recording"
++gdb_test_no_output "record btrace"
++gdb_test "stepi 4" ".*" "record branch trace"
++
++# for debugging
++gdb_test "info record" ".*"
++
++# show the branch trace with calls indented
++gdb_test "record function-call-history /c 1" [multi_line \
++  "1\tfoo" \
++  "2\t  foo_1" \
++  "3\t    bar" \
++  "4\t      bar_1"
++  ] "function-call-history"
++
++# We can step
++gdb_test "record goto begin" ".*foo.*"
++gdb_test "stepi" ".*foo_1.*" "step into foo_1"
++gdb_test "step" ".*bar.*" "step into bar"
++gdb_test "stepi" ".*bar_1.*" "step into bar_1"
++
++# We can neither finish nor return.
++gdb_test "finish" "Cannot find the caller frame.*"
++gdb_test_multiple "return" "return" {
++  -re "Make .* return now.*y or n. $" {
++    send_gdb "y\n"
++    exp_continue
++  }
++  -re "Cannot find the caller frame.*$gdb_prompt $" {
++    pass "return"
++  }
++}
++
++# But we can reverse-finish
++gdb_test "reverse-finish" ".*bar.*"
++gdb_test "reverse-step" ".*foo_1.*"
++
++# Info frame isn't useful but doesn't crash as it used to.
++gdb_test "up" ".*foo.*"
++gdb_test "info frame" ".*"
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/x86_64-tailcall-only.S
+@@ -0,0 +1,446 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++
++   This file has been generated using:
++   gcc -S -O2 -dA -g tailcall-only.c -o x86_64-tailcall-only.S  */
++
++	.file	"tailcall-only.c"
++	.text
++.Ltext0:
++	.p2align 4,,15
++	.type	bar_1, @function
++bar_1:
++.LFB0:
++	.file 1 "tailcall-only.c"
++	# tailcall-only.c:22
++	.loc 1 22 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:24
++	.loc 1 24 0
++	movl	$42, %eax
++# SUCC: EXIT [100.0%]
++	ret
++	.cfi_endproc
++.LFE0:
++	.size	bar_1, .-bar_1
++	.p2align 4,,15
++	.type	bar, @function
++bar:
++.LFB1:
++	# tailcall-only.c:28
++	.loc 1 28 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:29
++	.loc 1 29 0
++	jmp	bar_1
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL0:
++	.cfi_endproc
++.LFE1:
++	.size	bar, .-bar
++	.p2align 4,,15
++	.type	foo_1, @function
++foo_1:
++.LFB2:
++	# tailcall-only.c:34
++	.loc 1 34 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:35
++	.loc 1 35 0
++	jmp	bar
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL1:
++	.cfi_endproc
++.LFE2:
++	.size	foo_1, .-foo_1
++	.p2align 4,,15
++	.type	foo, @function
++foo:
++.LFB3:
++	# tailcall-only.c:40
++	.loc 1 40 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:41
++	.loc 1 41 0
++	jmp	foo_1
++# SUCC: EXIT [100.0%]  (ABNORMAL,SIBCALL)
++.LVL2:
++	.cfi_endproc
++.LFE3:
++	.size	foo, .-foo
++	.section	.text.startup,"ax",@progbits
++	.p2align 4,,15
++	.globl	main
++	.type	main, @function
++main:
++.LFB4:
++	# tailcall-only.c:46
++	.loc 1 46 0
++	.cfi_startproc
++# BLOCK 2 freq:10000 seq:0
++# PRED: ENTRY [100.0%]  (FALLTHRU)
++	# tailcall-only.c:49
++	.loc 1 49 0
++	call	foo
++.LVL3:
++	# tailcall-only.c:50
++	.loc 1 50 0
++	addl	$1, %eax
++.LVL4:
++# SUCC: EXIT [100.0%]
++	# tailcall-only.c:53
++	.loc 1 53 0
++	ret
++	.cfi_endproc
++.LFE4:
++	.size	main, .-main
++	.text
++.Letext0:
++	.section	.debug_info,"",@progbits
++.Ldebug_info0:
++	.long	0x111	# Length of Compilation Unit Info
++	.value	0x4	# DWARF version number
++	.long	.Ldebug_abbrev0	# Offset Into Abbrev. Section
++	.byte	0x8	# Pointer Size (in bytes)
++	.uleb128 0x1	# (DIE (0xb) DW_TAG_compile_unit)
++	.long	.LASF1	# DW_AT_producer: "GNU C 4.8.3 20140911 (Red Hat 4.8.3-9) -mtune=generic -march=x86-64 -g -O2"
++	.byte	0x1	# DW_AT_language
++	.long	.LASF2	# DW_AT_name: "tailcall-only.c"
++	.long	.LASF3	# DW_AT_comp_dir: ""
++	.long	.Ldebug_ranges0+0	# DW_AT_ranges
++	.quad	0	# DW_AT_low_pc
++	.long	.Ldebug_line0	# DW_AT_stmt_list
++	.uleb128 0x2	# (DIE (0x29) DW_TAG_subprogram)
++	.long	.LASF4	# DW_AT_name: "bar_1"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x15	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x46	# DW_AT_type
++	.quad	.LFB0	# DW_AT_low_pc
++	.quad	.LFE0-.LFB0	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.uleb128 0x3	# (DIE (0x46) DW_TAG_base_type)
++	.byte	0x4	# DW_AT_byte_size
++	.byte	0x5	# DW_AT_encoding
++	.ascii "int\0"	# DW_AT_name
++	.uleb128 0x4	# (DIE (0x4d) DW_TAG_subprogram)
++	.ascii "bar\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x1b	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x46	# DW_AT_type
++	.quad	.LFB1	# DW_AT_low_pc
++	.quad	.LFE1-.LFB1	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0x7c	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0x6e) DW_TAG_GNU_call_site)
++	.quad	.LVL0	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x29	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0x4d
++	.uleb128 0x6	# (DIE (0x7c) DW_TAG_subprogram)
++	.long	.LASF0	# DW_AT_name: "foo_1"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x21	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x46	# DW_AT_type
++	.quad	.LFB2	# DW_AT_low_pc
++	.quad	.LFE2-.LFB2	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0xab	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0x9d) DW_TAG_GNU_call_site)
++	.quad	.LVL1	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x4d	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0x7c
++	.uleb128 0x4	# (DIE (0xab) DW_TAG_subprogram)
++	.ascii "foo\0"	# DW_AT_name
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x27	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x46	# DW_AT_type
++	.quad	.LFB3	# DW_AT_low_pc
++	.quad	.LFE3-.LFB3	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.long	0xda	# DW_AT_sibling
++	.uleb128 0x5	# (DIE (0xcc) DW_TAG_GNU_call_site)
++	.quad	.LVL2	# DW_AT_low_pc
++			# DW_AT_GNU_tail_call
++	.long	0x7c	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0xab
++	.uleb128 0x7	# (DIE (0xda) DW_TAG_subprogram)
++			# DW_AT_external
++	.long	.LASF5	# DW_AT_name: "main"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x2d	# DW_AT_decl_line
++			# DW_AT_prototyped
++	.long	0x46	# DW_AT_type
++	.quad	.LFB4	# DW_AT_low_pc
++	.quad	.LFE4-.LFB4	# DW_AT_high_pc
++	.uleb128 0x1	# DW_AT_frame_base
++	.byte	0x9c	# DW_OP_call_frame_cfa
++			# DW_AT_GNU_all_call_sites
++	.uleb128 0x8	# (DIE (0xf7) DW_TAG_variable)
++	.long	.LASF6	# DW_AT_name: "answer"
++	.byte	0x1	# DW_AT_decl_file (tailcall-only.c)
++	.byte	0x2f	# DW_AT_decl_line
++	.long	0x46	# DW_AT_type
++	.long	.LLST0	# DW_AT_location
++	.uleb128 0x9	# (DIE (0x106) DW_TAG_GNU_call_site)
++	.quad	.LVL3	# DW_AT_low_pc
++	.long	0xab	# DW_AT_abstract_origin
++	.byte	0	# end of children of DIE 0xda
++	.byte	0	# end of children of DIE 0xb
++	.section	.debug_abbrev,"",@progbits
++.Ldebug_abbrev0:
++	.uleb128 0x1	# (abbrev code)
++	.uleb128 0x11	# (TAG: DW_TAG_compile_unit)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x25	# (DW_AT_producer)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x13	# (DW_AT_language)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x1b	# (DW_AT_comp_dir)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x55	# (DW_AT_ranges)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x10	# (DW_AT_stmt_list)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x2	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.byte	0
++	.byte	0
++	.uleb128 0x3	# (abbrev code)
++	.uleb128 0x24	# (TAG: DW_TAG_base_type)
++	.byte	0	# DW_children_no
++	.uleb128 0xb	# (DW_AT_byte_size)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3e	# (DW_AT_encoding)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.byte	0
++	.byte	0
++	.uleb128 0x4	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0x8	# (DW_FORM_string)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x5	# (abbrev code)
++	.uleb128 0x4109	# (TAG: DW_TAG_GNU_call_site)
++	.byte	0	# DW_children_no
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x2115	# (DW_AT_GNU_tail_call)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x31	# (DW_AT_abstract_origin)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x6	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x1	# (DW_AT_sibling)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.uleb128 0x7	# (abbrev code)
++	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
++	.byte	0x1	# DW_children_yes
++	.uleb128 0x3f	# (DW_AT_external)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x27	# (DW_AT_prototyped)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x12	# (DW_AT_high_pc)
++	.uleb128 0x7	# (DW_FORM_data8)
++	.uleb128 0x40	# (DW_AT_frame_base)
++	.uleb128 0x18	# (DW_FORM_exprloc)
++	.uleb128 0x2117	# (DW_AT_GNU_all_call_sites)
++	.uleb128 0x19	# (DW_FORM_flag_present)
++	.byte	0
++	.byte	0
++	.uleb128 0x8	# (abbrev code)
++	.uleb128 0x34	# (TAG: DW_TAG_variable)
++	.byte	0	# DW_children_no
++	.uleb128 0x3	# (DW_AT_name)
++	.uleb128 0xe	# (DW_FORM_strp)
++	.uleb128 0x3a	# (DW_AT_decl_file)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x3b	# (DW_AT_decl_line)
++	.uleb128 0xb	# (DW_FORM_data1)
++	.uleb128 0x49	# (DW_AT_type)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.uleb128 0x2	# (DW_AT_location)
++	.uleb128 0x17	# (DW_FORM_sec_offset)
++	.byte	0
++	.byte	0
++	.uleb128 0x9	# (abbrev code)
++	.uleb128 0x4109	# (TAG: DW_TAG_GNU_call_site)
++	.byte	0	# DW_children_no
++	.uleb128 0x11	# (DW_AT_low_pc)
++	.uleb128 0x1	# (DW_FORM_addr)
++	.uleb128 0x31	# (DW_AT_abstract_origin)
++	.uleb128 0x13	# (DW_FORM_ref4)
++	.byte	0
++	.byte	0
++	.byte	0
++	.section	.debug_loc,"",@progbits
++.Ldebug_loc0:
++.LLST0:
++	.quad	.LVL3	# Location list begin address (*.LLST0)
++	.quad	.LVL4	# Location list end address (*.LLST0)
++	.value	0x3	# Location expression size
++	.byte	0x70	# DW_OP_breg0
++	.sleb128 1
++	.byte	0x9f	# DW_OP_stack_value
++	.quad	.LVL4	# Location list begin address (*.LLST0)
++	.quad	.LFE4	# Location list end address (*.LLST0)
++	.value	0x1	# Location expression size
++	.byte	0x50	# DW_OP_reg0
++	.quad	0	# Location list terminator begin (*.LLST0)
++	.quad	0	# Location list terminator end (*.LLST0)
++	.section	.debug_aranges,"",@progbits
++	.long	0x3c	# Length of Address Ranges Info
++	.value	0x2	# DWARF Version
++	.long	.Ldebug_info0	# Offset of Compilation Unit Info
++	.byte	0x8	# Size of Address
++	.byte	0	# Size of Segment Descriptor
++	.value	0	# Pad to 16 byte boundary
++	.value	0
++	.quad	.Ltext0	# Address
++	.quad	.Letext0-.Ltext0	# Length
++	.quad	.LFB4	# Address
++	.quad	.LFE4-.LFB4	# Length
++	.quad	0
++	.quad	0
++	.section	.debug_ranges,"",@progbits
++.Ldebug_ranges0:
++	.quad	.Ltext0	# Offset 0
++	.quad	.Letext0
++	.quad	.LFB4	# Offset 0x10
++	.quad	.LFE4
++	.quad	0
++	.quad	0
++	.section	.debug_line,"",@progbits
++.Ldebug_line0:
++	.section	.debug_str,"MS",@progbits,1
++.LASF4:
++	.string	"bar_1"
++.LASF2:
++	.string	"tailcall-only.c"
++.LASF1:
++	.string	"GNU C 4.8.3 20140911 (Red Hat 4.8.3-9) -mtune=generic -march=x86-64 -g -O2"
++.LASF6:
++	.string	"answer"
++.LASF5:
++	.string	"main"
++.LASF3:
++	.string	""
++.LASF0:
++	.string	"foo_1"
++	.ident	"GCC: (GNU) 4.8.3 20140911 (Red Hat 4.8.3-9)"
++	.section	.note.GNU-stack,"",@progbits
+
+
+
+commit cd64cabb8c66a5565fc33bf66a07c08bc767e413
+Author: Yichao Yu <yyc1992@gmail.com>
+Date:   Thu Mar 31 19:28:47 2016 +0100
+
+    Fix PR gdb/19858: GDB doesn't register the JIT libraries on attach
+    
+    Ref: https://sourceware.org/ml/gdb/2016-03/msg00023.html
+    
+    GDB currently fails to fetch the list of already-registered JIT
+    modules on attach.
+    
+    Nothing is calling jit_inferior_init, which is what is responsible for
+    walking the JIT object list at init time.
+    
+    Despite the misleading naming, jit_inferior_created_hook ->
+    jit_inferior_init is only called when the inferior execs.
+    
+    This regressed with the fix for PR gdb/13431 (03bef283c2d3):
+     https://sourceware.org/ml/gdb-patches/2012-02/msg00023.html which
+    removed the inferior_created (jit_inferior_created_observer)
+    observer.
+    
+    Adding an inferior_created observer back fixes the issue.
+    
+    In turn, this exposes a bug in jit_breakpoint_re_set_internal as well,
+    which is returning the wrong result when we already have the
+    breakpoint at the right address.
+    
+    gdb/ChangeLog:
+    2016-03-31  Yichao Yu  <yyc1992@gmail.com>
+    
+    	PR gdb/19858
+    	* jit.c (jit_breakpoint_re_set_internal): Return 0 if we already
+    	got the breakpoint at the right address.
+    	(jit_inferior_created): New function.
+    	(_initialize_jit): Install jit_inferior_created as
+    	inferior_created observer.
+    
+    Signed-off-by: Pedro Alves <palves@redhat.com>
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,12 @@
++2016-03-31  Yichao Yu  <yyc1992@gmail.com>
++
++	PR gdb/19858
++	* jit.c (jit_breakpoint_re_set_internal): Return 0 if we already
++	got the breakpoint at the right address.
++	(jit_inferior_created): New function.
++	(_initialize_jit): Install jit_inferior_created as
++	inferior_created observer.
++
+ 2016-03-17  Markus Metzger  <markus.t.metzger@intel.com>
+ 
+ 	PR gdb/19829
+--- a/gdb/jit.c
++++ b/gdb/jit.c
+@@ -1026,7 +1026,7 @@ jit_breakpoint_deleted (struct breakpoint *b)
+ }
+ 
+ /* (Re-)Initialize the jit breakpoint if necessary.
+-   Return 0 on success.  */
++   Return 0 if the jit breakpoint has been successfully initialized.  */
+ 
+ static int
+ jit_breakpoint_re_set_internal (struct gdbarch *gdbarch,
+@@ -1070,7 +1070,7 @@ jit_breakpoint_re_set_internal (struct gdbarch *gdbarch,
+ 			paddress (gdbarch, addr));
+ 
+   if (ps_data->cached_code_address == addr)
+-    return 1;
++    return 0;
+ 
+   /* Delete the old breakpoint.  */
+   if (ps_data->jit_breakpoint != NULL)
+@@ -1367,6 +1367,14 @@ jit_inferior_init (struct gdbarch *gdbarch)
+     }
+ }
+ 
++/* inferior_created observer.  */
++
++static void
++jit_inferior_created (struct target_ops *ops, int from_tty)
++{
++  jit_inferior_created_hook ();
++}
++
+ /* Exported routine to call when an inferior has been created.  */
+ 
+ void
+@@ -1496,6 +1504,7 @@ _initialize_jit (void)
+ 			     show_jit_debug,
+ 			     &setdebuglist, &showdebuglist);
+ 
++  observer_attach_inferior_created (jit_inferior_created);
+   observer_attach_inferior_exit (jit_inferior_exit_hook);
+   observer_attach_breakpoint_deleted (jit_breakpoint_deleted);
+ 
+
+
+
+commit 89df5d6cce0e91c4b34c7a62ba4a68756a8ed4e7
+Author: Pedro Alves <palves@redhat.com>
+Date:   Thu Mar 31 19:28:47 2016 +0100
+
+    Make gdb.base/jit.exp binaries unique
+    
+    This testcase compiles the same program and library differently
+    multiple times using the same file names.  Make them unique, to make
+    it easier to debug test problems.
+    
+    gdb/testsuite/ChangeLog:
+    2016-03-31  Pedro Alves  <palves@redhat.com>
+    
+    	PR gdb/19858
+    	* gdb.base/jit.exp (compile_jit_test): Add intro comment.  Add
+    	BINSUFFIX parameter, and handle it.
+    	(top level): Adjust calls compile_jit_test.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,10 @@
++2016-03-31  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/19858
++	* gdb.base/jit.exp (compile_jit_test): Add intro comment.  Add
++	BINSUFFIX parameter, and handle it.
++	(top level): Adjust calls compile_jit_test.
++
+ 2016-03-17  Markus Metzger  <markus.t.metzger@intel.com>
+ 
+ 	PR gdb/19829
+--- a/gdb/testsuite/gdb.base/jit.exp
++++ b/gdb/testsuite/gdb.base/jit.exp
+@@ -24,18 +24,19 @@ if {[get_compiler_info]} {
+     return 1
+ }
+ 
+-#
+-# test running programs
+-#
++# Compile the testcase program and library.  BINSUFFIX is the suffix
++# to append to the program and library filenames, to make them unique
++# between invocations.  OPTIONS is passed to gdb_compile when
++# compiling the program.
+ 
+-proc compile_jit_test {testname options} {
++proc compile_jit_test {testname binsuffix options} {
+     global testfile srcfile binfile srcdir subdir
+     global solib_testfile solib_srcfile solib_binfile solib_binfile_test_msg
+     global solib_binfile_target
+ 
+     set testfile jit-main
+     set srcfile ${testfile}.c
+-    set binfile [standard_output_file $testfile]
++    set binfile [standard_output_file $testfile$binsuffix]
+     if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" \
+ 	      executable [concat debug $options]] != "" } {
+ 	untested $testname
+@@ -44,8 +45,8 @@ proc compile_jit_test {testname options} {
+ 
+     set solib_testfile "jit-solib"
+     set solib_srcfile "${srcdir}/${subdir}/${solib_testfile}.c"
+-    set solib_binfile [standard_output_file ${solib_testfile}.so]
+-    set solib_binfile_test_msg "SHLIBDIR/${solib_testfile}.so"
++    set solib_binfile [standard_output_file ${solib_testfile}$binsuffix.so]
++    set solib_binfile_test_msg "SHLIBDIR/${solib_testfile}$binsuffix.so"
+ 
+     # Note: compiling without debug info: the library goes through
+     # symbol renaming by munging on its symbol table, and that
+@@ -109,7 +110,7 @@ proc one_jit_test {count match_str} {
+     }
+ }
+ 
+-if {[compile_jit_test jit.exp {}] < 0} {
++if {[compile_jit_test jit.exp "" {}] < 0} {
+     return
+ }
+ one_jit_test 1 "${hex}  jit_function_0000"
+@@ -117,7 +118,7 @@ one_jit_test 2 "${hex}  jit_function_0000\[\r\n\]+${hex}  jit_function_0001"
+ 
+ with_test_prefix PIE {
+     if {[compile_jit_test "jit.exp PIE tests" \
+-	     {additional_flags=-fPIE ldflags=-pie}] < 0} {
++	     "-pie" {additional_flags=-fPIE ldflags=-pie}] < 0} {
+ 	return
+     }
+ 
+
+
+
+commit 85af34ee0211eedf8d30a5c44dfc59dddf8b512a
+Author: Pedro Alves <palves@redhat.com>
+Date:   Thu Mar 31 19:28:47 2016 +0100
+
+    Add regression test for PR gdb/19858 (JIT code registration on attach)
+    
+    This test would fail without the previous gdb/jit.c fix:
+    
+      (gdb) attach 23031
+      Attaching to program: .../build/gdb/testsuite/outputs/gdb.base/jit/jit-main, process 23031
+      [...]
+      207           WAIT_FOR_GDB; i = 0;  /* gdb break here 1 */
+      (gdb) PASS: gdb.base/jit.exp: attach: one_jit_test-2: attach
+      set var wait_for_gdb = 0
+      (gdb) PASS: gdb.base/jit.exp: attach: one_jit_test-2: set var wait_for_gdb = 0
+      info function ^jit_function
+      All functions matching regular expression "^jit_function":
+      (gdb) FAIL: gdb.base/jit.exp: attach: one_jit_test-2: info function ^jit_function
+    
+    gdb/testsuite/ChangeLog:
+    2016-03-31  Pedro Alves  <palves@redhat.com>
+    
+    	PR gdb/19858
+    	* gdb.base/jit-main.c: Include unistd.h.
+    	(ATTACH): Define to 0 if not already defined.
+    	(wait_for_gdb, mypid): New globals.
+    	(WAIT_FOR_GDB): New macro.
+    	(MAIN): Set an alarm.  Store the process's pid.  Wait for GDB at
+    	some breakpoint locations.
+    	* gdb.base/jit.exp (clean_reattach, continue_to_test_location):
+    	New procedures.
+    	(one_jit_test): Add REATTACH parameter, and handle it.  Use
+    	continue_to_test_location.
+    	(top level): Test attach, and adjusts calls to one_jit_test.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,6 +1,21 @@
+ 2016-03-31  Pedro Alves  <palves@redhat.com>
+ 
+ 	PR gdb/19858
++	* gdb.base/jit-main.c: Include unistd.h.
++	(ATTACH): Define to 0 if not already defined.
++	(wait_for_gdb, mypid): New globals.
++	(WAIT_FOR_GDB): New macro.
++	(MAIN): Set an alarm.  Store the process's pid.  Wait for GDB at
++	some breakpoint locations.
++	* gdb.base/jit.exp (clean_reattach, continue_to_test_location):
++	New procedures.
++	(one_jit_test): Add REATTACH parameter, and handle it.  Use
++	continue_to_test_location.
++	(top level): Test attach, and adjusts calls to one_jit_test.
++
++2016-03-31  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/19858
+ 	* gdb.base/jit.exp (compile_jit_test): Add intro comment.  Add
+ 	BINSUFFIX parameter, and handle it.
+ 	(top level): Adjust calls compile_jit_test.
+--- a/gdb/testsuite/gdb.base/jit-main.c
++++ b/gdb/testsuite/gdb.base/jit-main.c
+@@ -27,6 +27,7 @@
+ #include <string.h>
+ #include <sys/mman.h>
+ #include <sys/stat.h>
++#include <unistd.h>
+ 
+ /* ElfW is coming from linux. On other platforms it does not exist.
+    Let us define it here. */
+@@ -116,10 +117,22 @@ update_locations (const void *const addr, int idx)
+     }
+ }
+ 
++/* Defined by the .exp file if testing attach.  */
++#ifndef ATTACH
++#define ATTACH 0
++#endif
++
+ #ifndef MAIN
+ #define MAIN main
+ #endif
+ 
++/* Used to spin waiting for GDB.  */
++volatile int wait_for_gdb = ATTACH;
++#define WAIT_FOR_GDB while (wait_for_gdb)
++
++/* The current process's PID.  GDB retrieves this.  */
++int mypid;
++
+ int
+ MAIN (int argc, char *argv[])
+ {
+@@ -127,6 +140,10 @@ MAIN (int argc, char *argv[])
+   const char *libname = NULL;
+   int count = 0;
+ 
++  alarm (300);
++
++  mypid = getpid ();
++
+   count = count;  /* gdb break here 0  */
+ 
+   if (argc < 2)
+@@ -190,7 +207,7 @@ MAIN (int argc, char *argv[])
+           __jit_debug_register_code ();
+         }
+ 
+-      i = 0;  /* gdb break here 1 */
++      WAIT_FOR_GDB; i = 0;  /* gdb break here 1 */
+ 
+       /* Now unregister them all in reverse order.  */
+       while (__jit_debug_descriptor.relevant_entry != NULL)
+@@ -215,5 +232,5 @@ MAIN (int argc, char *argv[])
+           free (entry);
+         }
+     }
+-  return 0;  /* gdb break here 2  */
++  WAIT_FOR_GDB; return 0;  /* gdb break here 2  */
+ }
+--- a/gdb/testsuite/gdb.base/jit.exp
++++ b/gdb/testsuite/gdb.base/jit.exp
+@@ -66,7 +66,49 @@ proc compile_jit_test {testname binsuffix options} {
+     return 0
+ }
+ 
+-proc one_jit_test {count match_str} {
++# Detach, restart GDB, and re-attach to the program.
++
++proc clean_reattach {} {
++    global decimal gdb_prompt srcfile testfile
++
++    # Get PID of test program.
++    set testpid -1
++    set test "get inferior process ID"
++    gdb_test_multiple "p mypid" $test {
++	-re ".* = ($decimal).*$gdb_prompt $" {
++	    set testpid $expect_out(1,string)
++	    pass $test
++	}
++    }
++
++    gdb_test_no_output "set var wait_for_gdb = 1"
++    gdb_test "detach" "Detaching from .*"
++
++    clean_restart $testfile
++
++    set test "attach"
++    gdb_test_multiple "attach $testpid" "$test" {
++	-re "Attaching to program.*.*main.*at .*$srcfile:.*$gdb_prompt $" {
++	    pass "$test"
++	}
++    }
++
++    gdb_test_no_output "set var wait_for_gdb = 0"
++}
++
++# Continue to LOCATION in the program.  If REATTACH, detach and
++# re-attach to the program from scratch.
++proc continue_to_test_location {location reattach} {
++    gdb_breakpoint [gdb_get_line_number $location]
++    gdb_continue_to_breakpoint $location
++    if {$reattach} {
++	with_test_prefix "$location" {
++	    clean_reattach
++	}
++    }
++}
++
++proc one_jit_test {count match_str reattach} {
+     with_test_prefix "one_jit_test-$count" {
+ 	global verbose testfile solib_binfile_target solib_binfile_test_msg
+ 
+@@ -91,8 +133,7 @@ proc one_jit_test {count match_str} {
+ 	gdb_test_no_output "set var libname = \"$solib_binfile_target\"" "set var libname = \"$solib_binfile_test_msg\""
+ 	gdb_test_no_output "set var count = $count"
+ 
+-	gdb_breakpoint [gdb_get_line_number "break here 1"]
+-	gdb_continue_to_breakpoint "break here 1"
++	continue_to_test_location "break here 1" $reattach
+ 
+ 	gdb_test "info function ^jit_function" "$match_str"
+ 
+@@ -102,8 +143,8 @@ proc one_jit_test {count match_str} {
+ 	    gdb_test "maintenance info break"
+ 	}
+ 
+-	gdb_breakpoint [gdb_get_line_number "break here 2"]
+-	gdb_continue_to_breakpoint "break here 2"
++	continue_to_test_location "break here 2" $reattach
++
+ 	# All jit librares must have been unregistered
+ 	gdb_test "info function jit_function" \
+ 	    "All functions matching regular expression \"jit_function\":"
+@@ -113,8 +154,22 @@ proc one_jit_test {count match_str} {
+ if {[compile_jit_test jit.exp "" {}] < 0} {
+     return
+ }
+-one_jit_test 1 "${hex}  jit_function_0000"
+-one_jit_test 2 "${hex}  jit_function_0000\[\r\n\]+${hex}  jit_function_0001"
++one_jit_test 1 "${hex}  jit_function_0000" 0
++one_jit_test 2 "${hex}  jit_function_0000\[\r\n\]+${hex}  jit_function_0001" 0
++
++# Test attaching to an inferior with some JIT libraries already
++# registered.  We reuse the normal test, and detach/reattach at
++# specific interesting points.
++if {[can_spawn_for_attach]} {
++    if {[compile_jit_test "jit.exp attach tests" \
++	     "-attach" {additional_flags=-DATTACH=1}] < 0} {
++	return
++    }
++
++    with_test_prefix attach {
++	one_jit_test 2 "${hex}  jit_function_0000\[\r\n\]+${hex}  jit_function_0001" 1
++    }
++}
+ 
+ with_test_prefix PIE {
+     if {[compile_jit_test "jit.exp PIE tests" \
+@@ -122,5 +177,5 @@ with_test_prefix PIE {
+ 	return
+     }
+ 
+-    one_jit_test 1 "${hex}  jit_function_0000"
++    one_jit_test 1 "${hex}  jit_function_0000" 0
+ }

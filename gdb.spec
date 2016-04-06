@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 65%{?dist}
+Release: 66%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1385,6 +1385,9 @@ then
 fi
 
 %changelog
+* Wed Apr  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-66.fc24
+- Import upstream 7.11 branch stable fixes.
+
 * Wed Apr  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-65.fc24
 - Add messages suggesting more recent RHEL gdbserver (RH BZ 1321114).
 
