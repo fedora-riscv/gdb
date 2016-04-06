@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 63%{?dist}
+Release: 64%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -554,6 +554,9 @@ Patch1075: gdb-testsuite-readline63-sigint.patch
 #=fedoratest
 Patch1113: gdb-rhbz1261564-aarch64-hw-watchpoint-test.patch 
 
+# Fix non-stop gdb -p <container>: internal error (pedro Alves, RH BZ 1318049).
+Patch1117: gdb-rhbz1318049-gdb-p-container-internal-error.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -860,6 +863,7 @@ find -name "*.info*"|xargs rm -f
 %patch331 -p1
 %patch1075 -p1
 %patch1113 -p1
+%patch1117 -p1
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1044 -p1
@@ -1377,6 +1381,9 @@ then
 fi
 
 %changelog
+* Wed Apr  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-64.fc24
+- Fix non-stop gdb -p <container>: internal error (pedro Alves, RH BZ 1318049).
+
 * Sat Mar 19 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-63.fc24
 - .spec cleanup: Drop strict-aliasing GCC bug workaround (from RH BZ 1315191).
 
