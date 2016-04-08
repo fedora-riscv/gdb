@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 66%{?dist}
+Release: 67%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -549,6 +549,7 @@ Patch1073: gdb-opcodes-clflushopt-test.patch
 
 # [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
 Patch1075: gdb-testsuite-readline63-sigint.patch
+Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 
 # [aarch64] Fix hardware watchpoints (RH BZ 1261564).
 #=fedoratest
@@ -559,6 +560,9 @@ Patch1117: gdb-rhbz1318049-gdb-p-container-internal-error.patch
 
 # Add messages suggesting more recent RHEL gdbserver (RH BZ 1321114).
 Patch1118: gdb-container-rh-pkg.patch
+
+# [testsuite] Fix 7.11 regression: gdb.dwarf2/dw2-undefined-ret-addr.exp
+Patch1120: gdb-testsuite-dw2-undefined-ret-addr.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -864,12 +868,14 @@ find -name "*.info*"|xargs rm -f
 %patch642 -p1
 %patch337 -p1
 %patch331 -p1
-%patch1075 -p1
 %patch1113 -p1
 %patch1117 -p1
 %patch1118 -p1
+%patch1120 -p1
 
+%patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
+%patch1119 -p1
 %patch1044 -p1
 %endif
 
@@ -1385,6 +1391,9 @@ then
 fi
 
 %changelog
+* Fri Apr  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-67.fc24
+- [testsuite] Fix several false FAILs.
+
 * Wed Apr  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-66.fc24
 - Import upstream 7.11 branch stable fixes.
 

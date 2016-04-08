@@ -2055,3 +2055,334 @@ Date:   Thu Mar 31 19:28:47 2016 +0100
 -    one_jit_test 1 "${hex}  jit_function_0000"
 +    one_jit_test 1 "${hex}  jit_function_0000" 0
  }
+
+
+
+commit 2d35e871274a48331c4d6c7b3e4fbee42b901f33
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Thu Apr 7 22:18:49 2016 +0200
+
+    testsuite: Fix false FAILs with .bashrc GDBHISTFILE=...
+    
+    $ GDBHISTFILE=/tmp/gdbhistfile runtest gdb.base/gdbhistsize-history.exp gdb.base/gdbinit-history.exp
+    Running ./gdb.base/gdbinit-history.exp ...
+    FAIL: gdb.base/gdbinit-history.exp: home=gdbinit-history/unlimited gdbhistsize=1000: show commands
+    FAIL: gdb.base/gdbinit-history.exp: home=gdbinit-history/unlimited gdbhistsize=foo: show commands
+    Running ./gdb.base/gdbhistsize-history.exp ...
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=20: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize= 20 : show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=-5: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=not_an_integer: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=10zab: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=-5ab: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=99999999999999999999999999999999999: show commands
+    FAIL: gdb.base/gdbhistsize-history.exp: histsize=50: show commands
+    
+    This happens for my setup due to my:
+    	$ grep GDB ~/.bashrc
+    	export GDBHISTFILE="$HOME/.gdb_history"
+    
+    gdb/testsuite/ChangeLog
+    2016-04-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	* gdb.base/gdbhistsize-history.exp: Save and unset GDBHISTFILE and
+    	GDBHISTSIZE prior to the tests.
+    	* gdb.base/gdbinit-history.exp: Likewise.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,4 +1,10 @@
+-2015-04-07  Pedro Alves  <palves@redhat.com>
++2016-04-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* gdb.base/gdbhistsize-history.exp: Save and unset GDBHISTFILE and
++	GDBHISTSIZE prior to the tests.
++	* gdb.base/gdbinit-history.exp: Likewise.
++
++2016-04-07  Pedro Alves  <palves@redhat.com>
+ 
+ 	* gdb.compile/compile.exp: Use gdb_compile with "shlib=" option
+ 	instead of build_executable.  Use gdb_load_shlibs.
+--- a/gdb/testsuite/gdb.base/gdbhistsize-history.exp
++++ b/gdb/testsuite/gdb.base/gdbhistsize-history.exp
+@@ -32,7 +32,13 @@ if { [is_remote host] } {
+ proc test_histsize_history_setting { histsize size { env_var "GDBHISTSIZE" } } {
+     global env
+ 
+-    save_vars { env($env_var) } {
++    save_vars { env(GDBHISTFILE) env(GDBHISTSIZE) env($env_var) } {
++	# These environment variables take precedence over whatever
++	# history size is set in .gdbinit.  Make sure the former is not
++	# set.
++	unset -nocomplain env(GDBHISTFILE)
++	unset -nocomplain env(GDBHISTSIZE)
++
+ 	set env($env_var) $histsize
+ 
+ 	with_test_prefix "histsize=$histsize" {
+--- a/gdb/testsuite/gdb.base/gdbinit-history.exp
++++ b/gdb/testsuite/gdb.base/gdbinit-history.exp
+@@ -36,12 +36,13 @@ proc test_gdbinit_history_setting { home size { gdbhistsize_val "-" } } {
+     global srcdir
+     global subdir
+ 
+-    save_vars { INTERNAL_GDBFLAGS env(GDBHISTSIZE) env(HOME) } {
++    save_vars { INTERNAL_GDBFLAGS env(GDBHISTFILE) env(GDBHISTSIZE) env(HOME) } {
+ 	set env(HOME) "$srcdir/$subdir/$home"
+ 
+-	# The GDBHISTSIZE environment variable takes precedence over whatever
++	# These environment variables take precedence over whatever
+ 	# history size is set in .gdbinit.  Make sure the former is not
+ 	# set.
++	unset -nocomplain env(GDBHISTFILE)
+ 	unset -nocomplain env(GDBHISTSIZE)
+ 
+ 	if { $gdbhistsize_val != "-" } {
+@@ -77,10 +78,11 @@ proc test_no_truncation_of_unlimited_history_file { } {
+     global env
+     global INTERNAL_GDBFLAGS
+ 
+-    save_vars { INTERNAL_GDBFLAGS env(GDBHISTSIZE) } {
+-	# The GDBHISTSIZE environment variable takes precedence over whatever
++    save_vars { INTERNAL_GDBFLAGS env(GDBHISTFILE) env(GDBHISTSIZE) } {
++	# These environment variables take precedence over whatever
+ 	# history size is set in .gdbinit.  Make sure the former is not
+ 	# set.
++	unset -nocomplain env(GDBHISTFILE)
+ 	unset -nocomplain env(GDBHISTSIZE)
+ 
+ 	set temp_gdbinit [standard_output_file "gdbinit-history.gdbinit"]
+
+
+
+commit 065005336492337c92d06e87544646635a5b9566
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Fri Apr 8 15:38:53 2016 +0200
+
+    testsuite: Fix for gcc-4.8: gdb.base/jit.exp gdb.base/jit-so.exp
+    
+    on CentOS-7.2 I get
+    
+    Running /home/jkratoch/redhat/gdb-test-reg/gdb/testsuite/gdb.base/jit.exp ...
+    FAIL: gdb.base/jit.exp: one_jit_test-1: continue to breakpoint: break here 2 (the program exited)
+    FAIL: gdb.base/jit.exp: one_jit_test-2: continue to breakpoint: break here 2 (the program exited)
+    FAIL: gdb.base/jit.exp: attach: one_jit_test-2: continue to breakpoint: break here 2 (the program exited)
+    FAIL: gdb.base/jit.exp: attach: one_jit_test-2: break here 2: set var wait_for_gdb = 1
+    FAIL: gdb.base/jit.exp: attach: one_jit_test-2: break here 2: detach (the program is no longer running)
+    FAIL: gdb.base/jit.exp: attach: one_jit_test-2: break here 2: attach
+    FAIL: gdb.base/jit.exp: attach: one_jit_test-2: break here 2: set var wait_for_gdb = 0
+    FAIL: gdb.base/jit.exp: PIE: one_jit_test-1: continue to breakpoint: break here 2 (the program exited)
+    Running /home/jkratoch/redhat/gdb-test-reg/gdb/testsuite/gdb.base/jit-so.exp ...
+    FAIL: gdb.base/jit-so.exp: one_jit_test-1: continue to breakpoint: break here 2 (the program exited)
+    FAIL: gdb.base/jit-so.exp: one_jit_test-2: continue to breakpoint: break here 2 (the program exited)
+    
+    since:
+    
+    85af34ee0211eedf8d30a5c44dfc59dddf8b512a is the first bad commit
+    commit 85af34ee0211eedf8d30a5c44dfc59dddf8b512a
+    Author: Pedro Alves <palves@redhat.com>
+    Date:   Thu Mar 31 19:28:47 2016 +0100
+        Add regression test for PR gdb/19858 (JIT code registration on attach)
+    
+    The compiled code's .debug_line is wrong (for the simplistic approach of GDB
+    to put a breakpoint on the first address belonging to that source line) and so
+    GDB misses the breakpoint at the last line:
+              WAIT_FOR_GDB; return 0;  /* gdb break here 2  */
+    
+    Most of the patch is just about reindentation, no changes there.
+    
+    gdb/testsuite/ChangeLog
+    2016-04-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	Fix compatibility with gcc-4.8.5-4.el7.x86_64.
+    	* gdb.base/jit-main.c: Use exit after usage.
+
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,8 @@
++2016-04-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	Fix compatibility with gcc-4.8.5-4.el7.x86_64.
++	* gdb.base/jit-main.c: Use exit after usage.
++
+ 2016-04-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+ 
+ 	* gdb.base/gdbhistsize-history.exp: Save and unset GDBHISTFILE and
+--- a/gdb/testsuite/gdb.base/jit-main.c
++++ b/gdb/testsuite/gdb.base/jit-main.c
+@@ -138,7 +138,8 @@ MAIN (int argc, char *argv[])
+ {
+   /* These variables are here so they can easily be set from jit.exp.  */
+   const char *libname = NULL;
+-  int count = 0;
++  int count = 0, i, fd;
++  struct stat st;
+ 
+   alarm (300);
+ 
+@@ -147,90 +148,89 @@ MAIN (int argc, char *argv[])
+   count = count;  /* gdb break here 0  */
+ 
+   if (argc < 2)
+-    usage (argv[0]);
+-  else
+     {
+-      int i, fd;
+-      struct stat st;
++      usage (argv[0]);
++      exit (1);
++    }
+ 
+-      if (libname == NULL)
+-        /* Only set if not already set from GDB.  */
+-        libname = argv[1];
++  if (libname == NULL)
++    /* Only set if not already set from GDB.  */
++    libname = argv[1];
+ 
+-      if (argc > 2 && count == 0)
+-        /* Only set if not already set from GDB.  */
+-        count = atoi (argv[2]);
++  if (argc > 2 && count == 0)
++    /* Only set if not already set from GDB.  */
++    count = atoi (argv[2]);
+ 
+-      printf ("%s:%d: libname = %s, count = %d\n", __FILE__, __LINE__,
+-              libname, count);
++  printf ("%s:%d: libname = %s, count = %d\n", __FILE__, __LINE__,
++	  libname, count);
+ 
+-      if ((fd = open (libname, O_RDONLY)) == -1)
+-        {
+-          fprintf (stderr, "open (\"%s\", O_RDONLY): %s\n", libname,
+-                   strerror (errno));
+-          exit (1);
+-        }
++  if ((fd = open (libname, O_RDONLY)) == -1)
++    {
++      fprintf (stderr, "open (\"%s\", O_RDONLY): %s\n", libname,
++	       strerror (errno));
++      exit (1);
++    }
+ 
+-      if (fstat (fd, &st) != 0)
+-        {
+-          fprintf (stderr, "fstat (\"%d\"): %s\n", fd, strerror (errno));
+-          exit (1);
+-        }
++  if (fstat (fd, &st) != 0)
++    {
++      fprintf (stderr, "fstat (\"%d\"): %s\n", fd, strerror (errno));
++      exit (1);
++    }
+ 
+-      for (i = 0; i < count; ++i)
+-        {
+-          const void *const addr = mmap (0, st.st_size, PROT_READ|PROT_WRITE,
+-                                         MAP_PRIVATE, fd, 0);
+-          struct jit_code_entry *const entry = calloc (1, sizeof (*entry));
+-
+-          if (addr == MAP_FAILED)
+-            {
+-              fprintf (stderr, "mmap: %s\n", strerror (errno));
+-              exit (1);
+-            }
+-
+-          update_locations (addr, i);
+-
+-          /* Link entry at the end of the list.  */
+-          entry->symfile_addr = (const char *)addr;
+-          entry->symfile_size = st.st_size;
+-          entry->prev_entry = __jit_debug_descriptor.relevant_entry;
+-          __jit_debug_descriptor.relevant_entry = entry;
+-
+-          if (entry->prev_entry != NULL)
+-            entry->prev_entry->next_entry = entry;
+-          else
+-            __jit_debug_descriptor.first_entry = entry;
+-
+-          /* Notify GDB.  */
+-          __jit_debug_descriptor.action_flag = JIT_REGISTER_FN;
+-          __jit_debug_register_code ();
+-        }
++  for (i = 0; i < count; ++i)
++    {
++      const void *const addr = mmap (0, st.st_size, PROT_READ|PROT_WRITE,
++				     MAP_PRIVATE, fd, 0);
++      struct jit_code_entry *const entry = calloc (1, sizeof (*entry));
++
++      if (addr == MAP_FAILED)
++	{
++	  fprintf (stderr, "mmap: %s\n", strerror (errno));
++	  exit (1);
++	}
++
++      update_locations (addr, i);
++
++      /* Link entry at the end of the list.  */
++      entry->symfile_addr = (const char *)addr;
++      entry->symfile_size = st.st_size;
++      entry->prev_entry = __jit_debug_descriptor.relevant_entry;
++      __jit_debug_descriptor.relevant_entry = entry;
++
++      if (entry->prev_entry != NULL)
++	entry->prev_entry->next_entry = entry;
++      else
++	__jit_debug_descriptor.first_entry = entry;
++
++      /* Notify GDB.  */
++      __jit_debug_descriptor.action_flag = JIT_REGISTER_FN;
++      __jit_debug_register_code ();
++    }
+ 
+-      WAIT_FOR_GDB; i = 0;  /* gdb break here 1 */
++  WAIT_FOR_GDB; i = 0;  /* gdb break here 1 */
+ 
+-      /* Now unregister them all in reverse order.  */
+-      while (__jit_debug_descriptor.relevant_entry != NULL)
+-        {
+-          struct jit_code_entry *const entry =
+-            __jit_debug_descriptor.relevant_entry;
+-          struct jit_code_entry *const prev_entry = entry->prev_entry;
+-
+-          if (prev_entry != NULL)
+-            {
+-              prev_entry->next_entry = NULL;
+-              entry->prev_entry = NULL;
+-            }
+-          else
+-            __jit_debug_descriptor.first_entry = NULL;
+-
+-          /* Notify GDB.  */
+-          __jit_debug_descriptor.action_flag = JIT_UNREGISTER_FN;
+-          __jit_debug_register_code ();
+-
+-          __jit_debug_descriptor.relevant_entry = prev_entry;
+-          free (entry);
+-        }
++  /* Now unregister them all in reverse order.  */
++  while (__jit_debug_descriptor.relevant_entry != NULL)
++    {
++      struct jit_code_entry *const entry =
++	__jit_debug_descriptor.relevant_entry;
++      struct jit_code_entry *const prev_entry = entry->prev_entry;
++
++      if (prev_entry != NULL)
++	{
++	  prev_entry->next_entry = NULL;
++	  entry->prev_entry = NULL;
++	}
++      else
++	__jit_debug_descriptor.first_entry = NULL;
++
++      /* Notify GDB.  */
++      __jit_debug_descriptor.action_flag = JIT_UNREGISTER_FN;
++      __jit_debug_register_code ();
++
++      __jit_debug_descriptor.relevant_entry = prev_entry;
++      free (entry);
+     }
++
+   WAIT_FOR_GDB; return 0;  /* gdb break here 2  */
+ }
