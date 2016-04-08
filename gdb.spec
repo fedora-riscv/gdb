@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 67%{?dist}
+Release: 68%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -675,9 +675,11 @@ BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
 %endif
 BuildRequires: glibc-devel%{bits_local} glibc-devel%{bits_other}
 BuildRequires: libgcc%{bits_local} libgcc%{bits_other}
+BuildRequires: libgfortran%{bits_local} libgfortran%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
 # These Fedoras do not yet have gcc-go built.
 %ifnarch ppc64le aarch64
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
@@ -1391,6 +1393,9 @@ then
 fi
 
 %changelog
+* Fri Apr  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-68.fc24
+- [--with testsuite] Add two more BuildRequires.
+
 * Fri Apr  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-67.fc24
 - [testsuite] Fix several false FAILs.
 
