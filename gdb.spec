@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 68%{?dist}
+Release: 69%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -538,6 +538,9 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
+# Never kill PID on: gdb exec PID (Jan Kratochvil, RH BZ 1219747).
+Patch1053: gdb-bz1219747-attach-kills.patch
+
 # Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
 Patch1044: gdb-pahole-python2.patch
 
@@ -863,6 +866,7 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
+%patch1053 -p1
 %patch1056 -p1
 %patch1073 -p1
 %patch848 -p1
@@ -1393,6 +1397,9 @@ then
 fi
 
 %changelog
+* Tue Apr 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-69.fc24
+- Never kill PID on: gdb exec PID (Jan Kratochvil, RH BZ 1219747).
+
 * Fri Apr  8 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-68.fc24
 - [--with testsuite] Add two more BuildRequires.
 
