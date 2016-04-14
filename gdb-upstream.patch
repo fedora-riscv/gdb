@@ -1,0 +1,202 @@
+commit 43368e1d9ab8437079001f7a5f6ae2241acaece3
+Author: Markus Metzger <markus.t.metzger@intel.com>
+Date:   Wed Dec 23 13:53:53 2015 +0100
+
+    btrace: do not return out of TRY/CATCH
+    
+    In btrace_pt_readmem_callback, we read memory inside TRY/CATCH and return in
+    case of an error return value.  This corrupts the cleanup chain, which
+    eventually results in a SEGV when doing or discarding cleanups later on.
+    
+    gdb/
+    	* btrace.c (btrace_pt_readmem_callback): Do not return in TRY/CATCH.
+    
+    testsuite/
+    	* gdb.btrace/dlopen.exp: New.
+    	* gdb.btrace/dlopen.c: New.
+    	* gdb.btrace/dlopen-dso.c: New.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,7 @@
++2016-01-04  Markus Metzger  <markus.t.metzger@intel.com>
++
++	* btrace.c (btrace_pt_readmem_callback): Do not return in TRY/CATCH.
++
+ 2016-01-02  Mike Frysinger  <vapier@gentoo.org>
+ 
+ 	* configure.tgt (powerpc*-*-*): Delete test call and
+--- a/gdb/btrace.c
++++ b/gdb/btrace.c
+@@ -842,21 +842,22 @@ btrace_pt_readmem_callback (gdb_byte *buffer, size_t size,
+ 			    const struct pt_asid *asid, uint64_t pc,
+ 			    void *context)
+ {
+-  int errcode;
++  int result, errcode;
+ 
++  result = (int) size;
+   TRY
+     {
+       errcode = target_read_code ((CORE_ADDR) pc, buffer, size);
+       if (errcode != 0)
+-	return -pte_nomap;
++	result = -pte_nomap;
+     }
+   CATCH (error, RETURN_MASK_ERROR)
+     {
+-      return -pte_nomap;
++      result = -pte_nomap;
+     }
+   END_CATCH
+ 
+-  return size;
++  return result;
+ }
+ 
+ /* Translate the vendor from one enum to another.  */
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,9 @@
++2016-01-04  Markus Metzger  <markus.t.metzger@intel.com>
++
++	* gdb.btrace/dlopen.exp: New.
++	* gdb.btrace/dlopen.c: New.
++	* gdb.btrace/dlopen-dso.c: New.
++
+ 2015-12-25  Sandra Loosemore  <sandra@codesourcery.com>
+ 
+ 	* lib/gdb.exp (gdb_test): Update comments to clarify that the
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/dlopen-dso.c
+@@ -0,0 +1,22 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2015-2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++int
++answer (void)
++{
++  return 42;
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/dlopen.c
+@@ -0,0 +1,50 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2015-2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <dlfcn.h>
++#include <assert.h>
++#include <stdlib.h>
++
++static int
++test (void)
++{
++  void *dso;
++  int (*fun) (void);
++  int answer;
++
++  dso = dlopen (DSO_NAME, RTLD_NOW | RTLD_GLOBAL);
++  assert (dso != NULL);
++
++  fun = (int (*) (void)) dlsym (dso, "answer");
++  assert (fun != NULL);
++
++  answer = fun ();
++
++  dlclose (dso);
++
++  return answer;
++}
++
++int
++main (void)
++{
++  int answer;
++
++  answer = test ();
++
++  return answer;
++}
+--- /dev/null
++++ b/gdb/testsuite/gdb.btrace/dlopen.exp
+@@ -0,0 +1,52 @@
++# This testcase is part of GDB, the GNU debugger.
++#
++# Copyright 2015-2016 Free Software Foundation, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if { [skip_btrace_tests] } { return -1 }
++if { [skip_shlib_tests]  } { return -1 }
++
++standard_testfile
++
++set basename_lib dlopen-dso
++set srcfile_lib $srcdir/$subdir/$basename_lib.c
++set binfile_lib [standard_output_file $basename_lib.so]
++
++if { [gdb_compile_shlib $srcfile_lib $binfile_lib \
++	  [list additional_flags=-fPIC]] != "" } {
++    untested "Could not compile $binfile_lib."
++    return -1
++}
++
++if { [prepare_for_testing $testfile.exp $testfile $srcfile \
++	  [list additional_flags=-DDSO_NAME=\"$binfile_lib\" libs=-ldl]] } {
++    return -1
++}
++
++if ![runto_main] {
++    return 0
++}
++
++# Trace the test function
++#
++gdb_test_no_output "record btrace"
++gdb_test "next"
++
++# The memory containing the library call we traced is already gone.
++# Trace decode used to run into a SEGV after corrupting the cleanup chain.
++#
++# The test passes if we don't crash GDB.
++#
++gdb_test "info record"

@@ -27,7 +27,7 @@ Version: 7.10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,7 +245,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -747,7 +747,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch888 -p1
 %patch983 -p1
@@ -1370,6 +1370,9 @@ then
 fi
 
 %changelog
+* Thu Apr 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-31.fc23
+- Backport btrace crash fix (Markus Metzger).
+
 * Sun Dec  6 2015 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.10-30.fc23
 - Rebase to FSF GDB 7.10.1 (7.10 stable branch).
 
