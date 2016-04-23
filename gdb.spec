@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 69%{?dist}
+Release: 70%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -567,6 +567,9 @@ Patch1118: gdb-container-rh-pkg.patch
 # [testsuite] Fix 7.11 regression: gdb.dwarf2/dw2-undefined-ret-addr.exp
 Patch1120: gdb-testsuite-dw2-undefined-ret-addr.patch
 
+# New test for Python "Cannot locate object file for block" (for RH BZ 1325795).
+Patch1123: gdb-rhbz1325795-framefilters-test.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -878,6 +881,7 @@ find -name "*.info*"|xargs rm -f
 %patch1117 -p1
 %patch1118 -p1
 %patch1120 -p1
+%patch1123 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1397,6 +1401,9 @@ then
 fi
 
 %changelog
+* Sat Apr 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-70.fc24
+- New test for Python "Cannot locate object file for block" (for RH BZ 1325795).
+
 * Tue Apr 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-69.fc24
 - Never kill PID on: gdb exec PID (Jan Kratochvil, RH BZ 1219747).
 
