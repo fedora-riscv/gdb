@@ -2386,3 +2386,212 @@ Date:   Fri Apr 8 15:38:53 2016 +0200
 +
    WAIT_FOR_GDB; return 0;  /* gdb break here 2  */
  }
+
+
+
+commit 6b9ef0d488c556339aea7b095ef7a9b6bf6b1af1
+Author: Pedro Alves <palves@redhat.com>
+Date:   Wed Apr 13 14:34:00 2016 +0100
+
+    Fix PR remote/19840: gdb crashes on reverse-stepi
+    
+    Reverse debugging against a remote target that does reverse debugging
+    itself (with the bs/bc packets) always trips on:
+    
+     (gdb) target remote localhost:...
+     (gdb) reverse-stepi
+     ../../gdb/target.c:602: internal-error: default_execution_direction: to_execution_direction must be implemented for reverse async
+    
+    I missed adding a to_execution_direction method to remote.c in commit
+    3223143295b5 (Adds target_execution_direction to make record targets
+    support async mode), GDB 7.4 time.  Later, GDB 7.8 switched to
+    target-async on by default, making the regression user-visible by
+    default too.
+    
+    Fix is simply to add the missing to_execution_direction implementation
+    to target remote.
+    
+    Tested by Andi Kleen against Simics.
+    
+    gdb/ChangeLog:
+    2016-04-13  Pedro Alves  <palves@redhat.com>
+    
+    	PR remote/19840
+    	* remote.c (struct remote_state) <last_resume_exec_dir>: New
+    	field.
+    	(new_remote_state): Default last_resume_exec_dir to EXEC_FORWARD.
+    	(remote_open_1): Reset last_resume_exec_dir to EXEC_FORWARD.
+    	(remote_resume): Store the last execution direction.
+    	(remote_execution_direction): New function.
+    	(init_remote_ops): Install it as to_execution_direction target_ops
+    	method.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,15 @@
++2016-04-13  Pedro Alves  <palves@redhat.com>
++
++	PR remote/19840
++	* remote.c (struct remote_state) <last_resume_exec_dir>: New
++	field.
++	(new_remote_state): Default last_resume_exec_dir to EXEC_FORWARD.
++	(remote_open_1): Reset last_resume_exec_dir to EXEC_FORWARD.
++	(remote_resume): Store the last execution direction.
++	(remote_execution_direction): New function.
++	(init_remote_ops): Install it as to_execution_direction target_ops
++	method.
++
+ 2016-03-31  Yichao Yu  <yyc1992@gmail.com>
+ 
+ 	PR gdb/19858
+--- a/gdb/remote.c
++++ b/gdb/remote.c
+@@ -389,6 +389,9 @@ struct remote_state
+ 
+   int last_sent_step;
+ 
++  /* The execution direction of the last resume we got.  */
++  enum exec_direction_kind last_resume_exec_dir;
++
+   char *finished_object;
+   char *finished_annex;
+   ULONGEST finished_offset;
+@@ -477,6 +480,7 @@ new_remote_state (void)
+   result->buf = (char *) xmalloc (result->buf_size);
+   result->remote_traceframe_number = -1;
+   result->last_sent_signal = GDB_SIGNAL_0;
++  result->last_resume_exec_dir = EXEC_FORWARD;
+   result->fs_pid = -1;
+ 
+   return result;
+@@ -4928,6 +4932,8 @@ remote_open_1 (const char *name, int from_tty,
+   rs->continue_thread = not_sent_ptid;
+   rs->remote_traceframe_number = -1;
+ 
++  rs->last_resume_exec_dir = EXEC_FORWARD;
++
+   /* Probe for ability to use "ThreadInfo" query, as required.  */
+   rs->use_threadinfo_query = 1;
+   rs->use_threadextra_query = 1;
+@@ -5563,6 +5569,8 @@ remote_resume (struct target_ops *ops,
+   rs->last_sent_signal = siggnal;
+   rs->last_sent_step = step;
+ 
++  rs->last_resume_exec_dir = execution_direction;
++
+   /* The vCont packet doesn't need to specify threads via Hc.  */
+   /* No reverse support (yet) for vCont.  */
+   if (execution_direction != EXEC_REVERSE)
+@@ -13018,6 +13026,17 @@ remote_can_do_single_step (struct target_ops *ops)
+     return 0;
+ }
+ 
++/* Implementation of the to_execution_direction method for the remote
++   target.  */
++
++static enum exec_direction_kind
++remote_execution_direction (struct target_ops *self)
++{
++  struct remote_state *rs = get_remote_state ();
++
++  return rs->last_resume_exec_dir;
++}
++
+ static void
+ init_remote_ops (void)
+ {
+@@ -13163,6 +13182,7 @@ Specify the serial device it is connected to\n\
+   remote_ops.to_remove_vfork_catchpoint = remote_remove_vfork_catchpoint;
+   remote_ops.to_insert_exec_catchpoint = remote_insert_exec_catchpoint;
+   remote_ops.to_remove_exec_catchpoint = remote_remove_exec_catchpoint;
++  remote_ops.to_execution_direction = remote_execution_direction;
+ }
+ 
+ /* Set up the extended remote vector by making a copy of the standard
+
+
+
+commit a6ff23076f49c6322d96a76e0098f8019139bc4e
+Author: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date:   Wed Apr 27 21:27:40 2016 +0200
+
+    Workaround gdbserver<7.7 for setfs
+    
+    With current FSF GDB HEAD and old FSF gdbserver I expected I could do:
+    	gdb -ex 'file target:/root/redhat/threadit' -ex 'target remote :1234'
+    (supplying that unsupported qXfer:exec-file:read by "file")
+    But that does not work because:
+    	Sending packet: $vFile:setfs:0#bf...Packet received: OK
+    	Packet vFile:setfs (hostio-setfs) is supported
+    	...
+    	Sending packet: $vFile:setfs:104#24...Packet received: OK
+    	"target:/root/redhat/threadit": could not open as an executable file: Invalid argument
+    
+    GDB documentation says:
+    	The valid responses to Host I/O packets are:
+    	An empty response indicates that this operation is not recognized.
+    
+    This "empty response" vs. "OK" was a bug in gdbserver < 7.7.  It was fixed by:
+    	commit e7f0d979dd5cc4f8b658df892e93db69d6d660b7
+    	Author: Yao Qi <yao@codesourcery.com>
+    	Date:   Tue Dec 10 21:59:20 2013 +0800
+    	    Fix a bug in matching notifications.
+    	Message-ID: <1386684626-11415-1-git-send-email-yao@codesourcery.com>
+    	https://sourceware.org/ml/gdb-patches/2013-12/msg00373.html
+    	2013-12-10  Yao Qi  <yao@codesourcery.com>
+    		* notif.c (handle_notif_ack): Return 0 if no notification
+    		matches.
+    
+    with unpatched old FSF gdbserver and patched FSF GDB HEAD:
+    	gdb -ex 'file target:/root/redhat/threadit' -ex 'target remote :1234'
+    	Sending packet: $vFile:setfs:0#bf...Packet received: OK
+    	Packet vFile:setfs (hostio-setfs) is NOT supported
+    	...
+    	(gdb) info sharedlibrary
+    	From                To                  Syms Read   Shared Object Library
+    	0x00007ffff7ddbae0  0x00007ffff7df627a  Yes (*)     target:/lib64/ld-linux-x86-64.so.2
+    	0x00007ffff7bc48a0  0x00007ffff7bcf514  Yes (*)     target:/lib64/libpthread.so.0
+    
+    gdb/ChangeLog
+    2016-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+    	* remote.c (remote_start_remote): Detect PACKET_vFile_setfs.support.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,7 @@
++2016-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	* remote.c (remote_start_remote): Detect PACKET_vFile_setfs.support.
++
+ 2016-04-15  Pedro Alves  <palves@redhat.com>
+ 
+ 	* nat/linux-ptrace.h [__mips__] (GDB_ARCH_IS_TRAP_BRKPT): Also
+--- a/gdb/remote.c
++++ b/gdb/remote.c
+@@ -4021,6 +4021,25 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
+   if (packet_support (PACKET_QAllow) != PACKET_DISABLE)
+     remote_set_permissions (target);
+ 
++  /* gdbserver < 7.7 (before its fix from 2013-12-11) did reply to any
++     unknown 'v' packet with string "OK".  "OK" gets interpreted by GDB
++     as a reply to known packet.  For packet "vFile:setfs:" it is an
++     invalid reply and GDB would return error in
++     remote_hostio_set_filesystem, making remote files access impossible.
++     Disable "vFile:setfs:" in such case.  Do not disable other 'v' packets as
++     other "vFile" packets get correctly detected even on gdbserver < 7.7.  */
++  {
++    const char v_mustreplyempty[] = "vMustReplyEmpty";
++
++    putpkt (v_mustreplyempty);
++    getpkt (&rs->buf, &rs->buf_size, 0);
++    if (strcmp (rs->buf, "OK") == 0)
++      remote_protocol_packets[PACKET_vFile_setfs].support = PACKET_DISABLE;
++    else if (strcmp (rs->buf, "") != 0)
++      error (_("Remote replied unexpectedly to '%s': %s"), v_mustreplyempty,
++	     rs->buf);
++  }
++
+   /* Next, we possibly activate noack mode.
+ 
+      If the QStartNoAckMode packet configuration is set to AUTO,
