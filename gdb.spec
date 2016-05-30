@@ -27,7 +27,7 @@ Version: 7.11
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 73%{?dist}
+Release: 74%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -570,6 +570,10 @@ Patch1120: gdb-testsuite-dw2-undefined-ret-addr.patch
 # New test for Python "Cannot locate object file for block" (for RH BZ 1325795).
 Patch1123: gdb-rhbz1325795-framefilters-test.patch
 
+# Import bare DW_TAG_lexical_block (RH BZ 1325396).
+Patch1128: gdb-bare-DW_TAG_lexical_block-1of2.patch
+Patch1129: gdb-bare-DW_TAG_lexical_block-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -882,6 +886,8 @@ find -name "*.info*"|xargs rm -f
 %patch1118 -p1
 %patch1120 -p1
 %patch1123 -p1
+%patch1128 -p1
+%patch1129 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1401,6 +1407,9 @@ then
 fi
 
 %changelog
+* Mon May 30 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-74.fc24
+- Import bare DW_TAG_lexical_block (RH BZ 1325396).
+
 * Tue May  3 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-73.fc24
 - Fix compilation error by upstream symfile.c fix.
 
