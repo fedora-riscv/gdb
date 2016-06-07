@@ -23,11 +23,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.11
+Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 74%{?dist}
+Release: 75%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -241,7 +241,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -558,9 +558,6 @@ Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 #=fedoratest
 Patch1113: gdb-rhbz1261564-aarch64-hw-watchpoint-test.patch 
 
-# Fix non-stop gdb -p <container>: internal error (pedro Alves, RH BZ 1318049).
-Patch1117: gdb-rhbz1318049-gdb-p-container-internal-error.patch
-
 # Add messages suggesting more recent RHEL gdbserver (RH BZ 1321114).
 Patch1118: gdb-container-rh-pkg.patch
 
@@ -763,7 +760,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1059 -p1
@@ -882,7 +879,6 @@ find -name "*.info*"|xargs rm -f
 %patch337 -p1
 %patch331 -p1
 %patch1113 -p1
-%patch1117 -p1
 %patch1118 -p1
 %patch1120 -p1
 %patch1123 -p1
@@ -1407,6 +1403,9 @@ then
 fi
 
 %changelog
+* Mon Jun  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-75.fc24
+- Rebase to released FSF GDB 7.11.1.
+
 * Mon May 30 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11-74.fc24
 - Import bare DW_TAG_lexical_block (RH BZ 1325396).
 
