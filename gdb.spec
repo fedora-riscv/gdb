@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 75%{?dist}
+Release: 76%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -538,6 +538,9 @@ Patch927: gdb-python-gil.patch
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
 
+# Test 'info type-printers' Python error (RH BZ 1350436).
+Patch992: gdb-rhbz1350436-type-printers-error.patch
+
 # Never kill PID on: gdb exec PID (Jan Kratochvil, RH BZ 1219747).
 Patch1053: gdb-bz1219747-attach-kills.patch
 
@@ -870,6 +873,7 @@ find -name "*.info*"|xargs rm -f
 %patch925 -p1
 %patch927 -p1
 %patch978 -p1
+%patch992 -p1
 %patch1053 -p1
 %patch1056 -p1
 %patch1073 -p1
@@ -1403,6 +1407,9 @@ then
 fi
 
 %changelog
+* Mon Jun 27 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-76.fc24
+- Test 'info type-printers' Python error (RH BZ 1350436).
+
 * Mon Jun  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-75.fc24
 - Rebase to released FSF GDB 7.11.1.
 
