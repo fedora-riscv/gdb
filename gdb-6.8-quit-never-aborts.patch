@@ -5,38 +5,42 @@ Some of the threads may not be properly PTRACE_DETACHed which hurts if they
 should have been detached with SIGSTOP (as they are accidentally left running
 on the debugger termination).
 
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/defs.h gdb-7.10.50.20160106/gdb/defs.h
---- gdb-7.10.50.20160106-orig/gdb/defs.h	2016-01-09 15:06:57.658172875 +0100
-+++ gdb-7.10.50.20160106/gdb/defs.h	2016-01-09 15:07:12.431264378 +0100
-@@ -145,6 +145,9 @@ extern void set_quit_flag (void);
+Index: gdb-7.11.50.20160630/gdb/defs.h
+===================================================================
+--- gdb-7.11.50.20160630.orig/gdb/defs.h	2016-07-03 16:40:43.423078926 +0200
++++ gdb-7.11.50.20160630/gdb/defs.h	2016-07-03 16:41:08.568271741 +0200
+@@ -175,6 +175,10 @@
  /* Flag that function quit should call quit_force.  */
  extern volatile int sync_quit_force_run;
  
 +#ifdef NEED_DETACH_SIGSTOP
 +extern int quit_flag_cleanup;
 +#endif
- extern int immediate_quit;
- 
++
  extern void quit (void);
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/extension.c gdb-7.10.50.20160106/gdb/extension.c
---- gdb-7.10.50.20160106-orig/gdb/extension.c	2016-01-06 02:48:37.000000000 +0100
-+++ gdb-7.10.50.20160106/gdb/extension.c	2016-01-09 15:07:12.434264396 +0100
-@@ -833,6 +833,11 @@ check_quit_flag (void)
+ 
+ /* Helper for the QUIT macro.  */
+Index: gdb-7.11.50.20160630/gdb/extension.c
+===================================================================
+--- gdb-7.11.50.20160630.orig/gdb/extension.c	2016-07-03 16:40:41.723065890 +0200
++++ gdb-7.11.50.20160630/gdb/extension.c	2016-07-03 16:41:44.896550309 +0200
+@@ -830,6 +830,11 @@
    int i, result = 0;
    const struct extension_language_defn *extlang;
  
 +#ifdef NEED_DETACH_SIGSTOP
 +  if (quit_flag_cleanup)
 +    return 0;
-+
 +#endif
++
    ALL_ENABLED_EXTENSION_LANGUAGES (i, extlang)
      {
        if (extlang->ops->check_quit_flag != NULL)
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/top.c gdb-7.10.50.20160106/gdb/top.c
---- gdb-7.10.50.20160106-orig/gdb/top.c	2016-01-06 02:48:38.000000000 +0100
-+++ gdb-7.10.50.20160106/gdb/top.c	2016-01-09 15:07:12.432264384 +0100
-@@ -1557,7 +1557,13 @@ quit_force (char *args, int from_tty)
+Index: gdb-7.11.50.20160630/gdb/top.c
+===================================================================
+--- gdb-7.11.50.20160630.orig/gdb/top.c	2016-07-03 16:40:41.724065898 +0200
++++ gdb-7.11.50.20160630/gdb/top.c	2016-07-03 16:40:43.424078934 +0200
+@@ -1617,7 +1617,13 @@
    qt.args = args;
    qt.from_tty = from_tty;
  
@@ -50,20 +54,21 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/top.c gdb-7.10.50.20160106/gdb/top.
  
    /* Get out of tfind mode, and kill or detach all inferiors.  */
    TRY
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/utils.c gdb-7.10.50.20160106/gdb/utils.c
---- gdb-7.10.50.20160106-orig/gdb/utils.c	2016-01-09 15:06:57.654172850 +0100
-+++ gdb-7.10.50.20160106/gdb/utils.c	2016-01-09 15:07:12.433264390 +0100
-@@ -122,6 +122,13 @@ int job_control;
+Index: gdb-7.11.50.20160630/gdb/utils.c
+===================================================================
+--- gdb-7.11.50.20160630.orig/gdb/utils.c	2016-07-03 16:40:41.725065905 +0200
++++ gdb-7.11.50.20160630/gdb/utils.c	2016-07-03 16:41:38.961504799 +0200
+@@ -109,6 +109,13 @@
  
- int immediate_quit;
+ int job_control;
  
 +#ifdef NEED_DETACH_SIGSTOP
 +/* Nonzero means we are already processing the quitting cleanups and we should
 +   no longer get aborted.  */
 +
 +int quit_flag_cleanup;
-+
 +#endif
++
  /* Nonzero means that strings with character values >0x7F should be printed
     as octal escapes.  Zero means just print the value (e.g. it's an
     international character, and the terminal or window can cope.)  */

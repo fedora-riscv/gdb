@@ -1,7 +1,8 @@
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/infrun.c gdb-7.10.50.20160106/gdb/infrun.c
---- gdb-7.10.50.20160106-orig/gdb/infrun.c	2016-01-09 15:05:06.127481758 +0100
-+++ gdb-7.10.50.20160106/gdb/infrun.c	2016-01-09 15:05:24.054593048 +0100
-@@ -626,6 +626,13 @@ holding the child stopped.  Try \"set de
+Index: gdb-7.11.50.20160716/gdb/infrun.c
+===================================================================
+--- gdb-7.11.50.20160716.orig/gdb/infrun.c	2016-07-16 14:37:09.317178150 +0200
++++ gdb-7.11.50.20160716/gdb/infrun.c	2016-07-16 14:37:10.636188765 +0200
+@@ -620,6 +620,13 @@
  				target_pid_to_str (process_ptid));
  	    }
  
@@ -15,10 +16,11 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/infrun.c gdb-7.10.50.20160106/gdb/i
  	  target_detach (NULL, 0);
  	}
  
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gdb/linux-nat.c
---- gdb-7.10.50.20160106-orig/gdb/linux-nat.c	2016-01-09 15:05:06.225482366 +0100
-+++ gdb-7.10.50.20160106/gdb/linux-nat.c	2016-01-09 15:05:24.050593023 +0100
-@@ -194,6 +194,11 @@ enum tribool have_ptrace_getregset = TRI
+Index: gdb-7.11.50.20160716/gdb/linux-nat.c
+===================================================================
+--- gdb-7.11.50.20160716.orig/gdb/linux-nat.c	2016-07-16 14:37:09.320178174 +0200
++++ gdb-7.11.50.20160716/gdb/linux-nat.c	2016-07-16 14:38:09.574663094 +0200
+@@ -194,6 +194,11 @@
  static struct target_ops *linux_ops;
  static struct target_ops linux_ops_saved;
  
@@ -30,7 +32,7 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gd
  /* The method to call, if any, when a new thread is attached.  */
  static void (*linux_nat_new_thread) (struct lwp_info *);
  
-@@ -961,6 +966,9 @@ linux_nat_post_attach_wait (ptid_t ptid,
+@@ -1047,6 +1052,9 @@
        if (debug_linux_nat)
  	fprintf_unfiltered (gdb_stdlog,
  			    "LNPAW: Attaching to a stopped process\n");
@@ -40,8 +42,8 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gd
  
        /* The process is definitely stopped.  It is in a job control
  	 stop, unless the kernel predates the TASK_STOPPED /
-@@ -1303,6 +1311,25 @@ get_pending_status (struct lwp_info *lp,
- 			    gdb_signal_to_string (signo));
+@@ -1404,6 +1412,25 @@
+       return gdb_signal_to_host (signo);
      }
  
 +#ifdef NEED_DETACH_SIGSTOP
@@ -66,18 +68,18 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gd
    return 0;
  }
  
-@@ -1416,6 +1443,10 @@ linux_nat_detach (struct target_ops *ops
-     }
-   else
-     linux_ops->to_detach (ops, args, from_tty);
-+#ifdef NEED_DETACH_SIGSTOP
-+
-+  pid_was_stopped = 0;
-+#endif
- }
+@@ -1562,6 +1589,10 @@
+       detach_one_lwp (main_lwp, &signo);
  
- /* Resume execution of the inferior process.  If STEP is nonzero,
-@@ -1674,6 +1705,16 @@ linux_nat_resume (struct target_ops *ops
+       inf_ptrace_detach_success (ops);
++
++#ifdef NEED_DETACH_SIGSTOP
++      pid_was_stopped = 0;
++#endif
+     }
+   delete_lwp (main_lwp->ptid);
+ }
+@@ -1823,6 +1854,16 @@
        return;
      }
  
@@ -94,7 +96,7 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gd
    if (resume_many)
      iterate_over_lwps (ptid, linux_nat_resume_callback, lp);
  
-@@ -3618,6 +3659,10 @@ linux_nat_mourn_inferior (struct target_
+@@ -3819,6 +3860,10 @@
  
    /* Let the arch-specific native code know this process is gone.  */
    linux_nat_forget_process (pid);
@@ -105,10 +107,11 @@ diff -dup -rup gdb-7.10.50.20160106-orig/gdb/linux-nat.c gdb-7.10.50.20160106/gd
  }
  
  /* Convert a native/host siginfo object, into/from the siginfo in the
-diff -dup -rup gdb-7.10.50.20160106-orig/gdb/testsuite/gdb.threads/attach-stopped.exp gdb-7.10.50.20160106/gdb/testsuite/gdb.threads/attach-stopped.exp
---- gdb-7.10.50.20160106-orig/gdb/testsuite/gdb.threads/attach-stopped.exp	2016-01-06 02:48:38.000000000 +0100
-+++ gdb-7.10.50.20160106/gdb/testsuite/gdb.threads/attach-stopped.exp	2016-01-09 15:05:48.917747101 +0100
-@@ -56,7 +56,65 @@ proc corefunc { threadtype } {
+Index: gdb-7.11.50.20160716/gdb/testsuite/gdb.threads/attach-stopped.exp
+===================================================================
+--- gdb-7.11.50.20160716.orig/gdb/testsuite/gdb.threads/attach-stopped.exp	2016-07-16 14:37:09.321178182 +0200
++++ gdb-7.11.50.20160716/gdb/testsuite/gdb.threads/attach-stopped.exp	2016-07-16 14:37:10.640188797 +0200
+@@ -56,7 +56,65 @@
      gdb_reinitialize_dir $srcdir/$subdir
      gdb_load ${binfile}
  

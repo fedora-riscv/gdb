@@ -1,0 +1,102 @@
+From 8665344c14b9ae8b2e0c37ba06d6881a546d1a37 Mon Sep 17 00:00:00 2001
+From: Bernhard Heckel <bernhard.heckel@intel.com>
+Date: Tue, 12 Jul 2016 08:19:34 +0200
+Subject: [PATCH 6/7] Fortran: Testsuite, add cyclic pointers.
+
+2016-05-25  Bernhard Heckel  <bernhard.heckel@intel.com>
+
+gdb/testsuite/Changelog:
+	* pointers.f90: Add cylic pointers.
+	* pointers.exp: Add print of cyclic pointers.
+
+Change-Id: Ic3b6187c5980fd6c37e2e94787f8321e5b7f2d75
+---
+ gdb/testsuite/gdb.fortran/pointers.exp | 20 ++++++++++++++++++++
+ gdb/testsuite/gdb.fortran/pointers.f90 | 12 ++++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/gdb/testsuite/gdb.fortran/pointers.exp b/gdb/testsuite/gdb.fortran/pointers.exp
+index c19d7e0..67cf999 100644
+--- a/gdb/testsuite/gdb.fortran/pointers.exp
++++ b/gdb/testsuite/gdb.fortran/pointers.exp
+@@ -57,6 +57,24 @@ gdb_test_multiple "print intap" $test {
+ gdb_test "print realp" "= \\(PTR TO -> \\( $real \\)\\) 0x0" "print realp, not associated"
+ gdb_test "print *realp" "Cannot access memory at address 0x0" "print *realp, not associated"
+ gdb_test "print \$my_var = intp" "= \\(PTR TO -> \\( $int \\)\\) 0x0"
++set test "print cyclicp1, not associated"
++gdb_test_multiple "print cyclicp1" $test {
++  -re "= \\( i = -?\\d+, p = 0x0 \\)\r\n$gdb_prompt $" {
++    pass $test
++  }
++  -re "= \\( i = -?\\d+, p = <not associated> \\)\r\n$gdb_prompt $" {
++    pass $test
++  }
++}
++set test "print cyclicp1%p, not associated"
++gdb_test_multiple "print cyclicp1%p" $test {
++  -re "= \\(PTR TO -> \\( Type typewithpointer \\)\\) 0x0\r\n$gdb_prompt $" {
++    pass $test
++  }
++  -re "= \\(PTR TO -> \\( Type typewithpointer \\)\\) <not associated>\r\n$gdb_prompt $" {
++    pass $test
++  }
++}
+ 
+ 
+ gdb_breakpoint [gdb_get_line_number "Before value assignment"]
+@@ -118,6 +136,8 @@ gdb_test_multiple "print *(arrayOfPtr(3)%p)" $test_name {
+     pass $test_name
+   }
+ }
++gdb_test "print cyclicp1" "= \\( i = 1, p = $hex\( <.*>\)? \\)"
++gdb_test "print cyclicp1%p" "= \\(PTR TO -> \\( Type typewithpointer \\)\\) $hex\( <.*>\)?"
+ gdb_test "print *((integer*) &inta + 2)" "= 3" "print temporary pointer, array"
+ gdb_test "print *((integer*) &intvla + 3)" "= 4" "print temporary pointer, allocated vla"
+ gdb_test "print \$pc" "= \\(PTR TO -> \\( void \\(\\)\\(\\)\\)\\) $hex <pointers\\+\\d+>" "Print program counter"
+diff --git a/gdb/testsuite/gdb.fortran/pointers.f90 b/gdb/testsuite/gdb.fortran/pointers.f90
+index 000193c..6240c87 100644
+--- a/gdb/testsuite/gdb.fortran/pointers.f90
++++ b/gdb/testsuite/gdb.fortran/pointers.f90
+@@ -20,6 +20,11 @@ program pointers
+     integer, allocatable :: ivla2 (:, :)
+   end type two
+ 
++  type :: typeWithPointer
++    integer i
++    type(typeWithPointer), pointer:: p
++  end type typeWithPointer
++
+   type :: twoPtr
+     type (two), pointer :: p
+   end type twoPtr
+@@ -34,6 +39,7 @@ program pointers
+   real, target    :: realv
+   type(two), target  :: twov
+   type(twoPtr) :: arrayOfPtr (3)
++  type(typeWithPointer), target:: cyclicp1,cyclicp2
+ 
+   logical, pointer :: logp
+   complex, pointer :: comp
+@@ -57,6 +63,8 @@ program pointers
+   nullify (arrayOfPtr(1)%p)
+   nullify (arrayOfPtr(2)%p)
+   nullify (arrayOfPtr(3)%p)
++  nullify (cyclicp1%p)
++  nullify (cyclicp2%p)
+ 
+   logp => logv    ! Before pointer assignment
+   comp => comv
+@@ -68,6 +76,10 @@ program pointers
+   realp => realv
+   twop => twov
+   arrayOfPtr(2)%p => twov
++  cyclicp1%i = 1
++  cyclicp1%p => cyclicp2
++  cyclicp2%i = 2
++  cyclicp2%p => cyclicp1
+ 
+   logv = associated(logp)     ! Before value assignment
+   comv = cmplx(1,2)
+-- 
+2.7.4
+

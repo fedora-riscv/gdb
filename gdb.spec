@@ -19,15 +19,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20160210
+%global snapsrc    20160716
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.11.1
+Version: 7.11.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 76%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -519,12 +519,16 @@ Patch1060: gdb-fortran-stride-intel-3of6.patch
 Patch1061: gdb-fortran-stride-intel-4of6.patch
 Patch1062: gdb-fortran-stride-intel-5of6.patch
 Patch1063: gdb-fortran-stride-intel-6of6.patch
-Patch888: gdb-vla-intel.patch
-Patch983: gdb-vla-intel-logical-not.patch
+Patch1132: gdb-vla-intel-1of7.patch
+Patch1133: gdb-vla-intel-2of7.patch
+Patch1134: gdb-vla-intel-3of7.patch
+Patch1135: gdb-vla-intel-4of7.patch
+Patch1136: gdb-vla-intel-5of7.patch
+Patch1137: gdb-vla-intel-6of7.patch
+Patch1138: gdb-vla-intel-7of7.patch
 Patch889: gdb-vla-intel-stringbt-fix.patch
-Patch912: gdb-vla-intel-04of23-fix.patch
 Patch887: gdb-archer-vla-tests.patch
-Patch1069: gdb-fortran-stride-intel-6of6-nokfail.patch
+Patch888: gdb-vla-intel-tests.patch
 
 # Continue backtrace even if a frame filter throws an exception (Phil Muldoon).
 Patch918: gdb-btrobust.patch
@@ -570,9 +574,11 @@ Patch1120: gdb-testsuite-dw2-undefined-ret-addr.patch
 # New test for Python "Cannot locate object file for block" (for RH BZ 1325795).
 Patch1123: gdb-rhbz1325795-framefilters-test.patch
 
-# Import bare DW_TAG_lexical_block (RH BZ 1325396).
-Patch1128: gdb-bare-DW_TAG_lexical_block-1of2.patch
-Patch1129: gdb-bare-DW_TAG_lexical_block-2of2.patch
+# [testsuite] Fix gdb.gdb/selftest.exp for C++-O2-g-built GDB.
+Patch1139: gdb-testsuite-selftest-cxx.patch
+
+# [testsuite] Skip py-unwind.exp on x86_64 -m32.
+Patch1140: gdb-testsuite-py-unwind-m32.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -771,10 +777,14 @@ find -name "*.info*"|xargs rm -f
 %patch1061 -p1
 %patch1062 -p1
 %patch1063 -p1
-%patch888 -p1
-%patch983 -p1
+%patch1132 -p1
+%patch1133 -p1
+%patch1134 -p1
+%patch1135 -p1
+%patch1136 -p1
+%patch1137 -p1
+%patch1138 -p1
 %patch889 -p1
-%patch912 -p1
 %patch1 -p1
 
 %patch105 -p1
@@ -868,7 +878,7 @@ find -name "*.info*"|xargs rm -f
 %patch852 -p1
 %patch863 -p1
 %patch887 -p1
-%patch1069 -p1
+%patch888 -p1
 %patch918 -p1
 %patch925 -p1
 %patch927 -p1
@@ -886,8 +896,8 @@ find -name "*.info*"|xargs rm -f
 %patch1118 -p1
 %patch1120 -p1
 %patch1123 -p1
-%patch1128 -p1
-%patch1129 -p1
+%patch1139 -p1
+%patch1140 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -965,6 +975,8 @@ CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
 CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 %endif
 
+export CXXFLAGS="$CFLAGS"
+
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
 	--prefix=%{_prefix}					\
@@ -975,6 +987,7 @@ CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused		\
+	--enable-build-with-cxx					\
 %ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
 %else
@@ -1407,6 +1420,9 @@ then
 fi
 
 %changelog
+* Sun Jul 17 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160716-1.fc25
+- Rebase to FSF GDB 7.11.50.20160716 (pre-7.12 trunk snapshot).
+
 * Mon Jun 27 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-76.fc24
 - Test 'info type-printers' Python error (RH BZ 1350436).
 

@@ -1,7 +1,10 @@
-http://sourceware.org/ml/gdb-patches/2016-02/msg00842.html
-Subject: [PATCH v2 4/6] fortran: enable parsing of stride parameter for subranges
+RE: [ping] [PATCH v2 0/6] fortran: multi-dimensional subarrays with strides
+https://sourceware.org/ml/gdb-patches/2016-07/msg00009.html
 
+From 338e4c860ad205896b4a95c79f54470c79eeb348 Mon Sep 17 00:00:00 2001
 From: Christoph Weinmann <christoph.t.weinmann@intel.com>
+Date: Wed, 1 Jun 2016 15:11:24 +0200
+Subject: [PATCH 4/6] fortran: enable parsing of stride parameter for subranges
 
 Allow the user to provide a stride parameter for Fortran
 subarrays.  The stride parameter can be any integer except
@@ -11,10 +14,10 @@ subarrays.  The stride parameter can be any integer except
 
 	* eval.c (value_f90_subarray): Add expression evaluation
 	for a stride parameter in a Fortran range expression.
+	* expression.h (range_type): Add field to enum to show when
+	a stride value was provided by the user.
 	* f-exp.y: Add yacc rules for writing info on the elt stack
 	when the user provided a stride argument.
-	* f-lang.h (F90_RANGE): Add field to enum to show when a
-	stride was provided by the user.
 	* parse.c (operator_length_standard): Check if a stride
 	value was provided, and increment argument counter
 	accordingly.
@@ -22,26 +25,27 @@ subarrays.  The stride parameter can be any integer except
 
 Signed-off-by: Christoph Weinmann <christoph.t.weinmann@intel.com>
 ---
- gdb/eval.c   | 10 +++++++++-
- gdb/f-exp.y  | 33 +++++++++++++++++++++++++++++++--
- gdb/f-lang.h |  5 +++--
- gdb/parse.c  |  3 +++
- 4 files changed, 46 insertions(+), 5 deletions(-)
+ gdb/eval.c       | 11 ++++++++++-
+ gdb/expression.h |  7 +++++--
+ gdb/f-exp.y      | 31 ++++++++++++++++++++++++++++++-
+ gdb/parse.c      |  3 +++
+ gdb/valops.c     |  4 ++--
+ 5 files changed, 50 insertions(+), 6 deletions(-)
 
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 9b8b051..308ada3 100644
+index 44e8600..b5aaf1c 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
-@@ -438,7 +438,7 @@ value_f90_subarray (struct value *array, struct expression *exp,
-       struct subscript_range
-       {
-         enum f90_range_type f90_range_type;
--        LONGEST low, high;
-+        LONGEST low, high, stride;
-       }
-       range;
-       LONGEST number;
-@@ -488,6 +488,14 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -419,7 +419,7 @@ value_f90_subarray (struct value *array, struct expression *exp,
+   typedef struct subscript_range
+   {
+     enum range_type f90_range_type;
+-    LONGEST low, high;
++    LONGEST low, high, stride;
+   } subscript_range;
+ 
+   typedef enum subscript_kind
+@@ -490,6 +490,15 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	      == SUBARRAY_HIGH_BOUND)
  	    range->high = value_as_long (evaluate_subexp (NULL_TYPE, exp,
  							  pos, noside));
@@ -49,82 +53,81 @@ index 9b8b051..308ada3 100644
 +	  /* Assign the user's stride value if provided.  */
 +	  if ((range->f90_range_type & SUBARRAY_STRIDE) == SUBARRAY_STRIDE)
 +	    range->stride = value_as_long (evaluate_subexp (NULL_TYPE, exp,
-+							    pos, noside));
++							     pos, noside));
++
 +	  /* Assign the default stride value '1'.  */
 +	  else
 +	    range->stride = 1;
  	}
        /* User input is an index.  E.g.: "p arry(5)".  */
        else
-diff --git a/gdb/f-exp.y b/gdb/f-exp.y
-index b1206de..5151fee 100644
---- a/gdb/f-exp.y
-+++ b/gdb/f-exp.y
-@@ -316,8 +316,8 @@ arglist	:	arglist ',' exp   %prec ABOVE_COMMA
+diff --git a/gdb/expression.h b/gdb/expression.h
+index 5a6b720..34ca54b 100644
+--- a/gdb/expression.h
++++ b/gdb/expression.h
+@@ -153,13 +153,16 @@ extern void dump_raw_expression (struct expression *,
+ extern void dump_prefix_expression (struct expression *, struct ui_file *);
  
- subrange:	exp ':' exp	%prec ABOVE_COMMA
- 			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
--			  write_exp_elt_longcst (pstate,
--						 SUBARRAY_LOW_BOUND | SUBARRAY_HIGH_BOUND);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND
-+						 | SUBARRAY_HIGH_BOUND);
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
+ /* In an OP_RANGE expression, either bound can be provided by the user, or not.
+-   This enumeration type is to identify this.  */
++   In addition to this, the user can also specify a stride value to indicated
++   only certain elements of the array.  This enumeration type is to identify
++   this.  */
  
-@@ -339,6 +339,35 @@ subrange:	':'	%prec ABOVE_COMMA
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
- 
-+/* Each subrange type can have a stride argument.  */
-+subrange:	exp ':' exp ':' exp %prec ABOVE_COMMA
-+			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND
-+						 | SUBARRAY_HIGH_BOUND
-+						 | SUBARRAY_STRIDE);
-+			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
-+	;
-+
-+subrange:	exp ':' ':' exp %prec ABOVE_COMMA
-+			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND
-+						 | SUBARRAY_STRIDE);
-+			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
-+	;
-+
-+subrange:	':' exp ':' exp %prec ABOVE_COMMA
-+			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_HIGH_BOUND
-+						 | SUBARRAY_STRIDE);
-+			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
-+	;
-+
-+subrange:	':' ':' exp %prec ABOVE_COMMA
-+			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_STRIDE);
-+			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
-+	;
-+
- complexnum:     exp ',' exp 
-                 	{ }                          
-         ;
-diff --git a/gdb/f-lang.h b/gdb/f-lang.h
-index 4d56bf7..0ad57af 100644
---- a/gdb/f-lang.h
-+++ b/gdb/f-lang.h
-@@ -44,8 +44,9 @@ extern void f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
-    
- enum f90_range_type
+ enum range_type
    {
--    SUBARRAY_LOW_BOUND = 0x1,		/* "(low:)"  */
+     SUBARRAY_NONE_BOUND = 0x0,		/* "( : )"  */
+     SUBARRAY_LOW_BOUND = 0x1,		/* "(low:)"  */
 -    SUBARRAY_HIGH_BOUND = 0x2		/* "(:high)"  */
-+    SUBARRAY_LOW_BOUND = 0x1,		/* "(low:)" or "(low::)" */
-+    SUBARRAY_HIGH_BOUND = 0x2,		/* "(:high)" or "(:high:)"  */
++    SUBARRAY_HIGH_BOUND = 0x2,		/* "(:high)"  */
 +    SUBARRAY_STRIDE = 0x4		/* "(::stride)"  */
    };
  
- /* A common block.  */
+ #endif /* !defined (EXPRESSION_H) */
+diff --git a/gdb/f-exp.y b/gdb/f-exp.y
+index e2c54b6..71f1823 100644
+--- a/gdb/f-exp.y
++++ b/gdb/f-exp.y
+@@ -280,7 +280,36 @@ subrange:	':' exp	%prec ABOVE_COMMA
+ 
+ subrange:	':'	%prec ABOVE_COMMA
+ 			{ write_exp_elt_opcode (pstate, OP_RANGE);
+-			  write_exp_elt_longcst (pstate, 0);
++			  write_exp_elt_longcst (pstate, SUBARRAY_NONE_BOUND);
++			  write_exp_elt_opcode (pstate, OP_RANGE); }
++	;
++
++/* Each subrange type can have a stride argument.  */
++subrange:	exp ':' exp ':' exp %prec ABOVE_COMMA
++			{ write_exp_elt_opcode (pstate, OP_RANGE);
++			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND
++						 | SUBARRAY_HIGH_BOUND
++						 | SUBARRAY_STRIDE);
++			  write_exp_elt_opcode (pstate, OP_RANGE); }
++	;
++
++subrange:	exp ':' ':' exp %prec ABOVE_COMMA
++			{ write_exp_elt_opcode (pstate, OP_RANGE);
++			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND
++						 | SUBARRAY_STRIDE);
++			  write_exp_elt_opcode (pstate, OP_RANGE); }
++	;
++
++subrange:	':' exp ':' exp %prec ABOVE_COMMA
++			{ write_exp_elt_opcode (pstate, OP_RANGE);
++			  write_exp_elt_longcst (pstate, SUBARRAY_HIGH_BOUND
++						 | SUBARRAY_STRIDE);
++			  write_exp_elt_opcode (pstate, OP_RANGE); }
++	;
++
++subrange:	':' ':' exp %prec ABOVE_COMMA
++			{ write_exp_elt_opcode (pstate, OP_RANGE);
++			  write_exp_elt_longcst (pstate, SUBARRAY_STRIDE);
+ 			  write_exp_elt_opcode (pstate, OP_RANGE); }
+ 	;
+ 
 diff --git a/gdb/parse.c b/gdb/parse.c
-index d500279..07248c3 100644
+index 6d54a77..992af87 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
 @@ -1018,6 +1018,9 @@ operator_length_standard (const struct expression *expr, int endpos,
@@ -137,6 +140,28 @@ index d500279..07248c3 100644
        break;
  
      default:
+diff --git a/gdb/valops.c b/gdb/valops.c
+index 817a4cf..fbc7dcb 100644
+--- a/gdb/valops.c
++++ b/gdb/valops.c
+@@ -3834,7 +3834,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+   if (call_count == 1)
+     {
+       range_type = TYPE_INDEX_TYPE (array_type);
+-      slice_range_size = elem_count;
++      slice_range_size = ary_low_bound + elem_count - 1;
+ 
+       /* Check if the array bounds are valid.  */
+       if (get_discrete_bounds (range_type, &ary_low_bound, &ary_high_bound) < 0)
+@@ -3846,7 +3846,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+   else
+     {
+       range_type = TYPE_INDEX_TYPE (TYPE_TARGET_TYPE (array_type));
+-      slice_range_size = (ary_low_bound + row_count - 1) * (elem_count);
++      slice_range_size = ary_low_bound + (row_count * elem_count) - 1;
+       ary_low_bound = TYPE_LOW_BOUND (range_type);
+     }
+ 
 -- 
-2.5.0
+2.5.5
 

@@ -1,7 +1,10 @@
-http://sourceware.org/ml/gdb-patches/2016-02/msg00845.html
-Subject: [PATCH v2 3/6] fortran: change subrange enum to bit field
+RE: [ping] [PATCH v2 0/6] fortran: multi-dimensional subarrays with strides
+https://sourceware.org/ml/gdb-patches/2016-07/msg00009.html
 
+From 058ed9e55db72244fe1c5346a11fa67eff61d318 Mon Sep 17 00:00:00 2001
 From: Christoph Weinmann <christoph.t.weinmann@intel.com>
+Date: Mon, 23 Nov 2015 10:31:44 +0100
+Subject: [PATCH 3/6] fortran: change subrange enum to bit field
 
 Change Fortran subrange enum for subrange expressions to
 represent a bitfield for easier manipulation.  Consequently
@@ -12,31 +15,41 @@ behaviour of GDB is unchanged.
 
 	* eval.c (value_f90_subarray): Change evaluation of the
 	subarray boundaries.  Set boundaries to be either user
-	provided (bit in f90_range_type was set) or take the
-	default value if the boundary was not provided by the user.
+	provided (bit in range_type was set), or take the default
+	value if the boundary was not provided by the user.
+	* expprint.c (print_subexp_standard): Alter boundary com-
+	putations to use updated range_type enum.
+	* expprint.h (dump_subexp_body_standard): Dito.
+	* expression.h (range_type): Change the enum to use bit
+	values for each boundary, if set by the user.
 	* f-exp.y (subrange): Change rules for subrange expressions
 	to write the relevant bit sequence onto the elt stack.
-	* f-lang.h (f90_range_type): Change the enum to use bit
-	values for each boundary, if set by the user.
-	* parse.c (operator_length_standard): In case of
-	OP_F90_RANGE change the calculation of the number of
-	arguments on the elt stack, depending on the number of
-	boundaries provided by the user.
+	* parse.c (operator_length_standard): In case of OP_RANGE
+	change the calculation of the number of	arguments on the
+	elt stack, depending on the number of boundaries provided
+	by the user.
+	* rust-exp.y (convert_ast_to_expression): Modify calcula-
+	tion of subscript elements to use altered range_type.
+	* rust-lang.c (rust_range): Dito.
+	* rust-lang.c (rust_subscript): Dito.
 
 
 Signed-off-by: Christoph Weinmann <christoph.t.weinmann@intel.com>
 ---
- gdb/eval.c   | 14 ++++++--------
- gdb/f-exp.y  | 11 ++++++-----
- gdb/f-lang.h |  6 ++----
- gdb/parse.c  | 21 ++++++++-------------
- 4 files changed, 22 insertions(+), 30 deletions(-)
+ gdb/eval.c       | 14 ++++++--------
+ gdb/expprint.c   | 20 ++++++++------------
+ gdb/expression.h | 15 ++++++---------
+ gdb/f-exp.y      | 11 ++++++-----
+ gdb/parse.c      | 21 ++++++++-------------
+ gdb/rust-exp.y   | 12 +++---------
+ gdb/rust-lang.c  | 17 ++++++++---------
+ 7 files changed, 45 insertions(+), 65 deletions(-)
 
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 164d7ab..9b8b051 100644
+index 5c20fee..44e8600 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
-@@ -480,12 +480,12 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -482,12 +482,12 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	  /* If a lower bound was provided by the user, the bit has been
  	     set and we can assign the value from the elt stack.  Same for
  	     upper bound.  */
@@ -53,7 +66,7 @@ index 164d7ab..9b8b051 100644
  	    range->high = value_as_long (evaluate_subexp (NULL_TYPE, exp,
  							  pos, noside));
  	}
-@@ -526,12 +526,10 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -528,12 +528,10 @@ value_f90_subarray (struct value *array, struct expression *exp,
  
  	    /* If no lower bound was provided by the user, we take the
  	       default boundary.  Same for the high bound.  */
@@ -68,70 +81,135 @@ index 164d7ab..9b8b051 100644
  	      range->high = TYPE_HIGH_BOUND (index_type);
  
  	    /* Both user provided low and high bound have to be inside the
-diff --git a/gdb/f-exp.y b/gdb/f-exp.y
-index 9343abb..b1206de 100644
---- a/gdb/f-exp.y
-+++ b/gdb/f-exp.y
-@@ -315,26 +315,27 @@ arglist	:	arglist ',' exp   %prec ABOVE_COMMA
- /* There are four sorts of subrange types in F90.  */
+diff --git a/gdb/expprint.c b/gdb/expprint.c
+index c37ecb0..214d58e 100644
+--- a/gdb/expprint.c
++++ b/gdb/expprint.c
+@@ -568,12 +568,10 @@ print_subexp_standard (struct expression *exp, int *pos,
+ 	*pos += 2;
  
- subrange:	exp ':' exp	%prec ABOVE_COMMA
--			{ write_exp_elt_opcode (pstate, OP_F90_RANGE); 
--			  write_exp_elt_longcst (pstate, NONE_BOUND_DEFAULT);
-+			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
-+			  write_exp_elt_longcst (pstate,
-+						 SUBARRAY_LOW_BOUND | SUBARRAY_HIGH_BOUND);
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
+ 	fputs_filtered ("RANGE(", stream);
+-	if (range_type == HIGH_BOUND_DEFAULT
+-	    || range_type == NONE_BOUND_DEFAULT)
++	if ((range_type & SUBARRAY_LOW_BOUND) == SUBARRAY_LOW_BOUND)
+ 	  print_subexp (exp, pos, stream, PREC_ABOVE_COMMA);
+ 	fputs_filtered ("..", stream);
+-	if (range_type == LOW_BOUND_DEFAULT
+-	    || range_type == NONE_BOUND_DEFAULT)
++	if ((range_type & SUBARRAY_HIGH_BOUND) == SUBARRAY_HIGH_BOUND)
+ 	  print_subexp (exp, pos, stream, PREC_ABOVE_COMMA);
+ 	fputs_filtered (")", stream);
+ 	return;
+@@ -1055,16 +1053,16 @@ dump_subexp_body_standard (struct expression *exp,
  
- subrange:	exp ':'	%prec ABOVE_COMMA
- 			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
--			  write_exp_elt_longcst (pstate, HIGH_BOUND_DEFAULT);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND);
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
+ 	switch (range_type)
+ 	  {
+-	  case BOTH_BOUND_DEFAULT:
++	  case SUBARRAY_NONE_BOUND:
+ 	    fputs_filtered ("Range '..'", stream);
+ 	    break;
+-	  case LOW_BOUND_DEFAULT:
++	  case SUBARRAY_HIGH_BOUND:
+ 	    fputs_filtered ("Range '..EXP'", stream);
+ 	    break;
+-	  case HIGH_BOUND_DEFAULT:
++	  case SUBARRAY_LOW_BOUND:
+ 	    fputs_filtered ("Range 'EXP..'", stream);
+ 	    break;
+-	  case NONE_BOUND_DEFAULT:
++	  case (SUBARRAY_LOW_BOUND | SUBARRAY_HIGH_BOUND):
+ 	    fputs_filtered ("Range 'EXP..EXP'", stream);
+ 	    break;
+ 	  default:
+@@ -1072,11 +1070,9 @@ dump_subexp_body_standard (struct expression *exp,
+ 	    break;
+ 	  }
  
- subrange:	':' exp	%prec ABOVE_COMMA
- 			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
--			  write_exp_elt_longcst (pstate, LOW_BOUND_DEFAULT);
-+			  write_exp_elt_longcst (pstate, SUBARRAY_HIGH_BOUND);
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
+-	if (range_type == HIGH_BOUND_DEFAULT
+-	    || range_type == NONE_BOUND_DEFAULT)
++	if ((range_type & SUBARRAY_LOW_BOUND) == SUBARRAY_LOW_BOUND)
+ 	  elt = dump_subexp (exp, stream, elt);
+-	if (range_type == LOW_BOUND_DEFAULT
+-	    || range_type == NONE_BOUND_DEFAULT)
++	if ((range_type & SUBARRAY_HIGH_BOUND) == SUBARRAY_HIGH_BOUND)
+ 	  elt = dump_subexp (exp, stream, elt);
+       }
+       break;
+diff --git a/gdb/expression.h b/gdb/expression.h
+index 4952d84..5a6b720 100644
+--- a/gdb/expression.h
++++ b/gdb/expression.h
+@@ -152,17 +152,14 @@ extern void dump_raw_expression (struct expression *,
+ 				 struct ui_file *, char *);
+ extern void dump_prefix_expression (struct expression *, struct ui_file *);
  
- subrange:	':'	%prec ABOVE_COMMA
- 			{ write_exp_elt_opcode (pstate, OP_F90_RANGE);
--			  write_exp_elt_longcst (pstate, BOTH_BOUND_DEFAULT);
-+			  write_exp_elt_longcst (pstate, 0);
- 			  write_exp_elt_opcode (pstate, OP_F90_RANGE); }
- 	;
- 
-diff --git a/gdb/f-lang.h b/gdb/f-lang.h
-index eeca107..4d56bf7 100644
---- a/gdb/f-lang.h
-+++ b/gdb/f-lang.h
-@@ -44,10 +44,8 @@ extern void f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
-    
- enum f90_range_type
+-/* In an OP_RANGE expression, either bound could be empty, indicating
+-   that its value is by default that of the corresponding bound of the
+-   array or string.  So we have four sorts of subrange.  This
+-   enumeration type is to identify this.  */
+-   
++/* In an OP_RANGE expression, either bound can be provided by the user, or not.
++   This enumeration type is to identify this.  */
++
+ enum range_type
    {
 -    BOTH_BOUND_DEFAULT,		/* "(:)"  */
 -    LOW_BOUND_DEFAULT,		/* "(:high)"  */
 -    HIGH_BOUND_DEFAULT,		/* "(low:)"  */
 -    NONE_BOUND_DEFAULT		/* "(low:high)"  */
++    SUBARRAY_NONE_BOUND = 0x0,		/* "( : )"  */
 +    SUBARRAY_LOW_BOUND = 0x1,		/* "(low:)"  */
 +    SUBARRAY_HIGH_BOUND = 0x2		/* "(:high)"  */
    };
  
- /* A common block.  */
+ #endif /* !defined (EXPRESSION_H) */
+diff --git a/gdb/f-exp.y b/gdb/f-exp.y
+index dc131c1..e2c54b6 100644
+--- a/gdb/f-exp.y
++++ b/gdb/f-exp.y
+@@ -260,26 +260,27 @@ arglist	:	arglist ',' exp   %prec ABOVE_COMMA
+ /* There are four sorts of subrange types in F90.  */
+ 
+ subrange:	exp ':' exp	%prec ABOVE_COMMA
+-			{ write_exp_elt_opcode (pstate, OP_RANGE); 
+-			  write_exp_elt_longcst (pstate, NONE_BOUND_DEFAULT);
++			{ write_exp_elt_opcode (pstate, OP_RANGE);
++			  write_exp_elt_longcst (pstate,
++						 SUBARRAY_LOW_BOUND | SUBARRAY_HIGH_BOUND);
+ 			  write_exp_elt_opcode (pstate, OP_RANGE); }
+ 	;
+ 
+ subrange:	exp ':'	%prec ABOVE_COMMA
+ 			{ write_exp_elt_opcode (pstate, OP_RANGE);
+-			  write_exp_elt_longcst (pstate, HIGH_BOUND_DEFAULT);
++			  write_exp_elt_longcst (pstate, SUBARRAY_LOW_BOUND);
+ 			  write_exp_elt_opcode (pstate, OP_RANGE); }
+ 	;
+ 
+ subrange:	':' exp	%prec ABOVE_COMMA
+ 			{ write_exp_elt_opcode (pstate, OP_RANGE);
+-			  write_exp_elt_longcst (pstate, LOW_BOUND_DEFAULT);
++			  write_exp_elt_longcst (pstate, SUBARRAY_HIGH_BOUND);
+ 			  write_exp_elt_opcode (pstate, OP_RANGE); }
+ 	;
+ 
+ subrange:	':'	%prec ABOVE_COMMA
+ 			{ write_exp_elt_opcode (pstate, OP_RANGE);
+-			  write_exp_elt_longcst (pstate, BOTH_BOUND_DEFAULT);
++			  write_exp_elt_longcst (pstate, 0);
+ 			  write_exp_elt_opcode (pstate, OP_RANGE); }
+ 	;
+ 
 diff --git a/gdb/parse.c b/gdb/parse.c
-index 4191fc6..d500279 100644
+index 2b00708..6d54a77 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
 @@ -1006,22 +1006,17 @@ operator_length_standard (const struct expression *expr, int endpos,
  
-     case OP_F90_RANGE:
+     case OP_RANGE:
        oplen = 3;
 +      args = 0;
-       range_type = (enum f90_range_type)
+       range_type = (enum range_type)
  	longest_to_int (expr->elts[endpos - 2].longconst);
  
 -      switch (range_type)
@@ -157,6 +235,107 @@ index 4191fc6..d500279 100644
  
        break;
  
+diff --git a/gdb/rust-exp.y b/gdb/rust-exp.y
+index c1a863c..760929b5 100644
+--- a/gdb/rust-exp.y
++++ b/gdb/rust-exp.y
+@@ -2418,23 +2418,17 @@ convert_ast_to_expression (struct parser_state *state,
+ 
+     case OP_RANGE:
+       {
+-	enum range_type kind = BOTH_BOUND_DEFAULT;
++	enum range_type kind = SUBARRAY_NONE_BOUND;
+ 
+ 	if (operation->left.op != NULL)
+ 	  {
+ 	    convert_ast_to_expression (state, operation->left.op, top);
+-	    kind = HIGH_BOUND_DEFAULT;
++	    kind = SUBARRAY_LOW_BOUND;
+ 	  }
+ 	if (operation->right.op != NULL)
+ 	  {
+ 	    convert_ast_to_expression (state, operation->right.op, top);
+-	    if (kind == BOTH_BOUND_DEFAULT)
+-	      kind = LOW_BOUND_DEFAULT;
+-	    else
+-	      {
+-		gdb_assert (kind == HIGH_BOUND_DEFAULT);
+-		kind = NONE_BOUND_DEFAULT;
+-	      }
++	    kind = (range_type) (kind | SUBARRAY_HIGH_BOUND);
+ 	  }
+ 	write_exp_elt_opcode (state, OP_RANGE);
+ 	write_exp_elt_longcst (state, kind);
+diff --git a/gdb/rust-lang.c b/gdb/rust-lang.c
+index 5df99ce..8d53e31 100644
+--- a/gdb/rust-lang.c
++++ b/gdb/rust-lang.c
+@@ -1188,9 +1188,9 @@ rust_range (struct expression *exp, int *pos, enum noside noside)
+   kind = (enum range_type) longest_to_int (exp->elts[*pos + 1].longconst);
+   *pos += 3;
+ 
+-  if (kind == HIGH_BOUND_DEFAULT || kind == NONE_BOUND_DEFAULT)
++  if ((kind & SUBARRAY_LOW_BOUND) == SUBARRAY_LOW_BOUND)
+     low = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+-  if (kind == LOW_BOUND_DEFAULT || kind == NONE_BOUND_DEFAULT)
++  if ((kind & SUBARRAY_HIGH_BOUND) == SUBARRAY_HIGH_BOUND)
+     high = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+ 
+   if (noside == EVAL_SKIP)
+@@ -1279,7 +1279,7 @@ rust_compute_range (struct type *type, struct value *range,
+ 
+   *low = 0;
+   *high = 0;
+-  *kind = BOTH_BOUND_DEFAULT;
++  *kind = SUBARRAY_NONE_BOUND;
+ 
+   if (TYPE_NFIELDS (type) == 0)
+     return;
+@@ -1287,15 +1287,14 @@ rust_compute_range (struct type *type, struct value *range,
+   i = 0;
+   if (strcmp (TYPE_FIELD_NAME (type, 0), "start") == 0)
+     {
+-      *kind = HIGH_BOUND_DEFAULT;
++      *kind = SUBARRAY_LOW_BOUND;
+       *low = value_as_long (value_field (range, 0));
+       ++i;
+     }
+   if (TYPE_NFIELDS (type) > i
+       && strcmp (TYPE_FIELD_NAME (type, i), "end") == 0)
+     {
+-      *kind = (*kind == BOTH_BOUND_DEFAULT
+-	       ? LOW_BOUND_DEFAULT : NONE_BOUND_DEFAULT);
++      *kind = (range_type) (*kind | SUBARRAY_HIGH_BOUND);
+       *high = value_as_long (value_field (range, i));
+     }
+ }
+@@ -1310,7 +1309,7 @@ rust_subscript (struct expression *exp, int *pos, enum noside noside,
+   struct type *rhstype;
+   LONGEST low, high_bound;
+   /* Initialized to appease the compiler.  */
+-  enum range_type kind = BOTH_BOUND_DEFAULT;
++  enum range_type kind = SUBARRAY_NONE_BOUND;
+   LONGEST high = 0;
+   int want_slice = 0;
+ 
+@@ -1366,7 +1365,7 @@ rust_subscript (struct expression *exp, int *pos, enum noside noside,
+ 	error (_("Cannot subscript non-array type"));
+ 
+       if (want_slice
+-	  && (kind == BOTH_BOUND_DEFAULT || kind == LOW_BOUND_DEFAULT))
++	  && ((kind & SUBARRAY_LOW_BOUND) != SUBARRAY_LOW_BOUND))
+ 	low = low_bound;
+       if (low < 0)
+ 	error (_("Index less than zero"));
+@@ -1384,7 +1383,7 @@ rust_subscript (struct expression *exp, int *pos, enum noside noside,
+ 	  CORE_ADDR addr;
+ 	  struct value *addrval, *tem;
+ 
+-	  if (kind == BOTH_BOUND_DEFAULT || kind == HIGH_BOUND_DEFAULT)
++	  if ((kind & SUBARRAY_HIGH_BOUND) != SUBARRAY_HIGH_BOUND)
+ 	    high = high_bound;
+ 	  if (high < 0)
+ 	    error (_("High index less than zero"));
 -- 
-2.5.0
+2.5.5
 

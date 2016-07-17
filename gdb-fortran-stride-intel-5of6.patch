@@ -1,9 +1,12 @@
-http://sourceware.org/ml/gdb-patches/2016-02/msg00844.html
-Subject: [PATCH v2 5/6] fortran: calculate subarray with stride values.
+RE: [ping] [PATCH v2 0/6] fortran: multi-dimensional subarrays with strides
+https://sourceware.org/ml/gdb-patches/2016-07/msg00009.html
 
+From 1189098c3cacc2ee69021de1a83ad3328821d755 Mon Sep 17 00:00:00 2001
 From: Christoph Weinmann <christoph.t.weinmann@intel.com>
+Date: Wed, 1 Jun 2016 15:04:01 +0200
+Subject: [PATCH 5/6] fortran: calculate elements of a subarray using a
+ provided stride value
 
-Calculate elements of a subarray using a provided stride value
 The stride value can be a positive or negative integer, but may
 not be zero.  If no stride is provided, use the default value
 1 to print all elements inside the range.
@@ -32,44 +35,25 @@ $3 = (1, 3, 5, 7, 9)
 
 Signed-off-by: Christoph Weinmann <christoph.t.weinmann@intel.com>
 ---
- gdb/eval.c   | 111 ++++++++++++++++++++++++++++++++++++++++++++++-------------
- gdb/valops.c |  87 +++++++++++++++++++++++++++++++++-------------
+ gdb/eval.c   | 102 ++++++++++++++++++++++++++++++++++++++++++++++++-----------
+ gdb/valops.c |  83 +++++++++++++++++++++++++++++++++++-------------
  gdb/value.h  |   2 +-
- 3 files changed, 152 insertions(+), 48 deletions(-)
+ 3 files changed, 145 insertions(+), 42 deletions(-)
 
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 308ada3..d01b579 100644
+index b5aaf1c..1f27b6f 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
-@@ -437,8 +437,8 @@ value_f90_subarray (struct value *array, struct expression *exp,
-     {
-       struct subscript_range
-       {
--        enum f90_range_type f90_range_type;
--        LONGEST low, high, stride;
-+	enum f90_range_type f90_range_type;
-+	LONGEST low, high, stride;
-       }
-       range;
-       LONGEST number;
-@@ -475,7 +475,7 @@ value_f90_subarray (struct value *array, struct expression *exp,
- 	  range = &index->range;
+@@ -477,7 +477,7 @@ value_f90_subarray (struct value *array, struct expression *exp,
+ 	  range = &index->U.range;
  
  	  *pos += 3;
--	  range->f90_range_type = longest_to_int (exp->elts[pc].longconst);
-+	  range->f90_range_type = exp->elts[pc].longconst;
+-	  range->f90_range_type = (enum range_type) longest_to_int (exp->elts[pc].longconst);
++	  range->f90_range_type = (enum range_type) exp->elts[pc].longconst;
  
  	  /* If a lower bound was provided by the user, the bit has been
  	     set and we can assign the value from the elt stack.  Same for
-@@ -484,6 +484,7 @@ value_f90_subarray (struct value *array, struct expression *exp,
- 	      == SUBARRAY_LOW_BOUND)
- 	    range->low = value_as_long (evaluate_subexp (NULL_TYPE, exp,
- 							 pos, noside));
-+
- 	  if ((range->f90_range_type & SUBARRAY_HIGH_BOUND)
- 	      == SUBARRAY_HIGH_BOUND)
- 	    range->high = value_as_long (evaluate_subexp (NULL_TYPE, exp,
-@@ -496,6 +497,10 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -499,6 +499,10 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	  /* Assign the default stride value '1'.  */
  	  else
  	    range->stride = 1;
@@ -80,7 +64,7 @@ index 308ada3..d01b579 100644
  	}
        /* User input is an index.  E.g.: "p arry(5)".  */
        else
-@@ -512,10 +517,8 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -515,10 +519,8 @@ value_f90_subarray (struct value *array, struct expression *exp,
  
      }
  
@@ -93,7 +77,7 @@ index 308ada3..d01b579 100644
    for (i = nargs - 1; i >= 0; i--)
      {
        struct subscript_store *index = &subscript_array[i];
-@@ -548,6 +551,48 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -551,6 +553,48 @@ value_f90_subarray (struct value *array, struct expression *exp,
  		|| range->high > TYPE_HIGH_BOUND (index_type))
  	      error (_("provided bound(s) outside array bound(s)"));
  
@@ -113,7 +97,7 @@ index 308ada3..d01b579 100644
 +
 +	}
 +
-+      array_type = TYPE_TARGET_TYPE (array_type);
++       array_type = TYPE_TARGET_TYPE (array_type);
 +    }
 +
 +  /* Reset ARRAY_TYPE before slicing.*/
@@ -137,12 +121,12 @@ index 308ada3..d01b579 100644
 +	       treat any subsequent user entry as a range.  We simply
 +	       increment DIM_COUNT which tells us how many times we are
 +	       calling VALUE_SLICE_1.  */
-+	    struct subscript_range *range = &index->range;
++	    subscript_range *range = &index->U.range;
 +
  	    /* DIM_COUNT counts every user argument that is treated as a range.
  	       This is necessary for expressions like 'print array(7, 8:9).
  	       Here the first argument is a literal, but must be treated as a
-@@ -555,10 +600,9 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -558,10 +602,9 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	    dim_count++;
  
  	    new_array
@@ -156,13 +140,7 @@ index 308ada3..d01b579 100644
  	  }
  	  break;
  
-@@ -572,27 +616,38 @@ value_f90_subarray (struct value *array, struct expression *exp,
- 	       to get the value offset right.  */
- 	    if (dim_count == 0)
- 	      new_array
--	        = value_subscripted_rvalue (new_array, index->number,
-+		= value_subscripted_rvalue (new_array, index->number,
- 					    f77_get_lowerbound (value_type
+@@ -580,21 +623,32 @@ value_f90_subarray (struct value *array, struct expression *exp,
  								  (new_array)));
  	    else
  	      {
@@ -174,21 +152,21 @@ index 308ada3..d01b579 100644
 +		   cannot do the range checks for us. So we have to make sure
 +		   ourselves that the user provided index is inside the
 +		   array bounds.  Throw an error if not.  */
- 		if (index->number < TYPE_LOW_BOUND (index_type)
--		    || index->number > TYPE_HIGH_BOUND (index_type))
+ 		if (index->U.number < TYPE_LOW_BOUND (index_type)
+-		    || index->U.number > TYPE_HIGH_BOUND (index_type))
 -		  error (_("error no such vector element"));
-+		    && index->number < TYPE_HIGH_BOUND (index_type))
++		    && index->U.number > TYPE_HIGH_BOUND (index_type))
 +		  error (_("provided bound(s) outside array bound(s)"));
 +
-+		if (index->number > TYPE_LOW_BOUND (index_type)
-+		    && index->number > TYPE_HIGH_BOUND (index_type))
++		if (index->U.number > TYPE_LOW_BOUND (index_type)
++		    && index->U.number > TYPE_HIGH_BOUND (index_type))
 +		  error (_("provided bound(s) outside array bound(s)"));
  
 -		dim_count++;
  		new_array = value_slice_1 (new_array,
--					   longest_to_int (index->number),
+-					   longest_to_int (index->U.number),
 -					   1, /* length is '1' element  */
-+					   index->number,
++					   index->U.number,
 +					   1, /* COUNT is '1' element  */
 +					   1, /* STRIDE set to '1'  */
  					   dim_count);
@@ -197,13 +175,11 @@ index 308ada3..d01b579 100644
  	  }
  	  break;
  	}
--    }
 +      array_type = TYPE_TARGET_TYPE (array_type);
-+  }
+     }
  
    /* With DIM_COUNT > 1 we currently have a one dimensional array, but expect
-      an array of arrays, depending on how many ranges have been provided by
-@@ -617,7 +672,9 @@ value_f90_subarray (struct value *array, struct expression *exp,
+@@ -620,7 +674,9 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	 the output array.  So we traverse the SUBSCRIPT_ARRAY again, looking
  	 for a range entry.  When we find one, we use the range info to create
  	 an additional range_type to set the correct bounds and dimensions for
@@ -214,35 +190,35 @@ index 308ada3..d01b579 100644
        for (i = 0; i < nargs; i++)
  	{
  	  struct subscript_store *index = &subscript_array[i];
-@@ -625,12 +682,20 @@ value_f90_subarray (struct value *array, struct expression *exp,
- 	  if (index->kind == SUBSCRIPT_RANGE)
+@@ -629,12 +685,20 @@ value_f90_subarray (struct value *array, struct expression *exp,
  	    {
  	      struct type *range_type, *interim_array_type;
+ 
 +	      int new_length;
 +
 +	      /* The length of a sub-dimension with all elements between the
 +		 bounds plus the start element itself.  It may be modified by
 +		 a user provided stride value.  */
-+	      new_length = index->range.high - index->range.low;
++	      new_length = index->U.range.high - index->U.range.low;
 +
-+	      new_length /= index->range.stride;
- 
++	      new_length /= index->U.range.stride;
++
  	      range_type
  		= create_static_range_type (NULL,
--				     temp_type,
--				     1,
--				     index->range.high - index->range.low + 1);
-+					    temp_type,
-+					    index->range.low,
-+					    index->range.low + new_length);
+ 					    elt_type,
+-					    1,
+-					    index->U.range.high
+-					      - index->U.range.low + 1);
++					    index->U.range.low,
++					    index->U.range.low + new_length);
  
  	      interim_array_type = create_array_type (NULL,
- 						      temp_type,
+ 						      elt_type,
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 09ea877..83c8462 100644
+index fbc7dcb..ded8efc 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
-@@ -3759,10 +3759,13 @@ value_of_this_silent (const struct language_defn *lang)
+@@ -3766,10 +3766,13 @@ value_of_this_silent (const struct language_defn *lang)
  struct value *
  value_slice (struct value *array, int lowbound, int length)
  {
@@ -259,8 +235,8 @@ index 09ea877..83c8462 100644
 +  return value_slice_1 (array, lowbound, length, 1, 1);
  }
  
- /* CALL_COUNT is used to determine if we are calling the function once, e.g.
-@@ -3776,7 +3779,8 @@ value_slice (struct value *array, int lowbound, int length)
+ /* VALUE_SLICE_1 is called for each array dimension to calculate the number
+@@ -3785,7 +3788,8 @@ value_slice (struct value *array, int lowbound, int length)
     ranges in the calling function.  */
  
  struct value *
@@ -270,7 +246,7 @@ index 09ea877..83c8462 100644
  {
    struct type *slice_range_type, *slice_type, *range_type;
    struct type *array_type = check_typedef (value_type (array));
-@@ -3799,14 +3803,24 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+@@ -3808,14 +3812,24 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
       attributes of the underlying type.  */
    if (call_count > 1)
      {
@@ -297,25 +273,7 @@ index 09ea877..83c8462 100644
    elt_stride = TYPE_LENGTH (TYPE_INDEX_TYPE (array_type));
  
    elt_offs *= elt_size;
-@@ -3825,7 +3839,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
-   if (call_count == 1)
-     {
-       range_type = TYPE_INDEX_TYPE (array_type);
--      slice_range_size = elem_count;
-+      slice_range_size = ary_low_bound + elem_count - 1;
- 
-       /* Check if the array bounds are valid.  */
-       if (get_discrete_bounds (range_type, &ary_low_bound, &ary_high_bound) < 0)
-@@ -3837,7 +3851,7 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
-   else
-     {
-       range_type = TYPE_INDEX_TYPE (TYPE_TARGET_TYPE (array_type));
--      slice_range_size = (ary_low_bound + row_count - 1) * (elem_count);
-+      slice_range_size = ary_low_bound + (row_count * elem_count) - 1;
-       ary_low_bound = TYPE_LOW_BOUND (range_type);
-     }
- 
-@@ -3849,8 +3863,9 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+@@ -3858,8 +3872,9 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
    {
      struct type *element_type;
  
@@ -327,7 +285,7 @@ index 09ea877..83c8462 100644
        {
  	element_type = TYPE_TARGET_TYPE (array_type);
  
-@@ -3871,29 +3886,53 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
+@@ -3880,29 +3895,53 @@ value_slice_1 (struct value *array, int lowbound, int length, int call_count)
  	  }
  
        }
@@ -359,8 +317,8 @@ index 09ea877..83c8462 100644
  	slice_type = create_array_type (NULL, element_type, slice_range_type);
  
 -	TYPE_CODE (slice_type) = TYPE_CODE (TYPE_TARGET_TYPE (array_type));
-+	/* If we have a one dimensional array, we copy its TYPE_CODE.  For a
-+	   multi dimensional array we copy the embedded type's TYPE_CODE.  */
++	 /* If we have a one dimensional array, we copy its TYPE_CODE.  For a
++	    multi dimensional array we copy the embedded type's TYPE_CODE.  */
 +	if (call_count == 1)
 +	  TYPE_CODE (slice_type) = TYPE_CODE (array_type);
 +	else
@@ -395,7 +353,7 @@ index 09ea877..83c8462 100644
        }
  
 diff --git a/gdb/value.h b/gdb/value.h
-index 3400460..c18ef2e 100644
+index 95588af..e417639 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -1056,7 +1056,7 @@ extern struct value *varying_to_slice (struct value *);
@@ -408,5 +366,5 @@ index 3400460..c18ef2e 100644
  extern struct value *value_literal_complex (struct value *, struct value *,
  					    struct type *);
 -- 
-2.5.0
+2.5.5
 
