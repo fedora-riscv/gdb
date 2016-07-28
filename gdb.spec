@@ -27,7 +27,7 @@ Version: 7.11.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -882,6 +882,16 @@ find -name "*.info*"|xargs rm -f
 %patch1056 -p1
 %patch1073 -p1
 %patch848 -p1
+%if 0%{!?el6:1}
+for i in \
+  gdb/python/lib/gdb/FrameWrapper.py \
+  gdb/python/lib/gdb/backtrace.py \
+  gdb/python/lib/gdb/command/backtrace.py \
+  ;do
+  test -e $i
+  : >$i
+done
+%endif
 %patch833 -p1
 %patch642 -p1
 %patch337 -p1
@@ -1412,6 +1422,9 @@ then
 fi
 
 %changelog
+* Thu Jul 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160721-3.fc25
+- Do not apply RHEL-6 patches on non-RHEL-6 even for testsuite.
+
 * Thu Jul 21 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160721-2.fc25
 - Rebase to FSF GDB 7.11.50.20160721 (pre-7.12 trunk snapshot).
 
