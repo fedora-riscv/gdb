@@ -27,7 +27,7 @@ Version: 7.11.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -275,6 +275,8 @@ Patch271: gdb-6.5-bz243845-stale-testing-zombie-test.patch
 #=push
 Patch274: gdb-6.6-buildid-locate.patch
 # Fix loading of core files without build-ids but with build-ids in executables.
+# Load strictly build-id-checked core files only if no executable is specified
+# (Jan Kratochvil, RH BZ 1339862).
 #=push
 Patch659: gdb-6.6-buildid-locate-solib-missing-ids.patch
 #=push
@@ -1422,6 +1424,10 @@ then
 fi
 
 %changelog
+* Sun Jul 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160721-4.fc25
+- Testcase for: Load strictly build-id-checked core files only if no executable
+  is specified (Jan Kratochvil, RH BZ 1339862).
+
 * Thu Jul 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160721-3.fc25
 - Do not apply RHEL-6 patches on non-RHEL-6 even for testsuite.
 
