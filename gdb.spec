@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 76%{?dist}
+Release: 77%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -574,6 +574,10 @@ Patch1123: gdb-rhbz1325795-framefilters-test.patch
 Patch1128: gdb-bare-DW_TAG_lexical_block-1of2.patch
 Patch1129: gdb-bare-DW_TAG_lexical_block-2of2.patch
 
+# [aarch64] Fix ARMv8.1/v8.2 for hw watchpoint and breakpoint
+# (Andrew Pinski, RH BZ 1363635).
+Patch1141: gdb-rhbz1363635-aarch64-armv8182.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -888,6 +892,7 @@ find -name "*.info*"|xargs rm -f
 %patch1123 -p1
 %patch1128 -p1
 %patch1129 -p1
+%patch1141 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1407,6 +1412,10 @@ then
 fi
 
 %changelog
+* Wed Aug  3 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-77.fc24
+- [aarch64] Fix ARMv8.1/v8.2 for hw watchpoint and breakpoint
+  (Andrew Pinski, RH BZ 1363635).
+
 * Mon Jun 27 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-76.fc24
 - Test 'info type-printers' Python error (RH BZ 1350436).
 
