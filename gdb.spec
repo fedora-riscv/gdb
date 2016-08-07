@@ -19,15 +19,15 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20160721
+%global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.11.50.%{snapsrc}
+Version: 7.11.90.20160807
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1424,6 +1424,9 @@ then
 fi
 
 %changelog
+* Sun Aug  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-5.fc25
+- Rebase to FSF GDB 7.11.90.20160807 (pre-7.12 branch snapshot).
+
 * Sun Jul 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.50.20160721-4.fc25
 - Testcase for: Load strictly build-id-checked core files only if no executable
   is specified (Jan Kratochvil, RH BZ 1339862).

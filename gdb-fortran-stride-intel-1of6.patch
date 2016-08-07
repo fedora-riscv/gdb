@@ -45,11 +45,11 @@ Signed-off-by: Christoph Weinmann <christoph.t.weinmann@intel.com>
  gdb/value.h  |   2 +
  4 files changed, 380 insertions(+), 97 deletions(-)
 
-diff --git a/gdb/eval.c b/gdb/eval.c
-index de1c663..35815a4 100644
---- a/gdb/eval.c
-+++ b/gdb/eval.c
-@@ -399,29 +399,254 @@ init_array_element (struct value *array, struct value *element,
+Index: gdb-7.11.90.20160807/gdb/eval.c
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/eval.c	2016-08-07 22:06:45.266836619 +0200
++++ gdb-7.11.90.20160807/gdb/eval.c	2016-08-07 22:08:21.708688259 +0200
+@@ -399,29 +399,254 @@
    return index;
  }
  
@@ -74,11 +74,6 @@ index de1c663..35815a4 100644
 -    = (enum range_type) longest_to_int (exp->elts[pc].longconst);
 - 
 -  *pos += 3;
--
--  if (range_type == LOW_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
--    low_bound = TYPE_LOW_BOUND (range);
--  else
--    low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
 +  struct value *new_array = array;
 +  struct type *array_type = check_typedef (value_type (new_array));
 +  struct type *elt_type;
@@ -133,17 +128,21 @@ index de1c663..35815a4 100644
 +    {
 +      struct subscript_store *index = &subscript_array[i];
  
--  if (range_type == HIGH_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
--    high_bound = TYPE_HIGH_BOUND (range);
+-  if (range_type == LOW_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
+-    low_bound = TYPE_LOW_BOUND (range);
 -  else
--    high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
+-    low_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
 +      /* The user input is a range, with or without lower and upper bound.
 +	 E.g.: "p arry(2:5)", "p arry( :5)", "p arry( : )", etc.  */
 +      if (exp->elts[*pos].opcode == OP_RANGE)
 +	{
 +	  int pc = (*pos) + 1;
 +	  subscript_range *range;
-+
+ 
+-  if (range_type == HIGH_BOUND_DEFAULT || range_type == BOTH_BOUND_DEFAULT)
+-    high_bound = TYPE_HIGH_BOUND (range);
+-  else
+-    high_bound = value_as_long (evaluate_subexp (NULL_TYPE, exp, pos, noside));
 +	  index->kind = SUBSCRIPT_RANGE;
 +	  range = &index->U.range;
 +
@@ -279,8 +278,7 @@ index de1c663..35815a4 100644
 +      struct value *v = NULL;
 +
 +      elt_type = TYPE_TARGET_TYPE (value_type (new_array));
- 
--  return value_slice (array, low_bound, high_bound - low_bound + 1);
++
 +      /* Every SUBSCRIPT_RANGE in the user input signifies an actual range in
 +	 the output array.  So we traverse the SUBSCRIPT_ARRAY again, looking
 +	 for a range entry.  When we find one, we use the range info to create
@@ -307,7 +305,8 @@ index de1c663..35815a4 100644
 +
 +	      TYPE_CODE (interim_array_type)
 +		= TYPE_CODE (value_type (new_array));
-+
+ 
+-  return value_slice (array, low_bound, high_bound - low_bound + 1);
 +	      v = allocate_value (interim_array_type);
 +
 +	      elt_type = value_type (v);
@@ -322,7 +321,7 @@ index de1c663..35815a4 100644
  }
  
  
-@@ -1810,14 +2035,11 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -1810,14 +2035,11 @@
        switch (code)
  	{
  	case TYPE_CODE_ARRAY:
@@ -339,7 +338,7 @@ index de1c663..35815a4 100644
  	  else
  	    {
  	      arg2 = evaluate_subexp_with_coercion (exp, pos, noside);
-@@ -2222,49 +2444,6 @@ evaluate_subexp_standard (struct type *expect_type,
+@@ -2223,49 +2445,6 @@
  	}
        return (arg1);
  
@@ -389,7 +388,7 @@ index de1c663..35815a4 100644
      case BINOP_LOGICAL_AND:
        arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
        if (noside == EVAL_SKIP)
-@@ -3122,6 +3301,9 @@ calc_f77_array_dims (struct type *array_type)
+@@ -3123,6 +3302,9 @@
    int ndimen = 1;
    struct type *tmp_type;
  
@@ -399,11 +398,11 @@ index de1c663..35815a4 100644
    if ((TYPE_CODE (array_type) != TYPE_CODE_ARRAY))
      error (_("Can't get dimensions for a non-array type"));
  
-diff --git a/gdb/f-exp.y b/gdb/f-exp.y
-index e3148a3..dc131c1 100644
---- a/gdb/f-exp.y
-+++ b/gdb/f-exp.y
-@@ -253,6 +253,8 @@ arglist :	subrange
+Index: gdb-7.11.90.20160807/gdb/f-exp.y
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/f-exp.y	2016-08-07 22:06:45.266836619 +0200
++++ gdb-7.11.90.20160807/gdb/f-exp.y	2016-08-07 22:08:21.709688268 +0200
+@@ -253,6 +253,8 @@
     
  arglist	:	arglist ',' exp   %prec ABOVE_COMMA
  			{ arglist_len++; }
@@ -412,11 +411,11 @@ index e3148a3..dc131c1 100644
  	;
  
  /* There are four sorts of subrange types in F90.  */
-diff --git a/gdb/valops.c b/gdb/valops.c
-index 71fb1b3..817a4cf 100644
---- a/gdb/valops.c
-+++ b/gdb/valops.c
-@@ -3766,56 +3766,153 @@ value_of_this_silent (const struct language_defn *lang)
+Index: gdb-7.11.90.20160807/gdb/valops.c
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/valops.c	2016-08-07 22:06:45.266836619 +0200
++++ gdb-7.11.90.20160807/gdb/valops.c	2016-08-07 22:13:22.083340750 +0200
+@@ -3775,56 +3775,154 @@
  struct value *
  value_slice (struct value *array, int lowbound, int length)
  {
@@ -448,7 +447,8 @@ index 71fb1b3..817a4cf 100644
 +  struct type *array_type = check_typedef (value_type (array));
 +  struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
 +  unsigned int elt_size, elt_offs;
-+  LONGEST elt_stride, ary_high_bound, ary_low_bound;
++  /* ATTRIBUTE_UNUSED: VLA bug: https://sourceware.org/ml/gdb-patches/2016-08/msg00099.html */
++  LONGEST elt_stride ATTRIBUTE_UNUSED, ary_high_bound, ary_low_bound;
 +  struct value *v;
 +  int slice_range_size, i = 0, row_count = 1, elem_count = 1;
  
@@ -462,6 +462,10 @@ index 71fb1b3..817a4cf 100644
 -  range_type = TYPE_INDEX_TYPE (array_type);
 -  if (get_discrete_bounds (range_type, &lowerbound, &upperbound) < 0)
 -    error (_("slice from bad array or bitstring"));
+-
+-  if (lowbound < lowerbound || length < 0
+-      || lowbound + length - 1 > upperbound)
+-    error (_("slice out of range"));
 +  ary_low_bound = TYPE_LOW_BOUND (TYPE_INDEX_TYPE (array_type));
 +  ary_high_bound = TYPE_HIGH_BOUND (TYPE_INDEX_TYPE (array_type));
 +
@@ -487,10 +491,7 @@ index 71fb1b3..817a4cf 100644
 +	&& (!TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (array_type)
 +	      && elt_offs >= TYPE_LENGTH (array_type)))
 +    error (_("no such vector element"));
- 
--  if (lowbound < lowerbound || length < 0
--      || lowbound + length - 1 > upperbound)
--    error (_("slice out of range"));
++
 +  /* CALL_COUNT is 1 when we are dealing either with the highest dimension
 +     of the array, or a one dimensional array.  Set RANGE_TYPE accordingly.
 +     In both cases we calculate how many rows/elements will be in the output
@@ -528,6 +529,11 @@ index 71fb1b3..817a4cf 100644
 -    struct type *element_type = TYPE_TARGET_TYPE (array_type);
 -    LONGEST offset
 -      = (lowbound - lowerbound) * TYPE_LENGTH (check_typedef (element_type));
+-
+-    slice_type = create_array_type ((struct type *) NULL,
+-				    element_type,
+-				    slice_range_type);
+-    TYPE_CODE (slice_type) = TYPE_CODE (array_type);
 +    struct type *element_type;
 +
 +    /* When CALL_COUNT equals 1 we can use the legacy code for subarrays.  */
@@ -535,10 +541,8 @@ index 71fb1b3..817a4cf 100644
 +      {
 +	element_type = TYPE_TARGET_TYPE (array_type);
  
--    slice_type = create_array_type ((struct type *) NULL,
--				    element_type,
--				    slice_range_type);
--    TYPE_CODE (slice_type) = TYPE_CODE (array_type);
+-    if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
+-      slice = allocate_value_lazy (slice_type);
 +	slice_type = create_array_type (NULL, element_type, slice_range_type);
 +
 +	TYPE_CODE (slice_type) = TYPE_CODE (array_type);
@@ -554,9 +558,7 @@ index 71fb1b3..817a4cf 100644
 +				 value_embedded_offset (array) + elt_offs,
 +				 elt_size * longest_to_int (length));
 +	  }
- 
--    if (VALUE_LVAL (array) == lval_memory && value_lazy (array))
--      slice = allocate_value_lazy (slice_type);
++
 +      }
 +    /* When CALL_COUNT is larger than 1 we are working on a range of ranges.
 +       So we copy the relevant elements into the new array we return.  */
@@ -601,11 +603,11 @@ index 71fb1b3..817a4cf 100644
  }
  
  /* Create a value for a FORTRAN complex number.  Currently most of the
-diff --git a/gdb/value.h b/gdb/value.h
-index f8ec854..95588af 100644
---- a/gdb/value.h
-+++ b/gdb/value.h
-@@ -1056,6 +1056,8 @@ extern struct value *varying_to_slice (struct value *);
+Index: gdb-7.11.90.20160807/gdb/value.h
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/value.h	2016-08-07 22:06:45.266836619 +0200
++++ gdb-7.11.90.20160807/gdb/value.h	2016-08-07 22:08:21.710688276 +0200
+@@ -1064,6 +1064,8 @@
  
  extern struct value *value_slice (struct value *, int, int);
  
@@ -614,6 +616,3 @@ index f8ec854..95588af 100644
  extern struct value *value_literal_complex (struct value *, struct value *,
  					    struct type *);
  
--- 
-2.5.5
-
