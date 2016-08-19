@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 78%{?dist}
+Release: 79%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -583,6 +583,9 @@ Patch1129: gdb-bare-DW_TAG_lexical_block-2of2.patch
 # (Andrew Pinski, RH BZ 1363635).
 Patch1141: gdb-rhbz1363635-aarch64-armv8182.patch
 
+# [dts60+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+Patch1143: gdb-linux_perf-bundle.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -629,8 +632,6 @@ BuildRequires: guile-devel%{buildisa}
 %global have_libipt 1
 %if 0%{?scl:1}
 BuildRequires: cmake
-# RHEL-7.3 kernel Bug 1270539
-BuildRequires: kernel-headers >= 3.10.0-352.el7
 %else
 BuildRequires: libipt-devel%{buildisa}
 %endif
@@ -912,6 +913,7 @@ find -name "*.info*"|xargs rm -f
 %patch1128 -p1
 %patch1129 -p1
 %patch1141 -p1
+%patch1143 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -976,6 +978,11 @@ CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
 # Patch833: gdb-6.6-buildid-locate-rpm-scl.patch
 %if 0%{?el6:1} && 0%{?scl:1}
 CFLAGS="$CFLAGS -DGDB_INDEX_VERIFY_VENDOR"
+%endif
+
+# [dts60+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+%if 0%{?el7:1} && 0%{?scl:1}
+CFLAGS="$CFLAGS -DPERF_ATTR_SIZE_VER5_BUNDLE"
 %endif
 
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1450,6 +1457,9 @@ then
 fi
 
 %changelog
+* Fri Aug 19 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-79.fc24
+- [dts60+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+
 * Wed Aug 17 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-78.fc24
 - [dts60+el7] [x86*] Bundle libipt (RH BZ 1256513).
 
