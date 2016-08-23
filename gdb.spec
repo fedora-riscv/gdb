@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 80%{?dist}
+Release: 81%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1457,6 +1457,9 @@ then
 fi
 
 %changelog
+* Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-81.fc24
+- [dts+el7] [x86*] Bundle libipt - fix its initialization (RH BZ 1256513).
+
 * Mon Aug 22 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-80.fc24
 - [dts] Upgrade libstdc++-v3-python to 6.1.1-20160817.
 
