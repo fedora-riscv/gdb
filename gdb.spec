@@ -27,7 +27,7 @@ Version: 7.11.90.20160807
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -122,11 +122,16 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN.
-%global libstdcxxpython gdb-libstdc++-v3-python-r225521
+%global libstdcxxpython gdb-libstdc++-v3-python-6.1.1-20160817
 Source5: %{libstdcxxpython}.tar.xz
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
 Source6: gdbtui
+
+# libipt: Intel Processor Trace Decoder Library
+%global libipt_version 1.5
+Source7: v%{libipt_version}.tar.gz
+Patch1142: v1.5-libipt-static.patch
 
 # Work around out-of-date dejagnu that does not have KFAIL
 #=drop: That dejagnu is too old to be supported.
@@ -576,6 +581,9 @@ Patch1120: gdb-testsuite-dw2-undefined-ret-addr.patch
 # New test for Python "Cannot locate object file for block" (for RH BZ 1325795).
 Patch1123: gdb-rhbz1325795-framefilters-test.patch
 
+# [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+Patch1143: gdb-linux_perf-bundle.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -617,10 +625,14 @@ BuildRequires: libbabeltrace-devel%{buildisa}
 BuildRequires: guile-devel%{buildisa}
 %endif
 %global have_libipt 0
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%if 0%{!?rhel:1} || 0%{?rhel} > 7 || (0%{?rhel} == 7 && 0%{?scl:1})
 %ifarch %{ix86} x86_64
 %global have_libipt 1
+%if 0%{?el7:1} && 0%{?scl:1}
+BuildRequires: cmake
+%else
 BuildRequires: libipt-devel%{buildisa}
+%endif
 %endif
 %endif
 
@@ -752,6 +764,14 @@ This package provides INFO, HTML and PDF user manual for GDB.
 # libstdc++ pretty printers.
 tar xJf %{SOURCE5}
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 7
+
+%if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
+tar xzf %{SOURCE7}
+(
+ cd processor-trace-%{libipt_version}
+%patch1142 -p1
+)
+%endif
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 (cd gdb;rm -fv $(perl -pe 's/\\\n/ /' <Makefile.in|sed -n 's/^YYFILES = //p'))
@@ -902,6 +922,7 @@ done
 %patch1118 -p1
 %patch1120 -p1
 %patch1123 -p1
+%patch1143 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -968,6 +989,11 @@ CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
 CFLAGS="$CFLAGS -DGDB_INDEX_VERIFY_VENDOR"
 %endif
 
+# [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+%if %{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
+CFLAGS="$CFLAGS -DPERF_ATTR_SIZE_VER5_BUNDLE"
+%endif
+
 # Patch642: gdb-readline62-ask-more-rh.patch
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
@@ -980,6 +1006,25 @@ CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 %endif
 
 export CXXFLAGS="$CFLAGS"
+
+%if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
+(
+ mkdir processor-trace-%{libipt_version}-root
+ mkdir processor-trace-%{libipt_version}-build
+ cd    processor-trace-%{libipt_version}-build
+ # -DPTUNIT:BOOL=ON has no effect on ctest.
+ %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DPTUNIT:BOOL=OFF \
+	-DDEVBUILD:BOOL=ON \
+	../../processor-trace-%{libipt_version}
+ make VERBOSE=1 %{?_smp_mflags}
+ ctest -V %{?_smp_mflags}
+ make install DESTDIR=../processor-trace-%{libipt_version}-root
+)
+# There is also: --with-libipt-prefix
+CFLAGS="$CFLAGS -I$PWD/processor-trace-%{libipt_version}-root%{_includedir}"
+LDFLAGS="$LDFLAGS -L$PWD/processor-trace-%{libipt_version}-root%{_libdir}"
+%endif
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
@@ -1424,6 +1469,27 @@ then
 fi
 
 %changelog
+* Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-6.fc25
+- Merge Fedora packaging changes from Fedora 24 gdb-7.11.1-83.fc24:
+
+* Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-83.fc24
+- [dts+el7] [x86*] Bundle libipt - fix#3 its initialization (RH BZ 1256513).
+
+* Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-82.fc24
+- [dts+el7] [x86*] Bundle libipt - fix#2 its initialization (RH BZ 1256513).
+
+* Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-81.fc24
+- [dts+el7] [x86*] Bundle libipt - fix its initialization (RH BZ 1256513).
+
+* Mon Aug 22 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-80.fc24
+- [dts] Upgrade libstdc++-v3-python to 6.1.1-20160817.
+
+* Fri Aug 19 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-79.fc24
+- [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
+
+* Wed Aug 17 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-78.fc24
+- [dts+el7] [x86*] Bundle libipt (RH BZ 1256513).
+
 * Sun Aug  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-5.fc25
 - Rebase to FSF GDB 7.11.90.20160807 (pre-7.12 branch snapshot).
 
