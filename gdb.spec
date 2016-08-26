@@ -27,7 +27,7 @@ Version: 7.11.90.20160807
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -520,12 +520,9 @@ Patch848: gdb-dts-rhel6-python-compat.patch
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
 # VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
-Patch1058: gdb-fortran-stride-intel-1of6.patch
-Patch1059: gdb-fortran-stride-intel-2of6.patch
-Patch1060: gdb-fortran-stride-intel-3of6.patch
-Patch1061: gdb-fortran-stride-intel-4of6.patch
-Patch1062: gdb-fortran-stride-intel-5of6.patch
-Patch1063: gdb-fortran-stride-intel-6of6.patch
+Patch1058: gdb-vla-intel-branch.patch
+Patch1059: gdb-vla-intel-branch-fix-stride-1of2.patch
+Patch1060: gdb-vla-intel-branch-fix-stride-2of2.patch
 Patch1132: gdb-vla-intel-1of7.patch
 Patch1133: gdb-vla-intel-2of7.patch
 Patch1134: gdb-vla-intel-3of7.patch
@@ -790,9 +787,6 @@ find -name "*.info*"|xargs rm -f
 %patch1058 -p1
 %patch1059 -p1
 %patch1060 -p1
-%patch1061 -p1
-%patch1062 -p1
-%patch1063 -p1
 %patch1132 -p1
 %patch1133 -p1
 %patch1134 -p1
@@ -1469,6 +1463,9 @@ then
 fi
 
 %changelog
+* Fri Aug 26 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-7.fc25
+- Fix Intel VLA patchset regression: dynamic.exp: p varw filled
+
 * Tue Aug 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-6.fc25
 - Merge Fedora packaging changes from Fedora 24 gdb-7.11.1-83.fc24:
 

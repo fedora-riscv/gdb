@@ -1,0 +1,64 @@
+http://sourceware.org/ml/gdb-patches/2016-08/msg00278.html
+Subject: Re: [V4 00/21] Fortran dynamic array support
+
+
+--X1bOJ3K7DJ5YkBrT
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Thu, 25 Aug 2016 19:22:17 +0200, Jan Kratochvil wrote:
+> I see the source handles negative stide specially.  Particularly the comment
+> here does not explain the code it comments:
+
+With the attached patch disabling these cases still the supplied
+gdb.fortran/static-arrays.exp and gdb.fortran/vla-stride.exp PASS (on Fedora 24
+x86_64).
+
+
+Jan
+
+--X1bOJ3K7DJ5YkBrT
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
+index 88801ac..695825a 100644
+--- a/gdb/gdbtypes.c
++++ b/gdb/gdbtypes.c
+@@ -2197,12 +2197,14 @@ resolve_dynamic_type_internal (struct type *type,
+     {
+       struct type *range_type = TYPE_INDEX_TYPE (resolved_type);
+ 
++#if 0 // Fedora: gdb-vla-intel-branch-fix-stride.patch
+       /* Adjust the data location with the value of byte stride if set, which
+          can describe the separation between successive elements along the
+          dimension.  */
+       if (TYPE_BYTE_STRIDE (range_type) < 0)
+         value += (TYPE_HIGH_BOUND (range_type) - TYPE_LOW_BOUND (range_type))
+                   * TYPE_BYTE_STRIDE (range_type);
++#endif
+ 
+       TYPE_DATA_LOCATION_ADDR (resolved_type) = value;
+       TYPE_DATA_LOCATION_KIND (resolved_type) = PROP_CONST;
+diff --git a/gdb/valarith.c b/gdb/valarith.c
+index 9093969..eca7992 100644
+--- a/gdb/valarith.c
++++ b/gdb/valarith.c
+@@ -199,12 +199,14 @@ value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
+ 
+   if (elt_stride > 0)
+     elt_offs *= elt_stride;
++#if 0 // Fedora: gdb-vla-intel-branch-fix-stride.patch
+   else if (elt_stride < 0)
+     {
+       int offs = (elt_offs + 1) * elt_stride;
+ 
+       elt_offs = TYPE_LENGTH (array_type) + offs;
+     }
++#endif
+   else
+     elt_offs *= elt_size;
+ 
+
+--X1bOJ3K7DJ5YkBrT--
+

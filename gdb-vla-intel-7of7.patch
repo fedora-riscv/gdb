@@ -52,11 +52,11 @@ Change-Id: I7d7f47c7a4900a7fdb51102032455b53d60e60d7
  create mode 100644 gdb/testsuite/gdb.fortran/vla-strings.exp
  create mode 100644 gdb/testsuite/gdb.fortran/vla-strings.f90
 
-diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 6658a38..678da8f 100644
---- a/gdb/dwarf2read.c
-+++ b/gdb/dwarf2read.c
-@@ -1764,7 +1764,8 @@ static void read_signatured_type (struct signatured_type *);
+Index: gdb-7.11.90.20160807/gdb/dwarf2read.c
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/dwarf2read.c	2016-08-25 16:08:17.397714936 +0200
++++ gdb-7.11.90.20160807/gdb/dwarf2read.c	2016-08-25 16:09:56.703580597 +0200
+@@ -1764,7 +1764,8 @@
  
  static int attr_to_dynamic_prop (const struct attribute *attr,
  				 struct die_info *die, struct dwarf2_cu *cu,
@@ -66,7 +66,7 @@ index 6658a38..678da8f 100644
  
  /* memory allocation interface */
  
-@@ -11437,7 +11438,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -11446,7 +11447,7 @@
      {
        newobj->static_link
  	= XOBNEW (&objfile->objfile_obstack, struct dynamic_prop);
@@ -75,16 +75,16 @@ index 6658a38..678da8f 100644
      }
  
    cu->list_in_scope = &local_symbols;
-@@ -14495,29 +14496,94 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14512,29 +14513,94 @@
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
 -  unsigned int length;
 +  unsigned int length = UINT_MAX;
-+
+ 
 +  index_type = objfile_type (objfile)->builtin_int;
 +  range_type = create_static_range_type (NULL, index_type, 1, length);
- 
++
 +  /* If DW_AT_string_length is defined, the length is stored in memory.  */
    attr = dwarf2_attr (die, DW_AT_string_length, cu);
    if (attr)
@@ -181,7 +181,7 @@ index 6658a38..678da8f 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -14847,7 +14913,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -14864,7 +14930,8 @@
  
  static int
  attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
@@ -191,7 +191,7 @@ index 6658a38..678da8f 100644
  {
    struct dwarf2_property_baton *baton;
    struct obstack *obstack = &cu->objfile->objfile_obstack;
-@@ -14857,14 +14924,33 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -14874,14 +14941,33 @@
  
    if (attr_form_is_block (attr))
      {
@@ -229,7 +229,7 @@ index 6658a38..678da8f 100644
      }
    else if (attr_form_is_ref (attr))
      {
-@@ -14897,8 +14983,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -14914,8 +15000,28 @@
  		baton = XOBNEW (obstack, struct dwarf2_property_baton);
  		baton->referenced_type = die_type (target_die, target_cu);
  		baton->locexpr.per_cu = cu->per_cu;
@@ -260,7 +260,15 @@ index 6658a38..678da8f 100644
  		prop->data.baton = baton;
  		prop->kind = PROP_LOCEXPR;
  		gdb_assert (prop->data.baton != NULL);
-@@ -15008,17 +15114,17 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -15027,24 +15133,24 @@
+ 
+   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
+   if (attr)
+-    if (!attr_to_dynamic_prop (attr, die, cu, &stride))
++    if (!attr_to_dynamic_prop (attr, die, cu, &stride, NULL, 0))
+         complaint (&symfile_complaints, _("Missing DW_AT_byte_stride "
+                   "- DIE at 0x%x [in module %s]"),
+              die->offset.sect_off, objfile_name (cu->objfile));
  
    attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
    if (attr)
@@ -281,7 +289,7 @@ index 6658a38..678da8f 100644
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -22389,7 +22495,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -22416,7 +22522,7 @@
    attr = dwarf2_attr (die, DW_AT_allocated, cu);
    if (attr_form_is_block (attr))
      {
@@ -290,7 +298,7 @@ index 6658a38..678da8f 100644
          add_dyn_prop (DYN_PROP_ALLOCATED, prop, type, objfile);
      }
    else if (attr != NULL)
-@@ -22404,7 +22510,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -22431,7 +22537,7 @@
    attr = dwarf2_attr (die, DW_AT_associated, cu);
    if (attr_form_is_block (attr))
      {
@@ -299,7 +307,7 @@ index 6658a38..678da8f 100644
          add_dyn_prop (DYN_PROP_ASSOCIATED, prop, type, objfile);
      }
    else if (attr != NULL)
-@@ -22417,7 +22523,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -22444,7 +22550,7 @@
  
    /* Read DW_AT_data_location and set in type.  */
    attr = dwarf2_attr (die, DW_AT_data_location, cu);
@@ -308,11 +316,11 @@ index 6658a38..678da8f 100644
      add_dyn_prop (DYN_PROP_DATA_LOCATION, prop, type, objfile);
  
    if (dwarf2_per_objfile->die_type_hash == NULL)
-diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index b53e649..0aa9113 100644
---- a/gdb/gdbtypes.c
-+++ b/gdb/gdbtypes.c
-@@ -1841,6 +1841,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
+Index: gdb-7.11.90.20160807/gdb/gdbtypes.c
+===================================================================
+--- gdb-7.11.90.20160807.orig/gdb/gdbtypes.c	2016-08-25 16:08:17.397714936 +0200
++++ gdb-7.11.90.20160807/gdb/gdbtypes.c	2016-08-25 16:09:11.623187626 +0200
+@@ -1851,6 +1851,7 @@
        }
  
      case TYPE_CODE_ARRAY:
@@ -320,7 +328,7 @@ index b53e649..0aa9113 100644
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
-@@ -1945,7 +1946,8 @@ resolve_dynamic_array (struct type *type,
+@@ -1964,7 +1965,8 @@
    struct type *ary_dim;
    struct dynamic_prop *prop;
  
@@ -330,7 +338,7 @@ index b53e649..0aa9113 100644
  
    type = copy_type (type);
  
-@@ -1970,13 +1972,17 @@ resolve_dynamic_array (struct type *type,
+@@ -1989,13 +1991,17 @@
  
    ary_dim = check_typedef (TYPE_TARGET_TYPE (elt_type));
  
@@ -351,7 +359,7 @@ index b53e649..0aa9113 100644
  }
  
  /* Resolve dynamic bounds of members of the union TYPE to static
-@@ -2181,6 +2187,7 @@ resolve_dynamic_type_internal (struct type *type,
+@@ -2200,6 +2206,7 @@
   	  break;
  
  	case TYPE_CODE_ARRAY:
@@ -359,11 +367,10 @@ index b53e649..0aa9113 100644
  	  resolved_type = resolve_dynamic_array (type, addr_stack);
  	  break;
  
-diff --git a/gdb/testsuite/gdb.fortran/vla-strings.exp b/gdb/testsuite/gdb.fortran/vla-strings.exp
-new file mode 100644
-index 0000000..484fdcb
---- /dev/null
-+++ b/gdb/testsuite/gdb.fortran/vla-strings.exp
+Index: gdb-7.11.90.20160807/gdb/testsuite/gdb.fortran/vla-strings.exp
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.11.90.20160807/gdb/testsuite/gdb.fortran/vla-strings.exp	2016-08-25 16:09:11.624187635 +0200
 @@ -0,0 +1,103 @@
 +# Copyright 2016 Free Software Foundation, Inc.
 +
@@ -468,11 +475,10 @@ index 0000000..484fdcb
 +	    pass $test
 +    }
 +}
-diff --git a/gdb/testsuite/gdb.fortran/vla-strings.f90 b/gdb/testsuite/gdb.fortran/vla-strings.f90
-new file mode 100644
-index 0000000..3c22735
---- /dev/null
-+++ b/gdb/testsuite/gdb.fortran/vla-strings.f90
+Index: gdb-7.11.90.20160807/gdb/testsuite/gdb.fortran/vla-strings.f90
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gdb-7.11.90.20160807/gdb/testsuite/gdb.fortran/vla-strings.f90	2016-08-25 16:09:11.624187635 +0200
 @@ -0,0 +1,39 @@
 +! Copyright 2016 Free Software Foundation, Inc.
 +!
@@ -513,6 +519,3 @@ index 0000000..3c22735
 +  var_char_p => null()
 +  l = associated(var_char_p)              ! var_char_p-not-associated
 +end program vla_strings
--- 
-2.7.4
-

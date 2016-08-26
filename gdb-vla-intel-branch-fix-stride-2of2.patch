@@ -1,0 +1,929 @@
+http://sourceware.org/ml/gdb-patches/2016-08/msg00274.html
+Subject: Re: [V4 00/21] Fortran dynamic array support
+
+
+--VbJkn9YxBvnuCH5J
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Tue, 23 Aug 2016 15:34:09 +0200, Bernhard Heckel wrote:
+> created a branch with all stride patches.
+
+users/bheckel/fortran-strides
+2c392d41a3f2e38deeb9db5b7a93ca45682bbe3b
+
+> I don't see regression on RH7.1, gcc 4.8.3-9
+
+I see a regression for 32-bit targets (x86_64-m32 or native i686)
+on Fedora 24 (gcc-gfortran-6.1.1-3.fc24.x86_64).  I do not see the regression
+on CentOS-7.2 (x86_64-m32).
+
+print pvla^M
+value requires 4294967288 bytes, which is more than max-value-size^M
+(gdb) FAIL: gdb.fortran/vla-stride.exp: print single-element
+
+I have attached a fix.
+
+It is because:
+    <115>   DW_AT_lower_bound : 4 byte block: 97 23 10 6        (DW_OP_push_object_address; DW_OP_plus_uconst: 16; DW_OP_deref)
+    <11a>   DW_AT_upper_bound : 4 byte block: 97 23 14 6        (DW_OP_push_object_address; DW_OP_plus_uconst: 20; DW_OP_deref)
+    <11f>   DW_AT_byte_stride : 6 byte block: 97 23 c 6 34 1e   (DW_OP_push_object_address; DW_OP_plus_uconst: 12; DW_OP_deref; DW_OP_lit4; DW_OP_mul)
+	DW_AT_lower_bound == 1
+	DW_AT_upper_bound == 1
+	DW_AT_byte_stride == (-2) * 4 == -8
+
+I am not sure if gfortran is really wrong or not but a stride does not make
+sense for me for a single row array.
+
+Attaching also gdb.fortran/vla-stride.f90 from your branch built with
+gcc-gfortran-6.1.1-3.fc24.x86_64 on Fedora 24 x86_64 in -m32 mode.
+
+Besides that I see on all archs
+	-FAIL: gdb.pascal/arrays.exp: Print dynamic array of string
+	+FAIL: gdb.pascal/arrays.exp: Print dynamic array of string (GDB internal error)
+but that testcase is only in Fedora and the Pascal (fpc) support has been not
+well maintained so far so I am OK with that.
+
+
+Thanks,
+Jan
+
+--VbJkn9YxBvnuCH5J
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename=1
+
+diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
+index 88801ac..1fbf69a 100644
+--- a/gdb/gdbtypes.c
++++ b/gdb/gdbtypes.c
+@@ -1103,10 +1103,12 @@ create_array_type_with_stride (struct type *result_type,
+       if (high_bound < low_bound)
+ 	TYPE_LENGTH (result_type) = 0;
+       else if (byte_stride > 0)
+-	TYPE_LENGTH (result_type) = byte_stride * (high_bound - low_bound + 1);
++	TYPE_LENGTH (result_type) = (byte_stride * (high_bound - low_bound)
++				     + TYPE_LENGTH (element_type));
+       else if (bit_stride > 0)
+ 	TYPE_LENGTH (result_type) =
+-	  (bit_stride * (high_bound - low_bound + 1) + 7) / 8;
++	  ((bit_stride * (high_bound - low_bound) + 7) / 8
++	   + TYPE_LENGTH (element_type));
+       else
+ 	TYPE_LENGTH (result_type) =
+ 	  TYPE_LENGTH (element_type) * (high_bound - low_bound + 1);
+
+--VbJkn9YxBvnuCH5J
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="vla-stride.s"
+
+	.file	"vla-stride.f90"
+	.text
+.Ltext0:
+	.section	.rodata
+	.align 4
+.LC0:
+	.string	"Integer overflow when calculating the amount of memory to allocate"
+.LC1:
+	.string	"vla"
+	.align 4
+.LC2:
+	.string	"Attempting to allocate already allocated variable '%s'"
+	.align 4
+.LC3:
+	.string	"At line 20 of file gdb.fortran/vla-stride.f90"
+	.align 4
+.LC4:
+	.string	"Allocation would exceed memory limit"
+	.text
+	.type	MAIN__, @function
+MAIN__:
+.LFB0:
+	.file 1 "gdb.fortran/vla-stride.f90"
+	# gdb.fortran/vla-stride.f90:16
+	.loc 1 16 0
+	.cfi_startproc
+# BLOCK 2 seq:0
+# PRED: ENTRY (FALLTHRU)
+	pushl	%ebp
+	.cfi_def_cfa_offset 8
+	.cfi_offset 5, -8
+	movl	%esp, %ebp
+	.cfi_def_cfa_register 5
+	pushl	%edi
+	pushl	%esi
+	pushl	%ebx
+	subl	$60, %esp
+	.cfi_offset 7, -12
+	.cfi_offset 6, -16
+	.cfi_offset 3, -20
+	# gdb.fortran/vla-stride.f90:17
+	.loc 1 17 0
+	movl	$0, -72(%ebp)
+.LBB2:
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0
+	movl	$0, %eax
+	testl	%eax, %eax
+# SUCC: 3 (FALLTHRU) 4
+	je	.L2
+# BLOCK 3 seq:1
+# PRED: 2 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 is_stmt 0 discriminator 1
+	subl	$12, %esp
+	pushl	$.LC0
+# SUCC:
+	call	_gfortran_runtime_error
+# BLOCK 4 seq:2
+# PRED: 2
+.L2:
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 discriminator 2
+	movl	-72(%ebp), %eax
+	testl	%eax, %eax
+# SUCC: 5 (FALLTHRU) 6
+	je	.L3
+# BLOCK 5 seq:3
+# PRED: 4 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 discriminator 3
+	subl	$4, %esp
+	pushl	$.LC1
+	pushl	$.LC2
+	pushl	$.LC3
+# SUCC:
+	call	_gfortran_runtime_error_at
+# BLOCK 6 seq:4
+# PRED: 4
+.L3:
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 discriminator 4
+	subl	$12, %esp
+	pushl	$40
+	call	malloc
+	addl	$16, %esp
+	movl	%eax, -72(%ebp)
+	movl	-72(%ebp), %eax
+	testl	%eax, %eax
+# SUCC: 7 (FALLTHRU) 8
+	jne	.L4
+# BLOCK 7 seq:5
+# PRED: 6 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 discriminator 5
+	subl	$12, %esp
+	pushl	$.LC4
+# SUCC:
+	call	_gfortran_os_error
+# BLOCK 8 seq:6
+# PRED: 6
+.L4:
+	# gdb.fortran/vla-stride.f90:20
+	.loc 1 20 0 discriminator 6
+	movl	$265, -64(%ebp)
+	movl	$1, -56(%ebp)
+	movl	$10, -52(%ebp)
+	movl	$1, -60(%ebp)
+	movl	$-1, -68(%ebp)
+.LBB3:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 is_stmt 1 discriminator 6
+	movl	-72(%ebp), %edx
+	movl	-68(%ebp), %esi
+	movl	-56(%ebp), %ebx
+.LBB4:
+.LBB5:
+	movl	-72(%ebp), %eax
+	testl	%eax, %eax
+	sete	%al
+	movzbl	%al, %eax
+	testl	%eax, %eax
+# SUCC: 10 9 (FALLTHRU)
+	jne	.L5
+# BLOCK 9 seq:7
+# PRED: 8 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 is_stmt 0 discriminator 2
+	movl	-56(%ebp), %ecx
+	leal	9(%ecx), %edi
+	movl	-52(%ebp), %ecx
+	cmpl	%ecx, %edi
+# SUCC: 10 (FALLTHRU) 18
+	je	.L6
+# BLOCK 10 seq:8
+# PRED: 8 9 (FALLTHRU)
+.L5:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 3
+	testl	%eax, %eax
+# SUCC: 11 (FALLTHRU) 12
+	je	.L7
+# BLOCK 11 seq:9
+# PRED: 10 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 4
+	movl	$0, %eax
+# SUCC: 13 [100.0%] 
+	jmp	.L8
+# BLOCK 12 seq:10
+# PRED: 10
+.L7:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 5
+	movl	-52(%ebp), %edx
+	movl	-56(%ebp), %eax
+	subl	%eax, %edx
+	movl	%edx, %eax
+	addl	$1, %eax
+	movl	$0, %edx
+	testl	%eax, %eax
+# SUCC: 13 (FALLTHRU)
+	cmovs	%edx, %eax
+# BLOCK 13 seq:11
+# PRED: 12 (FALLTHRU) 11 [100.0%] 
+.L8:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 7
+	cmpl	$10, %eax
+	setne	%al
+	movzbl	%al, %eax
+	movl	$1, -56(%ebp)
+	movl	$10, -52(%ebp)
+	movl	$1, -60(%ebp)
+	movl	-56(%ebp), %edx
+	negl	%edx
+	movl	%edx, -68(%ebp)
+	movl	-68(%ebp), %esi
+	movl	-56(%ebp), %ebx
+	movl	-72(%ebp), %edx
+	testl	%edx, %edx
+# SUCC: 14 (FALLTHRU) 15
+	jne	.L9
+# BLOCK 14 seq:12
+# PRED: 13 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 8
+	subl	$12, %esp
+	pushl	$40
+	call	malloc
+	addl	$16, %esp
+	movl	%eax, -72(%ebp)
+	movl	$265, -64(%ebp)
+# SUCC: 17 [100.0%] 
+	jmp	.L10
+# BLOCK 15 seq:13
+# PRED: 13
+.L9:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 9
+	testl	%eax, %eax
+# SUCC: 16 (FALLTHRU) 17
+	je	.L10
+# BLOCK 16 seq:14
+# PRED: 15 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 11
+	movl	-72(%ebp), %eax
+	subl	$8, %esp
+	pushl	$40
+	pushl	%eax
+	call	realloc
+	addl	$16, %esp
+# SUCC: 17 (FALLTHRU)
+	movl	%eax, -72(%ebp)
+# BLOCK 17 seq:15
+# PRED: 16 (FALLTHRU) 15 14 [100.0%] 
+.L10:
+# SUCC: 18 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 13
+	movl	-72(%ebp), %edx
+# BLOCK 18 seq:16
+# PRED: 9 17 (FALLTHRU)
+.L6:
+.LBE5:
+# SUCC: 19 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 14
+	movl	$0, %eax
+# BLOCK 19 seq:17
+# PRED: 18 (FALLTHRU) 20 [100.0%] 
+.L12:
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 17
+	cmpl	$9, %eax
+# SUCC: 21 20 (FALLTHRU)
+	jg	.L11
+# BLOCK 20 seq:18
+# PRED: 19 (FALLTHRU)
+	# gdb.fortran/vla-stride.f90:21
+	.loc 1 21 0 discriminator 16
+	leal	(%eax,%ebx), %ecx
+	leal	(%ecx,%esi), %edi
+	movl	A.1.3368(,%eax,4), %ecx
+	movl	%ecx, (%edx,%edi,4)
+	addl	$1, %eax
+# SUCC: 19 [100.0%] 
+	jmp	.L12
+# BLOCK 21 seq:19
+# PRED: 19
+.L11:
+.LBE4:
+.LBE3:
+	# gdb.fortran/vla-stride.f90:23
+	.loc 1 23 0 is_stmt 1
+	movl	$265, -40(%ebp)
+	movl	$1, -32(%ebp)
+	movl	$10, -28(%ebp)
+	movl	$-1, -36(%ebp)
+	movl	-72(%ebp), %eax
+	movl	-56(%ebp), %edx
+	movl	$10, %ecx
+	subl	%edx, %ecx
+	movl	%ecx, %edx
+	sall	$2, %edx
+	addl	%edx, %eax
+	movl	%eax, -48(%ebp)
+	movl	$1, -44(%ebp)
+.LBB6:
+	# gdb.fortran/vla-stride.f90:24
+	.loc 1 24 0
+	movl	$265, -40(%ebp)
+	movl	-36(%ebp), %eax
+	movl	$1, -32(%ebp)
+	movl	$10, -28(%ebp)
+	movl	%eax, %edx
+	negl	%edx
+	movl	%edx, -36(%ebp)
+	movl	-48(%ebp), %edx
+	movl	-32(%ebp), %ecx
+	movl	$10, %ebx
+	subl	%ecx, %ebx
+	movl	%ebx, %ecx
+	imull	%eax, %ecx
+	sall	$2, %ecx
+	addl	%ecx, %edx
+	movl	%edx, -48(%ebp)
+	movl	%eax, -44(%ebp)
+.LBE6:
+	# gdb.fortran/vla-stride.f90:25
+	.loc 1 25 0
+	movl	$265, -40(%ebp)
+	movl	$1, -32(%ebp)
+	movl	$5, -28(%ebp)
+	movl	$2, -36(%ebp)
+	movl	-72(%ebp), %eax
+	movl	-56(%ebp), %edx
+	movl	$1, %ecx
+	subl	%edx, %ecx
+	movl	%ecx, %edx
+	sall	$2, %edx
+	addl	%edx, %eax
+	movl	%eax, -48(%ebp)
+	movl	$-2, -44(%ebp)
+	# gdb.fortran/vla-stride.f90:26
+	.loc 1 26 0
+	movl	$265, -40(%ebp)
+	movl	$1, -32(%ebp)
+	movl	$1, -28(%ebp)
+	movl	$-2, -36(%ebp)
+	movl	-72(%ebp), %eax
+	movl	-56(%ebp), %edx
+	movl	$5, %ecx
+	subl	%edx, %ecx
+	movl	%ecx, %edx
+	sall	$2, %edx
+	addl	%edx, %eax
+	movl	%eax, -48(%ebp)
+	movl	$2, -44(%ebp)
+	# gdb.fortran/vla-stride.f90:28
+	.loc 1 28 0
+	movl	$0, -48(%ebp)
+.LBE2:
+	# gdb.fortran/vla-stride.f90:29
+	.loc 1 29 0
+	nop
+	leal	-12(%ebp), %esp
+	popl	%ebx
+	.cfi_restore 3
+	popl	%esi
+	.cfi_restore 6
+	popl	%edi
+	.cfi_restore 7
+	popl	%ebp
+	.cfi_restore 5
+	.cfi_def_cfa 4, 4
+# SUCC: EXIT [100.0%] 
+	ret
+	.cfi_endproc
+.LFE0:
+	.size	MAIN__, .-MAIN__
+	.globl	main
+	.type	main, @function
+main:
+.LFB1:
+	# gdb.fortran/vla-stride.f90:29
+	.loc 1 29 0
+	.cfi_startproc
+# BLOCK 2 seq:0
+# PRED: ENTRY (FALLTHRU)
+	leal	4(%esp), %ecx
+	.cfi_def_cfa 1, 0
+	andl	$-16, %esp
+	pushl	-4(%ecx)
+	pushl	%ebp
+	.cfi_escape 0x10,0x5,0x2,0x75,0
+	movl	%esp, %ebp
+	pushl	%ecx
+	.cfi_escape 0xf,0x3,0x75,0x7c,0x6
+	subl	$4, %esp
+	movl	%ecx, %eax
+	# gdb.fortran/vla-stride.f90:29
+	.loc 1 29 0
+	subl	$8, %esp
+	pushl	4(%eax)
+	pushl	(%eax)
+	call	_gfortran_set_args
+	addl	$16, %esp
+	subl	$8, %esp
+	pushl	$options.3.3382
+	pushl	$9
+	call	_gfortran_set_options
+	addl	$16, %esp
+	call	MAIN__
+	movl	$0, %eax
+	movl	-4(%ebp), %ecx
+	.cfi_def_cfa 1, 0
+	leave
+	.cfi_restore 5
+	leal	-4(%ecx), %esp
+	.cfi_def_cfa 4, 4
+# SUCC: EXIT [100.0%] 
+	ret
+	.cfi_endproc
+.LFE1:
+	.size	main, .-main
+	.section	.rodata
+	.align 32
+	.type	A.1.3368, @object
+	.size	A.1.3368, 40
+A.1.3368:
+	.long	1
+	.long	2
+	.long	3
+	.long	4
+	.long	5
+	.long	6
+	.long	7
+	.long	8
+	.long	9
+	.long	10
+	.align 32
+	.type	options.3.3382, @object
+	.size	options.3.3382, 36
+options.3.3382:
+	.long	68
+	.long	1023
+	.long	0
+	.long	0
+	.long	1
+	.long	1
+	.long	0
+	.long	0
+	.long	31
+	.text
+.Letext0:
+	.section	.debug_info,"",@progbits
+.Ldebug_info0:
+	.long	0x128	# Length of Compilation Unit Info
+	.value	0x4	# DWARF version number
+	.long	.Ldebug_abbrev0	# Offset Into Abbrev. Section
+	.byte	0x4	# Pointer Size (in bytes)
+	.uleb128 0x1	# (DIE (0xb) DW_TAG_compile_unit)
+	.long	.LASF5	# DW_AT_producer: "GNU Fortran2008 6.1.1 20160621 (Red Hat 6.1.1-3) -m32 -mtune=generic -march=i686 -g -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/6.1.1/32/finclude"
+	.byte	0xe	# DW_AT_language
+	.byte	0x2	# DW_AT_identifier_case
+	.long	.LASF6	# DW_AT_name: "gdb.fortran/vla-stride.f90"
+	.long	.LASF7	# DW_AT_comp_dir: "/home/jkratoch/redhat/gdb-clean/gdb/testsuite"
+	.long	.Ltext0	# DW_AT_low_pc
+	.long	.Letext0-.Ltext0	# DW_AT_high_pc
+	.long	.Ldebug_line0	# DW_AT_stmt_list
+	.uleb128 0x2	# (DIE (0x26) DW_TAG_base_type)
+	.byte	0x4	# DW_AT_byte_size
+	.byte	0x5	# DW_AT_encoding
+	.long	.LASF2	# DW_AT_name: "integer(kind=4)"
+	.uleb128 0x3	# (DIE (0x2d) DW_TAG_const_type)
+	.long	0x26	# DW_AT_type
+	.uleb128 0x4	# (DIE (0x32) DW_TAG_subprogram)
+			# DW_AT_external
+	.long	.LASF8	# DW_AT_name: "main"
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x1d	# DW_AT_decl_line
+	.long	0x26	# DW_AT_type
+	.long	.LFB1	# DW_AT_low_pc
+	.long	.LFE1-.LFB1	# DW_AT_high_pc
+	.uleb128 0x1	# DW_AT_frame_base
+	.byte	0x9c	# DW_OP_call_frame_cfa
+			# DW_AT_GNU_all_tail_call_sites
+	.long	0x69	# DW_AT_sibling
+	.uleb128 0x5	# (DIE (0x4b) DW_TAG_formal_parameter)
+	.long	.LASF0	# DW_AT_name: "argc"
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x1d	# DW_AT_decl_line
+	.long	0x2d	# DW_AT_type
+	.uleb128 0x2	# DW_AT_location
+	.byte	0x91	# DW_OP_fbreg
+	.sleb128 0
+	.uleb128 0x5	# (DIE (0x59) DW_TAG_formal_parameter)
+	.long	.LASF1	# DW_AT_name: "argv"
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x1d	# DW_AT_decl_line
+	.long	0x69	# DW_AT_type
+	.uleb128 0x3	# DW_AT_location
+	.byte	0x91	# DW_OP_fbreg
+	.sleb128 4
+	.byte	0x6	# DW_OP_deref
+	.byte	0	# end of children of DIE 0x32
+	.uleb128 0x6	# (DIE (0x69) DW_TAG_pointer_type)
+	.byte	0x4	# DW_AT_byte_size
+	.long	0x6f	# DW_AT_type
+	.uleb128 0x2	# (DIE (0x6f) DW_TAG_base_type)
+	.byte	0x1	# DW_AT_byte_size
+	.byte	0x8	# DW_AT_encoding
+	.long	.LASF3	# DW_AT_name: "character(kind=1)"
+	.uleb128 0x7	# (DIE (0x76) DW_TAG_subprogram)
+	.long	.LASF9	# DW_AT_name: "vla_stride"
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x10	# DW_AT_decl_line
+			# DW_AT_main_subprogram
+	.byte	0x2	# DW_AT_calling_convention
+	.long	.LFB0	# DW_AT_low_pc
+	.long	.LFE0-.LFB0	# DW_AT_high_pc
+	.uleb128 0x1	# DW_AT_frame_base
+	.byte	0x9c	# DW_OP_call_frame_cfa
+			# DW_AT_GNU_all_tail_call_sites
+	.long	0xe7	# DW_AT_sibling
+	.uleb128 0x8	# (DIE (0x8c) DW_TAG_variable)
+	.ascii "i\0"	# DW_AT_name
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x15	# DW_AT_decl_line
+	.long	0x26	# DW_AT_type
+	.uleb128 0x9	# (DIE (0x95) DW_TAG_variable)
+	.long	.LASF4	# DW_AT_name: "pvla"
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x12	# DW_AT_decl_line
+	.long	0xe7	# DW_AT_type
+	.uleb128 0x2	# DW_AT_location
+	.byte	0x91	# DW_OP_fbreg
+	.sleb128 -56
+	.uleb128 0xa	# (DIE (0xa3) DW_TAG_variable)
+	.ascii "vla\0"	# DW_AT_name
+	.byte	0x1	# DW_AT_decl_file (gdb.fortran/vla-stride.f90)
+	.byte	0x11	# DW_AT_decl_line
+	.long	0x10b	# DW_AT_type
+	.uleb128 0x3	# DW_AT_location
+	.byte	0x91	# DW_OP_fbreg
+	.sleb128 -80
+	.uleb128 0xb	# (DIE (0xb2) DW_TAG_lexical_block)
+	.long	.LBB2	# DW_AT_low_pc
+	.long	.LBE2-.LBB2	# DW_AT_high_pc
+	.uleb128 0xc	# (DIE (0xbb) DW_TAG_lexical_block)
+	.long	.LBB3	# DW_AT_low_pc
+	.long	.LBE3-.LBB3	# DW_AT_high_pc
+	.long	0xdc	# DW_AT_sibling
+	.uleb128 0xb	# (DIE (0xc8) DW_TAG_lexical_block)
+	.long	.LBB4	# DW_AT_low_pc
+	.long	.LBE4-.LBB4	# DW_AT_high_pc
+	.uleb128 0xd	# (DIE (0xd1) DW_TAG_lexical_block)
+	.long	.LBB5	# DW_AT_low_pc
+	.long	.LBE5-.LBB5	# DW_AT_high_pc
+	.byte	0	# end of children of DIE 0xc8
+	.byte	0	# end of children of DIE 0xbb
+	.uleb128 0xd	# (DIE (0xdc) DW_TAG_lexical_block)
+	.long	.LBB6	# DW_AT_low_pc
+	.long	.LBE6-.LBB6	# DW_AT_high_pc
+	.byte	0	# end of children of DIE 0xb2
+	.byte	0	# end of children of DIE 0x76
+	.uleb128 0xe	# (DIE (0xe7) DW_TAG_array_type)
+	.uleb128 0x2	# DW_AT_data_location
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x4	# DW_AT_associated
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x6	# DW_OP_deref
+	.byte	0x30	# DW_OP_lit0
+	.byte	0x2e	# DW_OP_ne
+	.long	0x26	# DW_AT_type
+	.long	0x10b	# DW_AT_sibling
+	.uleb128 0xf	# (DIE (0xf8) DW_TAG_subrange_type)
+	.uleb128 0x4	# DW_AT_lower_bound
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0x10
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x4	# DW_AT_upper_bound
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0x14
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x6	# DW_AT_byte_stride
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0xc
+	.byte	0x6	# DW_OP_deref
+	.byte	0x34	# DW_OP_lit4
+	.byte	0x1e	# DW_OP_mul
+	.byte	0	# end of children of DIE 0xe7
+	.uleb128 0x10	# (DIE (0x10b) DW_TAG_array_type)
+	.uleb128 0x2	# DW_AT_data_location
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x4	# DW_AT_allocated
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x6	# DW_OP_deref
+	.byte	0x30	# DW_OP_lit0
+	.byte	0x2e	# DW_OP_ne
+	.long	0x26	# DW_AT_type
+	.uleb128 0xf	# (DIE (0x118) DW_TAG_subrange_type)
+	.uleb128 0x4	# DW_AT_lower_bound
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0x10
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x4	# DW_AT_upper_bound
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0x14
+	.byte	0x6	# DW_OP_deref
+	.uleb128 0x6	# DW_AT_byte_stride
+	.byte	0x97	# DW_OP_push_object_address
+	.byte	0x23	# DW_OP_plus_uconst
+	.uleb128 0xc
+	.byte	0x6	# DW_OP_deref
+	.byte	0x34	# DW_OP_lit4
+	.byte	0x1e	# DW_OP_mul
+	.byte	0	# end of children of DIE 0x10b
+	.byte	0	# end of children of DIE 0xb
+	.section	.debug_abbrev,"",@progbits
+.Ldebug_abbrev0:
+	.uleb128 0x1	# (abbrev code)
+	.uleb128 0x11	# (TAG: DW_TAG_compile_unit)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x25	# (DW_AT_producer)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x13	# (DW_AT_language)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x42	# (DW_AT_identifier_case)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x1b	# (DW_AT_comp_dir)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.uleb128 0x10	# (DW_AT_stmt_list)
+	.uleb128 0x17	# (DW_FORM_sec_offset)
+	.byte	0
+	.byte	0
+	.uleb128 0x2	# (abbrev code)
+	.uleb128 0x24	# (TAG: DW_TAG_base_type)
+	.byte	0	# DW_children_no
+	.uleb128 0xb	# (DW_AT_byte_size)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3e	# (DW_AT_encoding)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.byte	0
+	.byte	0
+	.uleb128 0x3	# (abbrev code)
+	.uleb128 0x26	# (TAG: DW_TAG_const_type)
+	.byte	0	# DW_children_no
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0x4	# (abbrev code)
+	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x3f	# (DW_AT_external)
+	.uleb128 0x19	# (DW_FORM_flag_present)
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.uleb128 0x40	# (DW_AT_frame_base)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x2116	# (DW_AT_GNU_all_tail_call_sites)
+	.uleb128 0x19	# (DW_FORM_flag_present)
+	.uleb128 0x1	# (DW_AT_sibling)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0x5	# (abbrev code)
+	.uleb128 0x5	# (TAG: DW_TAG_formal_parameter)
+	.byte	0	# DW_children_no
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.uleb128 0x2	# (DW_AT_location)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.byte	0
+	.byte	0
+	.uleb128 0x6	# (abbrev code)
+	.uleb128 0xf	# (TAG: DW_TAG_pointer_type)
+	.byte	0	# DW_children_no
+	.uleb128 0xb	# (DW_AT_byte_size)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0x7	# (abbrev code)
+	.uleb128 0x2e	# (TAG: DW_TAG_subprogram)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x6a	# (DW_AT_main_subprogram)
+	.uleb128 0x19	# (DW_FORM_flag_present)
+	.uleb128 0x36	# (DW_AT_calling_convention)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.uleb128 0x40	# (DW_AT_frame_base)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x2116	# (DW_AT_GNU_all_tail_call_sites)
+	.uleb128 0x19	# (DW_FORM_flag_present)
+	.uleb128 0x1	# (DW_AT_sibling)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0x8	# (abbrev code)
+	.uleb128 0x34	# (TAG: DW_TAG_variable)
+	.byte	0	# DW_children_no
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0x8	# (DW_FORM_string)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0x9	# (abbrev code)
+	.uleb128 0x34	# (TAG: DW_TAG_variable)
+	.byte	0	# DW_children_no
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0xe	# (DW_FORM_strp)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.uleb128 0x2	# (DW_AT_location)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.byte	0
+	.byte	0
+	.uleb128 0xa	# (abbrev code)
+	.uleb128 0x34	# (TAG: DW_TAG_variable)
+	.byte	0	# DW_children_no
+	.uleb128 0x3	# (DW_AT_name)
+	.uleb128 0x8	# (DW_FORM_string)
+	.uleb128 0x3a	# (DW_AT_decl_file)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x3b	# (DW_AT_decl_line)
+	.uleb128 0xb	# (DW_FORM_data1)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.uleb128 0x2	# (DW_AT_location)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.byte	0
+	.byte	0
+	.uleb128 0xb	# (abbrev code)
+	.uleb128 0xb	# (TAG: DW_TAG_lexical_block)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.byte	0
+	.byte	0
+	.uleb128 0xc	# (abbrev code)
+	.uleb128 0xb	# (TAG: DW_TAG_lexical_block)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.uleb128 0x1	# (DW_AT_sibling)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0xd	# (abbrev code)
+	.uleb128 0xb	# (TAG: DW_TAG_lexical_block)
+	.byte	0	# DW_children_no
+	.uleb128 0x11	# (DW_AT_low_pc)
+	.uleb128 0x1	# (DW_FORM_addr)
+	.uleb128 0x12	# (DW_AT_high_pc)
+	.uleb128 0x6	# (DW_FORM_data4)
+	.byte	0
+	.byte	0
+	.uleb128 0xe	# (abbrev code)
+	.uleb128 0x1	# (TAG: DW_TAG_array_type)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x50	# (DW_AT_data_location)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x4f	# (DW_AT_associated)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.uleb128 0x1	# (DW_AT_sibling)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.uleb128 0xf	# (abbrev code)
+	.uleb128 0x21	# (TAG: DW_TAG_subrange_type)
+	.byte	0	# DW_children_no
+	.uleb128 0x22	# (DW_AT_lower_bound)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x2f	# (DW_AT_upper_bound)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x51	# (DW_AT_byte_stride)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.byte	0
+	.byte	0
+	.uleb128 0x10	# (abbrev code)
+	.uleb128 0x1	# (TAG: DW_TAG_array_type)
+	.byte	0x1	# DW_children_yes
+	.uleb128 0x50	# (DW_AT_data_location)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x4e	# (DW_AT_allocated)
+	.uleb128 0x18	# (DW_FORM_exprloc)
+	.uleb128 0x49	# (DW_AT_type)
+	.uleb128 0x13	# (DW_FORM_ref4)
+	.byte	0
+	.byte	0
+	.byte	0
+	.section	.debug_aranges,"",@progbits
+	.long	0x1c	# Length of Address Ranges Info
+	.value	0x2	# DWARF Version
+	.long	.Ldebug_info0	# Offset of Compilation Unit Info
+	.byte	0x4	# Size of Address
+	.byte	0	# Size of Segment Descriptor
+	.value	0	# Pad to 8 byte boundary
+	.value	0
+	.long	.Ltext0	# Address
+	.long	.Letext0-.Ltext0	# Length
+	.long	0
+	.long	0
+	.section	.debug_line,"",@progbits
+.Ldebug_line0:
+	.section	.debug_str,"MS",@progbits,1
+.LASF7:
+	.string	"/home/jkratoch/redhat/gdb-clean/gdb/testsuite"
+.LASF3:
+	.string	"character(kind=1)"
+.LASF0:
+	.string	"argc"
+.LASF9:
+	.string	"vla_stride"
+.LASF2:
+	.string	"integer(kind=4)"
+.LASF5:
+	.string	"GNU Fortran2008 6.1.1 20160621 (Red Hat 6.1.1-3) -m32 -mtune=generic -march=i686 -g -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/6.1.1/32/finclude"
+.LASF8:
+	.string	"main"
+.LASF4:
+	.string	"pvla"
+.LASF6:
+	.string	"gdb.fortran/vla-stride.f90"
+.LASF1:
+	.string	"argv"
+	.ident	"GCC: (GNU) 6.1.1 20160621 (Red Hat 6.1.1-3)"
+	.section	.note.GNU-stack,"",@progbits
+
+--VbJkn9YxBvnuCH5J--
+
