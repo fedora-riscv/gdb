@@ -1,0 +1,317 @@
+commit 754653a7c0a43a668a38aa30c4063b9e292a19f9
+Author: Adhemerval Zanella <adhemerval.zanella@linaro.org>
+Date:   Thu Aug 25 08:42:03 2016 +0100
+
+    Sync proc_service definition with GLIBC
+    
+    GLIBC BZ#20311 [1] proc_service.h install patch also remove 'const'
+    attributes from ps_get_thread_area and comment #15 discuss why to remove
+    the const attribute (basically since it a callback with the struct
+    ps_prochandle owned by the client it should be able to modify it if
+    it the case).
+    
+    On default build this is not the issue and current g++ does not trigger
+    any issue with this mismatch declaration.  However, on some bootstrap
+    build configuration where gdbserver is build with gcc instead this
+    triggers:
+    
+    error: conflicting types for 'ps_get_thread_area'
+    
+    This patch fixes it by syncing the declaration with GLIBC.
+    
+    [1] https://sourceware.org/bugzilla/show_bug.cgi?id=20311
+    
+    gdb/ChangeLog:
+    
+    2016-08-25  Adhemerval Zanella  <adhemerval.zanella@linaro.org>
+    
+    	* aarch64-linux-nat.c (ps_get_thread_area): Remove const from
+    	struct ps_prochandle.
+    	* amd64-linux-nat.c (ps_get_thread_area): Likewise.
+    	* arm-linux-nat.c (ps_get_thread_area): Likewise.
+    	* gdb_proc_service.h (ps_get_thread_area): Likewise.
+    	* i386-linux-nat.c (ps_get_thread_area): Likewise.
+    	* m68klinux-nat.c (ps_get_thread_area): Likewise.
+    	* mips-linux-nat.c (ps_get_thread_area): Likewise.
+    	* nat/aarch64-linux.c (aarch64_ps_get_thread_area): Likewise.
+    	* nat/aarch64-linux.h (aarch64_ps_get_thread_area): Likewise.
+    	* xtensa-linux-nat.c (ps_get_thread_area): Likewise.
+    
+    gdb/gdbserver/ChangeLog:
+    
+    2016-08-25  Adhemerval Zanella  <adhemerval.zanella@linaro.org>
+    
+    	PR server/20491
+    	* gdb_proc_service.h (ps_get_thread_area): Remove const from struct
+    	ps_prochandle.
+    	* linux-aarch64-low.c (ps_get_thread_area): Likewise.
+    	* linux-arm-low.c (ps_get_thread_area): Likewise.
+    	* linux-crisv32-low.c (ps_get_thread_area): Likewise.
+    	* linux-m68k-low.c (ps_get_thread_area): Likewise.
+    	* linux-mips-low.c (ps_get_thread_area): Likewise.
+    	* linux-nios2-low.c (ps_get_thread_area): Likewise.
+    	* linux-tic6x-low.c (ps_get_thread_area): Likewise.
+    	* linux-x86-low.c (ps_get_thread_area): Likewise.
+    	* linux-xtensa-low.c (ps_get_thread_area): Likewise.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,17 @@
++2016-08-25  Adhemerval Zanella  <adhemerval.zanella@linaro.org>
++
++	* aarch64-linux-nat.c (ps_get_thread_area): Remove const from
++	struct ps_prochandle.
++	* amd64-linux-nat.c (ps_get_thread_area): Likewise.
++	* arm-linux-nat.c (ps_get_thread_area): Likewise.
++	* gdb_proc_service.h (ps_get_thread_area): Likewise.
++	* i386-linux-nat.c (ps_get_thread_area): Likewise.
++	* m68klinux-nat.c (ps_get_thread_area): Likewise.
++	* mips-linux-nat.c (ps_get_thread_area): Likewise.
++	* nat/aarch64-linux.c (aarch64_ps_get_thread_area): Likewise.
++	* nat/aarch64-linux.h (aarch64_ps_get_thread_area): Likewise.
++	* xtensa-linux-nat.c (ps_get_thread_area): Likewise.
++
+ 2016-08-24  Simon Marchi  <simon.marchi@ericsson.com>
+ 
+ 	* infcmd.c (set_inferior_io_terminal): Set inferior terminal to
+--- a/gdb/aarch64-linux-nat.c
++++ b/gdb/aarch64-linux-nat.c
+@@ -457,7 +457,7 @@ aarch64_linux_new_fork (struct lwp_info *parent, pid_t child_pid)
+    storage (or its descriptor).  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   int is_64bit_p
+--- a/gdb/amd64-linux-nat.c
++++ b/gdb/amd64-linux-nat.c
+@@ -245,7 +245,7 @@ amd64_linux_store_inferior_registers (struct target_ops *ops,
+    a request for a thread's local storage address.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   if (gdbarch_bfd_arch_info (target_gdbarch ())->bits_per_word == 32)
+--- a/gdb/arm-linux-nat.c
++++ b/gdb/arm-linux-nat.c
+@@ -477,7 +477,7 @@ supply_fpregset (struct regcache *regcache, const gdb_fpregset_t *fpregsetp)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdb_proc_service.h
++++ b/gdb/gdb_proc_service.h
+@@ -124,7 +124,7 @@ extern pid_t ps_getpid (struct ps_prochandle *);
+ /* Fetch the special per-thread address associated with the given LWP.
+    This call is only used on a few platforms (most use a normal register).
+    The meaning of the `int' parameter is machine-dependent.  */
+-extern ps_err_e ps_get_thread_area (const struct ps_prochandle *,
++extern ps_err_e ps_get_thread_area (struct ps_prochandle *,
+ 				    lwpid_t, int, psaddr_t *);
+ 
+ 
+### a/gdb/gdbserver/ChangeLog
+### b/gdb/gdbserver/ChangeLog
+## -1,3 +1,18 @@
++2016-08-25  Adhemerval Zanella  <adhemerval.zanella@linaro.org>
++
++	PR server/20491
++	* gdb_proc_service.h (ps_get_thread_area): Remove const from struct
++	ps_prochandle.
++	* linux-aarch64-low.c (ps_get_thread_area): Likewise.
++	* linux-arm-low.c (ps_get_thread_area): Likewise.
++	* linux-crisv32-low.c (ps_get_thread_area): Likewise.
++	* linux-m68k-low.c (ps_get_thread_area): Likewise.
++	* linux-mips-low.c (ps_get_thread_area): Likewise.
++	* linux-nios2-low.c (ps_get_thread_area): Likewise.
++	* linux-tic6x-low.c (ps_get_thread_area): Likewise.
++	* linux-x86-low.c (ps_get_thread_area): Likewise.
++	* linux-xtensa-low.c (ps_get_thread_area): Likewise.
++
+ 2016-08-19  Pedro Alves  <palves@redhat.com>
+ 
+ 	* linux-x86-low.c (amd64_emit_call): Emit missing call opcode.
+--- a/gdb/gdbserver/gdb_proc_service.h
++++ b/gdb/gdbserver/gdb_proc_service.h
+@@ -107,7 +107,7 @@ extern pid_t ps_getpid (struct ps_prochandle *);
+ /* Fetch the special per-thread address associated with the given LWP.
+    This call is only used on a few platforms (most use a normal register).
+    The meaning of the `int' parameter is machine-dependent.  */
+-extern ps_err_e ps_get_thread_area (const struct ps_prochandle *,
++extern ps_err_e ps_get_thread_area (struct ps_prochandle *,
+ 				    lwpid_t, int, psaddr_t *);
+ 
+ 
+--- a/gdb/gdbserver/linux-aarch64-low.c
++++ b/gdb/gdbserver/linux-aarch64-low.c
+@@ -401,7 +401,7 @@ aarch64_stopped_by_watchpoint (void)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   return aarch64_ps_get_thread_area (ph, lwpid, idx, base,
+--- a/gdb/gdbserver/linux-arm-low.c
++++ b/gdb/gdbserver/linux-arm-low.c
+@@ -270,7 +270,7 @@ get_next_pcs_read_memory_unsigned_integer (CORE_ADDR memaddr,
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-crisv32-low.c
++++ b/gdb/gdbserver/linux-crisv32-low.c
+@@ -309,7 +309,7 @@ cris_stopped_data_address (void)
+ }
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-m68k-low.c
++++ b/gdb/gdbserver/linux-m68k-low.c
+@@ -152,7 +152,7 @@ m68k_breakpoint_at (CORE_ADDR pc)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-mips-low.c
++++ b/gdb/gdbserver/linux-mips-low.c
+@@ -637,7 +637,7 @@ mips_stopped_data_address (void)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-nios2-low.c
++++ b/gdb/gdbserver/linux-nios2-low.c
+@@ -145,7 +145,7 @@ nios2_breakpoint_at (CORE_ADDR where)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-tic6x-low.c
++++ b/gdb/gdbserver/linux-tic6x-low.c
+@@ -274,7 +274,7 @@ tic6x_breakpoint_at (CORE_ADDR where)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/gdbserver/linux-x86-low.c
++++ b/gdb/gdbserver/linux-x86-low.c
+@@ -186,7 +186,7 @@ is_64bit_tdesc (void)
+ /* Called by libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+ #ifdef __x86_64__
+--- a/gdb/gdbserver/linux-xtensa-low.c
++++ b/gdb/gdbserver/linux-xtensa-low.c
+@@ -177,7 +177,7 @@ xtensa_breakpoint_at (CORE_ADDR where)
+ /* Called by libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   xtensa_elf_gregset_t regs;
+--- a/gdb/i386-linux-nat.c
++++ b/gdb/i386-linux-nat.c
+@@ -603,7 +603,7 @@ i386_linux_store_inferior_registers (struct target_ops *ops,
+    storage (or its descriptor).  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   unsigned int base_addr;
+--- a/gdb/m68klinux-nat.c
++++ b/gdb/m68klinux-nat.c
+@@ -508,7 +508,7 @@ m68k_linux_store_inferior_registers (struct target_ops *ops,
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph, 
++ps_get_thread_area (struct ps_prochandle *ph, 
+ 		    lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) < 0)
+--- a/gdb/mips-linux-nat.c
++++ b/gdb/mips-linux-nat.c
+@@ -152,7 +152,7 @@ mips64_linux_register_addr (struct gdbarch *gdbarch, int regno, int store)
+ /* Fetch the thread-local storage pointer for libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   if (ptrace (PTRACE_GET_THREAD_AREA, lwpid, NULL, base) != 0)
+--- a/gdb/nat/aarch64-linux.c
++++ b/gdb/nat/aarch64-linux.c
+@@ -205,7 +205,7 @@ aarch64_siginfo_from_compat_siginfo (siginfo_t *to, compat_siginfo_t *from)
+    storage (or its descriptor).  */
+ 
+ ps_err_e
+-aarch64_ps_get_thread_area (const struct ps_prochandle *ph,
++aarch64_ps_get_thread_area (struct ps_prochandle *ph,
+ 			    lwpid_t lwpid, int idx, void **base,
+ 			    int is_64bit_p)
+ {
+--- a/gdb/nat/aarch64-linux.h
++++ b/gdb/nat/aarch64-linux.h
+@@ -122,7 +122,7 @@ void aarch64_linux_prepare_to_resume (struct lwp_info *lwp);
+ 
+ void aarch64_linux_new_thread (struct lwp_info *lwp);
+ 
+-ps_err_e aarch64_ps_get_thread_area (const struct ps_prochandle *ph,
++ps_err_e aarch64_ps_get_thread_area (struct ps_prochandle *ph,
+ 				       lwpid_t lwpid, int idx, void **base,
+ 				       int is_64bit_p);
+ 
+--- a/gdb/xtensa-linux-nat.c
++++ b/gdb/xtensa-linux-nat.c
+@@ -286,7 +286,7 @@ xtensa_linux_store_inferior_registers (struct target_ops *ops,
+ /* Called by libthread_db.  */
+ 
+ ps_err_e
+-ps_get_thread_area (const struct ps_prochandle *ph,
++ps_get_thread_area (struct ps_prochandle *ph,
+                     lwpid_t lwpid, int idx, void **base)
+ {
+   xtensa_elf_gregset_t regs;
