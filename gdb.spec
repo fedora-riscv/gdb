@@ -23,11 +23,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.11.90.20160807
+Version: 7.11.90.20160829
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1463,6 +1463,9 @@ then
 fi
 
 %changelog
+* Mon Aug 29 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160829-8.fc25
+- Rebase to FSF GDB 7.11.90.20160829 (pre-7.12 branch snapshot).
+
 * Fri Aug 26 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160807-7.fc25
 - Fix Intel VLA patchset regression: dynamic.exp: p varw filled
 
