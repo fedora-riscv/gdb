@@ -22,12 +22,13 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
-%global tarname gdb-7.11.90.20160904
+%global tardate 20160904
+%global tarname gdb-7.11.90.%{tardate}
 Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 0.10.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -999,8 +1000,6 @@ CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
 CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 %endif
 
-export CXXFLAGS="$CFLAGS"
-
 %if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
 (
  mkdir processor-trace-%{libipt_version}-root
@@ -1019,6 +1018,8 @@ export CXXFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS -I$PWD/processor-trace-%{libipt_version}-root%{_includedir}"
 LDFLAGS="$LDFLAGS -L$PWD/processor-trace-%{libipt_version}-root%{_libdir}"
 %endif
+
+export CXXFLAGS="$CFLAGS"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
@@ -1463,6 +1464,9 @@ then
 fi
 
 %changelog
+* Sun Sep  4 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.10.20160904.fc25
+- Fix libipt bundling in 7.12.
+
 * Sun Sep  4 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.9.20160904.fc25
 - Rebase to FSF GDB 7.11.90.20160904 (pre-7.12 branch snapshot).
 - Make Version tag 7.12; but it is still a pre-release.
