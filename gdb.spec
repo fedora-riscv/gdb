@@ -22,12 +22,12 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
-%global tarname gdb-%{version}
-Version: 7.11.90.20160829
+%global tarname gdb-7.11.90.20160904
+Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1463,6 +1463,10 @@ then
 fi
 
 %changelog
+* Sun Sep  4 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.9.20160904.fc25
+- Rebase to FSF GDB 7.11.90.20160904 (pre-7.12 branch snapshot).
+- Make Version tag 7.12; but it is still a pre-release.
+
 * Mon Aug 29 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.90.20160829-8.fc25
 - Rebase to FSF GDB 7.11.90.20160829 (pre-7.12 branch snapshot).
 
