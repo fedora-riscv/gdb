@@ -28,7 +28,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.11.%{tardate}%{?dist}
+Release: 0.12.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -582,6 +582,9 @@ Patch1123: gdb-rhbz1325795-framefilters-test.patch
 # [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
 Patch1143: gdb-linux_perf-bundle.patch
 
+# [rhel6+7] Fix compatibility of bison <3.1 and gcc >=6.
+Patch1144: gdb-bison-old.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -918,6 +921,7 @@ done
 %patch1120 -p1
 %patch1123 -p1
 %patch1143 -p1
+%patch1144 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1464,6 +1468,9 @@ then
 fi
 
 %changelog
+* Wed Sep  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.12.20160904.fc25
+- [rhel6+7] Fix compatibility of bison <3.1 and gcc >=6.
+
 * Sun Sep  4 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.11.20160904.fc25
 - Release bump for a mistaken build.
 
