@@ -112,12 +112,11 @@ Index: gdb-7.11.50.20160630/gdb/python/python.c
      }
    END_CATCH
  
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.c	2016-07-03 16:30:42.813387876 +0200
-@@ -0,0 +1,12 @@
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-gil-mthread.c	2016-09-12 21:51:53.750317187 +0200
+@@ -0,0 +1,13 @@
 +#include <stdio.h>
++#include <unistd.h>
 +
 +int
 +main (void)
@@ -129,10 +128,8 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.c
 +      printf ("Sleeping %d\n", i);
 +    }
 +}
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.exp	2016-07-03 16:30:42.813387876 +0200
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-gil-mthread.exp	2016-09-12 21:52:38.605750360 +0200
 @@ -0,0 +1,69 @@
 +# Copyright (C) 2014 Free Software Foundation, Inc.
 +
@@ -171,7 +168,7 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.exp
 +set sleeping_last -1
 +set hello_last 0
 +set minimal 5
-+gdb_test_multiple "python execfile('$srcdir/$subdir/$srcfile2')" $test {
++gdb_test_multiple "python exec (open ('$srcdir/$subdir/$srcfile2').read ())" $test {
 +    -re "Error: unable to start thread\r\n" {
 +	fail $test
 +	# Not $gdb_prompt-synced!
@@ -203,12 +200,13 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.exp
 +	}
 +    }
 +}
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.py
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.py	2016-07-03 16:30:42.814387884 +0200
-@@ -0,0 +1,22 @@
-+import thread
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-gil-mthread.py	2016-09-12 21:59:02.668459286 +0200
+@@ -0,0 +1,28 @@
++try:
++   import thread
++except:
++   import _thread
 +import time
 +import gdb
 +
@@ -218,15 +216,18 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.python/py-gil-mthread.py
 +   while count < 10:
 +      time.sleep(1)
 +      count += 1
-+      print "Hello (", count, ")"
++      print ("Hello (", count, ")")
 +
 +# Create a threads a continue
 +try:
-+   thread.start_new_thread( print_thread_hello, ())
++   thread.start_new_thread (print_thread_hello, ())
 +   gdb.execute ("continue", release_gil=True)
-+   
 +except:
-+   print "Error: unable to start thread"
++   try:
++      _thread.start_new_thread (print_thread_hello, ())
++      gdb.execute ("continue", release_gil=True)
++   except:
++      print ("Error: unable to start thread")
 +
 +while 1:
 +   pass

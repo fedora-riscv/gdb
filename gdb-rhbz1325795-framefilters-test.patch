@@ -1,5 +1,47 @@
---- /dev/null	2016-04-19 22:52:19.405224269 +0200
-+++ gdb-7.6.1/gdb/testsuite/gdb.python/py-framefilter-thread.exp	2016-04-19 23:22:10.655271756 +0200
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-framefilter-thread.c	2016-09-12 21:43:56.448695513 +0200
+@@ -0,0 +1,39 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <pthread.h>
++#include <assert.h>
++
++static void *
++start (void *arg)
++{
++  return arg; /* Backtrace end breakpoint */
++}
++
++int
++main (void)
++{
++  pthread_t thread1;
++  int i;
++
++  i = pthread_create (&thread1, NULL, start, NULL);
++  assert (i == 0);
++  i = pthread_join (thread1, NULL);
++  assert (i == 0);
++
++  return 0;
++}
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-framefilter-thread.exp	2016-09-12 21:46:54.623428493 +0200
 @@ -0,0 +1,54 @@
 +# Copyright (C) 2016 Free Software Foundation, Inc.
 +
@@ -35,7 +77,7 @@
 +
 +# Load global frame-filters
 +set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
-+gdb_test_no_output "python execfile ('${remote_python_file}')" \
++gdb_test_no_output "python exec (open ('${remote_python_file}').read ())" \
 +    "Load python file"
 +
 +gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
@@ -55,51 +97,9 @@
 +#     block = self.frame.block()
 +# RuntimeError: Cannot locate object file for block.
 +gdb_test "bt" " in \[0-9\]+ \[^\r\n\]*" "bt with filters"
---- /dev/null	2016-04-19 22:52:19.405224269 +0200
-+++ gdb-7.6.1/gdb/testsuite/gdb.python/py-framefilter-thread.c	2016-04-18 22:44:07.096613437 +0200
-@@ -0,0 +1,39 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2016 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+#include <pthread.h>
-+#include <assert.h>
-+
-+static void *
-+start (void *arg)
-+{
-+  return; /* Backtrace end breakpoint */
-+}
-+
-+int
-+main (void)
-+{
-+  pthread_t thread1;
-+  int i;
-+
-+  i = pthread_create (&thread1, NULL, start, NULL);
-+  assert (i == 0);
-+  i = pthread_join (thread1, NULL);
-+  assert (i == 0);
-+
-+  return 0;
-+}
---- /dev/null	2016-04-19 22:52:19.405224269 +0200
-+++ gdb-7.6.1/gdb/testsuite/gdb.python/py-framefilter-thread.py	2016-04-19 23:14:03.273994063 +0200
-@@ -0,0 +1,56 @@
+--- /dev/null	2016-09-12 21:37:05.332693927 +0200
++++ gdb-7.11.90.20160907/gdb/testsuite/gdb.python/py-framefilter-thread.py	2016-09-12 21:49:16.150795235 +0200
+@@ -0,0 +1,60 @@
 +# Copyright (C) 2016 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -151,8 +151,12 @@
 +        gdb.frame_filters [self.name] = self
 +
 +    def filter (self, frame_iter):
-+        frame_iter = itertools.imap (Reverse_Function,
-+                                     frame_iter)
++        # Python 3.x moved the itertools.imap functionality to map(),
++        # so check if it is available.
++        if hasattr(itertools, "imap"):
++            frame_iter = itertools.imap (Reverse_Function, frame_iter)
++        else:
++            frame_iter = map (Reverse_Function, frame_iter)
 +        return frame_iter
 +
 +FrameFilter()

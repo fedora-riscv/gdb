@@ -28,7 +28,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.13.%{tardate}%{?dist}
+Release: 0.14.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -658,10 +658,7 @@ BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-# These Fedoras do not yet have gcc-go built.
-%ifnarch ppc64le aarch64
 BuildRequires: gcc-go
-%endif
 %endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
@@ -685,8 +682,8 @@ BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_oth
 BuildRequires: fpc
 %endif
 %endif
-# Copied from gcc-4.1.2-32.
-%ifarch %{ix86} x86_64 ppc alpha
+# Copied from: gcc-6.2.1-1.fc26
+%ifarch %{ix86} x86_64 ia64 ppc %{power64} alpha s390x %{arm} aarch64
 BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
 %endif
@@ -696,20 +693,19 @@ BuildRequires: libgfortran%{bits_local} libgfortran%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
-# These Fedoras do not yet have gcc-go built.
-%ifnarch ppc64le aarch64
-BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
+%else
+%ifarch %{ix86} x86_64
+BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
 %endif
+%endif
+BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 BuildRequires: glibc-static%{bits_local}
 # multilib glibc-static is open Bug 488472:
 #BuildRequires: glibc-static%{bits_other}
-# Copied from valgrind-3.5.0-1.
-# Valgrind is not yet ported to ppc64le.
-%ifarch %{ix86} x86_64 ppc ppc64
 BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
-%endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz
 %endif
@@ -1452,6 +1448,9 @@ then
 fi
 
 %changelog
+* Mon Sep 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.14.20160907.fc25
+- Various mostly testsuite compatibility and regression fixes.
+
 * Wed Sep  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.13.20160907.fc25
 - Rebase to FSF GDB 7.11.90.20160907 (pre-7.12 branch snapshot).
 - Rebase Intel VLA patchset.
