@@ -28,7 +28,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.14.%{tardate}%{?dist}
+Release: 0.15.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -247,7 +247,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -577,6 +577,10 @@ Patch1143: gdb-linux_perf-bundle.patch
 # [rhel6+7] Fix compatibility of bison <3.1 and gcc >=6.
 Patch1144: gdb-bison-old.patch
 
+# [testsuite] More testsuite fixes.
+Patch1145: gdb-testsuite-casts.patch
+Patch1146: gdb-testsuite-m-static.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -774,7 +778,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1132 -p1
@@ -902,6 +906,8 @@ done
 %patch1123 -p1
 %patch1143 -p1
 %patch1144 -p1
+%patch1145 -p1
+%patch1146 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1448,6 +1454,9 @@ then
 fi
 
 %changelog
+* Mon Sep 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.15.20160907.fc25
+- [testsuite] More testsuite fixes.
+
 * Mon Sep 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.14.20160907.fc25
 - Various mostly testsuite compatibility and regression fixes.
 
