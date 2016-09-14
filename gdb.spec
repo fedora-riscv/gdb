@@ -15,7 +15,6 @@
  %global _root_libdir %{_libdir}
 }
 
-Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
@@ -28,7 +27,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.15.%{tardate}%{?dist}
+Release: 0.16.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -41,6 +40,25 @@ URL: http://gnu.org/software/gdb/
 # For our convenience
 %global gdb_src %{tarname}
 %global gdb_build build-%{_target_platform}
+
+# For DTS RHEL<=7 GDB it is better to use none than a Requires dependency.
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+Recommends: %{?scl_prefix}gcc-gdb-plugin%{?_isa}
+%endif
+
+%if 0%{!?scl:1}
+Summary: A stub package for GNU source-level debugger
+Requires: gdb-headless%{?_isa} = %{version}-%{release}
+
+%description
+'gdb' package is only a stub to install gcc-gdb-plugin for 'compile' commands.
+See package 'gdb-headless'.
+
+%package headless
+Group: Development/Debuggers
+%endif
+
+Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 
 # Make sure we get rid of the old package gdb64, now that we have unified
 # support for 32-64 bits in one single 64-bit gdb.
@@ -70,7 +88,6 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 %global buildisa %{?_with_buildisa:%{?_isa}}
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
-Recommends: gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1209492
 Recommends: default-yama-scope
@@ -718,7 +735,11 @@ BuildRequires: xz
 
 %{?scl:Requires:%scl_runtime}
 
+%if 0%{!?scl:1}
+%description headless
+%else
 %description
+%endif
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
@@ -1235,6 +1256,12 @@ rm -rf $RPM_BUILD_ROOT
 
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
+%if 0%{!?scl:1}
+mkdir -p $RPM_BUILD_ROOT%{_prefix}/libexec
+mv -f $RPM_BUILD_ROOT%{_bindir}/gdb $RPM_BUILD_ROOT%{_prefix}/libexec/gdb
+ln -s -r $RPM_BUILD_ROOT%{_prefix}/libexec/gdb $RPM_BUILD_ROOT%{_bindir}/gdb
+%endif
+
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 test ! -e $RPM_BUILD_ROOT%{_prefix}/bin/gdbtui
@@ -1366,9 +1393,14 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
+%{_bindir}/gdb
+%if 0%{!?scl:1}
+%files headless
+%defattr(-,root,root)
+%{_prefix}/libexec/gdb
+%endif
 %doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gcore
-%{_bindir}/gdb
 %config(noreplace) %{_sysconfdir}/gdbinit
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdbinit.5*
@@ -1454,6 +1486,9 @@ then
 fi
 
 %changelog
+* Wed Sep 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.16.20160907.fc25
+- Provide gdb-headless package (RH BZ 1195005).
+
 * Mon Sep 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.15.20160907.fc25
 - [testsuite] More testsuite fixes.
 
