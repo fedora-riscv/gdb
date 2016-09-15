@@ -27,7 +27,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.16.%{tardate}%{?dist}
+Release: 0.17.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -735,14 +735,18 @@ BuildRequires: xz
 
 %{?scl:Requires:%scl_runtime}
 
+# FIXME: The text needs to be duplicated to prevent 2 empty heading lines.
 %if 0%{!?scl:1}
 %description headless
-%else
-%description
-%endif
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
 Java, and other languages, by executing them in a controlled fashion
 and printing their data.
+%else
+%description
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+Java, and other languages, by executing them in a controlled fashion
+and printing their data.
+%endif
 
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
@@ -1486,6 +1490,9 @@ then
 fi
 
 %changelog
+* Wed Sep 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.17.20160907.fc25
+- Fix description empty lines.
+
 * Wed Sep 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.16.20160907.fc25
 - Provide gdb-headless package (RH BZ 1195005).
 
