@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 85%{?dist}
+Release: 86%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1461,6 +1461,9 @@ then
 fi
 
 %changelog
+* Wed Sep 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-86.fc24
+- Fix#2 attachment of JIT-debug-enabled inf. (7.11.1 regression, RH BZ 1375553).
+
 * Wed Sep 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-85.fc24
 - Fix attachment of JIT-debug-enabled inf. (7.11.1 regression, RH BZ 1375553).
 
