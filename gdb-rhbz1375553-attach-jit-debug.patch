@@ -1,0 +1,339 @@
+Regression: gdb --pid $(pidof qemu-system-x86_64) stopped working with gdb 7.11.1
+https://bugzilla.redhat.com/show_bug.cgi?id=1375553
+
+http://sourceware.org/ml/gdb-patches/2016-09/msg00387.html
+Subject: [patch+7.12] PR gdb/20609 - attach of JIT-debug-enabled inf 7.11.1 regression
+
+
+--cNdxnHkX5QqsyA0e
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+Hi,
+
+Regression: gdb --pid $(pidof qemu-system-x86_64) stopped working with gdb 7.11.1
+https://sourceware.org/bugzilla/show_bug.cgi?id=20609
+
+It was reported for qemu-system-x86_64 but it happens for any multithreaded
+inferior with a JIT debugging hook.
+
+136613ef0c6850427317e57be1b644080ff6decb is the first bad commit
+Author: Pedro Alves <palves@redhat.com>
+    Fix PR gdb/19828: gdb -p <process from a container>: internal error
+Message-ID: <cbdf2e04-4fa8-872a-2a23-08c9c1b26e00@redhat.com>
+https://sourceware.org/ml/gdb-patches/2016-05/msg00450.html
+
+jit_breakpoint_re_set() is specific by trying to insert a breakpoint into the
+main executable, not into a shared library.  During attachment GDB thinks it
+needs to use 'breakpoint always-inserted' from
+breakpoints_should_be_inserted_now() as a newly attached thread is
+'thread_info->executing' due to 'lwp_info->must_set_ptrace_flags' enabled and
+the task not yet stopped.  This did not happen before the 'bad commit' above
+which adds tracking of such thread.
+
+GDB then fails to insert the breakpoints to invalid address as PIE executable
+gets properly relocated during later phase of attachment.  One can see in the
+backtraces below:
+#11 in setup_inferior (from_tty=0) at infcmd.c:2663
+ -> jit_breakpoint_re_set_internal()
+later:
+#5  in setup_inferior (from_tty=0) at infcmd.c:2673
+ -> svr4_exec_displacement()
+
+One can suppress the initial breakpoint_re_set() call as there will be another
+breakpoint_re_set() done from the final post_create_inferior() call in
+setup_inferior().
+
+BTW additionally 'threads_executing' cache bool is somehow stale (somewhere is
+missing update_threads_executing()).  I was trying to deal with that in my
+first/second attempt below but in my final third attempt (attached) I have
+left it as it is.
+
+First attempt trying not to falsely require 'breakpoint always-inserted':
+  https://people.redhat.com/jkratoch/rhbz1375553-fix1.patch
+Reduced first attempt:
+  https://people.redhat.com/jkratoch/rhbz1375553-fix2.patch
+
+The third attempt suppresses breakpoint insertion until PIE executable gets
+relocated by svr4_exec_displacement().  Attached.
+
+No regressions on {x86_64,x86_64-m32,i686}-fedora26pre-linux-gnu.
+
+OK for check-in for trunk + 7.12?
+
+
+Jan
+
+
+#0  jit_breakpoint_re_set_internal (gdbarch=0x25befe0, ps_data=0x23b37e0) at jit.c:1045
+#1  in jit_breakpoint_re_set () at jit.c:1408
+#2  in breakpoint_re_set () at breakpoint.c:14665
+#3  in clear_symtab_users (add_flags=4) at symfile.c:2970
+#4  in finish_new_objfile (objfile=0x25b6d10, add_flags=4) at symfile.c:1109
+#5  in symbol_file_add_with_addrs (abfd=0x25b4bd0, name=0x25b3970 "/tmp/a.out", add_flags=4, addrs=0x0, flags=0, parent=0x0) at symfile.c:1233
+#6  in symbol_file_add_from_bfd (abfd=0x25b4bd0, name=0x25b3970 "/tmp/a.out", add_flags=4, addrs=0x0, flags=0, parent=0x0) at symfile.c:1276
+#7  in symbol_file_add (name=0x25b3970 "/tmp/a.out", add_flags=4, addrs=0x0, flags=0) at symfile.c:1290
+#8  in symbol_file_add_main_1 (args=0x25b3970 "/tmp/a.out", from_tty=0, flags=0) at symfile.c:1315
+#9  in symbol_file_add_main (args=0x25b3970 "/tmp/a.out", from_tty=0) at symfile.c:1306
+#10 in exec_file_locate_attach (pid=2502, from_tty=0) at exec.c:235
+#11 in setup_inferior (from_tty=0) at infcmd.c:2663
+#12 in stop_all_threads () at infrun.c:4630
+#13 in stop_waiting (ecs=0x7fffffffd400) at infrun.c:7710
+#14 in handle_signal_stop (ecs=0x7fffffffd400) at infrun.c:5765
+#15 in handle_inferior_event_1 (ecs=0x7fffffffd400) at infrun.c:5395
+#16 in handle_inferior_event (ecs=0x7fffffffd400) at infrun.c:5426
+#17 in fetch_inferior_event (client_data=0x0) at infrun.c:3972
+#18 in inferior_event_handler (event_type=INF_REG_EVENT, client_data=0x0) at inf-loop.c:44
+#19 in handle_target_event (error=0, client_data=0x0) at linux-nat.c:4523
+#20 in handle_file_event (file_ptr=0x25ad330, ready_mask=1) at event-loop.c:733
+#21 in gdb_wait_for_event (block=0) at event-loop.c:859
+#22 in gdb_do_one_event () at event-loop.c:322
+#23 in wait_sync_command_done () at top.c:568
+#24 in maybe_wait_sync_command_done (was_sync=0) at top.c:587
+#25 in catch_command_errors (command=0x745e0c <attach_command(char*, int)>, arg=0x7fffffffdd08 "2502", from_tty=1) at main.c:377
+#26 in captured_main (data=0x7fffffffd800) at main.c:1065
+#27 in gdb_main (args=0x7fffffffd800) at main.c:1159
+#28 in main (argc=10, argv=0x7fffffffd908) at gdb.c:32
+
+#0  svr4_exec_displacement (displacementp=0x7fffffffced0) at solib-svr4.c:2634
+#1  in svr4_relocate_main_executable () at solib-svr4.c:3031
+#2  in svr4_solib_create_inferior_hook (from_tty=0) at solib-svr4.c:3092
+#3  in solib_create_inferior_hook (from_tty=0) at solib.c:1276
+#4  in post_create_inferior (target=0x21ee980 <current_target>, from_tty=0) at infcmd.c:445
+#5  in setup_inferior (from_tty=0) at infcmd.c:2673
+#6  in stop_all_threads () at infrun.c:4630
+#7  in stop_waiting (ecs=0x7fffffffd400) at infrun.c:7710
+#8  in handle_signal_stop (ecs=0x7fffffffd400) at infrun.c:5765
+#9  in handle_inferior_event_1 (ecs=0x7fffffffd400) at infrun.c:5395
+#10 in handle_inferior_event (ecs=0x7fffffffd400) at infrun.c:5426
+#11 in fetch_inferior_event (client_data=0x0) at infrun.c:3972
+#12 in inferior_event_handler (event_type=INF_REG_EVENT, client_data=0x0) at inf-loop.c:44
+#13 in handle_target_event (error=0, client_data=0x0) at linux-nat.c:4523
+#14 in handle_file_event (file_ptr=0x25ad330, ready_mask=1) at event-loop.c:733
+#15 in gdb_wait_for_event (block=0) at event-loop.c:859
+#16 in gdb_do_one_event () at event-loop.c:322
+#17 in wait_sync_command_done () at top.c:568
+#18 in maybe_wait_sync_command_done (was_sync=0) at top.c:587
+#19 in catch_command_errors (command=0x745e0c <attach_command(char*, int)>, arg=0x7fffffffdd08 "2502", from_tty=1) at main.c:377
+#20 in captured_main (data=0x7fffffffd800) at main.c:1065
+#21 in gdb_main (args=0x7fffffffd800) at main.c:1159
+#22 in main (argc=10, argv=0x7fffffffd908) at gdb.c:32
+
+--cNdxnHkX5QqsyA0e
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline; filename="jitbp.patch"
+
+gdb/ChangeLog
+2016-09-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/20609 - attach of JIT-debug-enabled inf 7.11.1 regression
+	* exec.c (exec_file_locate_attach): Add parameter defer_bp_reset.
+	Use it.
+	* gdbcore.h (exec_file_locate_attach): Add parameter defer_bp_reset.
+	* infcmd.c (setup_inferior): Update caller.
+	* remote.c (remote_add_inferior): Likewise.
+
+gdb/testsuite/ChangeLog
+2016-09-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/20609 - attach of JIT-debug-enabled inf 7.11.1 regression
+	* gdb.base/jit-attach-pie.c: New file.
+	* gdb.base/jit-attach-pie.exp: New file.
+
+diff --git a/gdb/exec.c b/gdb/exec.c
+index 00c31d3..f16cb4b 100644
+--- a/gdb/exec.c
++++ b/gdb/exec.c
+@@ -157,7 +157,7 @@ exception_print_same (struct gdb_exception e1, struct gdb_exception e2)
+ /* See gdbcore.h.  */
+ 
+ void
+-exec_file_locate_attach (int pid, int from_tty)
++exec_file_locate_attach (int pid, int defer_bp_reset, int from_tty)
+ {
+   char *exec_file, *full_exec_path = NULL;
+   struct cleanup *old_chain;
+@@ -232,6 +232,8 @@ exec_file_locate_attach (int pid, int from_tty)
+ 
+   TRY
+     {
++      if (defer_bp_reset)
++	current_inferior ()->symfile_flags |= SYMFILE_DEFER_BP_RESET;
+       symbol_file_add_main (full_exec_path, from_tty);
+     }
+   CATCH (err, RETURN_MASK_ERROR)
+@@ -240,6 +242,7 @@ exec_file_locate_attach (int pid, int from_tty)
+ 	warning ("%s", err.message);
+     }
+   END_CATCH
++  current_inferior ()->symfile_flags &= ~SYMFILE_DEFER_BP_RESET;
+ 
+   do_cleanups (old_chain);
+ }
+diff --git a/gdb/gdbcore.h b/gdb/gdbcore.h
+index 8b101bc..6aa9afa 100644
+--- a/gdb/gdbcore.h
++++ b/gdb/gdbcore.h
+@@ -154,9 +154,10 @@ extern void exec_file_attach (const char *filename, int from_tty);
+ /* If the filename of the main executable is unknown, attempt to
+    determine it.  If a filename is determined, proceed as though
+    it was just specified with the "file" command.  Do nothing if
+-   the filename of the main executable is already known.  */
++   the filename of the main executable is already known.
++   DEFER_BP_RESET uses SYMFILE_DEFER_BP_RESET for the main symbol file.  */
+ 
+-extern void exec_file_locate_attach (int pid, int from_tty);
++extern void exec_file_locate_attach (int pid, int defer_bp_reset, int from_tty);
+ 
+ extern void exec_file_clear (int from_tty);
+ 
+diff --git a/gdb/infcmd.c b/gdb/infcmd.c
+index 44a1fd1..8e34b7e 100644
+--- a/gdb/infcmd.c
++++ b/gdb/infcmd.c
+@@ -2660,7 +2660,7 @@ setup_inferior (int from_tty)
+   /* If no exec file is yet known, try to determine it from the
+      process itself.  */
+   if (get_exec_file (0) == NULL)
+-    exec_file_locate_attach (ptid_get_pid (inferior_ptid), from_tty);
++    exec_file_locate_attach (ptid_get_pid (inferior_ptid), 1, from_tty);
+   else
+     {
+       reopen_exec_file ();
+diff --git a/gdb/remote.c b/gdb/remote.c
+index 910ac81..b460bb1 100644
+--- a/gdb/remote.c
++++ b/gdb/remote.c
+@@ -1799,7 +1799,7 @@ remote_add_inferior (int fake_pid_p, int pid, int attached,
+   /* If no main executable is currently open then attempt to
+      open the file that was executed to create this inferior.  */
+   if (try_open_exec && get_exec_file (0) == NULL)
+-    exec_file_locate_attach (pid, 1);
++    exec_file_locate_attach (pid, 0, 1);
+ 
+   return inf;
+ }
+diff --git a/gdb/testsuite/gdb.base/jit-attach-pie.c b/gdb/testsuite/gdb.base/jit-attach-pie.c
+new file mode 100644
+index 0000000..5080bde
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/jit-attach-pie.c
+@@ -0,0 +1,61 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2016 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++#include <unistd.h>
++#include <stdint.h>
++#include <pthread.h>
++
++struct jit_code_entry
++{
++  struct jit_code_entry *next_entry;
++  struct jit_code_entry *prev_entry;
++  const char *symfile_addr;
++  uint64_t symfile_size;
++};
++
++struct jit_descriptor
++{
++  uint32_t version;
++  /* This type should be jit_actions_t, but we use uint32_t
++     to be explicit about the bitwidth.  */
++  uint32_t action_flag;
++  struct jit_code_entry *relevant_entry;
++  struct jit_code_entry *first_entry;
++};
++
++struct jit_descriptor __jit_debug_descriptor = { 1, 0, 0, 0 };
++
++void __jit_debug_register_code()
++{
++}
++
++static void *
++thread_proc (void *arg)
++{
++  sleep (60);
++  return arg;
++}
++
++int
++main (void)
++{
++  pthread_t thread;
++
++  pthread_create (&thread, NULL, thread_proc, 0);
++  pthread_join (thread, NULL);
++  return 0;
++}
+diff --git a/gdb/testsuite/gdb.base/jit-attach-pie.exp b/gdb/testsuite/gdb.base/jit-attach-pie.exp
+new file mode 100644
+index 0000000..2c25733
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/jit-attach-pie.exp
+@@ -0,0 +1,48 @@
++# Copyright (C) 2016 Free Software Foundation, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if {![can_spawn_for_attach]} {
++    return 0
++}
++
++standard_testfile .c
++set executable ${testfile}
++
++if { [build_executable ${testfile}.exp $executable $srcfile \
++			  [list debug pthreads "additional_flags=-fPIE -pie"]] } {
++    return -1
++}
++
++# Start the program running and then wait for a bit, to be sure
++# that it can be attached to.
++
++set test_spawn_id [spawn_wait_for_attach $binfile]
++set testpid [spawn_id_get_pid $test_spawn_id]
++
++# gdb_load ("file" command) must not be executed for the bug reproducibility.
++# That includes prepare_for_testing or clean_restart.
++gdb_start
++
++set test "attach"
++gdb_test_multiple "attach $testpid" $test {
++    -re "Attaching to process $testpid\r\n.*Cannot insert breakpoint .*\r\n$gdb_prompt $" {
++	fail $test
++    }
++    -re "Attaching to process $testpid\r\n.*\r\n$gdb_prompt $" {
++	pass $test
++    }
++}
++
++kill_wait_spawned_process $test_spawn_id
+
+--cNdxnHkX5QqsyA0e--
+
