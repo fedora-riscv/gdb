@@ -27,7 +27,7 @@ Version: 7.11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 84%{?dist}
+Release: 85%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -586,6 +586,9 @@ Patch1141: gdb-rhbz1363635-aarch64-armv8182.patch
 # [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
 Patch1143: gdb-linux_perf-bundle.patch
 
+# Fix attachment of JIT-debug-enabled inf. (7.11.1 regression, RH BZ 1375553).
+Patch1147: gdb-rhbz1375553-attach-jit-debug.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -914,6 +917,7 @@ find -name "*.info*"|xargs rm -f
 %patch1129 -p1
 %patch1141 -p1
 %patch1143 -p1
+%patch1147 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1457,6 +1461,9 @@ then
 fi
 
 %changelog
+* Wed Sep 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-85.fc24
+- Fix attachment of JIT-debug-enabled inf. (7.11.1 regression, RH BZ 1375553).
+
 * Sun Aug 28 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.11.1-84.fc24
 - Fix ps_get_thread_area compilation of gdb.f24 on Fedora 25+.
 
