@@ -21,13 +21,13 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
-%global tardate 20160929
+%global tardate 20161006
 %global tarname gdb-7.11.90.%{tardate}
 Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 0.19.%{tardate}%{?dist}
+Release: 0.20.%{tardate}%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -598,9 +598,6 @@ Patch1144: gdb-bison-old.patch
 Patch1145: gdb-testsuite-casts.patch
 Patch1146: gdb-testsuite-m-static.patch
 
-# Fix attachment of JIT-debug-enabled inf. (7.11.1 regression, RH BZ 1375553).
-Patch1147: gdb-rhbz1375553-attach-jit-debug.patch
-
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -936,7 +933,6 @@ done
 %patch1144 -p1
 %patch1145 -p1
 %patch1146 -p1
-%patch1147 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1494,6 +1490,9 @@ then
 fi
 
 %changelog
+* Thu Oct  6 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.20.20161006.fc25
+- Rebase to FSF GDB 7.11.90.20161006 (pre-7.12 branch snapshot).
+
 * Thu Sep 29 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-0.19.20160929.fc25
 - Rebase to FSF GDB 7.11.90.20160929 (pre-7.12 branch snapshot).
  - Fixes GDB crashes on inf. function call scripts (RH BZ 1378147, Pedro Alves).
