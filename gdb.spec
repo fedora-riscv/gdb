@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -87,7 +87,7 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 %if 0%{?_with_buildisa:1} || 0%{?_with_testsuite:1}
 %global buildisa %{?_isa}
 %else
-%global buildisa
+%global buildisa %{nil}
 %endif
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
@@ -1510,6 +1510,9 @@ then
 fi
 
 %changelog
+* Fri Oct  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-22.fc25
+- Fix .spec build: error: Macro %%buildisa has empty body
+
 * Fri Oct  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-21.fc25
 - Rebase to FSF GDB 7.12.
 
