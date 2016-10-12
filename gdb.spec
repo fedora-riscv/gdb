@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -609,6 +609,10 @@ Patch1146: gdb-testsuite-m-static.patch
 # [aarch64] Fix gdb.cp/nextoverthrow.exp regression (Yao Qi).
 Patch1148: gdb-aarch64-nextoverthrow.patch
 
+# Fix TLS (such as 'errno') regression.
+Patch1149: gdb-tls-1of2.patch
+Patch1150: gdb-tls-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -970,6 +974,8 @@ done
 %patch1145 -p1
 %patch1146 -p1
 %patch1148 -p1
+%patch1149 -p1
+%patch1150 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1527,6 +1533,9 @@ then
 fi
 
 %changelog
+* Wed Oct 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-24.fc25
+- Fix TLS (such as 'errno') regression.
+
 * Wed Oct 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-23.fc25
 - [testsuite] Various testsuite fixes.
 - [aarch64] Fix gdb.cp/nextoverthrow.exp regression (Yao Qi).
