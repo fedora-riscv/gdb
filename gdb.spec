@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -566,6 +566,10 @@ Patch978: gdb-jit-reader-multilib.patch
 # Test 'info type-printers' Python error (RH BZ 1350436).
 Patch992: gdb-rhbz1350436-type-printers-error.patch
 
+# Fix '[ppc64] and [s390x] wrong prologue skip on -O2 -g code' (Jan
+# Kratochvil, RH BZ 1084404).
+Patch1026: gdb-rhbz1084404-ppc64-s390x-wrong-prologue-skip-O2-g-3of3.patch
+
 # Never kill PID on: gdb exec PID (Jan Kratochvil, RH BZ 1219747).
 Patch1053: gdb-bz1219747-attach-kills.patch
 
@@ -601,6 +605,9 @@ Patch1144: gdb-bison-old.patch
 # [testsuite] More testsuite fixes.
 Patch1145: gdb-testsuite-casts.patch
 Patch1146: gdb-testsuite-m-static.patch
+
+# [aarch64] Fix gdb.cp/nextoverthrow.exp regression (Yao Qi).
+Patch1148: gdb-aarch64-nextoverthrow.patch
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -682,8 +689,17 @@ BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
+# Exception for RHEL<=7
+%ifarch aarch64
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+BuildRequires: gcc-go
+BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
+%endif
+%else
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: gcc-go
+BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
+%endif
 %endif
 # archer-sergiodj-stap-patch-split
 BuildRequires: systemtap-sdt-devel
@@ -733,7 +749,6 @@ BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
 BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
 %endif
 %endif
-BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 BuildRequires: glibc-static%{bits_local}
 # multilib glibc-static is open Bug 488472:
@@ -928,6 +943,7 @@ find -name "*.info*"|xargs rm -f
 %patch927 -p1
 %patch978 -p1
 %patch992 -p1
+%patch1026 -p1
 %patch1053 -p1
 %patch1056 -p1
 %patch1073 -p1
@@ -953,6 +969,7 @@ done
 %patch1144 -p1
 %patch1145 -p1
 %patch1146 -p1
+%patch1148 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1510,6 +1527,10 @@ then
 fi
 
 %changelog
+* Wed Oct 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-23.fc25
+- [testsuite] Various testsuite fixes.
+- [aarch64] Fix gdb.cp/nextoverthrow.exp regression (Yao Qi).
+
 * Fri Oct  7 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-22.fc25
 - Fix .spec build: error: Macro %%buildisa has empty body
 
