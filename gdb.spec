@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1306,7 +1306,10 @@ make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 %if 0%{!?scl:1}
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/libexec
 mv -f $RPM_BUILD_ROOT%{_bindir}/gdb $RPM_BUILD_ROOT%{_prefix}/libexec/gdb
-ln -s -r $RPM_BUILD_ROOT%{_prefix}/libexec/gdb $RPM_BUILD_ROOT%{_bindir}/gdb
+# RHEL-6: ln: invalid option -- 'r'
+# https://bugzilla.redhat.com/show_bug.cgi?id=1384947
+# ln -s -r $RPM_BUILD_ROOT%{_prefix}/libexec/gdb $RPM_BUILD_ROOT%{_bindir}/gdb
+ln -s $(realpath --relative-to=$RPM_BUILD_ROOT%{_bindir} $RPM_BUILD_ROOT%{_prefix}/libexec/gdb) $RPM_BUILD_ROOT%{_bindir}/gdb
 %endif
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -1533,6 +1536,9 @@ then
 fi
 
 %changelog
+* Fri Oct 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-25.fc25
+- [rhel6] Fix .spec without devtoolset-6-build installed (RH BZ 1384947).
+
 * Wed Oct 12 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-24.fc25
 - Fix TLS (such as 'errno') regression.
 
