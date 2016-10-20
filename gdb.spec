@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -289,6 +289,9 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 #=fedoratest
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
 
+# Stop while intentionally stepping and the thread exit is met.
+Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
+
 # Test kernel VDSO decoding while attaching to an i386 process.
 #=fedoratest
 Patch263: gdb-6.3-attach-see-vdso-test.patch
@@ -475,6 +478,10 @@ Patch547: gdb-test-dw2-aranges.patch
 #=fedoratest
 Patch548: gdb-test-expr-cumulative-archer.patch
 
+# Fix regressions on C++ names resolving (PR 11734, PR 12273, Keith Seitz).
+Patch565: gdb-physname-pr11734-test.patch
+Patch567: gdb-physname-pr12273-test.patch
+
 # Toolchain on sparc is slightly broken and debuginfo files are generated
 # with non 64bit aligned tables/offsets.
 # See for example readelf -S ../Xvnc.debug.
@@ -488,6 +495,9 @@ Patch548: gdb-test-expr-cumulative-archer.patch
 # rebuild to fix it, we need to be able to use gdb :)
 #=push+work
 Patch579: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
+
+# Test GDB opcodes/ disassembly of Intel Ivy Bridge instructions (BZ 696890).
+Patch616: gdb-test-ivy-bridge.patch
 
 # Work around PR libc/13097 "linux-vdso.so.1" warning message.
 #=push
@@ -544,6 +554,9 @@ Patch848: gdb-dts-rhel6-python-compat.patch
 # Fix crash of -readnow /usr/lib/debug/usr/bin/gnatbind.debug (BZ 1069211).
 Patch852: gdb-gnat-dwarf-crash-3of3.patch
 
+# Fix 'memory leak in infpy_read_memory()' (RH BZ 1007614)
+Patch861: gdb-rhbz1007614-memleak-infpy_read_memory-test.patch
+
 # VLA (Fortran dynamic arrays) from Intel + archer-jankratochvil-vla tests.
 Patch1058: gdb-vla-intel-fortran-strides.patch
 Patch1132: gdb-vla-intel-fortran-vla-strings.patch
@@ -560,8 +573,21 @@ Patch925: gdb-fortran-frame-string.patch
 # Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
 Patch927: gdb-python-gil.patch
 
+# Testcase for '[SAP] Recursive dlopen causes SAP HANA installer to
+# crash.' (RH BZ 1156192).
+Patch977: gdb-rhbz1156192-recursive-dlopen-test.patch
+
 # Fix jit-reader.h for multi-lib.
 Patch978: gdb-jit-reader-multilib.patch
+
+# Fix '`catch syscall' doesn't work for parent after `fork' is called'
+# (Philippe Waroquiers, RH BZ 1149205).
+Patch984: gdb-rhbz1149205-catch-syscall-after-fork-test.patch
+
+# Fix 'backport GDB 7.4 fix to RHEL 6.6 GDB' [Original Sourceware bug
+# description: 'C++ (and objc): Internal error on unqualified name
+# re-set', PR 11657] (RH BZ 1186476).
+Patch991: gdb-rhbz1186476-internal-error-unqualified-name-re-set-test.patch
 
 # Test 'info type-printers' Python error (RH BZ 1350436).
 Patch992: gdb-rhbz1350436-type-printers-error.patch
@@ -877,6 +903,7 @@ find -name "*.info*"|xargs rm -f
 %patch247 -p1
 %patch254 -p1
 %patch258 -p1
+%patch259 -p1
 %patch260 -p1
 %patch263 -p1
 %patch271 -p1
@@ -922,7 +949,10 @@ find -name "*.info*"|xargs rm -f
 %patch542 -p1
 %patch547 -p1
 %patch548 -p1
+%patch565 -p1
+%patch567 -p1
 %patch579 -p1
+%patch616 -p1
 %patch627 -p1
 %patch634 -p1
 %patch653 -p1
@@ -939,13 +969,17 @@ find -name "*.info*"|xargs rm -f
 %patch818 -p1
 %patch832 -p1
 %patch852 -p1
+%patch861 -p1
 %patch863 -p1
 %patch887 -p1
 %patch888 -p1
 %patch918 -p1
 %patch925 -p1
 %patch927 -p1
+%patch977 -p1
 %patch978 -p1
+%patch984 -p1
+%patch991 -p1
 %patch992 -p1
 %patch1026 -p1
 %patch1053 -p1
@@ -1306,10 +1340,12 @@ make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 %if 0%{!?scl:1}
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/libexec
 mv -f $RPM_BUILD_ROOT%{_bindir}/gdb $RPM_BUILD_ROOT%{_prefix}/libexec/gdb
-# RHEL-6: ln: invalid option -- 'r'
-# https://bugzilla.redhat.com/show_bug.cgi?id=1384947
-# ln -s -r $RPM_BUILD_ROOT%{_prefix}/libexec/gdb $RPM_BUILD_ROOT%{_bindir}/gdb
+%if 0%{?rhel:1} && 0%{?rhel} <= 6
+# RHEL-6: ln: invalid option -- 'r': https://bugzilla.redhat.com/show_bug.cgi?id=1384947
 ln -s $(realpath --relative-to=$RPM_BUILD_ROOT%{_bindir} $RPM_BUILD_ROOT%{_prefix}/libexec/gdb) $RPM_BUILD_ROOT%{_bindir}/gdb
+%else
+ln -s -r                                                 $RPM_BUILD_ROOT%{_prefix}/libexec/gdb  $RPM_BUILD_ROOT%{_bindir}/gdb
+%endif
 %endif
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -1536,6 +1572,9 @@ then
 fi
 
 %changelog
+* Thu Oct 20 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-26.fc25
+- Add missing testcases present in rhel6 GDB; some still FAIL.
+
 * Fri Oct 14 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-25.fc25
 - [rhel6] Fix .spec without devtoolset-6-build installed (RH BZ 1384947).
 
