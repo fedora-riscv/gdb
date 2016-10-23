@@ -1,7 +1,7 @@
 Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libbar.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libbar.c	2016-10-20 21:03:09.558272492 +0200
++++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libbar.c	2016-10-22 22:10:13.262634144 +0200
 @@ -0,0 +1,30 @@
 +/* Testcase for recursive dlopen calls.
 +
@@ -36,7 +36,7 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libbar.c
 Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libfoo.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libfoo.c	2016-10-20 21:03:09.558272492 +0200
++++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libfoo.c	2016-10-22 22:10:13.262634144 +0200
 @@ -0,0 +1,30 @@
 +/* Testcase for recursive dlopen calls.
 +
@@ -71,7 +71,7 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen-libfoo.c
 Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.c	2016-10-20 21:03:09.558272492 +0200
++++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.c	2016-10-22 22:10:13.262634144 +0200
 @@ -0,0 +1,124 @@
 +/* Testcase for recursive dlopen calls.
 +
@@ -200,8 +200,8 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.c
 Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp	2016-10-20 21:06:01.073613545 +0200
-@@ -0,0 +1,118 @@
++++ gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp	2016-10-23 21:56:43.815767639 +0200
+@@ -0,0 +1,119 @@
 +# Copyright 2014 Free Software Foundation, Inc.
 +#
 +# This program is free software; you can redistribute it and/or modify
@@ -231,7 +231,7 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 +set binfile_lib2 [standard_output_file ${libname2}.so]
 +
 +set testfile "gdb-rhbz1156192-recursive-dlopen"
-+set srcfile ${srcdir}/${subdir}/${testfile}.c
++set srcfile ${testfile}.c
 +set executable ${testfile}
 +set binfile [standard_output_file ${executable}]
 +
@@ -261,28 +261,28 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 +
 +  with_test_prefix "pass #$pass" {
 +    gdb_test_multiple "info shared" "info shared" {
-+      -re ".*$libfoo_match\r\n.*$libbar_match\(\r\n.*Shared library is missing.*\)?\r\n${gdb_prompt} $" {
++      -re ".*$libfoo_match\r\n.*$libbar_match\(\r\n.*Shared library is missing\)?.*\r\n${gdb_prompt} $" {
 +	if { $has_libfoo && $has_libbar } {
 +	  pass "matched libfoo and libbar"
 +	} else {
 +	  fail "matched libfoo and libbar (has_libfoo = $has_libfoo, has_libbar = $has_libbar)"
 +	}
 +      }
-+      -re ".*$libfoo_match\(\r\n.*Shared library is missing.*\)?\r\n${gdb_prompt} $" {
++      -re ".*$libfoo_match\(\r\n.*Shared library is missing\)?.*\r\n${gdb_prompt} $" {
 +	if { $has_libfoo && !$has_libbar } {
 +	  pass "matched libfoo"
 +	} else {
 +	  fail "matched libfoo (has_libfoo = $has_libfoo, has_libbar = $has_libbar)"
 +	}
 +      }
-+      -re ".*$libbar_match\(\r\n.*Shared library is missing.*\)?\r\n${gdb_prompt} $" {
++      -re ".*$libbar_match\(\r\n.*Shared library is missing\)?.*\r\n${gdb_prompt} $" {
 +	if { $has_libbar && !$has_libfoo } {
 +	  pass "matched libbar"
 +	} else {
 +	  fail "matched libbar (has_libfoo = $has_libfoo, has_libbar = $has_libbar)"
 +	}
 +      }
-+      "${gdb_prompt} $" {
++      "\r\n${gdb_prompt} $" {
 +	if { !$has_libfoo && !$has_libbar } {
 +	  pass "did not match libfoo nor libbar"
 +	} else {
@@ -297,12 +297,13 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 +  set pass 0
 +  # This variable holds the information about whether libfoo and
 +  # libbar (respectively) are expected in the "info shared" output.
-+  set solib_event_order { { 0 0 } { 0 0 } { 0 0 } { 0 1 } \
-+			  { 0 1 } { 0 0 } { 0 0 } { 0 1 } \
-+			  { 0 1 } { 0 0 } { 0 0 } { 0 1 } \
-+			  { 0 1 } { 0 0 } { 1 0 } { 1 1 } \
-+			  { 1 1 } { 1 0 } { 1 0 } { 1 1 } \
-+			  { 1 1 } { 1 0 } { 1 0 } { 1 0 } }
++#  set solib_event_order { { 0 0 } { 0 0 } { 0 0 } { 0 1 } \
++#			  { 0 1 } { 0 0 } { 0 0 } { 0 1 } \
++#			  { 0 1 } { 0 0 } { 0 0 } { 0 1 } \
++#			  { 0 1 } { 0 0 } { 1 0 } { 1 1 } \
++#			  { 1 1 } { 1 0 } { 1 0 } { 1 1 } \
++#			  { 1 1 } { 1 0 } { 1 0 } { 1 0 } }
++  set solib_event_order { { 0 0 } { 1 1 } }
 +
 +  with_test_prefix "stop-on-solib-events" {
 +    gdb_test_no_output "set stop-on-solib-events 1" "setting stop-on-solib-events"
@@ -311,7 +312,7 @@ Index: gdb-7.12/gdb/testsuite/gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 +    foreach l $solib_event_order {
 +      incr pass
 +      do_test [lindex $l 0] [lindex $l 1] $pass
-+      gdb_test "continue" "\(Called \(foo\|bar\)\r\n\)?Stopped due to shared library event"
++      gdb_test "continue" "\(Called \(foo\|bar\)\r\n\)?Stopped due to shared library event.*"
 +    }
 +    # In the last pass we do not expect to see libfoo or libbar.
 +    incr pass

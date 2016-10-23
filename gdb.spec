@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -288,9 +288,6 @@ Patch254: gdb-6.6-testsuite-timeouts.patch
 # Support for stepping over PPC atomic instruction sequences (BZ 237572).
 #=fedoratest
 Patch258: gdb-6.6-bz237572-ppc-atomic-sequence-test.patch
-
-# Stop while intentionally stepping and the thread exit is met.
-Patch259: gdb-6.3-step-thread-exit-20050211-test.patch
 
 # Test kernel VDSO decoding while attaching to an i386 process.
 #=fedoratest
@@ -639,6 +636,9 @@ Patch1148: gdb-aarch64-nextoverthrow.patch
 Patch1149: gdb-tls-1of2.patch
 Patch1150: gdb-tls-2of2.patch
 
+# [testsuite] Fix false FAIL for gdb.base/morestack.exp.
+Patch1151: gdb-testsuite-morestack-gold.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -903,7 +903,6 @@ find -name "*.info*"|xargs rm -f
 %patch247 -p1
 %patch254 -p1
 %patch258 -p1
-%patch259 -p1
 %patch260 -p1
 %patch263 -p1
 %patch271 -p1
@@ -1010,6 +1009,7 @@ done
 %patch1148 -p1
 %patch1149 -p1
 %patch1150 -p1
+%patch1151 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1572,6 +1572,9 @@ then
 fi
 
 %changelog
+* Sun Oct 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-27.fc25
+- More work on missing testcases present in rhel6 GDB; some still FAIL.
+
 * Thu Oct 20 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-26.fc25
 - Add missing testcases present in rhel6 GDB; some still FAIL.
 
