@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1572,6 +1572,9 @@ then
 fi
 
 %changelog
+* Mon Oct 24 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-28.fc25
+- Fix testcase: gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
+
 * Sun Oct 23 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-27.fc25
 - More work on missing testcases present in rhel6 GDB; some still FAIL.
 
