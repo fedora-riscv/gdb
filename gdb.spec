@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -639,6 +639,9 @@ Patch1150: gdb-tls-2of2.patch
 # [testsuite] Fix false FAIL for gdb.base/morestack.exp.
 Patch1151: gdb-testsuite-morestack-gold.patch
 
+# Fix gdb-headless /usr/bin/ executables (BZ 1390251).
+Patch1152: gdb-libexec-add-index.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1010,6 +1013,7 @@ done
 %patch1149 -p1
 %patch1150 -p1
 %patch1151 -p1
+%patch1152 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1479,40 +1483,37 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
+%doc COPYING3 COPYING COPYING.LIB README NEWS
 %{_bindir}/gdb
+%{_bindir}/gcore
+%{_mandir}/*/gcore.1*
+%{_bindir}/gstack
+%{_mandir}/*/gstack.1*
+%{_bindir}/pstack
+%{_mandir}/*/pstack.1*
+# Provide gdb/jit-reader.h so that users are able to write their own GDB JIT
+# plugins.
+%{_includedir}/gdb
 %if 0%{!?scl:1}
 %files headless
 %defattr(-,root,root)
 %{_prefix}/libexec/gdb
 %endif
-%doc COPYING3 COPYING COPYING.LIB README NEWS
-%{_bindir}/gcore
 %config(noreplace) %{_sysconfdir}/gdbinit
+%{_mandir}/*/gdb.1*
 %{_sysconfdir}/gdbinit.d
 %{_mandir}/*/gdbinit.5*
-%{_mandir}/*/gdb.1*
-%{_mandir}/*/gcore.1*
 # gdb-add-index cannot be run even for SCL package on RHEL<=6.
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
+%{_bindir}/gdb-add-index
 %{_mandir}/*/gdb-add-index.1*
 %endif
-%{_bindir}/gstack
-%{_mandir}/*/gstack.1*
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
 %if 0%{?rhel:1} && 0%{?rhel} <= 6
 %{_bindir}/gdbtui
 %{_mandir}/*/gdbtui.1*
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 6
-# gdb-add-index cannot be run even for SCL package on RHEL<=6.
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-%{_bindir}/gdb-add-index
-%endif
-%{_bindir}/pstack
-%{_mandir}/*/pstack.1*
 %{_datadir}/gdb
-# Provide gdb/jit-reader.h so that users are able to write their own GDB JIT
-# plugins.
-%{_includedir}/gdb
 
 # don't include the files in include, they are part of binutils
 
@@ -1572,6 +1573,9 @@ then
 fi
 
 %changelog
+* Mon Oct 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-29.fc25
+- Fix gdb-headless /usr/bin/ executables (BZ 1390251).
+
 * Mon Oct 24 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-28.fc25
 - Fix testcase: gdb.base/gdb-rhbz1156192-recursive-dlopen.exp
 
