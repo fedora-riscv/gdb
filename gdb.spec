@@ -1,5 +1,3 @@
-%global _without_python 1
-
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
 # --with buildisa: Use %%{?_isa} for BuildRequires
@@ -28,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1575,6 +1573,9 @@ then
 fi
 
 %changelog
+* Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-31.fc26
+- Python 3.6 rebuild: Rebuild with python3 support.
+
 * Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-30.fc26
 - Python 3.6 rebuild: Rebuild without python3 support.
 
