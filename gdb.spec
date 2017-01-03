@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -46,6 +46,12 @@ Recommends: %{?scl_prefix}gcc-gdb-plugin%{?_isa}
 %endif
 
 %if 0%{!?scl:1}
+# when manpages were moved from -headless to main
+# https://bugzilla.redhat.com/show_bug.cgi?id=1402554
+# theoretically should not be required due to versioned dependeny
+# below, but it cannot hurt either -- rdieter
+Conflicts: gdb-headless < 7.12-29
+
 Summary: A stub package for GNU source-level debugger
 Requires: gdb-headless%{?_isa} = %{version}-%{release}
 
@@ -55,10 +61,6 @@ See package 'gdb-headless'.
 
 %package headless
 Group: Development/Debuggers
-%else
-# when manpages were moved from -headless to main
-# https://bugzilla.redhat.com/show_bug.cgi?id=1402554
-Conflicts: gdb-headless < 7.12-29
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
@@ -1577,6 +1579,9 @@ then
 fi
 
 %changelog
+* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-33
+- fix logic of prior Conflicts
+
 * Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-32
 - Conflicts: gdb-headless < 7.12-29 (#1402554)
 
