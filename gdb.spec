@@ -1379,7 +1379,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}
 cp -p $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
 for pyo in "" "-O";do
   # RHEL-5: AttributeError: 'module' object has no attribute 'compile_file'
-  python $pyo -c 'import compileall, re, sys; sys.exit (not compileall.compile_dir("'"$RPM_BUILD_ROOT/usr/lib/debug%{_bindir}"'", 1, "'"/usr/lib/debug%{_bindir}"'"))'
+  %{__python} $pyo -c 'import compileall, re, sys; sys.exit (not compileall.compile_dir("'"$RPM_BUILD_ROOT/usr/lib/debug%{_bindir}"'", 1, "'"/usr/lib/debug%{_bindir}"'"))'
 done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
