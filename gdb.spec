@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -55,6 +55,10 @@ See package 'gdb-headless'.
 
 %package headless
 Group: Development/Debuggers
+%else
+# when manpages were moved from -headless to main
+# https://bugzilla.redhat.com/show_bug.cgi?id=1402554
+Conflicts: gdb-headless < 7.12-29
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
@@ -1573,6 +1577,9 @@ then
 fi
 
 %changelog
+* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-32
+- Conflicts: gdb-headless < 7.12-29 (#1402554)
+
 * Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-31.fc26
 - Python 3.6 rebuild: Rebuild with python3 support.
 
