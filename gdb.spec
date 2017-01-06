@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -648,6 +648,9 @@ Patch1151: gdb-testsuite-morestack-gold.patch
 # Fix gdb-headless /usr/bin/ executables (BZ 1390251).
 Patch1152: gdb-libexec-add-index.patch
 
+# Fix gdb-add-index for 444 *.debug files.
+Patch1153: gdb-add-index-chmod.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1020,6 +1023,7 @@ done
 %patch1150 -p1
 %patch1151 -p1
 %patch1152 -p1
+%patch1153 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1579,16 +1583,19 @@ then
 fi
 
 %changelog
-* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-33
+* Fri Jan  6 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-34.fc25
+- Fix gdb-add-index for 444 *.debug files.
+
+* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-33.fc25
 - fix logic of prior Conflicts
 
-* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-32
+* Mon Jan 02 2017 Rex Dieter <rdieter@fedoraproject.org> - 7.12-32.fc25
 - Conflicts: gdb-headless < 7.12-29 (#1402554)
 
-* Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-31.fc26
+* Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-31.fc25
 - Python 3.6 rebuild: Rebuild with python3 support.
 
-* Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-30.fc26
+* Fri Dec 09 2016 Charalampos Stratakis <cstratak@redhat.com> - 7.12-30.fc25
 - Python 3.6 rebuild: Rebuild without python3 support.
 
 * Mon Oct 31 2016 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-29.fc25
