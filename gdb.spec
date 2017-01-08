@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1583,6 +1583,9 @@ then
 fi
 
 %changelog
+* Sun Jan  8 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-35.fc25
+- Fix Python backtraces for 32-bit inferiors (Tom Tromey, RH BZ 1411094).
+
 * Fri Jan  6 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-34.fc25
 - Fix gdb-add-index for 444 *.debug files.
 
