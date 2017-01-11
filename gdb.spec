@@ -21,12 +21,12 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
-%global tarname gdb-%{version}
+%global tarname gdb-7.12.0.20170111
 Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 35%{?dist}
+Release: 36%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -635,9 +635,6 @@ Patch1144: gdb-bison-old.patch
 Patch1145: gdb-testsuite-casts.patch
 Patch1146: gdb-testsuite-m-static.patch
 
-# [aarch64] Fix gdb.cp/nextoverthrow.exp regression (Yao Qi).
-Patch1148: gdb-aarch64-nextoverthrow.patch
-
 # Fix TLS (such as 'errno') regression.
 Patch1149: gdb-tls-1of2.patch
 Patch1150: gdb-tls-2of2.patch
@@ -1018,7 +1015,6 @@ done
 %patch1144 -p1
 %patch1145 -p1
 %patch1146 -p1
-%patch1148 -p1
 %patch1149 -p1
 %patch1150 -p1
 %patch1151 -p1
@@ -1583,6 +1579,9 @@ then
 fi
 
 %changelog
+* Wed Jan 11 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-36.fc25
+- Update from FSF GDB 7.12 stable branch to snapshot: gdb-7.12.0.20170111
+
 * Sun Jan  8 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-35.fc25
 - Fix Python backtraces for 32-bit inferiors (Tom Tromey, RH BZ 1411094).
 
