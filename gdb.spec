@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 37%{?dist}
+Release: 38%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1583,6 +1583,9 @@ then
 fi
 
 %changelog
+* Thu Jan 12 2017 Igor Gnatenko <ignatenko@redhat.com> - 7.12-38
+- Rebuild for readline 7.x
+
 * Thu Jan 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-37.fc25
 - [rhel6] Fix missing /usr/bin/realpath.
 
