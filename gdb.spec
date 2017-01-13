@@ -26,7 +26,7 @@ Version: 7.12
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1092,8 +1092,11 @@ CFLAGS="$CFLAGS -DPERF_ATTR_SIZE_VER5_BUNDLE"
 %endif
 
 # Patch642: gdb-readline62-ask-more-rh.patch
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{?rhel} == 7
 CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
+%else
+# FIXME: Why not just: ! grep -w ...
+if grep -w RL_STATE_FEDORA_GDB %{_includedir}/readline/readline.h;then false;fi
 %endif
 
 # Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
@@ -1583,7 +1586,10 @@ then
 fi
 
 %changelog
-* Thu Jan 12 2017 Igor Gnatenko <ignatenko@redhat.com> - 7.12-38
+* Thu Jan 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-39.fc26
+- Fix gdb-readline62-ask-more-rh.patch for Rawhide readline-7.0.
+
+* Thu Jan 12 2017 Igor Gnatenko <ignatenko@redhat.com> - 7.12-38.fc26
 - Rebuild for readline 7.x
 
 * Thu Jan 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-37.fc25
