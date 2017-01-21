@@ -21,12 +21,12 @@ Name: %{?scl_prefix}gdb
 %global snapsrc    20160801
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
-%global tarname gdb-7.12.0.20170111
-Version: 7.12
+%global tarname gdb-%{version}
+Version: 7.12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 40%{?dist}
+Release: 41%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1584,6 +1584,9 @@ then
 fi
 
 %changelog
+* Sat Jan 21 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-41.fc25
+- Rebase to released FSF GDB 7.12.1.
+
 * Tue Jan 17 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12-40.fc25
 - Enable libinproctrace.so on all archs except arm32.
 
