@@ -26,9 +26,9 @@ Version: 7.12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?dist}
+Release: 42%{?dist}
 
-License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and BSD and Public Domain and GFDL
+License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
@@ -1494,7 +1494,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc COPYING3 COPYING COPYING.LIB README NEWS
+%license COPYING3 COPYING COPYING.LIB COPYING3.LIB
+%doc README NEWS
 %{_bindir}/gdb
 %{_bindir}/gcore
 %{_mandir}/*/gcore.1*
@@ -1584,6 +1585,9 @@ then
 fi
 
 %changelog
+* Wed Feb  8 2017 Stephen Gallagher <sgallagh@redhat.com> - 7.12.1-42.fc25
+- Add missing %%license macro
+
 * Sat Jan 21 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-41.fc25
 - Rebase to released FSF GDB 7.12.1.
 
