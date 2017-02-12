@@ -26,7 +26,7 @@ Version: 7.12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 42%{?dist}
+Release: 44%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -150,7 +150,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN.
-%global libstdcxxpython gdb-libstdc++-v3-python-6.1.1-20160817
+%global libstdcxxpython gdb-libstdc++-v3-python-6.3.1-20170212
 Source5: %{libstdcxxpython}.tar.xz
 
 # Provide gdbtui for RHEL-5 and RHEL-6 as it is removed upstream (BZ 797664).
@@ -1585,6 +1585,9 @@ then
 fi
 
 %changelog
+* Sun Feb 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-44.fc25
+- [dts] Upgrade libstdc++-v3-python to 6.3.1-20170212.
+
 * Wed Feb  8 2017 Stephen Gallagher <sgallagh@redhat.com> - 7.12.1-42.fc25
 - Add missing %%license macro
 
