@@ -26,7 +26,7 @@ Version: 7.12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?dist}
+Release: 47%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -649,6 +649,9 @@ Patch1152: gdb-libexec-add-index.patch
 # Fix gdb-add-index for 444 *.debug files.
 Patch1153: gdb-add-index-chmod.patch
 
+# New testcase for: Fix <tab>-completion crash (Gary Benson, RH BZ 1398387).
+Patch1155: gdb-rhbz1398387-tab-crash-test.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1021,6 +1024,7 @@ done
 %patch1151 -p1
 %patch1152 -p1
 %patch1153 -p1
+%patch1155 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1590,6 +1594,10 @@ then
 fi
 
 %changelog
+* Fri Feb 24 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-47.fc26
+- New testcase for: Fix <tab>-completion crash (Gary Benson, RH BZ 1398387).
+- [testsuite] Use more standard_output_file.
+
 * Wed Feb 15 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-46.fc26
 - Fix <tab>-completion crash (Gary Benson, RH BZ 1398387).
 
