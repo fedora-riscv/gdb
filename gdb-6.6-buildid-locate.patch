@@ -1,7 +1,7 @@
-Index: gdb-7.11.50.20160630/gdb/corelow.c
+Index: gdb-7.12.50.20170207/gdb/corelow.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/corelow.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/corelow.c	2016-07-03 14:34:32.022753582 +0200
+--- gdb-7.12.50.20170207.orig/gdb/corelow.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/corelow.c	2017-02-24 22:32:38.793264396 +0100
 @@ -45,6 +45,10 @@
  #include "gdb_bfd.h"
  #include "completer.h"
@@ -13,7 +13,7 @@ Index: gdb-7.11.50.20160630/gdb/corelow.c
  
  #ifndef O_LARGEFILE
  #define O_LARGEFILE 0
-@@ -266,6 +270,53 @@
+@@ -266,6 +270,54 @@
      inferior_ptid = ptid;			/* Yes, make it current.  */
  }
  
@@ -52,7 +52,8 @@ Index: gdb-7.11.50.20160630/gdb/corelow.c
 +    {
 +      make_cleanup (xfree, execfilename);
 +      exec_file_attach (execfilename, from_tty);
-+      symbol_file_add_main (execfilename, from_tty);
++      symbol_file_add_main (execfilename,
++			    symfile_add_flag (!from_tty ? 0 : SYMFILE_VERBOSE));
 +      if (symfile_objfile != NULL)
 +        symfile_objfile->flags |= OBJF_BUILD_ID_CORE_LOADED;
 +    }
@@ -67,7 +68,7 @@ Index: gdb-7.11.50.20160630/gdb/corelow.c
  /* This routine opens and sets up the core file bfd.  */
  
  static void
-@@ -404,6 +455,14 @@
+@@ -402,6 +454,14 @@
  	switch_to_thread (thread->ptid);
      }
  
@@ -82,7 +83,7 @@ Index: gdb-7.11.50.20160630/gdb/corelow.c
    post_create_inferior (&core_ops, from_tty);
  
    /* Now go through the target stack looking for threads since there
-@@ -1068,4 +1127,11 @@
+@@ -1078,4 +1138,11 @@
    init_core_ops ();
  
    add_target_with_completer (&core_ops, filename_completer);
@@ -94,11 +95,11 @@ Index: gdb-7.11.50.20160630/gdb/corelow.c
 +			   NULL, NULL, NULL,
 +			   &setlist, &showlist);
  }
-Index: gdb-7.11.50.20160630/gdb/doc/gdb.texinfo
+Index: gdb-7.12.50.20170207/gdb/doc/gdb.texinfo
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/doc/gdb.texinfo	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/doc/gdb.texinfo	2016-07-03 14:34:32.030753651 +0200
-@@ -18916,6 +18916,27 @@
+--- gdb-7.12.50.20170207.orig/gdb/doc/gdb.texinfo	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/doc/gdb.texinfo	2017-02-24 22:32:38.803264463 +0100
+@@ -18962,6 +18962,27 @@
  
  @end table
  
@@ -126,10 +127,10 @@ Index: gdb-7.11.50.20160630/gdb/doc/gdb.texinfo
  @cindex @code{.gnu_debuglink} sections
  @cindex debug link sections
  A debug link is a special section of the executable file named
-Index: gdb-7.11.50.20160630/gdb/solib-svr4.c
+Index: gdb-7.12.50.20170207/gdb/solib-svr4.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/solib-svr4.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/solib-svr4.c	2016-07-03 14:34:32.031753659 +0200
+--- gdb-7.12.50.20170207.orig/gdb/solib-svr4.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/solib-svr4.c	2017-02-24 22:32:38.804264469 +0100
 @@ -45,6 +45,7 @@
  #include "auxv.h"
  #include "gdb_bfd.h"
@@ -138,7 +139,7 @@ Index: gdb-7.11.50.20160630/gdb/solib-svr4.c
  
  static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
  static int svr4_have_link_map_offsets (void);
-@@ -1416,9 +1417,52 @@
+@@ -1420,9 +1421,52 @@
  	  continue;
  	}
  
@@ -194,41 +195,37 @@ Index: gdb-7.11.50.20160630/gdb/solib-svr4.c
        xfree (buffer);
  
        /* If this entry has no name, or its name matches the name
-Index: gdb-7.11.50.20160630/gdb/elfread.c
+Index: gdb-7.12.50.20170207/gdb/elfread.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/elfread.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/elfread.c	2016-07-03 14:34:32.031753659 +0200
-@@ -1259,9 +1259,10 @@
+--- gdb-7.12.50.20170207.orig/gdb/elfread.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/elfread.c	2017-02-24 22:32:38.805264476 +0100
+@@ -1265,8 +1265,9 @@
  	   && objfile->separate_debug_objfile == NULL
  	   && objfile->separate_debug_objfile_backlink == NULL)
      {
--      char *debugfile;
-+      char *debugfile, *build_id_filename;
- 
--      debugfile = find_separate_debug_file_by_buildid (objfile);
-+      debugfile = find_separate_debug_file_by_buildid (objfile,
-+						       &build_id_filename);
++      gdb::unique_xmalloc_ptr<char> build_id_filename;
+       gdb::unique_xmalloc_ptr<char> debugfile
+-	(find_separate_debug_file_by_buildid (objfile));
++	(find_separate_debug_file_by_buildid (objfile, &build_id_filename));
  
        if (debugfile == NULL)
- 	debugfile = find_separate_debug_file_by_debuglink (objfile);
-@@ -1275,6 +1276,12 @@
- 	  symbol_file_add_separate (abfd, debugfile, symfile_flags, objfile);
- 	  do_cleanups (cleanup);
+ 	debugfile.reset (find_separate_debug_file_by_debuglink (objfile));
+@@ -1278,6 +1279,10 @@
+ 	  symbol_file_add_separate (abfd.get (), debugfile.get (),
+ 				    symfile_flags, objfile);
  	}
 +      /* Check if any separate debug info has been extracted out.  */
 +      else if (bfd_get_section_by_name (objfile->obfd, ".gnu_debuglink")
 +	       != NULL)
-+	debug_print_missing (objfile_name (objfile), build_id_filename);
-+
-+      xfree (build_id_filename);
++	debug_print_missing (objfile_name (objfile), build_id_filename.get ());
      }
  }
  
-Index: gdb-7.11.50.20160630/gdb/symfile.h
+Index: gdb-7.12.50.20170207/gdb/symfile.h
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/symfile.h	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/symfile.h	2016-07-03 14:34:32.032753668 +0200
-@@ -589,6 +589,10 @@
+--- gdb-7.12.50.20170207.orig/gdb/symfile.h	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/symfile.h	2017-02-24 22:32:38.805264476 +0100
+@@ -573,6 +573,10 @@
  void map_symbol_filenames (symbol_filename_ftype *fun, void *data,
  			   int need_fullname);
  
@@ -239,11 +236,11 @@ Index: gdb-7.11.50.20160630/gdb/symfile.h
  /* From dwarf2read.c */
  
  /* Names for a dwarf2 debugging section.  The field NORMAL is the normal
-Index: gdb-7.11.50.20160630/gdb/testsuite/lib/gdb.exp
+Index: gdb-7.12.50.20170207/gdb/testsuite/lib/gdb.exp
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/testsuite/lib/gdb.exp	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/testsuite/lib/gdb.exp	2016-07-03 14:34:32.033753676 +0200
-@@ -1641,6 +1641,16 @@
+--- gdb-7.12.50.20170207.orig/gdb/testsuite/lib/gdb.exp	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/testsuite/lib/gdb.exp	2017-02-24 22:32:38.806264483 +0100
+@@ -1646,6 +1646,16 @@
  	    warning "Couldn't set the width to 0."
  	}
      }
@@ -260,11 +257,11 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/lib/gdb.exp
      return 0
  }
  
-Index: gdb-7.11.50.20160630/gdb/testsuite/lib/mi-support.exp
+Index: gdb-7.12.50.20170207/gdb/testsuite/lib/mi-support.exp
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/testsuite/lib/mi-support.exp	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/testsuite/lib/mi-support.exp	2016-07-03 14:34:32.033753676 +0200
-@@ -309,6 +309,16 @@ proc default_mi_gdb_start { args } {
+--- gdb-7.12.50.20170207.orig/gdb/testsuite/lib/mi-support.exp	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/testsuite/lib/mi-support.exp	2017-02-24 22:32:38.807264489 +0100
+@@ -309,6 +309,16 @@
  	    warning "Couldn't set the width to 0."
  	}
      }
@@ -281,9 +278,11 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/lib/mi-support.exp
  
      if { $separate_inferior_pty } {
  	mi_create_inferior_pty
---- gdb-7.11.90.20160907/gdb/testsuite/gdb.base/new-ui-pending-input.exp-orig	2016-09-07 04:01:15.000000000 +0200
-+++ gdb-7.11.90.20160907/gdb/testsuite/gdb.base/new-ui-pending-input.exp	2016-09-07 22:35:35.818534069 +0200
-@@ -62,6 +62,7 @@ proc test_command_line_new_ui_pending_in
+Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.base/new-ui-pending-input.exp
+===================================================================
+--- gdb-7.12.50.20170207.orig/gdb/testsuite/gdb.base/new-ui-pending-input.exp	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/testsuite/gdb.base/new-ui-pending-input.exp	2017-02-24 22:32:38.807264489 +0100
+@@ -62,6 +62,7 @@
      set options ""
      append options " -iex \"set height 0\""
      append options " -iex \"set width 0\""
@@ -291,25 +290,25 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/lib/mi-support.exp
      append options " -iex \"new-ui console $extra_tty_name\""
      append options " -ex \"b $bpline\""
      append options " -ex \"run\""
-Index: gdb-7.11.50.20160630/gdb/objfiles.h
+Index: gdb-7.12.50.20170207/gdb/objfiles.h
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/objfiles.h	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/objfiles.h	2016-07-03 14:34:32.034753685 +0200
-@@ -489,6 +489,10 @@
- 
- #define OBJF_NOT_FILENAME (1 << 6)
+--- gdb-7.12.50.20170207.orig/gdb/objfiles.h	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/objfiles.h	2017-02-24 22:32:38.808264496 +0100
+@@ -444,6 +444,10 @@
+   htab_t static_links;
+ };
  
 +/* This file was loaded according to the BUILD_ID_CORE_LOADS rules.  */
 +
-+#define OBJF_BUILD_ID_CORE_LOADED (1 << 12)
++#define OBJF_BUILD_ID_CORE_LOADED static_cast<enum objfile_flag>(1 << 12)
 +
  /* Declarations for functions defined in objfiles.c */
  
- extern struct objfile *allocate_objfile (bfd *, const char *name, int);
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/corefile.exp
+ extern struct objfile *allocate_objfile (bfd *, const char *name,
+Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.base/corefile.exp
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/testsuite/gdb.base/corefile.exp	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.base/corefile.exp	2016-07-03 14:34:32.034753685 +0200
+--- gdb-7.12.50.20170207.orig/gdb/testsuite/gdb.base/corefile.exp	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/testsuite/gdb.base/corefile.exp	2017-02-24 22:32:38.808264496 +0100
 @@ -293,3 +293,33 @@
  	pass $test
      }
@@ -344,10 +343,10 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/corefile.exp
 +    gdb_test "info files" "Local exec file:\r\n\[ \t\]*`[string_to_regexp $debugdir/$buildid]', file type .*"
 +    pass $wholetest
 +}
-Index: gdb-7.11.50.20160630/gdb/build-id.c
+Index: gdb-7.12.50.20170207/gdb/build-id.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/build-id.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/build-id.c	2016-07-03 14:36:50.124938187 +0200
+--- gdb-7.12.50.20170207.orig/gdb/build-id.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/build-id.c	2017-02-24 22:45:25.817403162 +0100
 @@ -26,11 +26,67 @@
  #include "objfiles.h"
  #include "filenames.h"
@@ -817,7 +816,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +
  /* See build-id.h.  */
  
- bfd *
+ gdb_bfd_ref_ptr
 -build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 +build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id,
 +		       char **link_return, int add_debug_suffix)
@@ -827,7 +826,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
    VEC (char_ptr) *debugdir_vec;
    struct cleanup *back_to;
    int ix;
-   bfd *abfd = NULL;
+   gdb_bfd_ref_ptr abfd;
 -  int alloc_len;
  
    /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
@@ -853,7 +852,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
  
        memcpy (link, debugdir, debugdir_len);
        s = &link[debugdir_len];
-@@ -110,47 +544,281 @@
+@@ -110,45 +544,290 @@
  	*s++ = '/';
        while (size-- > 0)
  	s += sprintf (s, "%02x", (unsigned) *data++);
@@ -903,38 +902,36 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +	  inner = make_cleanup (xfree, filename);
 +	  abfd = gdb_bfd_open (filename, gnutarget, -1);
 +	  do_cleanups (inner);
++
++	  if (abfd == NULL)
++	    continue;
  
 -      if (filename == NULL)
 -	continue;
-+	  if (abfd == NULL)
-+	    continue;
++	  if (build_id_verify (abfd.get(), build_id_len, build_id))
++	    break;
  
 -      /* We expect to be silent on the non-existing files.  */
 -      inner = make_cleanup (xfree, filename);
 -      abfd = gdb_bfd_open (filename, gnutarget, -1);
 -      do_cleanups (inner);
-+	  if (build_id_verify (abfd, build_id_len, build_id))
-+	    break;
++	  abfd.release ();
  
 -      if (abfd == NULL)
 -	continue;
-+	  gdb_bfd_unref (abfd);
-+	  abfd = NULL;
- 
--      if (build_id_verify (abfd, build_id_len, build_id))
--	break;
 +	  filename = NULL;
 +	}
  
--      gdb_bfd_unref (abfd);
--      abfd = NULL;
+-      if (build_id_verify (abfd.get(), build_id_len, build_id))
+-	break;
 +      if (filename != NULL)
 +	{
 +	  /* LINK_ALL is not used below in this non-NULL FILENAME case.  */
 +	  xfree (link0);
 +	  break;
 +	}
-+
+ 
+-      abfd.release ();
 +      /* If the symlink has target request to install the target.
 +         BASE-debuginfo.rpm contains the symlink but BASE.rpm may be missing.
 +         https://bugzilla.redhat.com/show_bug.cgi?id=981154  */
@@ -982,7 +979,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +char *
 +build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
 +{
-+  bfd *abfd;
++  gdb_bfd_ref_ptr abfd;
 +  char *result;
 +  
 +  abfd = build_id_to_debug_bfd (build_id->size, build_id->data, link_return, 0);
@@ -990,7 +987,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +    return NULL;
 +
 +  result = xstrdup (bfd_get_filename (abfd));
-+  gdb_bfd_unref (abfd);
++  abfd.release ();
 +  return result;
 +}
 +
@@ -1135,7 +1132,7 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
  char *
 -find_separate_debug_file_by_buildid (struct objfile *objfile)
 +find_separate_debug_file_by_buildid (struct objfile *objfile,
-+				     char **build_id_filename_return)
++			gdb::unique_xmalloc_ptr<char> *build_id_filename_return)
  {
    const struct bfd_build_id *build_id;
  
@@ -1146,15 +1143,25 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +  build_id = build_id_bfd_shdr_get (objfile->obfd);
    if (build_id != NULL)
      {
-       bfd *abfd;
- 
--      abfd = build_id_to_debug_bfd (build_id->size, build_id->data);
-+      abfd = build_id_to_debug_bfd (build_id->size, build_id->data,
-+				    build_id_filename_return, 1);
++      char *build_id_filename_cstr = NULL;
+       gdb_bfd_ref_ptr abfd (build_id_to_debug_bfd (build_id->size,
+-						   build_id->data));
++						    build_id->data,
++	      (!build_id_filename_return ? NULL : &build_id_filename_cstr), 1));
++      if (build_id_filename_return)
++	{
++	  if (!build_id_filename_cstr)
++	    gdb_assert (!*build_id_filename_return);
++	  else
++	    {
++	      *build_id_filename_return = gdb::unique_xmalloc_ptr<char> (build_id_filename_cstr);
++	      build_id_filename_cstr = NULL;
++	    }
++	}
        /* Prevent looping on a stripped .debug file.  */
        if (abfd != NULL
- 	  && filename_cmp (bfd_get_filename (abfd),
-@@ -170,3 +838,21 @@
+ 	  && filename_cmp (bfd_get_filename (abfd.get ()),
+@@ -160,3 +839,21 @@
      }
    return NULL;
  }
@@ -1176,13 +1183,13 @@ Index: gdb-7.11.50.20160630/gdb/build-id.c
 +
 +  observer_attach_executable_changed (debug_print_executable_changed);
 +}
-Index: gdb-7.11.50.20160630/gdb/build-id.h
+Index: gdb-7.12.50.20170207/gdb/build-id.h
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/build-id.h	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/build-id.h	2016-07-03 14:34:32.035753694 +0200
-@@ -20,9 +20,10 @@
- #ifndef BUILD_ID_H
- #define BUILD_ID_H
+--- gdb-7.12.50.20170207.orig/gdb/build-id.h	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/build-id.h	2017-02-24 22:32:38.809264503 +0100
+@@ -22,9 +22,10 @@
+ 
+ #include "gdb_bfd.h"
  
 -/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
 +/* Separate debuginfo files have corrupted PHDR but SHDR is correct there.
@@ -1193,13 +1200,14 @@ Index: gdb-7.11.50.20160630/gdb/build-id.h
  
  /* Return true if ABFD has NT_GNU_BUILD_ID matching the CHECK value.
     Otherwise, issue a warning and return false.  */
-@@ -36,13 +37,18 @@
+@@ -38,13 +39,19 @@
     the caller.  */
  
- extern bfd *build_id_to_debug_bfd (size_t build_id_len,
--				   const bfd_byte *build_id);
-+				   const bfd_byte *build_id, char **link_return,
-+				   int add_debug_suffix);
+ extern gdb_bfd_ref_ptr build_id_to_debug_bfd (size_t build_id_len,
+-					      const bfd_byte *build_id);
++					      const bfd_byte *build_id,
++					      char **link_return,
++					      int add_debug_suffix);
 +
 +extern char *build_id_to_filename (const struct bfd_build_id *build_id,
 +				   char **link_return);
@@ -1211,14 +1219,14 @@ Index: gdb-7.11.50.20160630/gdb/build-id.h
  
 -extern char *find_separate_debug_file_by_buildid (struct objfile *objfile);
 +extern char *find_separate_debug_file_by_buildid (struct objfile *objfile,
-+					       char **build_id_filename_return);
++		       gdb::unique_xmalloc_ptr<char> *build_id_filename_return);
  
  #endif /* BUILD_ID_H */
-Index: gdb-7.11.50.20160630/gdb/dwarf2read.c
+Index: gdb-7.12.50.20170207/gdb/dwarf2read.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/dwarf2read.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/dwarf2read.c	2016-07-03 14:34:32.040753736 +0200
-@@ -2535,7 +2535,7 @@
+--- gdb-7.12.50.20170207.orig/gdb/dwarf2read.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/dwarf2read.c	2017-02-24 22:32:38.814264536 +0100
+@@ -2534,7 +2534,7 @@
      }
  
    if (dwz_bfd == NULL)
@@ -1227,10 +1235,10 @@ Index: gdb-7.11.50.20160630/gdb/dwarf2read.c
  
    if (dwz_bfd == NULL)
      error (_("could not find '.gnu_debugaltlink' file for %s"),
-Index: gdb-7.11.50.20160630/gdb/python/py-objfile.c
+Index: gdb-7.12.50.20170207/gdb/python/py-objfile.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/python/py-objfile.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/python/py-objfile.c	2016-07-03 14:34:32.040753736 +0200
+--- gdb-7.12.50.20170207.orig/gdb/python/py-objfile.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/python/py-objfile.c	2017-02-24 22:32:38.814264536 +0100
 @@ -136,7 +136,7 @@
  
    TRY
@@ -1240,7 +1248,7 @@ Index: gdb-7.11.50.20160630/gdb/python/py-objfile.c
      }
    CATCH (except, RETURN_MASK_ALL)
      {
-@@ -547,7 +547,7 @@
+@@ -546,7 +546,7 @@
        /* Don't return separate debug files.  */
        if (objfile->separate_debug_objfile_backlink != NULL)
  	continue;
@@ -1249,11 +1257,11 @@ Index: gdb-7.11.50.20160630/gdb/python/py-objfile.c
        if (obfd_build_id == NULL)
  	continue;
        if (objfpy_build_id_matches (obfd_build_id, build_id))
-Index: gdb-7.11.50.20160630/gdb/coffread.c
+Index: gdb-7.12.50.20170207/gdb/coffread.c
 ===================================================================
---- gdb-7.11.50.20160630.orig/gdb/coffread.c	2016-07-03 14:33:28.130205528 +0200
-+++ gdb-7.11.50.20160630/gdb/coffread.c	2016-07-03 14:34:32.041753745 +0200
-@@ -737,7 +737,7 @@
+--- gdb-7.12.50.20170207.orig/gdb/coffread.c	2017-02-24 22:18:02.176391400 +0100
++++ gdb-7.12.50.20170207/gdb/coffread.c	2017-02-24 22:32:38.815264543 +0100
+@@ -734,7 +734,7 @@
      {
        char *debugfile;
  

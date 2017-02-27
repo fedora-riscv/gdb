@@ -18,15 +18,15 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20160801
+%global snapsrc    20170226
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.12.1
+Version: 7.12.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 47%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -274,7 +274,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-Patch232: gdb-upstream.patch
+#Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest+ppc
@@ -344,10 +344,6 @@ Patch289: gdb-6.5-ia64-libunwind-leak-test.patch
 # Test hiding unexpected breakpoints on intentional step commands.
 #=fedoratest
 Patch290: gdb-6.5-missed-trap-on-step-test.patch
-
-# Support DW_TAG_interface_type the same way as DW_TAG_class_type (BZ 426600).
-#=fedoratest
-Patch294: gdb-6.7-bz426600-DW_TAG_interface_type-test.patch
 
 # Test gcore memory and time requirements for large inferiors.
 #=fedoratest
@@ -629,19 +625,9 @@ Patch1123: gdb-rhbz1325795-framefilters-test.patch
 # [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
 Patch1143: gdb-linux_perf-bundle.patch
 
-# [rhel6+7] Fix compatibility of bison <3.1 and gcc >=6.
-Patch1144: gdb-bison-old.patch
-
-# [testsuite] More testsuite fixes.
-Patch1145: gdb-testsuite-casts.patch
-Patch1146: gdb-testsuite-m-static.patch
-
 # Fix TLS (such as 'errno') regression.
 Patch1149: gdb-tls-1of2.patch
 Patch1150: gdb-tls-2of2.patch
-
-# [testsuite] Fix false FAIL for gdb.base/morestack.exp.
-Patch1151: gdb-testsuite-morestack-gold.patch
 
 # Fix gdb-headless /usr/bin/ executables (BZ 1390251).
 Patch1152: gdb-libexec-add-index.patch
@@ -808,6 +794,9 @@ BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz
 %endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+BuildRequires: rust
+%endif
 
 %endif # 0%{?_with_testsuite:1}
 
@@ -881,7 +870,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-%patch232 -p1
+#patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1132 -p1
@@ -927,7 +916,6 @@ find -name "*.info*"|xargs rm -f
 %patch287 -p1
 %patch289 -p1
 %patch290 -p1
-%patch294 -p1
 %patch296 -p1
 %patch298 -p1
 %patch309 -p1
@@ -1016,12 +1004,8 @@ done
 %patch1118 -p1
 %patch1123 -p1
 %patch1143 -p1
-%patch1144 -p1
-%patch1145 -p1
-%patch1146 -p1
 %patch1149 -p1
 %patch1150 -p1
-%patch1151 -p1
 %patch1152 -p1
 %patch1153 -p1
 %patch1155 -p1
@@ -1594,6 +1578,10 @@ then
 fi
 
 %changelog
+* Mon Feb 27 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170226-1.fc26
+- Rebase to pre-7.13 FSF GDB trunk.
+- Dropped gdb-6.7-bz426600-DW_TAG_interface_type-test.patch as GCJ is no more.
+
 * Fri Feb 24 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-47.fc26
 - New testcase for: Fix <tab>-completion crash (Gary Benson, RH BZ 1398387).
 - [testsuite] Use more standard_output_file.

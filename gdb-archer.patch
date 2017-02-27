@@ -2,7 +2,7 @@ http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
 GIT snapshot:
-commit cfee64ee869a6a6e4ab0b64af149d4cf59517d80
+commit e2c0cbf93cf20667be449a75d2ada5d377ddb090
 
 tromey/python
 
@@ -16,10 +16,10 @@ index 0000000..173b8ea
 +This branch originally held the Python code for gdb.  It still exists
 +because a small amount of code here has not yet been merged upstream.
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
-index 5af6103..9c69cb0 100644
+index 268c2c6..4045ef7 100644
 --- a/gdb/Makefile.in
 +++ b/gdb/Makefile.in
-@@ -1553,6 +1553,12 @@ stamp-h: $(srcdir)/config.in config.status
+@@ -2345,6 +2345,12 @@ stamp-h: $(srcdir)/config.in config.status
  	  CONFIG_LINKS= \
  	  $(SHELL) config.status
  
@@ -33,21 +33,22 @@ index 5af6103..9c69cb0 100644
  	$(SHELL) config.status --recheck
  
 diff --git a/gdb/data-directory/Makefile.in b/gdb/data-directory/Makefile.in
-index 3f23516..b5d6390 100644
+index 304d4b0..d2007a4 100644
 --- a/gdb/data-directory/Makefile.in
 +++ b/gdb/data-directory/Makefile.in
-@@ -66,7 +66,10 @@ PYTHON_FILE_LIST = \
+@@ -77,7 +77,11 @@ PYTHON_FILE_LIST = \
+ 	gdb/types.py \
  	gdb/unwinder.py \
- 	gdb/prompt.py \
  	gdb/xmethod.py \
 +	gdb/types.py \
  	gdb/command/__init__.py \
 +	gdb/command/ignore_errors.py \
 +	gdb/command/pahole.py \
- 	gdb/command/xmethods.py \
++	gdb/command/xmethods.py \
+ 	gdb/command/explore.py \
  	gdb/command/frame_filters.py \
- 	gdb/command/unwinders.py \
-@@ -78,6 +81,8 @@ PYTHON_FILE_LIST = \
+ 	gdb/command/pretty_printers.py \
+@@ -89,6 +93,8 @@ PYTHON_FILE_LIST = \
  	gdb/function/as_string.py \
  	gdb/function/caller_is.py \
  	gdb/function/strfns.py \
@@ -57,10 +58,10 @@ index 3f23516..b5d6390 100644
  	gdb/printer/bound_registers.py
  
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index f5dde61..1d92bd6 100644
+index 962325b..589e22c 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -1225,6 +1225,16 @@ for remote debugging.
+@@ -1230,6 +1230,16 @@ for remote debugging.
  Run using @var{device} for your program's standard input and output.
  @c FIXME: kingdon thinks there is more to -tty.  Investigate.
  
@@ -78,7 +79,7 @@ index f5dde61..1d92bd6 100644
  @item -tui
  @cindex @code{--tui}
 diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
-index a17e37d..c56068b 100644
+index c3ea203..a3bdb98 100644
 --- a/gdb/doc/python.texi
 +++ b/gdb/doc/python.texi
 @@ -88,8 +88,6 @@ containing @code{end}.  For example:
@@ -111,7 +112,7 @@ index 05a38b2..9801fdf 100644
    set variable $gdb_init_done = 1
  
 diff --git a/gdb/main.c b/gdb/main.c
-index 5477379..b7e413f 100644
+index 30e27c2..0460c28 100644
 --- a/gdb/main.c
 +++ b/gdb/main.c
 @@ -33,6 +33,7 @@
@@ -122,16 +123,16 @@ index 5477379..b7e413f 100644
  #include "source.h"
  #include "cli/cli-cmds.h"
  #include "objfiles.h"
-@@ -459,6 +460,8 @@ captured_main (void *data)
-   char *cdarg = NULL;
-   char *ttyarg = NULL;
+@@ -459,7 +460,7 @@ struct cmdarg
+ };
  
-+  int python_script = 0;
-+
-   /* These are static so that we can take their address in an
-      initializer.  */
-   static int print_help;
-@@ -663,10 +666,14 @@ captured_main (void *data)
+ static void
+-captured_main_1 (struct captured_main_args *context)
++captured_main_1 (struct captured_main_args *context, int &python_script)
+ {
+   int argc = context->argc;
+   char **argv = context->argv;
+@@ -674,10 +675,14 @@ captured_main_1 (struct captured_main_args *context)
        {"args", no_argument, &set_args, 1},
        {"l", required_argument, 0, 'l'},
        {"return-child-result", no_argument, &return_child_result, 1},
@@ -147,7 +148,7 @@ index 5477379..b7e413f 100644
        {
  	int option_index;
  
-@@ -684,6 +691,9 @@ captured_main (void *data)
+@@ -695,6 +700,9 @@ captured_main_1 (struct captured_main_args *context)
  	  case 0:
  	    /* Long option that just sets a flag.  */
  	    break;
@@ -157,7 +158,7 @@ index 5477379..b7e413f 100644
  	  case OPT_SE:
  	    symarg = optarg;
  	    execarg = optarg;
-@@ -864,7 +874,31 @@ captured_main (void *data)
+@@ -853,7 +861,31 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Now that gdb_init has created the initial inferior, we're in
       position to set args for that inferior.  */
@@ -190,7 +191,7 @@ index 5477379..b7e413f 100644
      {
        /* The remaining options are the command-line options for the
  	 inferior.  The first one is the sym/exec file, and the rest
-@@ -1127,7 +1161,8 @@ captured_main (void *data)
+@@ -1123,7 +1155,8 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Read in the old history after all the command files have been
       read.  */
@@ -200,9 +201,14 @@ index 5477379..b7e413f 100644
  
    if (batch_flag)
      {
-@@ -1138,13 +1173,25 @@ captured_main (void *data)
-   /* Show time and/or space usage.  */
-   do_cleanups (pre_stat_chain);
+@@ -1136,16 +1169,29 @@ static void
+ captured_main (void *data)
+ {
+   struct captured_main_args *context = (struct captured_main_args *) data;
++  int python_script = 0;
+ 
+-  captured_main_1 (context);
++  captured_main_1 (context, python_script);
  
 -  /* NOTE: cagney/1999-11-07: There is probably no reason for not
 -     moving this loop and the code found in captured_command_loop()
@@ -211,16 +217,16 @@ index 5477379..b7e413f 100644
 -  while (1)
 +#if HAVE_PYTHON
 +  if (python_script)
-     {
--      catch_errors (captured_command_loop, 0, "", RETURN_MASK_ALL);
++    {
 +      extern int pagination_enabled;
 +      pagination_enabled = 0;
-+      run_python_script (argc - optind, &argv[optind]);
-+      return 1;
++      run_python_script (context->argc - optind, &context->argv[optind]);
++      return;
 +    }
 +  else
 +#endif
-+    {
+     {
+-      catch_errors (captured_command_loop, 0, "", RETURN_MASK_ALL);
 +      /* NOTE: cagney/1999-11-07: There is probably no reason for not
 +	 moving this loop and the code found in captured_command_loop()
 +	 into the command_loop() proper.  The main thing holding back that
@@ -232,7 +238,7 @@ index 5477379..b7e413f 100644
      }
    /* No exit -- exit is through quit_command.  */
  }
-@@ -1187,6 +1234,12 @@ print_gdb_help (struct ui_file *stream)
+@@ -1188,6 +1234,12 @@ print_gdb_help (struct ui_file *stream)
    fputs_unfiltered (_("\
  This is the GNU debugger.  Usage:\n\n\
      gdb [options] [executable-file [core-file or process-id]]\n\
@@ -245,7 +251,7 @@ index 5477379..b7e413f 100644
      gdb [options] --args executable-file [inferior-arguments ...]\n\n\
  "), stream);
    fputs_unfiltered (_("\
-@@ -1231,6 +1284,13 @@ Output and user interface control:\n\n\
+@@ -1232,6 +1284,13 @@ Output and user interface control:\n\n\
  #endif
    fputs_unfiltered (_("\
    --dbx              DBX compatibility mode.\n\
@@ -442,8 +448,22 @@ index 0000000..8742680
 +        return wanted == found
 +
 +InScope ()
+diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
+index 4dd413d..2ad4071 100644
+--- a/gdb/python/python-internal.h
++++ b/gdb/python/python-internal.h
+@@ -551,6 +551,9 @@ class gdbpy_enter_varobj : public gdbpy_enter
+ 
+ };
+ 
++struct cleanup *ensure_python_env (struct gdbarch *gdbarch,
++				   const struct language_defn *language);
++
+ extern struct gdbarch *python_gdbarch;
+ extern const struct language_defn *python_language;
+ 
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index 621e201..703a1a0 100644
+index 73fb3d0..0789c16 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
 @@ -95,6 +95,8 @@ const struct extension_language_defn extension_language_python =
@@ -455,7 +475,37 @@ index 621e201..703a1a0 100644
  #include "target.h"
  #include "gdbthread.h"
  #include "interps.h"
-@@ -1263,6 +1265,92 @@ gdbpy_print_stack (void)
+@@ -242,6 +244,29 @@ gdbpy_enter::~gdbpy_enter ()
+   restore_active_ext_lang (m_previous_active);
+ }
+ 
++static void
++restore_python_env (void *p)
++{
++  gdbpy_enter *env = (gdbpy_enter *) p;
++
++  delete env;
++}
++
++/* Called before entering the Python interpreter to install the
++   current language and architecture to be used for Python values.
++   Also set the active extension language for GDB so that SIGINT's
++   are directed our way, and if necessary install the right SIGINT
++   handler.  */
++
++struct cleanup *
++ensure_python_env (struct gdbarch *gdbarch,
++                   const struct language_defn *language)
++{
++  gdbpy_enter *env = new gdbpy_enter (gdbarch, language);
++
++  return make_cleanup (restore_python_env, env);
++}
++
+ /* Set the quit flag.  */
+ 
+ static void
+@@ -1192,6 +1217,92 @@ gdbpy_print_stack (void)
  
  /* Return the current Progspace.
     There always is one.  */
@@ -473,7 +523,7 @@ index 621e201..703a1a0 100644
 +  if (! running_python_script || in_cli)
 +    return PyErr_Format (PyExc_RuntimeError, "cannot invoke CLI recursively");
 +  
-+  if (ui_out_is_mi_like_p (current_uiout))
++  if (current_uiout->is_mi_like_p ())
 +    return PyErr_Format (PyExc_RuntimeError, _("Cannot invoke CLI from MI."));
 +
 +  in_cli = 1;
@@ -548,7 +598,7 @@ index 621e201..703a1a0 100644
  
  static PyObject *
  gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
-@@ -1981,6 +2069,8 @@ PyMethodDef python_GdbMethods[] =
+@@ -1888,6 +1999,8 @@ PyMethodDef python_GdbMethods[] =
  Evaluate command, a string, as a gdb CLI command.  Optionally returns\n\
  a Python String containing the output of the command if to_string is\n\
  set to True." },
@@ -558,7 +608,7 @@ index 621e201..703a1a0 100644
      "Return a gdb parameter's value" },
  
 diff --git a/gdb/python/python.h b/gdb/python/python.h
-index b810187..a3620ab 100644
+index e407faa..fc1c632 100644
 --- a/gdb/python/python.h
 +++ b/gdb/python/python.h
 @@ -25,4 +25,6 @@
@@ -568,23 +618,8 @@ index b810187..a3620ab 100644
 +extern void run_python_script (int argc, char **argv);
 +
  #endif /* GDB_PYTHON_H */
-diff --git a/gdb/testsuite/gdb.gdb/selftest.exp b/gdb/testsuite/gdb.gdb/selftest.exp
-index 2fdd9e3..391900d 100644
---- a/gdb/testsuite/gdb.gdb/selftest.exp
-+++ b/gdb/testsuite/gdb.gdb/selftest.exp
-@@ -87,6 +87,10 @@ proc do_steps_and_nexts {} {
- 		set description "step over cmdarg_vec initialization"
- 		set command "step"
- 	    }
-+	    -re ".*python_script = 0.*$gdb_prompt $" {
-+		set description "step over python_script initialization"
-+		set command "step"
-+	    }
- 	    -re ".*pre_stat_chain = make_command_stats_cleanup.*$gdb_prompt $" {
- 		set description "next over make_command_stats_cleanup and everything it calls"
- 		set command "next"
 diff --git a/gdb/testsuite/gdb.python/py-frame.exp b/gdb/testsuite/gdb.python/py-frame.exp
-index b5a4682..d5451a6 100644
+index f5d4a3c..3546f7b 100644
 --- a/gdb/testsuite/gdb.python/py-frame.exp
 +++ b/gdb/testsuite/gdb.python/py-frame.exp
 @@ -95,6 +95,8 @@ gdb_test "python print ('result = %s' % f0.read_var ('a'))" " = 1" "test Frame.r
@@ -597,10 +632,10 @@ index b5a4682..d5451a6 100644
  gdb_test "python print ('result = %s' % (gdb.selected_frame ().read_register ('sp') == gdb.parse_and_eval ('\$sp')))" \
    " = True" \
 diff --git a/gdb/testsuite/gdb.python/py-value.exp b/gdb/testsuite/gdb.python/py-value.exp
-index 57a9ba1..d90d85a 100644
+index d9a4d20..c87e4d8 100644
 --- a/gdb/testsuite/gdb.python/py-value.exp
 +++ b/gdb/testsuite/gdb.python/py-value.exp
-@@ -397,6 +397,15 @@ proc test_value_after_death {} {
+@@ -407,6 +407,15 @@ proc test_value_after_death {} {
      "print value's type"
  }
  
@@ -616,11 +651,43 @@ index 57a9ba1..d90d85a 100644
  # Regression test for invalid subscript operations.  The bug was that
  # the type of the value was not being checked before allowing a
  # subscript operation to proceed.
-@@ -526,6 +535,7 @@ test_value_in_inferior
+@@ -536,6 +545,7 @@ test_value_in_inferior
  test_inferior_function_call
  test_lazy_strings
  test_value_after_death
 +test_cast_regression
  
  # Test either C or C++ values. 
+ 
+diff --git a/gdb/varobj.c b/gdb/varobj.c
+index 173abf3..c3abf66 100644
+--- a/gdb/varobj.c
++++ b/gdb/varobj.c
+@@ -226,6 +226,14 @@ is_root_p (const struct varobj *var)
+ }
+ 
+ #ifdef HAVE_PYTHON
++/* Helper function to install a Python environment suitable for
++   use during operations on VAR.  */
++struct cleanup *
++varobj_ensure_python_env (const struct varobj *var)
++{
++  return ensure_python_env (var->root->exp->gdbarch,
++			    var->root->exp->language_defn);
++}
+ 
+ /* See python-internal.h.  */
+ gdbpy_enter_varobj::gdbpy_enter_varobj (const struct varobj *var)
+diff --git a/gdb/varobj.h b/gdb/varobj.h
+index 989c8cd..fc7f177 100644
+--- a/gdb/varobj.h
++++ b/gdb/varobj.h
+@@ -320,6 +320,8 @@ extern int varobj_has_more (const struct varobj *var, int to);
+ 
+ extern int varobj_is_dynamic_p (const struct varobj *var);
+ 
++extern struct cleanup *varobj_ensure_python_env (const struct varobj *var);
++
+ extern int varobj_default_value_is_changeable_p (const struct varobj *var);
+ extern int varobj_value_is_changeable_p (const struct varobj *var);
  
