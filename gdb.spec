@@ -26,7 +26,7 @@ Version: 7.12.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1578,8 +1578,11 @@ then
 fi
 
 %changelog
+* Tue Feb 28 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170226-3.fc26
+- Fix gdb.arch/amd64-entry-value-paramref.exp rebase regression.
+
 * Tue Feb 28 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170226-2.fc26
-- [rhel] Fix gdb.python/py-gil-mthread.exp for Python 2 compat. (RH BZ 1427487).
+- [testsuite] [rhel] Fix py-gil-mthread.exp for Python 2 compat (RH BZ 1427487).
 
 * Mon Feb 27 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170226-1.fc26
 - Rebase to pre-7.13 FSF GDB trunk.

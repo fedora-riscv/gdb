@@ -31,35 +31,33 @@ Index: gdb-7.12.50.20170207/gdb/dwarf2loc.c
 ===================================================================
 --- gdb-7.12.50.20170207.orig/gdb/dwarf2loc.c	2017-02-16 23:31:53.977893289 +0100
 +++ gdb-7.12.50.20170207/gdb/dwarf2loc.c	2017-02-16 23:37:44.625522081 +0100
-@@ -2285,6 +2285,12 @@
+@@ -42,6 +42,7 @@
+ #include <algorithm>
+ #include <vector>
+ #include <unordered_set>
++#include <functional>
+ 
+ extern int dwarf_always_disassemble;
+ 
+@@ -2350,6 +2350,18 @@ dwarf2_evaluate_loc_desc_full (struct ty
    ctx.per_cu = per_cu;
    ctx.obj_address = 0;
  
 +struct frame_info *old_frame (deprecated_safe_get_selected_frame ());
-+TRY
-+  {
-+  if (frame != NULL)
-+    select_frame (frame);
++class RestoreCall {
++private:
++  const std::function<void ()> func;
++public:
++  RestoreCall(std::function<void ()> func_):func(func_) {}
++  ~RestoreCall() { func(); }
++} restore_frame([&]() {
++  select_frame (old_frame);
++});
++if (frame != NULL) select_frame (frame);
 +
    scoped_value_mark free_values;
  
    ctx.gdbarch = get_objfile_arch (objfile);
-@@ -2471,6 +2477,15 @@
- 
-   set_value_initialized (retval, ctx.initialized);
- 
-+  }
-+CATCH (ex, RETURN_MASK_ALL)
-+  {
-+    select_frame (old_frame);
-+    throw_exception (ex);
-+  }
-+END_CATCH
-+select_frame (old_frame);
-+
-   return retval;
- }
- 
 Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
