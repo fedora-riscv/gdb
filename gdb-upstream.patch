@@ -494,3 +494,176 @@ index 356f480..2c141e5 100644
 -- 
 1.8.3.1
 
+
+
+commit 6e5d74e74756fafe59e8198c4cc462cf7c57e12c
+Author: Pedro Alves <palves@redhat.com>
+Date:   Wed Mar 8 11:41:35 2017 +0000
+
+    Fix PR 21218: GDB dumps core when escaping newline in multi-line command
+    
+    With commit 3b12939dfc2399 ("Replace the sync_execution global with a
+    new enum prompt_state tristate"), GDB started aborting if you try
+    splitting an input line with a continuation char (backslash) while in
+    a multi-line command:
+    
+     (gdb) commands
+     Type commands for breakpoint(s) 1, one per line.
+     End with a line saying just "end".
+     >print \
+    
+     (gdb) 1      # note "(gdb)" incorrectly printed here.
+     >end
+    
+     readline: readline_callback_read_char() called with no handler!
+     $
+    
+    That abort is actually a symptom of an old problem introduced when
+    gdb_readline_wrapper was rewritten to use asynchronous readline, back
+    in 2007.  Note how the "(gdb)" prompt is printed above in the "(gdb)
+    1" line.  Clearly it shouldn't be there, but it already was before the
+    commit mentioned above.  Fixing that also fixes the readline abort
+    shown above.
+    
+    The problem starts when command_line_input passes a NULL prompt to
+    gdb_readline_wrapper when it finds previous incomplete input due to a
+    backslash, trying to fetch more input without printing another ">"
+    secondary prompt.  That itself should not be a problem, because
+    passing NULL to gdb_readline_wrapper has the same meaning as passing a
+    pointer to empty string, since gdb_readline_wrapper exposes the same
+    interface as 'readline(char *)'.  However, gdb_readline_wrapper passes
+    the prompt argument directly to display_gdb_prompt, and for the
+    latter, a NULL prompt argument has a different meaning - it requests
+    printing the primary prompt.
+    
+    Before commit 782a7b8ef9c096 (which rewrote gdb_readline_wrapper to
+    use asynchronous readline), GDB behaved like this:
+    
+     (gdb) commands
+     [....]
+     >print \
+     1
+     >end
+     (gdb)
+    
+    The above is what this commit restores GDB back to.
+    
+    New test included.
+    
+    gdb/ChangeLog:
+    2017-03-08  Pedro Alves  <palves@redhat.com>
+    
+            PR cli/21218
+            * top.c (gdb_readline_wrapper): Avoid passing NULL to
+            display_gdb_prompt.
+            (command_line_input): Add comment.
+    
+    gdb/testsuite/ChangeLog:
+    2017-03-08  Pedro Alves  <palves@redhat.com>
+                Jan Kratochvil  <jan.kratochvil@redhat.com>
+    
+            PR cli/21218
+            * gdb.base/commands.exp (backslash_in_multi_line_command_test):
+            New proc.
+            (top level): Call it.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,5 +1,12 @@
+ 2017-03-08  Pedro Alves  <palves@redhat.com>
+ 
++	PR cli/21218
++	* top.c (gdb_readline_wrapper): Avoid passing NULL to
++	display_gdb_prompt.
++	(command_line_input): Add comment.
++
++2017-03-08  Pedro Alves  <palves@redhat.com>
++
+ 	PR tui/21216
+ 	* tui/tui-file.c (tui_file::write): New.
+ 	* tui/tui-file.h (tui_file): Override "write".
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,4 +1,12 @@
+ 2017-03-08  Pedro Alves  <palves@redhat.com>
++	    Jan Kratochvil  <jan.kratochvil@redhat.com>
++
++	PR cli/21218
++	* gdb.base/commands.exp (backslash_in_multi_line_command_test):
++	New proc.
++	(top level): Call it.
++
++2017-03-08  Pedro Alves  <palves@redhat.com>
+ 
+ 	PR tui/21216
+ 	* gdb.tui/tui-nl-filtered-output.exp: New file.
+--- a/gdb/testsuite/gdb.base/commands.exp
++++ b/gdb/testsuite/gdb.base/commands.exp
+@@ -759,6 +759,34 @@ proc redefine_backtrace_test {} {
+ 	    "execute bt command in redefine_backtrace_test"
+ }
+ 
++# Test an input line split with a continuation character (backslash)
++# while entering a multi-line command (in a secondary prompt).
++
++proc backslash_in_multi_line_command_test {} {
++    gdb_breakpoint "main"
++
++    gdb_test_multiple "commands" "commands" {
++	-re "End with a line saying just \"end\"\\.\r\n>$" {
++	    pass "commands"
++	}
++    }
++
++    set test "input line split with backslash"
++    send_gdb "print \\\nargc\n"
++    gdb_test_multiple "" $test {
++	-re "^print \\\\\r\nargc\r\n>$" {
++	    pass $test
++	}
++    }
++
++    gdb_test_no_output "end"
++
++    # Input any command, just to be sure the readline state is sane.
++    # In PR 21218, this would trigger the infamous:
++    # readline: readline_callback_read_char() called with no handler!
++    gdb_test "print 1" "" "run command"
++}
++
+ gdbvar_simple_if_test
+ gdbvar_simple_while_test
+ gdbvar_complex_if_while_test
+@@ -1027,5 +1055,6 @@ recursive_source_test
+ if_commands_test
+ error_clears_commands_left
+ redefine_hook_test
++backslash_in_multi_line_command_test
+ # This one should come last, as it redefines "backtrace".
+ redefine_backtrace_test
+--- a/gdb/top.c
++++ b/gdb/top.c
+@@ -1030,8 +1030,11 @@ gdb_readline_wrapper (const char *prompt)
+   if (cleanup->target_is_async_orig)
+     target_async (0);
+ 
+-  /* Display our prompt and prevent double prompt display.  */
+-  display_gdb_prompt (prompt);
++  /* Display our prompt and prevent double prompt display.  Don't pass
++     down a NULL prompt, since that has special meaning for
++     display_gdb_prompt -- it indicates a request to print the primary
++     prompt, while we want a secondary prompt here.  */
++  display_gdb_prompt (prompt != NULL ? prompt : "");
+   if (ui->command_editing)
+     rl_already_prompted = 1;
+ 
+@@ -1307,6 +1310,9 @@ command_line_input (const char *prompt_arg, int repeat, char *annotation_suffix)
+       if (cmd != NULL)
+ 	break;
+ 
++      /* Got partial input.  I.e., got a line that ends with a
++	 continuation character (backslash).  Suppress printing the
++	 prompt again.  */
+       prompt = NULL;
+     }
+ 

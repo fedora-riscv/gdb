@@ -26,7 +26,7 @@ Version: 7.12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 46%{?dist}
+Release: 47%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1585,6 +1585,9 @@ then
 fi
 
 %changelog
+* Wed Mar  8 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-47.fc25
+- Fix EOL escape in multiline command segv (Pedro Alves, RH BZ 1429172).
+
 * Wed Feb 15 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.1-46.fc25
 - Fix <tab>-completion crash (Gary Benson, RH BZ 1398387).
 
