@@ -26,7 +26,7 @@ Version: 7.12.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1113,8 +1113,6 @@ CFLAGS="$CFLAGS -I$PWD/processor-trace-%{libipt_version}-root%{_includedir}"
 LDFLAGS="$LDFLAGS -L$PWD/processor-trace-%{libipt_version}-root%{_libdir}"
 %endif
 
-# FIXME: gcc-7 compatibility.
-CFLAGS="$CFLAGS -Wno-implicit-fallthrough"
 export CXXFLAGS="$CFLAGS"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
@@ -1578,6 +1576,10 @@ then
 fi
 
 %changelog
+* Wed Apr 19 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170309-7.fc26
+- Fix reported gdb-vla-intel-stringbt-fix.patch regression (SuSE).
+- Remove gcc-7 compilation compatibility hack.
+
 * Fri Mar 10 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.12.50.20170309-6.fc26
 - [testsuite] [ppc*,s390*] Do not FAIL rhbz1261564-aarch64-watchpoint.exp
   (RH BZ 1352563).
