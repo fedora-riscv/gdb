@@ -27,17 +27,19 @@ cannot reproduce it.
 Thanks,
 Jan
 
---- ./gdb/dwarf2loc.c	2016-08-29 04:01:25.000000000 +0200
-+++ ./gdb/dwarf2loc.c	2016-09-01 11:00:20.258909494 +0200
-@@ -2289,6 +2289,15 @@ const struct dwarf_expr_context_funcs dw
+Index: gdb-7.12.1/gdb/dwarf2loc.c
+===================================================================
+--- gdb-7.12.1.orig/gdb/dwarf2loc.c	2017-04-19 21:46:34.791753815 +0200
++++ gdb-7.12.1/gdb/dwarf2loc.c	2017-04-19 21:58:08.252106538 +0200
+@@ -2289,6 +2289,15 @@
    dwarf_expr_get_obj_addr
  };
  
 +static void
 +select_frame_cleanup (void *arg)
 +{
-+  struct frame_info *frame = (struct frame_info *) arg;
-+
++  frame_id *frame_id_p = (frame_id *) arg;
++  struct frame_info *frame (frame_find_by_id (*frame_id_p));
 +  if (frame != NULL)
 +    select_frame (frame);
 +}
@@ -45,22 +47,23 @@ Jan
  /* Evaluate a location description, starting at DATA and with length
     SIZE, to find the current location of variable of TYPE in the
     context of FRAME.  BYTE_OFFSET is applied after the contents are
-@@ -2318,6 +2327,11 @@ dwarf2_evaluate_loc_desc_full (struct ty
+@@ -2318,6 +2327,12 @@
  
    ctx = new_dwarf_expr_context ();
    old_chain = make_cleanup_free_dwarf_expr_context (ctx);
 +
-+  make_cleanup (select_frame_cleanup, deprecated_safe_get_selected_frame ());
++  frame_id selected_frame_id (get_frame_id (deprecated_safe_get_selected_frame ()));
++  make_cleanup (select_frame_cleanup, &selected_frame_id);
 +  if (frame != NULL)
 +    select_frame (frame);
 +
    value_chain = make_cleanup_value_free_to_mark (value_mark ());
  
    ctx->gdbarch = get_objfile_arch (objfile);
-Index: gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
+Index: gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90	2015-05-31 16:14:05.844545344 +0200
++++ gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f90	2017-04-19 21:46:34.854754214 +0200
 @@ -0,0 +1,24 @@
 +! Copyright 2010 Free Software Foundation, Inc.
 +!
@@ -86,10 +89,10 @@ Index: gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame-stub.f9
 +  real :: dummy
 +  dummy = 1
 +end subroutine bar
-Index: gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
+Index: gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp	2015-05-31 16:14:05.845545351 +0200
++++ gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp	2017-04-19 21:46:34.854754214 +0200
 @@ -0,0 +1,39 @@
 +# Copyright 2010 Free Software Foundation, Inc.
 +
@@ -130,10 +133,10 @@ Index: gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame.exp
 +}
 +
 +gdb_test "bt" {foo \(string='hello'.*}
-Index: gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
+Index: gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.9.50.20150520/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90	2015-05-31 16:14:05.845545351 +0200
++++ gdb-7.12.1/gdb/testsuite/gdb.fortran/dynamic-other-frame.f90	2017-04-19 21:46:34.855754220 +0200
 @@ -0,0 +1,36 @@
 +! Copyright 2010 Free Software Foundation, Inc.
 +!
