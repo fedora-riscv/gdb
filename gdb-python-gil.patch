@@ -1,7 +1,7 @@
-Index: gdb-7.12.50.20170226/gdb/doc/python.texi
+Index: gdb-7.99.90.20170420/gdb/doc/python.texi
 ===================================================================
---- gdb-7.12.50.20170226.orig/gdb/doc/python.texi	2017-02-28 16:06:13.508969181 +0100
-+++ gdb-7.12.50.20170226/gdb/doc/python.texi	2017-02-28 16:06:14.958979480 +0100
+--- gdb-7.99.90.20170420.orig/gdb/doc/python.texi	2017-04-20 23:16:30.895328018 +0200
++++ gdb-7.99.90.20170420/gdb/doc/python.texi	2017-04-20 23:16:35.690360136 +0200
 @@ -230,6 +230,14 @@
  return value is @code{None}.  If @var{to_string} is @code{True}, the
  @value{GDBN} virtual terminal will be temporarily set to unlimited width
@@ -17,10 +17,10 @@ Index: gdb-7.12.50.20170226/gdb/doc/python.texi
  @end defun
  
  @findex gdb.breakpoints
-Index: gdb-7.12.50.20170226/gdb/python/python-internal.h
+Index: gdb-7.99.90.20170420/gdb/python/python-internal.h
 ===================================================================
---- gdb-7.12.50.20170226.orig/gdb/python/python-internal.h	2017-02-28 16:06:13.510969195 +0100
-+++ gdb-7.12.50.20170226/gdb/python/python-internal.h	2017-02-28 16:06:14.958979480 +0100
+--- gdb-7.99.90.20170420.orig/gdb/python/python-internal.h	2017-04-20 23:16:30.896328024 +0200
++++ gdb-7.99.90.20170420/gdb/python/python-internal.h	2017-04-20 23:16:35.690360136 +0200
 @@ -142,6 +142,8 @@
  #define PyGILState_Release(ARG) ((void)(ARG))
  #define PyEval_InitThreads()
@@ -30,32 +30,32 @@ Index: gdb-7.12.50.20170226/gdb/python/python-internal.h
  #define PyEval_ReleaseLock()
  #endif
  
-Index: gdb-7.12.50.20170226/gdb/python/python.c
+Index: gdb-7.99.90.20170420/gdb/python/python.c
 ===================================================================
---- gdb-7.12.50.20170226.orig/gdb/python/python.c	2017-02-28 16:06:13.510969195 +0100
-+++ gdb-7.12.50.20170226/gdb/python/python.c	2017-02-28 16:06:14.959979487 +0100
-@@ -596,12 +596,16 @@
+--- gdb-7.99.90.20170420.orig/gdb/python/python.c	2017-04-20 23:16:30.897328031 +0200
++++ gdb-7.99.90.20170420/gdb/python/python.c	2017-04-20 23:18:11.377001070 +0200
+@@ -594,12 +594,16 @@
  {
    const char *arg;
    PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
 -  int from_tty, to_string;
--  static char *keywords[] = {"command", "from_tty", "to_string", NULL };
+-  static const char *keywords[] = { "command", "from_tty", "to_string", NULL };
 +  int from_tty, to_string, release_gil;
-+  static char *keywords[] = {"command", "from_tty", "to_string", "release_gil", NULL };
++  static const char *keywords[] = {"command", "from_tty", "to_string", "release_gil", NULL };
 +  PyObject *release_gil_obj = NULL;
 +  /* Initialize it just to avoid a GCC false warning.  */
 +  PyThreadState *state = NULL;
  
--  if (! PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!", keywords, &arg,
-+  if (! PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!O!", keywords, &arg,
- 				     &PyBool_Type, &from_tty_obj,
--				     &PyBool_Type, &to_string_obj))
-+				     &PyBool_Type, &to_string_obj,
-+				     &PyBool_Type, &release_gil_obj))
+-  if (!gdb_PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!", keywords, &arg,
++  if (!gdb_PyArg_ParseTupleAndKeywords (args, kw, "s|O!O!O!", keywords, &arg,
+ 					&PyBool_Type, &from_tty_obj,
+-					&PyBool_Type, &to_string_obj))
++					&PyBool_Type, &to_string_obj,
++					&PyBool_Type, &release_gil_obj))
      return NULL;
  
    from_tty = 0;
-@@ -622,6 +626,15 @@
+@@ -620,6 +624,15 @@
        to_string = cmp;
      }
  
@@ -71,7 +71,7 @@ Index: gdb-7.12.50.20170226/gdb/python/python.c
    std::string to_string_res;
  
    TRY
-@@ -630,6 +643,13 @@
+@@ -628,6 +641,13 @@
        std::string copy (arg);
        struct interp *interp;
  
@@ -85,7 +85,7 @@ Index: gdb-7.12.50.20170226/gdb/python/python.c
        scoped_restore save_async = make_scoped_restore (&current_ui->async, 0);
  
        scoped_restore save_uiout = make_scoped_restore (&current_uiout);
-@@ -644,10 +664,22 @@
+@@ -642,10 +662,22 @@
  	to_string_res = execute_command_to_string (&copy[0], from_tty);
        else
  	execute_command (&copy[0], from_tty);
@@ -109,10 +109,10 @@ Index: gdb-7.12.50.20170226/gdb/python/python.c
      }
    END_CATCH
  
-Index: gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.c
+Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.c	2017-02-28 16:06:14.959979487 +0100
++++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.c	2017-04-20 23:16:35.691360143 +0200
 @@ -0,0 +1,13 @@
 +#include <stdio.h>
 +#include <unistd.h>
@@ -127,10 +127,10 @@ Index: gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.c
 +      printf ("Sleeping %d\n", i);
 +    }
 +}
-Index: gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.exp
+Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.exp
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.exp	2017-02-28 16:06:14.959979487 +0100
++++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.exp	2017-04-20 23:16:35.691360143 +0200
 @@ -0,0 +1,69 @@
 +# Copyright (C) 2014 Free Software Foundation, Inc.
 +
@@ -201,10 +201,10 @@ Index: gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.exp
 +	}
 +    }
 +}
-Index: gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.py
+Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.py
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170226/gdb/testsuite/gdb.python/py-gil-mthread.py	2017-02-28 16:26:39.565085643 +0100
++++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.py	2017-04-20 23:16:35.692360149 +0200
 @@ -0,0 +1,28 @@
 +try:
 +   import thread
