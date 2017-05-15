@@ -26,7 +26,7 @@ Version: 7.99.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1580,6 +1580,9 @@ then
 fi
 
 %changelog
+* Mon May 15 2017 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.99.90.20170420-9
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_26_27_Mass_Rebuild
+
 * Fri Apr 21 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.99.90.20170420-8.fc26
 - Rebase to FSF GDB 7.99.90.20170420 (pre-8.0 stable branch).
 
