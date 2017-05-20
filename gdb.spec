@@ -26,7 +26,7 @@ Version: 7.99.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -43,6 +43,7 @@ URL: http://gnu.org/software/gdb/
 # For DTS RHEL<=7 GDB it is better to use none than a Requires dependency.
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: %{?scl_prefix}gcc-gdb-plugin%{?_isa}
+Recommends: dnf-command(debuginfo-install)
 %endif
 
 %if 0%{!?scl:1}
@@ -98,7 +99,6 @@ Provides: bundled(md5-gcc) = %{snapsrc}
 %endif
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
-Recommends: dnf-command(debuginfo-install)
 # https://bugzilla.redhat.com/show_bug.cgi?id=1209492
 Recommends: default-yama-scope
 %endif
@@ -1615,7 +1615,10 @@ then
 fi
 
 %changelog
-* Mon May 15 2017 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.99.90.20170420-11
+* Sat May 20 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.99.90.20170420-12.fc26
+- Move 'dnf-command(debuginfo-install)' gdb-headless -> gdb (RH BZ 1452335).
+
+* Mon May 15 2017 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.99.90.20170420-11.fc26
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_26_27_Mass_Rebuild
 
 * Mon May  8 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.99.90.20170420-10.fc26
