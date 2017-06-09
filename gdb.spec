@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -672,6 +672,10 @@ Patch1153: gdb-add-index-chmod.patch
 #=fedoratest
 Patch1155: gdb-rhbz1398387-tab-crash-test.patch
 
+# [rhel dts libipt] Fix [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+#=push+jan
+Patch1171: v1.6.1-implicit-fallthrough.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -889,6 +893,7 @@ tar xzf %{SOURCE7}
 (
  cd processor-trace-%{libipt_version}
 %patch1142 -p1
+%patch1171 -p1
 )
 %endif
 
@@ -1610,6 +1615,9 @@ then
 fi
 
 %changelog
+* Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-14.fc26
+- [rhel dts libipt] Fix [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+
 * Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-13.fc26
 - Rebase to FSF GDB 8.0 final.
 - [rhel7 dts] Rebase bundled libipt to 1.6.1.
