@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1615,6 +1615,9 @@ then
 fi
 
 %changelog
+* Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-15.fc26
+- [rhel dts libipt] Fix#2 [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+
 * Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-14.fc26
 - [rhel dts libipt] Fix [-Werror=implicit-fallthrough=] with gcc-7.1.1.
 
