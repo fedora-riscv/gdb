@@ -22,11 +22,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20150822
 %global tarname gdb-%{version}
-Version: 7.99.90.%{snapsrc}
+Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -156,7 +156,7 @@ Source5: %{libstdcxxpython}.tar.xz
 Source6: gdbtui
 
 # libipt: Intel Processor Trace Decoder Library
-%global libipt_version 1.5
+%global libipt_version 1.6.1
 #=fedora
 Source7: v%{libipt_version}.tar.gz
 #=fedora
@@ -672,10 +672,6 @@ Patch1153: gdb-add-index-chmod.patch
 #=fedoratest
 Patch1155: gdb-rhbz1398387-tab-crash-test.patch
 
-# Release branch: Fix: --enable-werror
-#=push+jan
-Patch1170: gdb-release-werror.patch
-
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1047,7 +1043,6 @@ done
 %patch1152 -p1
 %patch1153 -p1
 %patch1155 -p1
-%patch1170 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1615,6 +1610,10 @@ then
 fi
 
 %changelog
+* Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-13.fc26
+- Rebase to FSF GDB 8.0 final.
+- [rhel7 dts] Rebase bundled libipt to 1.6.1.
+
 * Sat May 20 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.99.90.20170420-12.fc26
 - Move 'dnf-command(debuginfo-install)' gdb-headless -> gdb (RH BZ 1452335).
 
