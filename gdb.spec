@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 15%{?dist}
+Release: 16%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -147,7 +147,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN.
-%global libstdcxxpython gdb-libstdc++-v3-python-6.3.1-20170212
+%global libstdcxxpython gdb-libstdc++-v3-python-7.1.1-20170526
 #=fedora
 Source5: %{libstdcxxpython}.tar.xz
 
@@ -1615,6 +1615,9 @@ then
 fi
 
 %changelog
+* Sat Jun 10 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-16.fc26
+- [dts] Upgrade libstdc++-v3-python to 7.1.1-20170526.
+
 * Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-15.fc26
 - [rhel dts libipt] Fix#2 [-Werror=implicit-fallthrough=] with gcc-7.1.1.
 
