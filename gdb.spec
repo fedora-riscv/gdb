@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -124,6 +124,11 @@ BuildRequires: %{librpmname}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 Recommends: %{librpmname}
+%endif
+
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+BuildRequires: %{?scl_prefix}gcc-c++
 %endif
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
@@ -1091,6 +1096,11 @@ rm -rf %{buildroot}
 
 test -e %{_root_libdir}/librpm.so.%{librpmver}
 
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+%{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
+%endif
+
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
 # built.
@@ -1376,6 +1386,11 @@ echo ====================TESTING END=====================
 cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
 
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+%{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
+%endif
+
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
 %if 0%{!?scl:1}
@@ -1524,7 +1539,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
+# File must begin with "/": {GFDL,COPYING3,COPYING,COPYING.LIB,COPYING3.LIB}
+%if 0%{!?el6:1}
 %license COPYING3 COPYING COPYING.LIB COPYING3.LIB
+%else
+%doc     COPYING3 COPYING COPYING.LIB COPYING3.LIB
+%endif
 %doc README NEWS
 %{_bindir}/gdb
 %{_bindir}/gcore
@@ -1615,6 +1635,9 @@ then
 fi
 
 %changelog
+* Mon Jun 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-17.fc26
+- [rhel6 dts] Use devtoolset gcc for GDB being now in C++11.
+
 * Sat Jun 10 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-16.fc26
 - [dts] Upgrade libstdc++-v3-python to 7.1.1-20170526.
 
