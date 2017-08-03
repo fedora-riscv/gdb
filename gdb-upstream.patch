@@ -1,0 +1,471 @@
+commit 50e64da58e648ff8708935add5b2a87b4e590edf
+Author: Yao Qi <yao.qi@linaro.org>
+Date:   Tue Jul 25 10:15:25 2017 +0100
+
+    [ARM] Access FPSCR on vfpv2
+    
+    GDB can fetch or store FPSCR on vfpv3, which has 32 VFP registers, but
+    fail to do so on vfpv2, which has 16 VFP registers.  GDB code is incorrect
+    for vfpv2,
+    
+           else if (tdep->vfp_register_count > 0
+                   && regno >= ARM_D0_REGNUM
+                   && regno <= ARM_D0_REGNUM + tdep->vfp_register_count)
+    
+    while FPSCR register number is defined as ARM_D0_REGNUM + 32.
+    
+      ARM_D0_REGNUM,                /* VFP double-precision registers.  */
+      ARM_D31_REGNUM = ARM_D0_REGNUM + 31,
+      ARM_FPSCR_REGNUM,
+    
+    The code above uses "<=" rather than "<", in order to put FPSCR in the
+    range, but it is only correct when tdep->vfp_register_count is 32.  On
+    vpfv2, it is 16, and FPSCR is out of the range, so fetch_vfp_regs or
+    store_vfp_regs are not called.
+    
+    gdb:
+    
+    2017-07-25  Yao Qi  <yao.qi@linaro.org>
+    
+            PR tdep/21717
+            * arm-linux-nat.c (arm_linux_fetch_inferior_registers): Update
+            condition for FPSCR.
+            (arm_linux_store_inferior_registers): Likewise.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,10 @@
++2017-07-25  Yao Qi  <yao.qi@linaro.org>
++
++	PR tdep/21717
++	* arm-linux-nat.c (arm_linux_fetch_inferior_registers): Update
++	condition for FPSCR.
++	(arm_linux_store_inferior_registers): Likewise.
++
+ 2017-06-04  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	* version.in: Set GDB version number to 8.0.0.DATE-git.
+--- a/gdb/arm-linux-nat.c
++++ b/gdb/arm-linux-nat.c
+@@ -402,7 +402,8 @@ arm_linux_fetch_inferior_registers (struct target_ops *ops,
+ 	fetch_wmmx_regs (regcache);
+       else if (tdep->vfp_register_count > 0
+ 	       && regno >= ARM_D0_REGNUM
+-	       && regno <= ARM_D0_REGNUM + tdep->vfp_register_count)
++	       && (regno < ARM_D0_REGNUM + tdep->vfp_register_count
++		   || regno == ARM_FPSCR_REGNUM))
+ 	fetch_vfp_regs (regcache);
+     }
+ }
+@@ -439,7 +440,8 @@ arm_linux_store_inferior_registers (struct target_ops *ops,
+ 	store_wmmx_regs (regcache);
+       else if (tdep->vfp_register_count > 0
+ 	       && regno >= ARM_D0_REGNUM
+-	       && regno <= ARM_D0_REGNUM + tdep->vfp_register_count)
++	       && (regno < ARM_D0_REGNUM + tdep->vfp_register_count
++		   || regno == ARM_FPSCR_REGNUM))
+ 	store_vfp_regs (regcache);
+     }
+ }
+
+
+
+commit cd33a03d183a268b83ccbcae07f3788308e8d9f4
+Author: Yao Qi <yao.qi@linaro.org>
+Date:   Tue Jul 25 11:38:50 2017 +0100
+
+    Catch exceptions thrown from gdbarch_skip_prologue
+    
+    PR 21555 is caused by the exception during the prologue analysis when re-set
+    a breakpoint.
+    
+    (gdb) bt
+     #0  memory_error_message (err=TARGET_XFER_E_IO, gdbarch=0x153db50, memaddr=93824992233232) at ../../binutils-gdb/gdb/corefile.c:192
+     #1  0x00000000005718ed in memory_error (err=TARGET_XFER_E_IO, memaddr=memaddr@entry=93824992233232) at ../../binutils-gdb/gdb/corefile.c:220
+     #2  0x00000000005719d6 in read_memory_object (object=object@entry=TARGET_OBJECT_CODE_MEMORY, memaddr=93824992233232, memaddr@entry=1, myaddr=myaddr@entry=0x7fffffffd0a0 "P\333S\001", len=len@entry=1) at ../../binutils-gdb/gdb/corefile.c:259
+     #3  0x0000000000571c6e in read_code (len=1, myaddr=0x7fffffffd0a0 "P\333S\001", memaddr=<optimized out>) at ../../binutils-gdb/gdb/corefile.c:287
+     #4  read_code_unsigned_integer (memaddr=memaddr@entry=93824992233232, len=len@entry=1, byte_order=byte_order@entry=BFD_ENDIAN_LITTLE)                          at ../../binutils-gdb/gdb/corefile.c:362
+     #5  0x000000000041d4a0 in amd64_analyze_prologue (gdbarch=gdbarch@entry=0x153db50, pc=pc@entry=93824992233232, current_pc=current_pc@entry=18446744073709551615, cache=cache@entry=0x7fffffffd1e0) at ../../binutils-gdb/gdb/amd64-tdep.c:2310
+     #6  0x000000000041e404 in amd64_skip_prologue (gdbarch=0x153db50, start_pc=93824992233232) at ../../binutils-gdb/gdb/amd64-tdep.c:2459
+     #7  0x000000000067bfb0 in skip_prologue_sal (sal=sal@entry=0x7fffffffd4e0) at ../../binutils-gdb/gdb/symtab.c:3628
+     #8  0x000000000067c4d8 in find_function_start_sal (sym=sym@entry=0x1549960, funfirstline=1) at ../../binutils-gdb/gdb/symtab.c:3501
+     #9  0x000000000060999d in symbol_to_sal (result=result@entry=0x7fffffffd5f0, funfirstline=<optimized out>, sym=sym@entry=0x1549960) at ../../binutils-gdb/gdb/linespec.c:3860
+    ....
+     #16 0x000000000054b733 in location_to_sals (b=b@entry=0x15792d0, location=0x157c230, search_pspace=search_pspace@entry=0x1148120, found=found@entry=0x7fffffffdc64) at ../../binutils-gdb/gdb/breakpoint.c:14211
+     #17 0x000000000054c1f5 in breakpoint_re_set_default (b=0x15792d0) at ../../binutils-gdb/gdb/breakpoint.c:14301
+     #18 0x00000000005412a9 in breakpoint_re_set_one (bint=bint@entry=0x15792d0) at ../../binutils-gdb/gdb/breakpoint.c:14412
+    
+    This problem can be fixed by
+    
+     - either each prologue analyzer doesn't throw exception,
+     - or catch the exception thrown from gdbarch_skip_prologue,
+    
+    I choose the latter because the former needs to fix *every* prologue
+    analyzer to not throw exception.
+    
+    This error can be reproduced by changing reread.exp.  The test reread.exp
+    has already test that breakpoint can be reset correctly after the
+    executable is re-read.  This patch extends this test by compiling test c
+    file with and without -fPIE.
+    
+    (gdb) run ^M
+    The program being debugged has been started already.^M
+    Start it from the beginning? (y or n) y^M
+    x86_64/gdb/testsuite/outputs/gdb.base/reread/reread' has changed; re-reading symbols.
+    Error in re-setting breakpoint 1: Cannot access memory at address 0x555555554790^M
+    Error in re-setting breakpoint 2: Cannot access memory at address 0x555555554790^M
+    Starting program: /scratch/yao/gdb/build-git/x86_64/gdb/testsuite/outputs/gdb.base/reread/reread ^M
+    This is foo^M
+    [Inferior 1 (process 27720) exited normally]^M
+    (gdb) FAIL: gdb.base/reread.exp: opts= "-fPIE" "ldflags=-pie" : run to foo() second time (the program exited)
+    
+    This patch doesn't re-indent the code, to keep the patch simple.
+    
+    gdb:
+    
+    2017-07-25  Yao Qi  <yao.qi@linaro.org>
+    
+            PR gdb/21555
+            * arch-utils.c (gdbarch_skip_prologue_noexcept): New function.
+            * arch-utils.h (gdbarch_skip_prologue_noexcept): Declare.
+            * infrun.c: Include arch-utils.h
+            (handle_step_into_function): Call gdbarch_skip_prologue_noexcept.
+            (handle_step_into_function_backward): Likewise.
+            * symtab.c (skip_prologue_sal): Likewise.
+    
+    gdb/testsuite:
+    
+    2017-07-25  Yao Qi  <yao.qi@linaro.org>
+    
+            PR gdb/21555
+            * gdb.base/reread.exp: Wrap the whole test with two kinds of
+            compilation flags, with -fPIE and without -fPIE.
+
+--- a/gdb/arch-utils.c
++++ b/gdb/arch-utils.c
+@@ -964,6 +964,24 @@ default_guess_tracepoint_registers (struct gdbarch *gdbarch,
+   regcache_raw_supply (regcache, pc_regno, regs);
+ }
+ 
++/* See arch-utils.h.  */
++
++CORE_ADDR
++gdbarch_skip_prologue_noexcept (gdbarch *gdbarch, CORE_ADDR pc) noexcept
++{
++  CORE_ADDR new_pc = pc;
++
++  TRY
++    {
++      new_pc = gdbarch_skip_prologue (gdbarch, pc);
++    }
++  CATCH (ex, RETURN_MASK_ALL)
++    {}
++  END_CATCH
++
++  return new_pc;
++}
++
+ /* -Wmissing-prototypes */
+ extern initialize_file_ftype _initialize_gdbarch_utils;
+ 
+--- a/gdb/arch-utils.h
++++ b/gdb/arch-utils.h
+@@ -267,4 +267,10 @@ extern void default_guess_tracepoint_registers (struct gdbarch *gdbarch,
+ 						struct regcache *regcache,
+ 						CORE_ADDR addr);
+ 
++/* Wrapper to gdbarch_skip_prologue, but doesn't throw exception.  Catch
++   exception thrown from gdbarch_skip_prologue, and return PC.  */
++
++extern CORE_ADDR gdbarch_skip_prologue_noexcept (gdbarch *gdbarch,
++						 CORE_ADDR pc) noexcept;
++
+ #endif
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -64,6 +64,7 @@
+ #include "event-loop.h"
+ #include "thread-fsm.h"
+ #include "common/enum-flags.h"
++#include "arch-utils.h"
+ 
+ /* Prototypes for local functions */
+ 
+@@ -7314,8 +7315,8 @@ handle_step_into_function (struct gdbarch *gdbarch,
+ 
+   cust = find_pc_compunit_symtab (stop_pc);
+   if (cust != NULL && compunit_language (cust) != language_asm)
+-    ecs->stop_func_start = gdbarch_skip_prologue (gdbarch,
+-						  ecs->stop_func_start);
++    ecs->stop_func_start
++      = gdbarch_skip_prologue_noexcept (gdbarch, ecs->stop_func_start);
+ 
+   stop_func_sal = find_pc_line (ecs->stop_func_start, 0);
+   /* Use the step_resume_break to step until the end of the prologue,
+@@ -7393,8 +7394,8 @@ handle_step_into_function_backward (struct gdbarch *gdbarch,
+ 
+   cust = find_pc_compunit_symtab (stop_pc);
+   if (cust != NULL && compunit_language (cust) != language_asm)
+-    ecs->stop_func_start = gdbarch_skip_prologue (gdbarch,
+-						  ecs->stop_func_start);
++    ecs->stop_func_start
++      = gdbarch_skip_prologue_noexcept (gdbarch, ecs->stop_func_start);
+ 
+   stop_func_sal = find_pc_line (stop_pc, 0);
+ 
+--- a/gdb/symtab.c
++++ b/gdb/symtab.c
+@@ -61,6 +61,7 @@
+ 
+ #include "parser-defs.h"
+ #include "completer.h"
++#include "arch-utils.h"
+ 
+ /* Forward declarations for local functions.  */
+ 
+@@ -3626,7 +3627,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
+       if (gdbarch_skip_entrypoint_p (gdbarch))
+         pc = gdbarch_skip_entrypoint (gdbarch, pc);
+       if (skip)
+-	pc = gdbarch_skip_prologue (gdbarch, pc);
++	pc = gdbarch_skip_prologue_noexcept (gdbarch, pc);
+ 
+       /* For overlays, map pc back into its mapped VMA range.  */
+       pc = overlay_mapped_address (pc, section);
+--- a/gdb/testsuite/gdb.base/reread.exp
++++ b/gdb/testsuite/gdb.base/reread.exp
+@@ -15,111 +15,131 @@
+ 
+ set prototypes 1
+ 
+-# build the first test case
++# Build programs in PIE mode, to reproduce PR 21555.
++foreach_with_prefix opts {
++    { "" "" }
++    { "-fPIE" "ldflags=-pie" } } {
+ 
+-set testfile1 "reread1"
+-set srcfile1 ${testfile1}.c
+-# Cygwin needs $EXEEXT.
+-set binfile1 [standard_output_file ${testfile1}$EXEEXT]
+-
+-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile1}" "${binfile1}" executable {debug nowarnings}] != "" } {
+-    untested "failed to compile first testcase"
+-    return -1
+-}
+-
+-# build the second test case
+-
+-set testfile2 "reread2"
+-set srcfile2 ${testfile2}.c
+-set binfile2 [standard_output_file ${testfile2}$EXEEXT]
+-
+-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" executable {debug nowarnings}] != ""
+-      && [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" executable {debug nowarnings additional_flags=-DNO_SECTIONS}] != ""} {
+-    untested "failed to compile second testcase"
+-    return -1
+-}
+-
+-# Start with a fresh gdb.
+-
+-set testfile "reread"
+-set binfile [standard_output_file ${testfile}$EXEEXT]
+-
+-gdb_start
+-gdb_reinitialize_dir $srcdir/$subdir
+-
+-# Load the first executable.
+-
+-gdb_rename_execfile ${binfile1} ${binfile}
+-gdb_load ${binfile}
+-
+-# Set a breakpoint at foo
+-
+-gdb_test "break foo" \
+-    "Breakpoint.*at.* file .*$srcfile1, line 14.*" \
+-    "breakpoint foo in first file"
+-
+-
+-# Run, should see "Breakpoint 1, foo () at hello1.c:14"
+-
+-gdb_run_cmd
+-gdb_test "" "Breakpoint.* foo .* at .*$srcfile1:14.*" "run to foo()"
+-
+-# Restore first executable to its original name, and move
+-# second executable into its place.  Ensure that the new
+-# executable is at least a second newer than the old.
+-
+-gdb_rename_execfile ${binfile} ${binfile1}
+-gdb_rename_execfile ${binfile2} ${binfile}
+-gdb_test "shell sleep 1" ".*" ""
+-gdb_touch_execfile ${binfile}
+-
+-# Run a second time; GDB should detect that the executable has changed
+-# and reset the breakpoints correctly.
+-# Should see "Breakpoint 1, foo () at reread2.c:9"
+-
+-set test "run to foo() second time"
+-if [is_remote target] {
+-    unsupported $test
+-} else {
+-    gdb_run_cmd
+-    gdb_test "" "Breakpoint.* foo .* at .*:9.*" $test
+-}
+-
+-
+-### Second pass: verify that GDB checks the executable file's
+-### timestamp when the program is *restarted*, not just when it exits.
+-
+-if [is_remote target] {
+-    unsupported "second pass: GDB should check for changes before running"
+-} else {
+-
+-    # Put the older executable back in place.
+-    gdb_rename_execfile ${binfile} ${binfile2}
+-    gdb_rename_execfile ${binfile1} ${binfile}
+-
+-    # Restart GDB entirely.
+-    clean_restart ${binfile}
+-
+-    # Set a breakpoint on foo and run to it.
+-    gdb_test "break foo" \
+-            "Breakpoint.*at.* file .*$srcfile1, line 14.*" \
+-            "second pass: breakpoint foo in first file"
+-    gdb_run_cmd
+-    gdb_test "" "Breakpoint.* foo .* at .*$srcfile1:14.*" "second pass: run to foo()"
+-
+-    # This time, let the program run to completion.  If GDB checks the
+-    # executable file's timestamp now, it won't notice any change.
+-    gdb_continue_to_end "second pass"
+-    
+-    # Now move the newer executable into place, and re-run.  GDB
+-    # should still notice that the executable file has changed,
+-    # and still re-set the breakpoint appropriately.
+-    gdb_rename_execfile ${binfile} ${binfile1}
+-    gdb_rename_execfile ${binfile2} ${binfile}
+-    gdb_run_cmd
+-    gdb_test "" "Breakpoint.* foo .* at .*:9.*" "second pass: run to foo() second time"
+-}
++	# build the first test case
+ 
++	set testfile1 "reread1"
++	set srcfile1 ${testfile1}.c
++	# Cygwin needs $EXEEXT.
++	set binfile1 [standard_output_file ${testfile1}$EXEEXT]
++
++	set testfile1_opt [list debug nowarnings \
++			       additional_flags=[lindex $opts 0] \
++			       [lindex $opts 1] ]
++	if  { [gdb_compile "${srcdir}/${subdir}/${srcfile1}" "${binfile1}" \
++		   executable ${testfile1_opt}] != "" } {
++	    untested "failed to compile first testcase"
++	    return -1
++	}
++
++	# build the second test case
++
++	set testfile2 "reread2"
++	set srcfile2 ${testfile2}.c
++	set binfile2 [standard_output_file ${testfile2}$EXEEXT]
++
++	set testfile2_opt1 [list debug nowarnings \
++				additional_flags=[lindex $opts 0] \
++				[lindex $opts 1]]
++	set testfile2_op2 [list debug nowarnings \
++			       "additional_flags=-DNO_SECTIONS [lindex $opts 0]" \
++			       [lindex $opts 1]]
++	if  { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" \
++		   executable ${testfile2_opt1}] != ""
++	      && [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" \
++		      executable ${testfile2_opt2}] != ""} {
++	    untested "failed to compile second testcase"
++	    return -1
++	}
++
++	# Start with a fresh gdb.
++
++	set testfile "reread"
++	set binfile [standard_output_file ${testfile}$EXEEXT]
++
++	gdb_start
++	gdb_reinitialize_dir $srcdir/$subdir
++
++	# Load the first executable.
++
++	gdb_rename_execfile ${binfile1} ${binfile}
++	gdb_load ${binfile}
++
++	# Set a breakpoint at foo
++
++	gdb_test "break foo" \
++	    "Breakpoint.*at.* file .*$srcfile1, line 14.*" \
++	    "breakpoint foo in first file"
++
++
++	# Run, should see "Breakpoint 1, foo () at hello1.c:14"
++
++	gdb_run_cmd
++	gdb_test "" "Breakpoint.* foo .* at .*$srcfile1:14.*" "run to foo()"
++
++	# Restore first executable to its original name, and move
++	# second executable into its place.  Ensure that the new
++	# executable is at least a second newer than the old.
++
++	gdb_rename_execfile ${binfile} ${binfile1}
++	gdb_rename_execfile ${binfile2} ${binfile}
++	gdb_test "shell sleep 1" ".*" ""
++	gdb_touch_execfile ${binfile}
++
++	# Run a second time; GDB should detect that the executable has changed
++	# and reset the breakpoints correctly.
++	# Should see "Breakpoint 1, foo () at reread2.c:9"
++
++	set test "run to foo() second time"
++	if [is_remote target] {
++	    unsupported $test
++	} else {
++	    gdb_run_cmd
++	    gdb_test "" "Breakpoint.* foo .* at .*:9.*" $test
++	}
++
++
++	### Second pass: verify that GDB checks the executable file's
++	### timestamp when the program is *restarted*, not just when it exits.
++
++	if [is_remote target] {
++	    unsupported "second pass: GDB should check for changes before running"
++	} else {
++
++	    # Put the older executable back in place.
++	    gdb_rename_execfile ${binfile} ${binfile2}
++	    gdb_rename_execfile ${binfile1} ${binfile}
++
++	    # Restart GDB entirely.
++	    clean_restart ${binfile}
++
++	    # Set a breakpoint on foo and run to it.
++	    gdb_test "break foo" \
++		"Breakpoint.*at.* file .*$srcfile1, line 14.*" \
++		"second pass: breakpoint foo in first file"
++	    gdb_run_cmd
++	    gdb_test "" "Breakpoint.* foo .* at .*$srcfile1:14.*" \
++		"second pass: run to foo()"
++
++	    # This time, let the program run to completion.  If GDB checks the
++	    # executable file's timestamp now, it won't notice any change.
++	    gdb_continue_to_end "second pass"
++
++	    # Now move the newer executable into place, and re-run.  GDB
++	    # should still notice that the executable file has changed,
++	    # and still re-set the breakpoint appropriately.
++	    gdb_rename_execfile ${binfile} ${binfile1}
++	    gdb_rename_execfile ${binfile2} ${binfile}
++	    gdb_run_cmd
++	    gdb_test "" "Breakpoint.* foo .* at .*:9.*" \
++		"second pass: run to foo() second time"
++	}
++
++    }
+ # End of tests.
+ 
+ return 0
