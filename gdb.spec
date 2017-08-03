@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 20%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -126,6 +126,11 @@ BuildRequires: %{librpmname}
 Recommends: %{librpmname}
 %endif
 
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+BuildRequires: %{?scl_prefix}gcc-c++
+%endif
+
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
 
@@ -147,7 +152,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN.
-%global libstdcxxpython gdb-libstdc++-v3-python-6.3.1-20170212
+%global libstdcxxpython gdb-libstdc++-v3-python-7.1.1-20170526
 #=fedora
 Source5: %{libstdcxxpython}.tar.xz
 
@@ -275,7 +280,7 @@ Patch231: gdb-6.3-bz202689-exec-from-pthread-test.patch
 
 # Backported fixups post the source tarball.
 #Xdrop: Just backports.
-#Patch232: gdb-upstream.patch
+Patch232: gdb-upstream.patch
 
 # Testcase for PPC Power6/DFP instructions disassembly (BZ 230000).
 #=fedoratest
@@ -672,6 +677,10 @@ Patch1153: gdb-add-index-chmod.patch
 #=fedoratest
 Patch1155: gdb-rhbz1398387-tab-crash-test.patch
 
+# [rhel dts libipt] Fix [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+#=push+jan
+Patch1171: v1.6.1-implicit-fallthrough.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -889,6 +898,7 @@ tar xzf %{SOURCE7}
 (
  cd processor-trace-%{libipt_version}
 %patch1142 -p1
+%patch1171 -p1
 )
 %endif
 
@@ -904,7 +914,7 @@ find -name "*.info*"|xargs rm -f
 # Match the Fedora's version info.
 %patch2 -p1
 
-#patch232 -p1
+%patch232 -p1
 %patch349 -p1
 %patch1058 -p1
 %patch1132 -p1
@@ -1085,6 +1095,11 @@ rm -rf zlib
 rm -rf %{buildroot}
 
 test -e %{_root_libdir}/librpm.so.%{librpmver}
+
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+%{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
+%endif
 
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
@@ -1371,6 +1386,11 @@ echo ====================TESTING END=====================
 cd %{gdb_build}
 rm -rf $RPM_BUILD_ROOT
 
+%if 0%{?el6:1}
+# GDB C++11 requires devtoolset gcc.
+%{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
+%endif
+
 make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
 
 %if 0%{!?scl:1}
@@ -1519,7 +1539,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
+# File must begin with "/": {GFDL,COPYING3,COPYING,COPYING.LIB,COPYING3.LIB}
+%if 0%{!?el6:1}
 %license COPYING3 COPYING COPYING.LIB COPYING3.LIB
+%else
+%doc     COPYING3 COPYING COPYING.LIB COPYING3.LIB
+%endif
 %doc README NEWS
 %{_bindir}/gdb
 %{_bindir}/gcore
@@ -1610,6 +1635,27 @@ then
 fi
 
 %changelog
+* Thu Aug  3 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-20.fc26
+- Two fixes from upstream stable branch 8.0.
+
+* Wed Aug  2 2017 Fedora Release Engineering <releng@fedoraproject.org> - 8.0-19.fc26
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Binutils_Mass_Rebuild
+
+* Wed Jul 26 2017 Fedora Release Engineering <releng@fedoraproject.org> - 8.0-18.fc26
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Mass_Rebuild
+
+* Mon Jun 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-17.fc26
+- [rhel6 dts] Use devtoolset gcc for GDB being now in C++11.
+
+* Sat Jun 10 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-16.fc26
+- [dts] Upgrade libstdc++-v3-python to 7.1.1-20170526.
+
+* Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-15.fc26
+- [rhel dts libipt] Fix#2 [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+
+* Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-14.fc26
+- [rhel dts libipt] Fix [-Werror=implicit-fallthrough=] with gcc-7.1.1.
+
 * Fri Jun  9 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-13.fc26
 - Rebase to FSF GDB 8.0 final.
 - [rhel7 dts] Rebase bundled libipt to 1.6.1.
