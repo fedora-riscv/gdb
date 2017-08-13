@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -39,6 +39,10 @@ URL: http://gnu.org/software/gdb/
 # For our convenience
 %global gdb_src %{tarname}
 %global gdb_build build-%{_target_platform}
+
+# error: Installed (but unpackaged) file(s) found: /usr/lib/debug/usr/bin/gdb-gdb.py
+# https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/message/PBOJDOFMWTRV3ZOKNV5HN7IBX5EPHDHF/
+%undefine _debuginfo_subpackages
 
 # For DTS RHEL<=7 GDB it is better to use none than a Requires dependency.
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
@@ -110,7 +114,11 @@ Recommends: default-yama-scope
 %if 0%{?el7:1}
 %global librpmver 3
 %else
+%if 0%{?fedora} >= 27
+%global librpmver 8
+%else
 %global librpmver 7
+%endif
 %endif
 %endif
 %if 0%{?__isa_bits} == 64
@@ -1635,6 +1643,10 @@ then
 fi
 
 %changelog
+* Sun Aug 13 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-21.fc26
+- Fix compatibility with F-27 debuginfo packaging.
+- Fix compatibility with F-27 librpm version 8.
+
 * Thu Aug  3 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-20.fc26
 - Two fixes from upstream stable branch 8.0.
 
