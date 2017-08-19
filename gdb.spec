@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -689,6 +689,43 @@ Patch1155: gdb-rhbz1398387-tab-crash-test.patch
 #=push+jan
 Patch1171: v1.6.1-implicit-fallthrough.patch
 
+# [s390x] Backport arch12 support and other s390x fixes (RH BZ 1420304).
+Patch1210: gdb-rhbz1420304-s390x-01of35.patch
+Patch1211: gdb-rhbz1420304-s390x-02of35.patch
+Patch1212: gdb-rhbz1420304-s390x-03of35.patch
+Patch1213: gdb-rhbz1420304-s390x-04of35.patch
+Patch1214: gdb-rhbz1420304-s390x-05of35.patch
+Patch1215: gdb-rhbz1420304-s390x-06of35.patch
+Patch1216: gdb-rhbz1420304-s390x-07of35.patch
+Patch1217: gdb-rhbz1420304-s390x-08of35.patch
+Patch1218: gdb-rhbz1420304-s390x-09of35.patch
+Patch1219: gdb-rhbz1420304-s390x-10of35.patch
+Patch1220: gdb-rhbz1420304-s390x-11of35.patch
+Patch1221: gdb-rhbz1420304-s390x-12of35.patch
+Patch1222: gdb-rhbz1420304-s390x-13of35.patch
+Patch1223: gdb-rhbz1420304-s390x-14of35.patch
+Patch1224: gdb-rhbz1420304-s390x-15of35.patch
+Patch1225: gdb-rhbz1420304-s390x-16of35.patch
+Patch1226: gdb-rhbz1420304-s390x-17of35.patch
+Patch1227: gdb-rhbz1420304-s390x-18of35.patch
+Patch1228: gdb-rhbz1420304-s390x-19of35.patch
+Patch1229: gdb-rhbz1420304-s390x-20of35.patch
+Patch1230: gdb-rhbz1420304-s390x-21of35.patch
+Patch1231: gdb-rhbz1420304-s390x-22of35.patch
+Patch1232: gdb-rhbz1420304-s390x-23of35.patch
+Patch1233: gdb-rhbz1420304-s390x-24of35.patch
+Patch1234: gdb-rhbz1420304-s390x-25of35.patch
+Patch1235: gdb-rhbz1420304-s390x-26of35.patch
+Patch1236: gdb-rhbz1420304-s390x-27of35.patch
+Patch1237: gdb-rhbz1420304-s390x-28of35.patch
+Patch1238: gdb-rhbz1420304-s390x-29of35.patch
+Patch1239: gdb-rhbz1420304-s390x-30of35.patch
+Patch1240: gdb-rhbz1420304-s390x-31of35.patch
+Patch1241: gdb-rhbz1420304-s390x-32of35.patch
+Patch1242: gdb-rhbz1420304-s390x-33of35.patch
+Patch1243: gdb-rhbz1420304-s390x-34of35.patch
+Patch1244: gdb-rhbz1420304-s390x-35of35.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1012,6 +1049,41 @@ find -name "*.info*"|xargs rm -f
 %patch690 -p1
 %patch698 -p1
 %patch703 -p1
+%patch1210 -p1
+%patch1211 -p1
+%patch1212 -p1
+%patch1213 -p1
+%patch1214 -p1
+%patch1215 -p1
+%patch1216 -p1
+%patch1217 -p1
+%patch1218 -p1
+%patch1219 -p1
+%patch1220 -p1
+%patch1221 -p1
+%patch1222 -p1
+%patch1223 -p1
+%patch1224 -p1
+%patch1225 -p1
+%patch1226 -p1
+%patch1227 -p1
+%patch1228 -p1
+%patch1229 -p1
+%patch1230 -p1
+%patch1231 -p1
+%patch1232 -p1
+%patch1233 -p1
+%patch1234 -p1
+%patch1235 -p1
+%patch1236 -p1
+%patch1237 -p1
+%patch1238 -p1
+%patch1239 -p1
+%patch1240 -p1
+%patch1241 -p1
+%patch1242 -p1
+%patch1243 -p1
+%patch1244 -p1
 %patch811 -p1
 %patch812 -p1
 %patch813 -p1
@@ -1643,6 +1715,9 @@ then
 fi
 
 %changelog
+* Sat Aug 19 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-23.fc26
+- [s390x] Backport arch12 support and other s390x fixes (RH BZ 1420304).
+
 * Fri Aug 18 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-22.fc26
 - Backport a fix for clang && -gsplit-dwarf debuggees (RH BZ 1482892).
 
