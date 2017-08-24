@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1715,6 +1715,9 @@ then
 fi
 
 %changelog
+* Thu Aug 24 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-24.fc26
+- Backport DWARF-5 and breakpoint fixes from upstream stable branch 8.0.
+
 * Sat Aug 19 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-23.fc26
 - [s390x] Backport arch12 support and other s390x fixes (RH BZ 1420304).
 
