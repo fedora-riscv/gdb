@@ -26,7 +26,7 @@ Version: 8.0
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -726,6 +726,9 @@ Patch1242: gdb-rhbz1420304-s390x-33of35.patch
 Patch1243: gdb-rhbz1420304-s390x-34of35.patch
 Patch1244: gdb-rhbz1420304-s390x-35of35.patch
 
+# [rhel6] Fix T-stopping of processes after their detachment (RH BZ 1486223).
+Patch1254: gdb-rhbz1486223-rhel6-stop.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1133,6 +1136,7 @@ done
 %patch1152 -p1
 %patch1153 -p1
 %patch1155 -p1
+%patch1254 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1715,6 +1719,9 @@ then
 fi
 
 %changelog
+* Wed Aug 30 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-25.fc26
+- [rhel6] Fix T-stopping of processes after their detachment (RH BZ 1486223).
+
 * Thu Aug 24 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0-24.fc26
 - Backport DWARF-5 and breakpoint fixes from upstream stable branch 8.0.
 
