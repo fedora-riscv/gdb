@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1715,7 +1715,10 @@ then
 fi
 
 %changelog
-* Tue Sep 26 2017 Troy Dawson <tdawson@redhat.com> - 8.0.1-27.fc28
+* Thu Sep 28 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-28.fc26
+- Performance fix of gcore to use --readnever (for RH BZ 1493675).
+
+* Tue Sep 26 2017 Troy Dawson <tdawson@redhat.com> - 8.0.1-27.fc26
 - Cleanup spec file conditionals
 
 * Tue Sep 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-26.fc26
