@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 29%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -726,6 +726,13 @@ Patch1242: gdb-rhbz1420304-s390x-33of35.patch
 Patch1243: gdb-rhbz1420304-s390x-34of35.patch
 Patch1244: gdb-rhbz1420304-s390x-35of35.patch
 
+# [s390x] Backport arch14 guarded-storage register support (RH BZ 1498758).
+Patch1255: gdb-rhbz1498758-1of5.patch
+Patch1256: gdb-rhbz1498758-2of5.patch
+Patch1257: gdb-rhbz1498758-3of5.patch
+Patch1258: gdb-rhbz1498758-4of5.patch
+Patch1259: gdb-rhbz1498758-5of5.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1133,6 +1140,11 @@ done
 %patch1152 -p1
 %patch1153 -p1
 %patch1155 -p1
+%patch1255 -p1
+%patch1256 -p1
+%patch1257 -p1
+%patch1258 -p1
+%patch1259 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1715,6 +1727,9 @@ then
 fi
 
 %changelog
+* Sat Oct  7 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-29.fc26
+- [s390x] Backport arch14 guarded-storage register support (RH BZ 1498758).
+
 * Thu Sep 28 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-28.fc26
 - Performance fix of gcore to use --readnever (for RH BZ 1493675).
 
