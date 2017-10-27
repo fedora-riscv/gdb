@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -114,7 +114,7 @@ Recommends: default-yama-scope
 %if 0%{?el7:1}
 %global librpmver 3
 %else
-%if 0%{?fedora} >= 27
+%if 0%{?fedora} >= 27 || 0%{?rhel} > 7
 %global librpmver 8
 %else
 %global librpmver 7
@@ -726,6 +726,17 @@ Patch1242: gdb-rhbz1420304-s390x-33of35.patch
 Patch1243: gdb-rhbz1420304-s390x-34of35.patch
 Patch1244: gdb-rhbz1420304-s390x-35of35.patch
 
+# [s390x] Backport arch14 guarded-storage register support (RH BZ 1498758).
+Patch1255: gdb-rhbz1498758-1of5.patch
+Patch1256: gdb-rhbz1498758-2of5.patch
+Patch1257: gdb-rhbz1498758-3of5.patch
+Patch1258: gdb-rhbz1498758-4of5.patch
+Patch1259: gdb-rhbz1498758-5of5.patch
+
+# Use inlined func name for printing breakpoints (RH BZ 1228556, Keith Seitz).
+Patch1261: gdb-rhbz1228556-bpt-inlined-func-name-1of2.patch
+Patch1262: gdb-rhbz1228556-bpt-inlined-func-name-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -762,7 +773,7 @@ BuildRequires: texlive-collection-latexrecommended
 %endif
 # Permit rebuilding *.[0-9] files even if they are distributed in gdb-*.tar:
 BuildRequires: /usr/bin/pod2man
-%if 0%{!?rhel:1}
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
 BuildRequires: guile-devel%{buildisa}
 %endif
@@ -834,7 +845,7 @@ BuildRequires: prelink
 BuildRequires: libmpx%{bits_local} libmpx%{bits_other}
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
-%if 0%{!?rhel:1}
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 # Fedora arm+ppc64le do not yet have fpc built.
 %ifnarch %{arm} ppc64le
 BuildRequires: fpc
@@ -1133,6 +1144,13 @@ done
 %patch1152 -p1
 %patch1153 -p1
 %patch1155 -p1
+%patch1255 -p1
+%patch1256 -p1
+%patch1257 -p1
+%patch1258 -p1
+%patch1259 -p1
+%patch1261 -p1
+%patch1262 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1263,7 +1281,7 @@ export CXXFLAGS="$CFLAGS"
 	--with-separate-debug-dir=/usr/lib/debug		\
 	--disable-sim						\
 	--disable-rpath						\
-%if 0%{!?rhel:1}
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
 	--with-babeltrace					\
 	--with-guile						\
 %else
@@ -1596,7 +1614,7 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
 
 rm -f $RPM_BUILD_ROOT%{_infodir}/dir
 
-%if 0%{?rhel:1}
+%if 0%{?rhel:1}  && 0%{?rhel} <= 7
 # /usr/share/gdb/guile/ gets installed even --without-guile
 # https://sourceware.org/bugzilla/show_bug.cgi?id=17105
 rm -rf $RPM_BUILD_ROOT%{_datadir}/gdb/guile
@@ -1715,6 +1733,18 @@ then
 fi
 
 %changelog
+* Fri Oct 27 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-30.fc26
+- Use inlined func name for printing breakpoints (RH BZ 1228556, Keith Seitz).
+
+* Sat Oct  7 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-29.fc26
+- [s390x] Backport arch14 guarded-storage register support (RH BZ 1498758).
+
+* Thu Sep 28 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-28.fc26
+- Performance fix of gcore to use --readnever (for RH BZ 1493675).
+
+* Tue Sep 26 2017 Troy Dawson <tdawson@redhat.com> - 8.0.1-27.fc26
+- Cleanup spec file conditionals
+
 * Tue Sep 12 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-26.fc26
 - Rebase to FSF GDB 8.0.1 (8.0 stable branch).
 
