@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 29%{?dist}
+Release: 30%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -733,6 +733,10 @@ Patch1257: gdb-rhbz1498758-3of5.patch
 Patch1258: gdb-rhbz1498758-4of5.patch
 Patch1259: gdb-rhbz1498758-5of5.patch
 
+# Use inlined func name for printing breakpoints (RH BZ 1228556, Keith Seitz).
+Patch1261: gdb-rhbz1228556-bpt-inlined-func-name-1of2.patch
+Patch1262: gdb-rhbz1228556-bpt-inlined-func-name-2of2.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1145,6 +1149,8 @@ done
 %patch1257 -p1
 %patch1258 -p1
 %patch1259 -p1
+%patch1261 -p1
+%patch1262 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1727,6 +1733,9 @@ then
 fi
 
 %changelog
+* Fri Oct 27 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-30.fc26
+- Use inlined func name for printing breakpoints (RH BZ 1228556, Keith Seitz).
+
 * Sat Oct  7 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-29.fc26
 - [s390x] Backport arch14 guarded-storage register support (RH BZ 1498758).
 
