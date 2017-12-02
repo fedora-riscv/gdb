@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 30%{?dist}
+Release: 31%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -842,7 +842,9 @@ BuildRequires: prelink
 %endif
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
+%ifarch %{ix86} x86_64
 BuildRequires: libmpx%{bits_local} libmpx%{bits_other}
+%endif
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
@@ -870,12 +872,8 @@ BuildRequires: libgfortran%{bits_local} libgfortran%{bits_other}
 # libstdc++-devel of matching bits is required only for g++ -static.
 BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
-BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
-%else
 %ifarch %{ix86} x86_64
 BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
-%endif
 %endif
 %endif
 BuildRequires: glibc-static%{bits_local}
@@ -1733,6 +1731,9 @@ then
 fi
 
 %changelog
+* Sat Dec  2 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-31.fc26
+- [testsuite] Fix BuildRequires for non-x86* arches.
+
 * Fri Oct 27 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-30.fc26
 - Use inlined func name for printing breakpoints (RH BZ 1228556, Keith Seitz).
 
