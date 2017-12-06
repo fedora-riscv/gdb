@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 32%{?dist}
+Release: 33%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1731,6 +1731,9 @@ then
 fi
 
 %changelog
+* Wed Dec  6 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-33.fc26
+- [rhel7] Fix C++ compiler compatibility.
+
 * Tue Dec  5 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-32.fc26
 - Backport upstream fix for Intel PKRU (Walfred Tedeschi).
 - Backport upstream fix AVX instr. single-stepping (RH BZ 1515209, Pedro Alves).
