@@ -74,3 +74,461 @@ Date:   Wed Aug 9 05:01:55 2017 -0700
  	  || attr->form == DW_FORM_GNU_strp_alt)
  	str = DW_STRING (attr);
        else
+
+
+
+commit f24b864960e61f9a91f8c168c1afe12a6676ad7a
+Author: Walfred Tedeschi <walfred.tedeschi@intel.com>
+Date:   Mon Oct 16 08:59:38 2017 +0200
+
+    PR22137: gdbserver crashes on host with pkru register.
+    
+    This patch adds missing backslash on a makefile and regenerate the
+    files created via the xml files.  Those were not in sync with the xml file.
+    
+    gdb/ChangeLog:
+    
+    2017-10-16  Walfred Tedeschi  <walfred.tedeschi@intel.com>
+    
+            * features/Makefile (i386-avx-mpx-avx512-pku.dat): Add backslash
+            at the end of the line.
+            * regformats/i386/amd64-avx-mpx-avx512-pku-linux.dat: Regenerate.
+            * regformats/i386/amd64-avx-mpx-avx512-pku.dat: Regenerate.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,10 @@
++2017-10-16  Walfred Tedeschi  <walfred.tedeschi@intel.com>
++
++	* features/Makefile (i386-avx-mpx-avx512-pku.dat): Add backslash 
++	at the end of the line.
++	* regformats/i386/amd64-avx-mpx-avx512-pku-linux.dat: Regenerate.
++	* regformats/i386/amd64-avx-mpx-avx512-pku.dat: Regenerate.
++
+ 2017-09-07  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	* version.in: Set GDB version number to 8.0.1.DATE-git.
+--- a/gdb/features/Makefile
++++ b/gdb/features/Makefile
+@@ -281,7 +281,7 @@ $(outdir)/i386/i386-avx-avx512.dat: i386/32bit-core.xml i386/32bit-avx.xml \
+ 			       i386/32bit-avx512.xml
+ $(outdir)/i386/i386-avx-avx512-linux.dat: i386/32bit-core.xml i386/32bit-avx.xml \
+ 			       i386/32bit-linux.xml i386/32bit-avx512.xml
+-$(outdir)/i386/i386-avx-mpx-avx512-pku.dat: i386/32bit-core.xml
++$(outdir)/i386/i386-avx-mpx-avx512-pku.dat: i386/32bit-core.xml \
+ 			       i386/32bit-avx.xml i386/32bit-mpx.xml i386/32bit-avx512.xml \
+ 			       i386/32bit-pkeys.xml
+ $(outdir)/i386/i386-avx-mpx-avx512-pku-linux.dat: i386/32bit-core.xml \
+--- a/gdb/regformats/i386/amd64-avx-mpx-avx512-pku-linux.dat
++++ b/gdb/regformats/i386/amd64-avx-mpx-avx512-pku-linux.dat
+@@ -157,3 +157,4 @@ expedite:rbp,rsp,rip
+ 256:zmm29h
+ 256:zmm30h
+ 256:zmm31h
++32:pkru
+--- a/gdb/regformats/i386/amd64-avx-mpx-avx512-pku.dat
++++ b/gdb/regformats/i386/amd64-avx-mpx-avx512-pku.dat
+@@ -60,9 +60,6 @@ expedite:rbp,rsp,rip
+ 128:xmm14
+ 128:xmm15
+ 32:mxcsr
+-64:orig_rax
+-64:fs_base
+-64:gs_base
+ 128:ymm0h
+ 128:ymm1h
+ 128:ymm2h
+
+
+
+commit 50a1fdd59c1777672a9be0e81fe2301c2a115fce
+Author: Pedro Alves <palves@redhat.com>
+Date:   Mon Dec 4 15:59:20 2017 +0000
+
+    Fix displaced-stepping RIP-relative VEX-encoded instructions (AVX) (PR gdb/22499)
+    
+    PR gdb/22499 is about a latent bug exposed by the switch to "maint set
+    target-non-stop on" by default on x86-64 GNU/Linux, a while ago.  With
+    that on, GDB is also preferring to use displaced-stepping by default.
+    
+    The testcase in the bug is failing because GDB ends up incorrectly
+    displaced-stepping over a RIP-relative VEX-encoded instruction, like
+    this:
+    
+     0x00000000004007f5 <+15>:    c5 fb 10 05 8b 01 00 00 vmovsd 0x18b(%rip),%xmm0        # 0x400988
+    
+    While RIP-relative instructions need adjustment when relocated to the
+    scratch pad, GDB ends up just copying VEX-encoded instructions to the
+    scratch pad unmodified, with the end result that the inferior ends up
+    executing an instruction that fetches/writes memory from the wrong
+    address...
+    
+    This patch teaches GDB about the VEX-encoding prefixes, fixing the
+    problem, and adds a testcase that fails without the GDB fix.
+    
+    I think we may need a similar treatment for EVEX-encoded instructions,
+    but I didn't address that simply because I couldn't find any
+    EVEX-encoded RIP-relative instruction in the gas testsuite.  In any
+    case, this commit is forward progress as-is already.
+    
+    gdb/ChangeLog:
+    2017-12-04  Pedro Alves  <palves@redhat.com>
+    
+            PR gdb/22499
+            * amd64-tdep.c (amd64_insn::rex_offset): Rename to...
+            (amd64_insn::enc_prefix_offset): ... this, and tweak comment.
+            (vex2_prefix_p, vex3_prefix_p): New functions.
+            (amd64_get_insn_details): Adjust to rename.  Also skip VEX2 and
+            VEX3 prefixes.
+            (fixup_riprel): Set VEX3.!B.
+    
+    gdb/testsuite/ChangeLog:
+    2017-12-04  Pedro Alves  <palves@redhat.com>
+    
+            PR gdb/22499
+            * gdb.arch/amd64-disp-step-avx.S: New file.
+            * gdb.arch/amd64-disp-step-avx.exp: New file.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,13 @@
++2017-12-04  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/22499
++	* amd64-tdep.c (amd64_insn::rex_offset): Rename to...
++	(amd64_insn::enc_prefix_offset): ... this, and tweak comment.
++	(vex2_prefix_p, vex3_prefix_p): New functions.
++	(amd64_get_insn_details): Adjust to rename.  Also skip VEX2 and
++	VEX3 prefixes.
++	(fixup_riprel): Set VEX3.!B.
++
+ 2017-12-03  Simon Marchi  <simon.marchi@ericsson.com>
+ 
+ 	* target.h (mem_region_vector): Remove.
+--- a/gdb/amd64-tdep.c
++++ b/gdb/amd64-tdep.c
+@@ -1037,8 +1037,9 @@ struct amd64_insn
+ {
+   /* The number of opcode bytes.  */
+   int opcode_len;
+-  /* The offset of the rex prefix or -1 if not present.  */
+-  int rex_offset;
++  /* The offset of the REX/VEX instruction encoding prefix or -1 if
++     not present.  */
++  int enc_prefix_offset;
+   /* The offset to the first opcode byte.  */
+   int opcode_offset;
+   /* The offset to the modrm byte or -1 if not present.  */
+@@ -1124,6 +1125,22 @@ rex_prefix_p (gdb_byte pfx)
+   return REX_PREFIX_P (pfx);
+ }
+ 
++/* True if PFX is the start of the 2-byte VEX prefix.  */
++
++static bool
++vex2_prefix_p (gdb_byte pfx)
++{
++  return pfx == 0xc5;
++}
++
++/* True if PFX is the start of the 3-byte VEX prefix.  */
++
++static bool
++vex3_prefix_p (gdb_byte pfx)
++{
++  return pfx == 0xc4;
++}
++
+ /* Skip the legacy instruction prefixes in INSN.
+    We assume INSN is properly sentineled so we don't have to worry
+    about falling off the end of the buffer.  */
+@@ -1242,19 +1259,30 @@ amd64_get_insn_details (gdb_byte *insn, struct amd64_insn *details)
+   details->raw_insn = insn;
+ 
+   details->opcode_len = -1;
+-  details->rex_offset = -1;
++  details->enc_prefix_offset = -1;
+   details->opcode_offset = -1;
+   details->modrm_offset = -1;
+ 
+   /* Skip legacy instruction prefixes.  */
+   insn = amd64_skip_prefixes (insn);
+ 
+-  /* Skip REX instruction prefix.  */
++  /* Skip REX/VEX instruction encoding prefixes.  */
+   if (rex_prefix_p (*insn))
+     {
+-      details->rex_offset = insn - start;
++      details->enc_prefix_offset = insn - start;
+       ++insn;
+     }
++  else if (vex2_prefix_p (*insn))
++    {
++      /* Don't record the offset in this case because this prefix has
++	 no REX.B equivalent.  */
++      insn += 2;
++    }
++  else if (vex3_prefix_p (*insn))
++    {
++      details->enc_prefix_offset = insn - start;
++      insn += 3;
++    }
+ 
+   details->opcode_offset = insn - start;
+ 
+@@ -1329,10 +1357,22 @@ fixup_riprel (struct gdbarch *gdbarch, amd64_displaced_step_closure *dsc,
+   arch_tmp_regno = amd64_get_unused_input_int_reg (insn_details);
+   tmp_regno = amd64_arch_reg_to_regnum (arch_tmp_regno);
+ 
+-  /* REX.B should be unset as we were using rip-relative addressing,
+-     but ensure it's unset anyway, tmp_regno is not r8-r15.  */
+-  if (insn_details->rex_offset != -1)
+-    dsc->insn_buf[insn_details->rex_offset] &= ~REX_B;
++  /* Position of the not-B bit in the 3-byte VEX prefix (in byte 1).  */
++  static constexpr gdb_byte VEX3_NOT_B = 0x20;
++
++  /* REX.B should be unset (VEX.!B set) as we were using rip-relative
++     addressing, but ensure it's unset (set for VEX) anyway, tmp_regno
++     is not r8-r15.  */
++  if (insn_details->enc_prefix_offset != -1)
++    {
++      gdb_byte *pfx = &dsc->insn_buf[insn_details->enc_prefix_offset];
++      if (rex_prefix_p (pfx[0]))
++	pfx[0] &= ~REX_B;
++      else if (vex3_prefix_p (pfx[0]))
++	pfx[1] |= VEX3_NOT_B;
++      else
++	gdb_assert_not_reached ("unhandled prefix");
++    }
+ 
+   regcache_cooked_read_unsigned (regs, tmp_regno, &orig_value);
+   dsc->tmp_regno = tmp_regno;
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,9 @@
++2017-12-04  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/22499
++	* gdb.arch/amd64-disp-step-avx.S: New file.
++	* gdb.arch/amd64-disp-step-avx.exp: New file.
++
+ 2017-12-03  Pedro Alves  <palves@redhat.com>
+ 
+ 	* gdb.threads/process-dies-while-detaching.c: Include <errno.h>
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/amd64-disp-step-avx.S
+@@ -0,0 +1,70 @@
++/* Copyright 2009-2017 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++   This file is part of the gdb testsuite.
++
++   Test displaced stepping over VEX-encoded RIP-relative AVX
++   instructions.  */
++
++	.text
++
++	.global main
++main:
++	nop
++
++/***********************************************/
++
++/* Test a VEX2-encoded RIP-relative instruction.  */
++
++	.global test_rip_vex2
++test_rip_vex2:
++	vmovsd ro_var(%rip),%xmm0
++	.global test_rip_vex2
++test_rip_vex2_end:
++	nop
++
++/* Test a VEX3-encoded RIP-relative instruction.  */
++
++	.global test_rip_vex3
++test_rip_vex3:
++	vextractf128 $0x0,%ymm0,var128(%rip)
++	.global test_rip_vex3
++test_rip_vex3_end:
++	nop
++
++	/* skip over test data */
++	jmp done
++
++/* RIP-relative ro-data for VEX2 test above.  */
++
++ro_var:
++	.8byte 0x1122334455667788
++	.8byte 0x8877665544332211
++
++/***********************************************/
++
++/* All done.  */
++
++done:
++	mov $0,%rdi
++	call exit
++	hlt
++
++/* RIP-relative data for VEX3 test above.  */
++
++.data
++var128:
++	.8byte 0xaa55aa55aa55aa55
++	.8byte 0x55aa55aa55aa55aa
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/amd64-disp-step-avx.exp
+@@ -0,0 +1,141 @@
++# Copyright 2009-2017 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This file is part of the gdb testsuite.
++
++# Test displaced stepping over VEX-encoded RIP-relative AVX
++# instructions.
++
++if { ![istarget x86_64-*-* ] || ![is_lp64_target] } {
++    verbose "Skipping x86_64 displaced stepping tests."
++    return
++}
++
++standard_testfile .S
++
++set additional_flags "-Wa,-g"
++
++if { [prepare_for_testing "failed to prepare" ${testfile} ${srcfile} \
++	  [list debug $additional_flags]] } {
++    return -1
++}
++
++# Get things started.
++
++gdb_test "set displaced-stepping on" ""
++gdb_test "show displaced-stepping" ".* displaced stepping .* is on.*"
++
++if ![runto_main] then {
++    fail "can't run to main"
++    return 0
++}
++
++# GDB picks a spare register from this list to hold the RIP-relative
++# address.
++set rip_regs { "rax" "rbx" "rcx" "rdx" "rbp" "rsi" "rdi" }
++
++# Assign VAL to all the RIP_REGS.
++
++proc set_regs { val } {
++    global gdb_prompt
++    global rip_regs
++
++    foreach reg ${rip_regs} {
++	gdb_test_no_output "set \$${reg} = ${val}"
++    }
++}
++
++# Verify all RIP_REGS print as HEX_VAL_RE in hex.
++
++proc verify_regs { hex_val_re } {
++    global rip_regs
++
++    foreach reg ${rip_regs} {
++	gdb_test "p /x \$${reg}" " = ${hex_val_re}" "${reg} expected value"
++    }
++}
++
++# Set a break at FUNC, which starts with a RIP-relative instruction
++# that we want to displaced-step over, and then continue over the
++# breakpoint, forcing a displaced-stepping sequence.
++
++proc disp_step_func { func } {
++    global srcfile
++
++    set test_start_label "${func}"
++    set test_end_label "${func}_end"
++
++    gdb_test "break ${test_start_label}" \
++	"Breakpoint.*at.* file .*$srcfile, line.*" \
++	"break ${test_start_label}"
++    gdb_test "break ${test_end_label}" \
++	"Breakpoint.*at.* file .*$srcfile, line.*" \
++	"break ${test_end_label}"
++
++    gdb_test "continue" \
++	"Continuing.*Breakpoint.*, ${test_start_label} ().*" \
++	"continue to ${test_start_label}"
++
++    # GDB picks a spare register to hold the RIP-relative address.
++    # Ensure the spare register value is restored properly (rax-rdi,
++    # sans rsp).
++    set value "0xdeadbeefd3adb33f"
++    set_regs $value
++
++    gdb_test "continue" \
++	"Continuing.*Breakpoint.*, ${test_end_label} ().*" \
++	"continue to ${test_end_label}"
++
++    verify_regs $value
++}
++
++# Test a VEX2-encoded RIP-relative instruction.
++with_test_prefix "vex2" {
++    # This case writes to the 'xmm0' register.  Confirm the register's
++    # value is what we believe it is before the AVX instruction runs.
++    # Fedora: 0* for missing: https://sourceware.org/bugzilla/show_bug.cgi?id=16225
++    gdb_test "p /x \$xmm0.uint128" " = 0x00*" \
++	"xmm0 has expected value before"
++
++    disp_step_func "test_rip_vex2"
++
++    # Confirm the instruction's expected side effects.  It should have
++    # modified xmm0.
++    # Fedora: 0* for missing: https://sourceware.org/bugzilla/show_bug.cgi?id=16225
++    gdb_test "p /x \$xmm0.uint128" " = 0x0*1122334455667788" \
++	"xmm0 has expected value after"
++}
++
++# Test a VEX3-encoded RIP-relative instruction.
++with_test_prefix "vex3" {
++    # This case writes to the 'var128' variable.  Confirm the
++    # variable's value is what we believe it is before the AVX
++    # instruction runs.
++    gdb_test "p /x (unsigned long long \[2\]) var128" \
++	" = \\{0xaa55aa55aa55aa55, 0x55aa55aa55aa55aa\\}" \
++	"var128 has expected value before"
++
++    # Run the AVX instruction.
++    disp_step_func "test_rip_vex3"
++
++    # Confirm the instruction's expected side effects.  It should have
++    # modifed the 'var128' variable.
++    gdb_test "p /x (unsigned long long \[2\]) var128" \
++	" = \\{0x1122334455667788, 0x0\\}" \
++	"var128 has expected value after"
++}
++
++# Done, run program to exit.
++gdb_continue_to_end "amd64-disp-step-avx"
