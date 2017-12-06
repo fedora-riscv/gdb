@@ -20,13 +20,13 @@ Name: %{?scl_prefix}gdb
 # Freeze it when GDB gets branched
 %global snapsrc    20170420
 # See timestamp of source gnulib installed into gdb/gnulib/ .
-%global snapgnulib 20150822
+%global snapgnulib 20161115
 %global tarname gdb-%{version}
 Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 31%{?dist}
+Release: 32%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1731,6 +1731,11 @@ then
 fi
 
 %changelog
+* Tue Dec  5 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-32.fc26
+- Backport upstream fix for Intel PKRU (Walfred Tedeschi).
+- Backport upstream fix AVX instr. single-stepping (RH BZ 1515209, Pedro Alves).
+- Fix snapgnulib bundle number.
+
 * Sat Dec  2 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-31.fc26
 - [testsuite] Fix BuildRequires for non-x86* arches.
 
