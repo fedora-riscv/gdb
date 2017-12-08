@@ -1,9 +1,12 @@
+From 418b024eea6cea42e787ff056697f81fa0b55e0b Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-x86_64-i386-syscall-restart.patch
 
 FileName: gdb-x86_64-i386-syscall-restart.patch
 
+;; Fix syscall restarts for amd64->i386 biarch.
+;;=push+jan
 
 http://sourceware.org/ml/gdb-patches/2009-11/msg00592.html
 Subject: [patch] Fix syscall restarts for amd64->i386 biarch
@@ -22,7 +25,6 @@ x86_64 i386     i386     PASS on recent kernels
                          (PASS: kernel-2.6.32-0.55.rc8.git1.fc13.x86_64)
 i386   i386     i386     PASS
 
-
 Currently gdb.base/interrupt.exp fails on amd64 host running under
 --target_board unix/-m32 with:
 	continue
@@ -36,7 +38,6 @@ Currently gdb.base/interrupt.exp fails on amd64 host running under
  * at syscall exit tracing, but they will never be left for the debugged user
  * process to see.
  */
-#define ERESTARTSYS     512
 
 "Unknown error 512" printed above is printed by the inferior itself, not by GDB.
 
@@ -45,7 +46,6 @@ It is because GDB reads it as 0xfffffffffffffe00 but writes it back as
 +      /* Sign-extend %eax as during return from a syscall it is being checked
 +	 for -ERESTART* values -512 being above 0xfffffffffffffe00; tested by
 +	 interrupt.exp.  */
-
 
 Quote of Roland McGrath from IRC:
 
@@ -69,7 +69,6 @@ roland: so a 64-bit debugger should see and be able to fiddle the full
 registers.  it can even change cs via ptrace to force the inferior into
 running 32 or 64 bit code.
 
-
 Saving whole 64bits for i386 targets on x86_64 hosts does not much match the
 GDB architecture as `struct type' for these registers still should be 32bit
 etc.   Therefore provided just this exception.
@@ -79,20 +78,23 @@ interruption to do full inferior save/restore from GDB regcache.
 
 Regression tested on {x86_64,x86_64-m32,i686}-fedora12-linux-gnu.
 
-
 Thanks,
 Jan
-
 
 gdb/
 2009-11-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* amd64-nat.c (amd64_collect_native_gregset): Do not pre-clear %eax.
 	Sign extend it afterwards.
+---
+ gdb/amd64-nat.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
+diff --git a/gdb/amd64-nat.c b/gdb/amd64-nat.c
+index b046052954..e0b0762c7c 100644
 --- a/gdb/amd64-nat.c
 +++ b/gdb/amd64-nat.c
-@@ -131,9 +131,9 @@ amd64_collect_native_gregset (const struct regcache *regcache,
+@@ -135,9 +135,9 @@ amd64_collect_native_gregset (const struct regcache *regcache,
      {
        num_regs = amd64_native_gregset32_num_regs;
  
@@ -104,7 +106,7 @@ gdb/
  	{
  	  if (regnum == -1 || regnum == i)
  	    memset (regs + amd64_native_gregset_reg_offset (gdbarch, i), 0, 8);
-@@ -159,4 +159,20 @@ amd64_collect_native_gregset (const struct regcache *regcache,
+@@ -163,4 +163,20 @@ amd64_collect_native_gregset (const struct regcache *regcache,
  	    regcache_raw_collect (regcache, i, regs + offset);
  	}
      }
@@ -125,4 +127,6 @@ gdb/
 +	}
 +    }
  }
+-- 
+2.14.3
 

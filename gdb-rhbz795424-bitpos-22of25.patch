@@ -1,12 +1,15 @@
+From 0d283a012934a36adade9c3f0c504424a078bc51 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: [PATCH 3/4] Expand watchpoint lengths to LONGEST
+Subject: Expand watchpoint lengths to LONGEST
 
 FileName: gdb-rhbz795424-bitpos-22of25.patch
 
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
+
 http://sourceware.org/ml/gdb-patches/2012-09/msg00629.html
-
-
 
 --MP_/6HRlH6vpyqtSy4CYyMrX6b2
 Content-Type: text/plain; charset=US-ASCII
@@ -101,12 +104,37 @@ gdb/ChangeLog:
 Content-Type: text/x-patch
 Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename=bitpos-wp.patch
+---
+ gdb/aarch64-linux-nat.c          |  2 +-
+ gdb/arm-linux-nat.c              |  2 +-
+ gdb/nat/aarch64-linux-hw-point.c | 21 +++++++++++----------
+ gdb/nat/aarch64-linux-hw-point.h |  4 ++--
+ gdb/ppc-linux-nat.c              | 14 +++++++-------
+ gdb/procfs.c                     |  4 ++--
+ gdb/remote.c                     |  6 +++---
+ gdb/target-delegates.c           | 14 +++++++-------
+ gdb/target.c                     |  4 ++--
+ gdb/target.h                     |  4 ++--
+ 10 files changed, 38 insertions(+), 37 deletions(-)
 
-Index: gdb-7.10.50.20151027/gdb/arm-linux-nat.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/arm-linux-nat.c	2015-11-08 10:36:33.050071812 +0100
-+++ gdb-7.10.50.20151027/gdb/arm-linux-nat.c	2015-11-08 10:36:33.094072110 +0100
-@@ -1209,7 +1209,7 @@ arm_linux_stopped_by_watchpoint (struct
+diff --git a/gdb/aarch64-linux-nat.c b/gdb/aarch64-linux-nat.c
+index 8606111c00..9a29445320 100644
+--- a/gdb/aarch64-linux-nat.c
++++ b/gdb/aarch64-linux-nat.c
+@@ -767,7 +767,7 @@ aarch64_linux_stopped_by_watchpoint (struct target_ops *ops)
+ static int
+ aarch64_linux_watchpoint_addr_within_range (struct target_ops *target,
+ 					    CORE_ADDR addr,
+-					    CORE_ADDR start, int length)
++					    CORE_ADDR start, LONGEST length)
+ {
+   return start <= addr && start + length - 1 >= addr;
+ }
+diff --git a/gdb/arm-linux-nat.c b/gdb/arm-linux-nat.c
+index b5732cb48e..f7249fa799 100644
+--- a/gdb/arm-linux-nat.c
++++ b/gdb/arm-linux-nat.c
+@@ -1177,7 +1177,7 @@ arm_linux_stopped_by_watchpoint (struct target_ops *ops)
  static int
  arm_linux_watchpoint_addr_within_range (struct target_ops *target,
  					CORE_ADDR addr,
@@ -115,11 +143,107 @@ Index: gdb-7.10.50.20151027/gdb/arm-linux-nat.c
  {
    return start <= addr && start + length - 1 >= addr;
  }
-Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/ppc-linux-nat.c	2015-11-08 10:36:33.064071907 +0100
-+++ gdb-7.10.50.20151027/gdb/ppc-linux-nat.c	2015-11-08 10:36:33.095072117 +0100
-@@ -1807,11 +1807,11 @@ can_use_watchpoint_cond_accel (void)
+diff --git a/gdb/nat/aarch64-linux-hw-point.c b/gdb/nat/aarch64-linux-hw-point.c
+index 9800d9a59c..ee1ea40664 100644
+--- a/gdb/nat/aarch64-linux-hw-point.c
++++ b/gdb/nat/aarch64-linux-hw-point.c
+@@ -111,7 +111,7 @@ aarch64_point_encode_ctrl_reg (enum target_hw_bp_type type, int len)
+    Return 0 for any non-compliant ADDR and/or LEN; return 1 otherwise.  */
+ 
+ static int
+-aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, int len)
++aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, LONGEST len)
+ {
+   unsigned int alignment = 0;
+ 
+@@ -180,9 +180,10 @@ aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, int len)
+    limitations can be largely relaxed with some further work.  */
+ 
+ static void
+-aarch64_align_watchpoint (CORE_ADDR addr, int len, CORE_ADDR *aligned_addr_p,
++aarch64_align_watchpoint (CORE_ADDR addr, LONGEST len,
++			  CORE_ADDR *aligned_addr_p,
+ 			  int *aligned_len_p, CORE_ADDR *next_addr_p,
+-			  int *next_len_p)
++			  LONGEST *next_len_p)
+ {
+   int aligned_len;
+   unsigned int offset;
+@@ -501,7 +502,7 @@ aarch64_handle_aligned_watchpoint (enum target_hw_bp_type type,
+ 
+ static int
+ aarch64_handle_unaligned_watchpoint (enum target_hw_bp_type type,
+-				     CORE_ADDR addr, int len, int is_insert,
++				     CORE_ADDR addr, LONGEST len, int is_insert,
+ 				     struct aarch64_debug_reg_state *state)
+ {
+   while (len > 0)
+@@ -524,9 +525,9 @@ aarch64_handle_unaligned_watchpoint (enum target_hw_bp_type type,
+ 		      "                             "
+ 		      "aligned_addr: %s, aligned_len: %d\n"
+ 		      "                                "
+-		      "next_addr: %s,    next_len: %d\n",
++		      "next_addr: %s,    next_len: %s\n",
+ 		      is_insert, core_addr_to_string_nz (aligned_addr),
+-		      aligned_len, core_addr_to_string_nz (addr), len);
++		      aligned_len, core_addr_to_string_nz (addr), plongest (len));
+ 
+       if (ret != 0)
+ 	return ret;
+@@ -537,7 +538,7 @@ aarch64_handle_unaligned_watchpoint (enum target_hw_bp_type type,
+ 
+ int
+ aarch64_handle_watchpoint (enum target_hw_bp_type type, CORE_ADDR addr,
+-			   int len, int is_insert,
++			   LONGEST len, int is_insert,
+ 			   struct aarch64_debug_reg_state *state)
+ {
+   if (aarch64_point_is_aligned (1 /* is_watchpoint */ , addr, len))
+@@ -588,14 +589,14 @@ aarch64_linux_set_debug_regs (const struct aarch64_debug_reg_state *state,
+ void
+ aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
+ 			      const char *func, CORE_ADDR addr,
+-			      int len, enum target_hw_bp_type type)
++			      LONGEST len, enum target_hw_bp_type type)
+ {
+   int i;
+ 
+   debug_printf ("%s", func);
+   if (addr || len)
+-    debug_printf (" (addr=0x%08lx, len=%d, type=%s)",
+-		  (unsigned long) addr, len,
++    debug_printf (" (addr=0x%08lx, len=%s, type=%s)",
++		  (unsigned long) addr, plongest (len),
+ 		  type == hw_write ? "hw-write-watchpoint"
+ 		  : (type == hw_read ? "hw-read-watchpoint"
+ 		     : (type == hw_access ? "hw-access-watchpoint"
+diff --git a/gdb/nat/aarch64-linux-hw-point.h b/gdb/nat/aarch64-linux-hw-point.h
+index 610a5f1215..18e1c826c3 100644
+--- a/gdb/nat/aarch64-linux-hw-point.h
++++ b/gdb/nat/aarch64-linux-hw-point.h
+@@ -172,7 +172,7 @@ int aarch64_handle_breakpoint (enum target_hw_bp_type type, CORE_ADDR addr,
+ 			       int len, int is_insert,
+ 			       struct aarch64_debug_reg_state *state);
+ int aarch64_handle_watchpoint (enum target_hw_bp_type type, CORE_ADDR addr,
+-			       int len, int is_insert,
++			       LONGEST len, int is_insert,
+ 			       struct aarch64_debug_reg_state *state);
+ 
+ void aarch64_linux_set_debug_regs (const struct aarch64_debug_reg_state *state,
+@@ -180,7 +180,7 @@ void aarch64_linux_set_debug_regs (const struct aarch64_debug_reg_state *state,
+ 
+ void aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
+ 				   const char *func, CORE_ADDR addr,
+-				   int len, enum target_hw_bp_type type);
++				   LONGEST len, enum target_hw_bp_type type);
+ 
+ void aarch64_linux_get_debug_reg_capacity (int tid);
+ 
+diff --git a/gdb/ppc-linux-nat.c b/gdb/ppc-linux-nat.c
+index 429b9c6231..39004c1a77 100644
+--- a/gdb/ppc-linux-nat.c
++++ b/gdb/ppc-linux-nat.c
+@@ -1798,11 +1798,11 @@ can_use_watchpoint_cond_accel (void)
     CONDITION_VALUE will hold the value which should be put in the
     DVC register.  */
  static void
@@ -134,7 +258,7 @@ Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
    CORE_ADDR addr_end_data, addr_end_dvc;
  
    /* The DVC register compares bytes within fixed-length windows which
-@@ -1898,7 +1898,7 @@ num_memory_accesses (struct value *v)
+@@ -1889,7 +1889,7 @@ num_memory_accesses (struct value *v)
     of the constant.  */
  static int
  check_condition (CORE_ADDR watch_addr, struct expression *cond,
@@ -143,7 +267,7 @@ Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
  {
    int pc = 1, num_accesses_left, num_accesses_right;
    struct value *left_val, *right_val, *left_chain, *right_chain;
-@@ -1966,7 +1966,7 @@ check_condition (CORE_ADDR watch_addr, s
+@@ -1957,7 +1957,7 @@ check_condition (CORE_ADDR watch_addr, struct expression *cond,
     true.  */
  static int
  ppc_linux_can_accel_watchpoint_condition (struct target_ops *self,
@@ -152,7 +276,7 @@ Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
  					  struct expression *cond)
  {
    CORE_ADDR data_value;
-@@ -1983,7 +1983,7 @@ ppc_linux_can_accel_watchpoint_condition
+@@ -1974,7 +1974,7 @@ ppc_linux_can_accel_watchpoint_condition (struct target_ops *self,
  
  static void
  create_watchpoint_request (struct ppc_hw_breakpoint *p, CORE_ADDR addr,
@@ -161,7 +285,7 @@ Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
  			   struct expression *cond, int insert)
  {
    if (len == 1
-@@ -2249,7 +2249,7 @@ ppc_linux_stopped_by_watchpoint (struct
+@@ -2240,7 +2240,7 @@ ppc_linux_stopped_by_watchpoint (struct target_ops *ops)
  static int
  ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
  					CORE_ADDR addr,
@@ -170,20 +294,20 @@ Index: gdb-7.10.50.20151027/gdb/ppc-linux-nat.c
  {
    int mask;
  
-Index: gdb-7.10.50.20151027/gdb/procfs.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/procfs.c	2015-11-08 10:36:33.065071913 +0100
-+++ gdb-7.10.50.20151027/gdb/procfs.c	2015-11-08 10:36:33.096072123 +0100
-@@ -2427,7 +2427,7 @@ procfs_address_to_host_pointer (CORE_ADD
- #endif
+diff --git a/gdb/procfs.c b/gdb/procfs.c
+index 1dd383aecb..dbb98c165d 100644
+--- a/gdb/procfs.c
++++ b/gdb/procfs.c
+@@ -1563,7 +1563,7 @@ procfs_address_to_host_pointer (CORE_ADDR addr)
+ }
  
  static int
 -proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, int len, int wflags)
 +proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, LONGEST len, int wflags)
  {
- #if !defined (PCWATCH) && !defined (PIOCSWATCH)
-   /* If neither or these is defined, we can't support watchpoints.
-@@ -4706,7 +4706,7 @@ procfs_pid_to_str (struct target_ops *op
+   struct {
+     procfs_ctl_t cmd;
+@@ -3250,7 +3250,7 @@ procfs_pid_to_str (struct target_ops *ops, ptid_t ptid)
  /* Insert a watchpoint.  */
  
  static int
@@ -191,12 +315,12 @@ Index: gdb-7.10.50.20151027/gdb/procfs.c
 +procfs_set_watchpoint (ptid_t ptid, CORE_ADDR addr, LONGEST len, int rwflag,
  		       int after)
  {
- #ifndef AIX5
-Index: gdb-7.10.50.20151027/gdb/remote.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/remote.c	2015-11-08 10:36:33.067071927 +0100
-+++ gdb-7.10.50.20151027/gdb/remote.c	2015-11-08 10:36:33.097072130 +0100
-@@ -9085,7 +9085,7 @@ remote_insert_watchpoint (struct target_
+   int       pflags = 0;
+diff --git a/gdb/remote.c b/gdb/remote.c
+index 47d3a04dd9..303fcddd8a 100644
+--- a/gdb/remote.c
++++ b/gdb/remote.c
+@@ -9892,7 +9892,7 @@ remote_insert_watchpoint (struct target_ops *self, CORE_ADDR addr, int len,
    p = strchr (rs->buf, '\0');
    addr = remote_address_masked (addr);
    p += hexnumstr (p, (ULONGEST) addr);
@@ -205,7 +329,7 @@ Index: gdb-7.10.50.20151027/gdb/remote.c
  
    putpkt (rs->buf);
    getpkt (&rs->buf, &rs->buf_size, 0);
-@@ -9105,7 +9105,7 @@ remote_insert_watchpoint (struct target_
+@@ -9912,7 +9912,7 @@ remote_insert_watchpoint (struct target_ops *self, CORE_ADDR addr, int len,
  
  static int
  remote_watchpoint_addr_within_range (struct target_ops *target, CORE_ADDR addr,
@@ -214,7 +338,7 @@ Index: gdb-7.10.50.20151027/gdb/remote.c
  {
    CORE_ADDR diff = remote_address_masked (addr - start);
  
-@@ -9134,7 +9134,7 @@ remote_remove_watchpoint (struct target_
+@@ -9941,7 +9941,7 @@ remote_remove_watchpoint (struct target_ops *self, CORE_ADDR addr, int len,
    p = strchr (rs->buf, '\0');
    addr = remote_address_masked (addr);
    p += hexnumstr (p, (ULONGEST) addr);
@@ -223,68 +347,11 @@ Index: gdb-7.10.50.20151027/gdb/remote.c
    putpkt (rs->buf);
    getpkt (&rs->buf, &rs->buf_size, 0);
  
-Index: gdb-7.10.50.20151027/gdb/target.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/target.c	2015-11-08 10:36:33.069071941 +0100
-+++ gdb-7.10.50.20151027/gdb/target.c	2015-11-08 10:36:33.098072137 +0100
-@@ -51,7 +51,7 @@ static void generic_tls_error (void) ATT
- static void default_terminal_info (struct target_ops *, const char *, int);
- 
- static int default_watchpoint_addr_within_range (struct target_ops *,
--						 CORE_ADDR, CORE_ADDR, int);
-+						 CORE_ADDR, CORE_ADDR, LONGEST);
- 
- static int default_region_ok_for_hw_watchpoint (struct target_ops *,
- 						CORE_ADDR, LONGEST);
-@@ -3140,7 +3140,7 @@ default_region_ok_for_hw_watchpoint (str
- static int
- default_watchpoint_addr_within_range (struct target_ops *target,
- 				      CORE_ADDR addr,
--				      CORE_ADDR start, int length)
-+				      CORE_ADDR start, LONGEST length)
- {
-   return addr >= start && addr < start + length;
- }
-Index: gdb-7.10.50.20151027/gdb/target.h
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/target.h	2015-11-08 10:36:33.069071941 +0100
-+++ gdb-7.10.50.20151027/gdb/target.h	2015-11-08 10:36:33.098072137 +0100
-@@ -543,7 +543,7 @@ struct target_ops
-     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *)
-       TARGET_DEFAULT_RETURN (0);
-     int (*to_watchpoint_addr_within_range) (struct target_ops *,
--					    CORE_ADDR, CORE_ADDR, int)
-+					    CORE_ADDR, CORE_ADDR, LONGEST)
-       TARGET_DEFAULT_FUNC (default_watchpoint_addr_within_range);
- 
-     /* Documentation of this routine is provided with the corresponding
-@@ -553,7 +553,7 @@ struct target_ops
-       TARGET_DEFAULT_FUNC (default_region_ok_for_hw_watchpoint);
- 
-     int (*to_can_accel_watchpoint_condition) (struct target_ops *,
--					      CORE_ADDR, int, int,
-+					      CORE_ADDR, LONGEST, int,
- 					      struct expression *)
-       TARGET_DEFAULT_RETURN (0);
-     int (*to_masked_watch_num_registers) (struct target_ops *,
-Index: gdb-7.10.50.20151027/gdb/aarch64-linux-nat.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/aarch64-linux-nat.c	2015-11-08 10:36:33.074071975 +0100
-+++ gdb-7.10.50.20151027/gdb/aarch64-linux-nat.c	2015-11-08 10:36:33.098072137 +0100
-@@ -795,7 +795,7 @@ aarch64_linux_stopped_by_watchpoint (str
- static int
- aarch64_linux_watchpoint_addr_within_range (struct target_ops *target,
- 					    CORE_ADDR addr,
--					    CORE_ADDR start, int length)
-+					    CORE_ADDR start, LONGEST length)
- {
-   return start <= addr && start + length - 1 >= addr;
- }
-Index: gdb-7.10.50.20151027/gdb/target-delegates.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/target-delegates.c	2015-11-08 10:36:33.073071968 +0100
-+++ gdb-7.10.50.20151027/gdb/target-delegates.c	2015-11-08 10:36:33.099072144 +0100
-@@ -709,14 +709,14 @@ debug_stopped_data_address (struct targe
+diff --git a/gdb/target-delegates.c b/gdb/target-delegates.c
+index 04cadc1d4b..052638b92b 100644
+--- a/gdb/target-delegates.c
++++ b/gdb/target-delegates.c
+@@ -733,14 +733,14 @@ debug_stopped_data_address (struct target_ops *self, CORE_ADDR *arg1)
  }
  
  static int
@@ -301,7 +368,7 @@ Index: gdb-7.10.50.20151027/gdb/target-delegates.c
  {
    int result;
    fprintf_unfiltered (gdb_stdlog, "-> %s->to_watchpoint_addr_within_range (...)\n", debug_target.to_shortname);
-@@ -728,7 +728,7 @@ debug_watchpoint_addr_within_range (stru
+@@ -752,7 +752,7 @@ debug_watchpoint_addr_within_range (struct target_ops *self, CORE_ADDR arg1, COR
    fputs_unfiltered (", ", gdb_stdlog);
    target_debug_print_CORE_ADDR (arg2);
    fputs_unfiltered (", ", gdb_stdlog);
@@ -310,7 +377,7 @@ Index: gdb-7.10.50.20151027/gdb/target-delegates.c
    fputs_unfiltered (") = ", gdb_stdlog);
    target_debug_print_int (result);
    fputs_unfiltered ("\n", gdb_stdlog);
-@@ -761,20 +761,20 @@ debug_region_ok_for_hw_watchpoint (struc
+@@ -785,20 +785,20 @@ debug_region_ok_for_hw_watchpoint (struct target_ops *self, CORE_ADDR arg1, LONG
  }
  
  static int
@@ -334,7 +401,7 @@ Index: gdb-7.10.50.20151027/gdb/target-delegates.c
  {
    int result;
    fprintf_unfiltered (gdb_stdlog, "-> %s->to_can_accel_watchpoint_condition (...)\n", debug_target.to_shortname);
-@@ -784,7 +784,7 @@ debug_can_accel_watchpoint_condition (st
+@@ -808,7 +808,7 @@ debug_can_accel_watchpoint_condition (struct target_ops *self, CORE_ADDR arg1, i
    fputs_unfiltered (", ", gdb_stdlog);
    target_debug_print_CORE_ADDR (arg1);
    fputs_unfiltered (", ", gdb_stdlog);
@@ -343,99 +410,50 @@ Index: gdb-7.10.50.20151027/gdb/target-delegates.c
    fputs_unfiltered (", ", gdb_stdlog);
    target_debug_print_int (arg3);
    fputs_unfiltered (", ", gdb_stdlog);
-Index: gdb-7.10.50.20151027/gdb/nat/aarch64-linux-hw-point.c
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/nat/aarch64-linux-hw-point.c	2015-10-27 02:48:31.000000000 +0100
-+++ gdb-7.10.50.20151027/gdb/nat/aarch64-linux-hw-point.c	2015-11-08 10:36:33.099072144 +0100
-@@ -111,7 +111,7 @@ aarch64_point_encode_ctrl_reg (enum targ
-    Return 0 for any non-compliant ADDR and/or LEN; return 1 otherwise.  */
+diff --git a/gdb/target.c b/gdb/target.c
+index c9471f61fb..bcc67a9b4b 100644
+--- a/gdb/target.c
++++ b/gdb/target.c
+@@ -53,7 +53,7 @@ static void generic_tls_error (void) ATTRIBUTE_NORETURN;
+ static void default_terminal_info (struct target_ops *, const char *, int);
  
+ static int default_watchpoint_addr_within_range (struct target_ops *,
+-						 CORE_ADDR, CORE_ADDR, int);
++						 CORE_ADDR, CORE_ADDR, LONGEST);
+ 
+ static int default_region_ok_for_hw_watchpoint (struct target_ops *,
+ 						CORE_ADDR, LONGEST);
+@@ -3120,7 +3120,7 @@ default_region_ok_for_hw_watchpoint (struct target_ops *self,
  static int
--aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, int len)
-+aarch64_point_is_aligned (int is_watchpoint, CORE_ADDR addr, LONGEST len)
+ default_watchpoint_addr_within_range (struct target_ops *target,
+ 				      CORE_ADDR addr,
+-				      CORE_ADDR start, int length)
++				      CORE_ADDR start, LONGEST length)
  {
-   unsigned int alignment = 0;
+   return addr >= start && addr < start + length;
+ }
+diff --git a/gdb/target.h b/gdb/target.h
+index 349e87de6f..97ce16caf4 100644
+--- a/gdb/target.h
++++ b/gdb/target.h
+@@ -544,7 +544,7 @@ struct target_ops
+     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *)
+       TARGET_DEFAULT_RETURN (0);
+     int (*to_watchpoint_addr_within_range) (struct target_ops *,
+-					    CORE_ADDR, CORE_ADDR, int)
++					    CORE_ADDR, CORE_ADDR, LONGEST)
+       TARGET_DEFAULT_FUNC (default_watchpoint_addr_within_range);
  
-@@ -180,9 +180,10 @@ aarch64_point_is_aligned (int is_watchpo
-    limitations can be largely relaxed with some further work.  */
+     /* Documentation of this routine is provided with the corresponding
+@@ -554,7 +554,7 @@ struct target_ops
+       TARGET_DEFAULT_FUNC (default_region_ok_for_hw_watchpoint);
  
- static void
--aarch64_align_watchpoint (CORE_ADDR addr, int len, CORE_ADDR *aligned_addr_p,
-+aarch64_align_watchpoint (CORE_ADDR addr, LONGEST len,
-+			  CORE_ADDR *aligned_addr_p,
- 			  int *aligned_len_p, CORE_ADDR *next_addr_p,
--			  int *next_len_p)
-+			  LONGEST *next_len_p)
- {
-   int aligned_len;
-   unsigned int offset;
-@@ -494,7 +495,7 @@ aarch64_handle_aligned_watchpoint (enum
- 
- static int
- aarch64_handle_unaligned_watchpoint (enum target_hw_bp_type type,
--				     CORE_ADDR addr, int len, int is_insert,
-+				     CORE_ADDR addr, LONGEST len, int is_insert,
- 				     struct aarch64_debug_reg_state *state)
- {
-   while (len > 0)
-@@ -517,9 +518,9 @@ aarch64_handle_unaligned_watchpoint (enu
- 		      "                             "
- 		      "aligned_addr: %s, aligned_len: %d\n"
- 		      "                                "
--		      "next_addr: %s,    next_len: %d\n",
-+		      "next_addr: %s,    next_len: %s\n",
- 		      is_insert, core_addr_to_string_nz (aligned_addr),
--		      aligned_len, core_addr_to_string_nz (addr), len);
-+		      aligned_len, core_addr_to_string_nz (addr), plongest (len));
- 
-       if (ret != 0)
- 	return ret;
-@@ -530,7 +531,7 @@ aarch64_handle_unaligned_watchpoint (enu
- 
- int
- aarch64_handle_watchpoint (enum target_hw_bp_type type, CORE_ADDR addr,
--			   int len, int is_insert,
-+			   LONGEST len, int is_insert,
- 			   struct aarch64_debug_reg_state *state)
- {
-   if (aarch64_point_is_aligned (1 /* is_watchpoint */ , addr, len))
-@@ -581,14 +582,14 @@ aarch64_linux_set_debug_regs (const stru
- void
- aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
- 			      const char *func, CORE_ADDR addr,
--			      int len, enum target_hw_bp_type type)
-+			      LONGEST len, enum target_hw_bp_type type)
- {
-   int i;
- 
-   debug_printf ("%s", func);
-   if (addr || len)
--    debug_printf (" (addr=0x%08lx, len=%d, type=%s)",
--		  (unsigned long) addr, len,
-+    debug_printf (" (addr=0x%08lx, len=%s, type=%s)",
-+		  (unsigned long) addr, plongest (len),
- 		  type == hw_write ? "hw-write-watchpoint"
- 		  : (type == hw_read ? "hw-read-watchpoint"
- 		     : (type == hw_access ? "hw-access-watchpoint"
-Index: gdb-7.10.50.20151027/gdb/nat/aarch64-linux-hw-point.h
-===================================================================
---- gdb-7.10.50.20151027.orig/gdb/nat/aarch64-linux-hw-point.h	2015-10-27 02:48:31.000000000 +0100
-+++ gdb-7.10.50.20151027/gdb/nat/aarch64-linux-hw-point.h	2015-11-08 10:36:47.656170839 +0100
-@@ -168,7 +168,7 @@ int aarch64_handle_breakpoint (enum targ
- 			       int len, int is_insert,
- 			       struct aarch64_debug_reg_state *state);
- int aarch64_handle_watchpoint (enum target_hw_bp_type type, CORE_ADDR addr,
--			       int len, int is_insert,
-+			       LONGEST len, int is_insert,
- 			       struct aarch64_debug_reg_state *state);
- 
- void aarch64_linux_set_debug_regs (const struct aarch64_debug_reg_state *state,
-@@ -176,7 +176,7 @@ void aarch64_linux_set_debug_regs (const
- 
- void aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
- 				   const char *func, CORE_ADDR addr,
--				   int len, enum target_hw_bp_type type);
-+				   LONGEST len, enum target_hw_bp_type type);
- 
- void aarch64_linux_get_debug_reg_capacity (int tid);
- 
+     int (*to_can_accel_watchpoint_condition) (struct target_ops *,
+-					      CORE_ADDR, int, int,
++					      CORE_ADDR, LONGEST, int,
+ 					      struct expression *)
+       TARGET_DEFAULT_RETURN (0);
+     int (*to_masked_watch_num_registers) (struct target_ops *,
+-- 
+2.14.3
+

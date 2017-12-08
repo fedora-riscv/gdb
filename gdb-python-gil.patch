@@ -1,14 +1,29 @@
+From 8c40408dadd86bcbb319173bab665b9fc6d12f72 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-python-gil.patch
 
 FileName: gdb-python-gil.patch
 
-Index: gdb-7.99.90.20170420/gdb/doc/python.texi
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/doc/python.texi	2017-04-20 23:16:30.895328018 +0200
-+++ gdb-7.99.90.20170420/gdb/doc/python.texi	2017-04-20 23:16:35.690360136 +0200
-@@ -230,6 +230,14 @@
+;; Fix Python GIL with gdb.execute("continue") (Phil Muldoon, BZ 1116957).
+;;=push
+---
+ gdb/doc/python.texi                         |  8 ++++
+ gdb/python/python-internal.h                |  2 +
+ gdb/python/python.c                         | 42 +++++++++++++++---
+ gdb/testsuite/gdb.python/py-gil-mthread.c   | 13 ++++++
+ gdb/testsuite/gdb.python/py-gil-mthread.exp | 69 +++++++++++++++++++++++++++++
+ gdb/testsuite/gdb.python/py-gil-mthread.py  | 28 ++++++++++++
+ 6 files changed, 157 insertions(+), 5 deletions(-)
+ create mode 100644 gdb/testsuite/gdb.python/py-gil-mthread.c
+ create mode 100644 gdb/testsuite/gdb.python/py-gil-mthread.exp
+ create mode 100644 gdb/testsuite/gdb.python/py-gil-mthread.py
+
+diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
+index f411f60d7e..01243c7c7d 100644
+--- a/gdb/doc/python.texi
++++ b/gdb/doc/python.texi
+@@ -232,6 +232,14 @@ returned as a string.  The default is @code{False}, in which case the
  return value is @code{None}.  If @var{to_string} is @code{True}, the
  @value{GDBN} virtual terminal will be temporarily set to unlimited width
  and height, and its pagination will be disabled; @pxref{Screen Size}.
@@ -23,11 +38,11 @@ Index: gdb-7.99.90.20170420/gdb/doc/python.texi
  @end defun
  
  @findex gdb.breakpoints
-Index: gdb-7.99.90.20170420/gdb/python/python-internal.h
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/python/python-internal.h	2017-04-20 23:16:30.896328024 +0200
-+++ gdb-7.99.90.20170420/gdb/python/python-internal.h	2017-04-20 23:16:35.690360136 +0200
-@@ -142,6 +142,8 @@
+diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
+index 8fc8cc5a5d..f099ae437f 100644
+--- a/gdb/python/python-internal.h
++++ b/gdb/python/python-internal.h
+@@ -142,6 +142,8 @@ typedef int Py_ssize_t;
  #define PyGILState_Release(ARG) ((void)(ARG))
  #define PyEval_InitThreads()
  #define PyThreadState_Swap(ARG) ((void)(ARG))
@@ -36,11 +51,11 @@ Index: gdb-7.99.90.20170420/gdb/python/python-internal.h
  #define PyEval_ReleaseLock()
  #endif
  
-Index: gdb-7.99.90.20170420/gdb/python/python.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/python/python.c	2017-04-20 23:16:30.897328031 +0200
-+++ gdb-7.99.90.20170420/gdb/python/python.c	2017-04-20 23:18:11.377001070 +0200
-@@ -594,12 +594,16 @@
+diff --git a/gdb/python/python.c b/gdb/python/python.c
+index c29a46b448..0f71a4335e 100644
+--- a/gdb/python/python.c
++++ b/gdb/python/python.c
+@@ -554,12 +554,16 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
  {
    const char *arg;
    PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
@@ -61,7 +76,7 @@ Index: gdb-7.99.90.20170420/gdb/python/python.c
      return NULL;
  
    from_tty = 0;
-@@ -620,6 +624,15 @@
+@@ -580,12 +584,28 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
        to_string = cmp;
      }
  
@@ -77,8 +92,7 @@ Index: gdb-7.99.90.20170420/gdb/python/python.c
    std::string to_string_res;
  
    TRY
-@@ -628,6 +641,13 @@
-       std::string copy (arg);
+     {
        struct interp *interp;
  
 +      /* In the case of long running GDB commands, allow the user to
@@ -91,10 +105,10 @@ Index: gdb-7.99.90.20170420/gdb/python/python.c
        scoped_restore save_async = make_scoped_restore (&current_ui->async, 0);
  
        scoped_restore save_uiout = make_scoped_restore (&current_uiout);
-@@ -642,10 +662,22 @@
- 	to_string_res = execute_command_to_string (&copy[0], from_tty);
+@@ -600,10 +620,22 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+ 	to_string_res = execute_command_to_string (arg, from_tty);
        else
- 	execute_command (&copy[0], from_tty);
+ 	execute_command (arg, from_tty);
 +
 +      /* Reacquire the GIL if it was released earlier.  */
 +      if (release_gil)
@@ -115,10 +129,11 @@ Index: gdb-7.99.90.20170420/gdb/python/python.c
      }
    END_CATCH
  
-Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.c	2017-04-20 23:16:35.691360143 +0200
+diff --git a/gdb/testsuite/gdb.python/py-gil-mthread.c b/gdb/testsuite/gdb.python/py-gil-mthread.c
+new file mode 100644
+index 0000000000..1a12fc9c6d
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-gil-mthread.c
 @@ -0,0 +1,13 @@
 +#include <stdio.h>
 +#include <unistd.h>
@@ -133,10 +148,11 @@ Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.c
 +      printf ("Sleeping %d\n", i);
 +    }
 +}
-Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.exp	2017-04-20 23:16:35.691360143 +0200
+diff --git a/gdb/testsuite/gdb.python/py-gil-mthread.exp b/gdb/testsuite/gdb.python/py-gil-mthread.exp
+new file mode 100644
+index 0000000000..a89c16a45b
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-gil-mthread.exp
 @@ -0,0 +1,69 @@
 +# Copyright (C) 2014 Free Software Foundation, Inc.
 +
@@ -207,10 +223,11 @@ Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.exp
 +	}
 +    }
 +}
-Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.py
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.py	2017-04-20 23:16:35.692360149 +0200
+diff --git a/gdb/testsuite/gdb.python/py-gil-mthread.py b/gdb/testsuite/gdb.python/py-gil-mthread.py
+new file mode 100644
+index 0000000000..6a89964139
+--- /dev/null
++++ b/gdb/testsuite/gdb.python/py-gil-mthread.py
 @@ -0,0 +1,28 @@
 +try:
 +   import thread
@@ -240,3 +257,6 @@ Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.python/py-gil-mthread.py
 +
 +while 1:
 +   pass
+-- 
+2.14.3
+

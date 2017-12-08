@@ -1,125 +1,33 @@
+From faadc471aba29e9dbf5f134d0bf1d53ed1d488b5 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-rhbz1084404-ppc64-s390x-wrong-prologue-skip-O2-g-3of3.patch
 
 FileName: gdb-rhbz1084404-ppc64-s390x-wrong-prologue-skip-O2-g-3of3.patch
 
+;; Fix '[ppc64] and [s390x] wrong prologue skip on -O2 -g code' (Jan
+;; Kratochvil, RH BZ 1084404).
+;;=fedoratest
+
 These testcases have been created by compiling glibc-2.17-78 on
 RHEL-7.1 s390x/ppc64 boxes, and then taking the "select.o" file
 present at $builddir/misc/select.o.
+---
+ gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp  | 34 ++++++++++++
+ gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu | 70 +++++++++++++++++++++++++
+ gdb/testsuite/gdb.arch/s390x-prologue-skip.exp  | 34 ++++++++++++
+ gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu | 64 ++++++++++++++++++++++
+ 4 files changed, 202 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
+ create mode 100644 gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
+ create mode 100644 gdb/testsuite/gdb.arch/s390x-prologue-skip.exp
+ create mode 100644 gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu
 
-Index: gdb-7.6.1/gdb/testsuite/gdb.arch/s390x-prologue-skip.exp
-===================================================================
+diff --git a/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp b/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
+new file mode 100644
+index 0000000000..2f54c1f981
 --- /dev/null
-+++ gdb-7.6.1/gdb/testsuite/gdb.arch/s390x-prologue-skip.exp
-@@ -0,0 +1,34 @@
-+# Copyright 2015 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 3 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+if { ![istarget s390x-*linux-*] || ![is_lp64_target] } {
-+    verbose "Skipping s390x-prologue-skip.exp"
-+    return
-+}
-+
-+set testfile "s390x-prologue-skip"
-+set uufile "${srcdir}/${subdir}/${testfile}.o.uu"
-+set ofile "${srcdir}/${subdir}/${testfile}.o"
-+
-+if { [catch "system \"uudecode -o ${ofile} ${uufile}\"" ] != 0 } {
-+    untested "failed uudecode"
-+    return -1
-+}
-+
-+gdb_exit
-+gdb_start
-+gdb_load $ofile
-+
-+gdb_test "break select" "Breakpoint $decimal at 0x48: file ../sysdeps/unix/syscall-template.S, line 81." "breakpoint on select"
-Index: gdb-7.6.1/gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu
-===================================================================
---- /dev/null
-+++ gdb-7.6.1/gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu
-@@ -0,0 +1,64 @@
-+begin 644 s390x-prologue-skip.o.uu
-+M?T5,1@("`0`````````````!`!8````!````````````````````````````
-+M``+```````!```````!``!(`#^LE\!``).O?\&@`)+D$`.^G^_]@X^#P```D
-+MP.4`````N00``NLE\+``!`J.N00`TKD$`"#`Y0````"Y!``MZ]_Q"``$I_0`
-+M"L`0`````+\/$`"G=/_7"HZG2?`!N2$`),"T``````?^````5@`"````.0$!
-+M^PX-``$!`0$````!```!+BXO<WES9&5P<R]U;FEX``!S>7-C86QL+71E;7!L
-+M871E+E,``0`````)`@```````````]```0)F$P("``$!````CP`"``````@!
-+M```````````````````````````N+B]S>7-D97!S+W5N:7@O<WES8V%L;"UT
-+M96UP;&%T92Y3`"]R;V]T+V=L:6)C+V=L:6)C+3(N,3<M-S@N96PW+G-R8R]G
-+M;&EB8RTR+C$W+6,W-3AA-C@V+VUI<V,`1TY5($%3(#(N,C,N-3(N,"XQ`(`!
-+M`1$`$`81`1(!`P@;""4($P4`````````````````+``"``````@`````````
-+M`````````````````&@`````````````````````````%``````!>E(``7@.
-+M`1L,#Z`!````````&````!P`````````1`!,CP6.!HT'2`[``@```!`````X
-+M`````````"```````"YS>6UT86(`+G-T<G1A8@`N<VAS=')T86(`+G)E;&$N
-+M=&5X=``N9&%T80`N8G-S`"YN;W1E+D=.52US=&%C:P`N<F5L82YD96)U9U]L
-+M:6YE`"YR96QA+F1E8G5G7VEN9F\`+F1E8G5G7V%B8G)E=@`N<F5L82YD96)U
-+M9U]A<F%N9V5S`"YR96QA+F5H7V9R86UE````````````````````````````
-+M````````````````````````````````````````````````````````````
-+M````````(`````$`````````!@```````````````````$``````````:```
-+M``````````````````0``````````````!L````$````````````````````
-+M``````````F``````````&`````0`````0`````````(`````````!@````F
-+M`````0`````````#````````````````````J```````````````````````
-+M````````!```````````````+`````@``````````P``````````````````
-+M`*@```````````````````````````````0``````````````#$````!````
-+M``````````````````````````"H```````````````````````````````!
-+M``````````````!&`````0``````````````````````````````J```````
-+M``!:`````````````````````0``````````````00````0`````````````
-+M````````````````">``````````&````!`````&``````````@`````````
-+M&````%<````!``````````````````````````````$"`````````),`````
-+M```````````````!``````````````!2````!```````````````````````
-+M```````)^`````````!@````$`````@`````````"``````````8````8P``
-+M``$``````````````````````````````94`````````%```````````````
-+M``````$``````````````'8````!``````````````````````````````&P
-+M`````````#`````````````````````0``````````````!Q````!```````
-+M```````````````````````*6``````````P````$`````L`````````"```
-+M```````8````B@````$``````````@```````````````````>``````````
-+M2`````````````````````@``````````````(4````$````````````````
-+M``````````````J(`````````#`````0````#0`````````(`````````!@`
-+M```1`````P`````````````````````````````"*`````````"4````````
-+M`````````````0```````````````0````(`````````````````````````
-+M````!T`````````!L````!$````*``````````@`````````&`````D````#
-+M``````````````````````````````CP`````````(X`````````````````
-+M```!`````````````````````````````````````````````````P```0``
-+M`````````````````````````P```P```````````````````````````P``
-+M!````````````````````````````P``"```````````````````````````
-+M`P``"@```````````````````````````P``!@``````````````````````
-+M`````P``"P```````````````````````````P``#0``````````````````
-+M`````````P``!0`````````````````````````!$```````````````````
-+M```````````;$``````````````````````````````V$@```0````````!(
-+M`````````"`````_$`````````````````````````````!7$@```0``````
-+M``!6`````````!````!I$`````````````````````````````!Y(@```0``
-+M``````!(`````````"````"'(@```0````````!(`````````"``7U]L:6)C
-+M7V5N86)L95]A<WEN8V-A;F-E;`!?7VQI8F-?9&ES86)L95]A<WEN8V-A;F-E
-+M;`!?7W-E;&5C=`!?7VQI8F-?;75L=&EP;&5?=&AR96%D<P!?7W-E;&5C=%]N
-+M;V-A;F-E;`!?7W-Y<V-A;&Q?97)R;W(`7U]L:6)C7W-E;&5C=`!S96QE8W0`
-+M````````````'`````H````3``````````(`````````-@````L````3````
-+M``````(`````````2@````T````3``````````(`````````8@````\````3
-+M``````````(`````````1@````$````6````````````````````!@````4`
-+M```$````````````````````#`````8````$````````````````````$```
-+M``$````6````````````````````&`````$````6`````````&@`````````
-+M!@````0````$````````````````````$`````$````6````````````````
-+L````(`````$````%````````````````````/`````$````%`````````$@`
-+`
-+end
-Index: gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
-===================================================================
---- /dev/null
-+++ gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
++++ b/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
 @@ -0,0 +1,34 @@
 +# Copyright 2015 Free Software Foundation, Inc.
 +
@@ -155,10 +63,11 @@ Index: gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.exp
 +gdb_load $ofile
 +
 +gdb_test "break ___newselect_nocancel" "Breakpoint $decimal at 0xc: file ../sysdeps/unix/syscall-template.S, line 81." "breakpoint on ___newselect_nocancel"
-Index: gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
-===================================================================
+diff --git a/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu b/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
+new file mode 100644
+index 0000000000..9196bbac47
 --- /dev/null
-+++ gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
++++ b/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
 @@ -0,0 +1,70 @@
 +begin 644 ppc64-skip-prologue.o.uu
 +M?T5,1@("`0`````````````!`!4````!````````````````````````````
@@ -230,3 +139,116 @@ Index: gdb-7.6.1/gdb/testsuite/gdb.arch/ppc64-prologue-skip.o.uu
 +6```````<`````0```!H`````````````
 +`
 +end
+diff --git a/gdb/testsuite/gdb.arch/s390x-prologue-skip.exp b/gdb/testsuite/gdb.arch/s390x-prologue-skip.exp
+new file mode 100644
+index 0000000000..df3acf8c02
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/s390x-prologue-skip.exp
+@@ -0,0 +1,34 @@
++# Copyright 2015 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++if { ![istarget s390x-*linux-*] || ![is_lp64_target] } {
++    verbose "Skipping s390x-prologue-skip.exp"
++    return
++}
++
++set testfile "s390x-prologue-skip"
++set uufile "${srcdir}/${subdir}/${testfile}.o.uu"
++set ofile "${srcdir}/${subdir}/${testfile}.o"
++
++if { [catch "system \"uudecode -o ${ofile} ${uufile}\"" ] != 0 } {
++    untested "failed uudecode"
++    return -1
++}
++
++gdb_exit
++gdb_start
++gdb_load $ofile
++
++gdb_test "break select" "Breakpoint $decimal at 0x48: file ../sysdeps/unix/syscall-template.S, line 81." "breakpoint on select"
+diff --git a/gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu b/gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu
+new file mode 100644
+index 0000000000..6442e6048d
+--- /dev/null
++++ b/gdb/testsuite/gdb.arch/s390x-prologue-skip.o.uu
+@@ -0,0 +1,64 @@
++begin 644 s390x-prologue-skip.o.uu
++M?T5,1@("`0`````````````!`!8````!````````````````````````````
++M``+```````!```````!``!(`#^LE\!``).O?\&@`)+D$`.^G^_]@X^#P```D
++MP.4`````N00``NLE\+``!`J.N00`TKD$`"#`Y0````"Y!``MZ]_Q"``$I_0`
++M"L`0`````+\/$`"G=/_7"HZG2?`!N2$`),"T``````?^````5@`"````.0$!
++M^PX-``$!`0$````!```!+BXO<WES9&5P<R]U;FEX``!S>7-C86QL+71E;7!L
++M871E+E,``0`````)`@```````````]```0)F$P("``$!````CP`"``````@!
++M```````````````````````````N+B]S>7-D97!S+W5N:7@O<WES8V%L;"UT
++M96UP;&%T92Y3`"]R;V]T+V=L:6)C+V=L:6)C+3(N,3<M-S@N96PW+G-R8R]G
++M;&EB8RTR+C$W+6,W-3AA-C@V+VUI<V,`1TY5($%3(#(N,C,N-3(N,"XQ`(`!
++M`1$`$`81`1(!`P@;""4($P4`````````````````+``"``````@`````````
++M`````````````````&@`````````````````````````%``````!>E(``7@.
++M`1L,#Z`!````````&````!P`````````1`!,CP6.!HT'2`[``@```!`````X
++M`````````"```````"YS>6UT86(`+G-T<G1A8@`N<VAS=')T86(`+G)E;&$N
++M=&5X=``N9&%T80`N8G-S`"YN;W1E+D=.52US=&%C:P`N<F5L82YD96)U9U]L
++M:6YE`"YR96QA+F1E8G5G7VEN9F\`+F1E8G5G7V%B8G)E=@`N<F5L82YD96)U
++M9U]A<F%N9V5S`"YR96QA+F5H7V9R86UE````````````````````````````
++M````````````````````````````````````````````````````````````
++M````````(`````$`````````!@```````````````````$``````````:```
++M``````````````````0``````````````!L````$````````````````````
++M``````````F``````````&`````0`````0`````````(`````````!@````F
++M`````0`````````#````````````````````J```````````````````````
++M````````!```````````````+`````@``````````P``````````````````
++M`*@```````````````````````````````0``````````````#$````!````
++M``````````````````````````"H```````````````````````````````!
++M``````````````!&`````0``````````````````````````````J```````
++M``!:`````````````````````0``````````````00````0`````````````
++M````````````````">``````````&````!`````&``````````@`````````
++M&````%<````!``````````````````````````````$"`````````),`````
++M```````````````!``````````````!2````!```````````````````````
++M```````)^`````````!@````$`````@`````````"``````````8````8P``
++M``$``````````````````````````````94`````````%```````````````
++M``````$``````````````'8````!``````````````````````````````&P
++M`````````#`````````````````````0``````````````!Q````!```````
++M```````````````````````*6``````````P````$`````L`````````"```
++M```````8````B@````$``````````@```````````````````>``````````
++M2`````````````````````@``````````````(4````$````````````````
++M``````````````J(`````````#`````0````#0`````````(`````````!@`
++M```1`````P`````````````````````````````"*`````````"4````````
++M`````````````0```````````````0````(`````````````````````````
++M````!T`````````!L````!$````*``````````@`````````&`````D````#
++M``````````````````````````````CP`````````(X`````````````````
++M```!`````````````````````````````````````````````````P```0``
++M`````````````````````````P```P```````````````````````````P``
++M!````````````````````````````P``"```````````````````````````
++M`P``"@```````````````````````````P``!@``````````````````````
++M`````P``"P```````````````````````````P``#0``````````````````
++M`````````P``!0`````````````````````````!$```````````````````
++M```````````;$``````````````````````````````V$@```0````````!(
++M`````````"`````_$`````````````````````````````!7$@```0``````
++M``!6`````````!````!I$`````````````````````````````!Y(@```0``
++M``````!(`````````"````"'(@```0````````!(`````````"``7U]L:6)C
++M7V5N86)L95]A<WEN8V-A;F-E;`!?7VQI8F-?9&ES86)L95]A<WEN8V-A;F-E
++M;`!?7W-E;&5C=`!?7VQI8F-?;75L=&EP;&5?=&AR96%D<P!?7W-E;&5C=%]N
++M;V-A;F-E;`!?7W-Y<V-A;&Q?97)R;W(`7U]L:6)C7W-E;&5C=`!S96QE8W0`
++M````````````'`````H````3``````````(`````````-@````L````3````
++M``````(`````````2@````T````3``````````(`````````8@````\````3
++M``````````(`````````1@````$````6````````````````````!@````4`
++M```$````````````````````#`````8````$````````````````````$```
++M``$````6````````````````````&`````$````6`````````&@`````````
++M!@````0````$````````````````````$`````$````6````````````````
++L````(`````$````%````````````````````/`````$````%`````````$@`
++`
++end
+-- 
+2.14.3
+

@@ -1,11 +1,15 @@
+From 24e16d436c9acfa44106f83dc4359f33ae36b37c Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: Re: [PATCH] Expand fortran array bounds sizes to LONGEST
+Subject: Expand fortran array bounds sizes to LONGEST
 
 FileName: gdb-rhbz795424-bitpos-25of25-test.patch
 
-http://sourceware.org/ml/gdb-patches/2012-10/msg00231.html
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
 
+http://sourceware.org/ml/gdb-patches/2012-10/msg00231.html
 
 On Mon, 15 Oct 2012 15:25:55 +0200, Jan Kratochvil wrote:
 > I have filed for it now:
@@ -15,10 +19,8 @@ On Mon, 15 Oct 2012 15:25:55 +0200, Jan Kratochvil wrote:
 Therefore it looks as a valid gfortran FSF GCC HEAD bug so provided
 a hand-patched .S file for i386; patched GDB PASSes with it.
 
-
 Thanks,
 Jan
-
 
 2012-10-15  Siddhesh Poyarekar  <siddhesh@redhat.com>
 	    Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -26,80 +28,20 @@ Jan
 	* gdb.fortran/array-bounds.exp: New test file.
 	* gdb.fortran/array-bounds.f: New test file.
 	* gdb.fortran/array-bounds.S: New test file.
+---
+ gdb/testsuite/gdb.fortran/array-bounds.S   | 529 +++++++++++++++++++++++++++++
+ gdb/testsuite/gdb.fortran/array-bounds.exp |  43 +++
+ gdb/testsuite/gdb.fortran/array-bounds.f   |  22 ++
+ 3 files changed, 594 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.fortran/array-bounds.S
+ create mode 100644 gdb/testsuite/gdb.fortran/array-bounds.exp
+ create mode 100644 gdb/testsuite/gdb.fortran/array-bounds.f
 
---- /dev/null	2012-09-26 15:32:16.098506310 +0200
-+++ gdb-7.2/gdb/testsuite/gdb.fortran/array-bounds.exp	2012-10-15 20:53:26.427072583 +0200
-@@ -0,0 +1,43 @@
-+# Copyright 2012 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 3 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+# This file is part of the gdb testsuite.  It contains test to ensure that
-+# array bounds accept LONGEST.
-+
-+if { [skip_fortran_tests] } { return -1 }
-+
-+set testfile "array-bounds"
-+
-+if { [is_ilp32_target] && ([istarget "i\[34567\]86-*-linux*"]
-+			   || [istarget "x86_64-*-linux*"]) } {
-+    set srcfile ${testfile}.S
-+    set opts {nodebug f90}
-+} else {
-+    set srcfile ${testfile}.f
-+    set opts {debug f90}
-+}
-+
-+if {[prepare_for_testing $testfile.exp $testfile $srcfile $opts]} {
-+    print "compile failed"
-+    return -1
-+}
-+
-+if { ![runto MAIN__] } {
-+    perror "Could not run to breakpoint `MAIN__'."
-+    continue
-+}
-+
-+gdb_test "print &foo" {.*\(4294967296:4294967297\).*}
-+gdb_test "print &bar" {.*\(-4294967297:-4294967296\).*}
---- /dev/null	2012-09-26 15:32:16.098506310 +0200
-+++ gdb-7.2/gdb/testsuite/gdb.fortran/array-bounds.f	2012-10-15 19:35:12.500254261 +0200
-@@ -0,0 +1,22 @@
-+c Copyright 2012 Free Software Foundation, Inc.
-+
-+c This program is free software; you can redistribute it and/or modify
-+c it under the terms of the GNU General Public License as published by
-+c the Free Software Foundation; either version 3 of the License, or
-+c (at your option) any later version.
-+c
-+c This program is distributed in the hope that it will be useful,
-+c but WITHOUT ANY WARRANTY; without even the implied warranty of
-+c MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+c GNU General Public License for more details.
-+c
-+c You should have received a copy of the GNU General Public License
-+c along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+        dimension foo(4294967296_8:4294967297_8)
-+        dimension bar(-4294967297_8:-4294967296_8)
-+        bar = 42
-+        foo=bar
-+        stop
-+        end
-+
---- /dev/null	2012-09-26 15:32:16.098506310 +0200
-+++ gdb-7.2/gdb/testsuite/gdb.fortran/array-bounds.S	2012-10-15 20:52:36.851118215 +0200
+diff --git a/gdb/testsuite/gdb.fortran/array-bounds.S b/gdb/testsuite/gdb.fortran/array-bounds.S
+new file mode 100644
+index 0000000000..463a427650
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/array-bounds.S
 @@ -0,0 +1,529 @@
 +/* Copyright 2012 Free Software Foundation, Inc.
 +
@@ -630,4 +572,83 @@ Jan
 +	.string	"argv"
 +	.ident	"GCC: (GNU) 4.8.0 20121015 (experimental)"
 +	.section	.note.GNU-stack,"",@progbits
+diff --git a/gdb/testsuite/gdb.fortran/array-bounds.exp b/gdb/testsuite/gdb.fortran/array-bounds.exp
+new file mode 100644
+index 0000000000..ba0ebe13b8
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/array-bounds.exp
+@@ -0,0 +1,43 @@
++# Copyright 2012 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This file is part of the gdb testsuite.  It contains test to ensure that
++# array bounds accept LONGEST.
++
++if { [skip_fortran_tests] } { return -1 }
++
++set testfile "array-bounds"
++
++if { [is_ilp32_target] && ([istarget "i\[34567\]86-*-linux*"]
++			   || [istarget "x86_64-*-linux*"]) } {
++    set srcfile ${testfile}.S
++    set opts {nodebug f90}
++} else {
++    set srcfile ${testfile}.f
++    set opts {debug f90}
++}
++
++if {[prepare_for_testing $testfile.exp $testfile $srcfile $opts]} {
++    print "compile failed"
++    return -1
++}
++
++if { ![runto MAIN__] } {
++    perror "Could not run to breakpoint `MAIN__'."
++    continue
++}
++
++gdb_test "print &foo" {.*\(4294967296:4294967297\).*}
++gdb_test "print &bar" {.*\(-4294967297:-4294967296\).*}
+diff --git a/gdb/testsuite/gdb.fortran/array-bounds.f b/gdb/testsuite/gdb.fortran/array-bounds.f
+new file mode 100644
+index 0000000000..78b36e6c27
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/array-bounds.f
+@@ -0,0 +1,22 @@
++c Copyright 2012 Free Software Foundation, Inc.
++
++c This program is free software; you can redistribute it and/or modify
++c it under the terms of the GNU General Public License as published by
++c the Free Software Foundation; either version 3 of the License, or
++c (at your option) any later version.
++c
++c This program is distributed in the hope that it will be useful,
++c but WITHOUT ANY WARRANTY; without even the implied warranty of
++c MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++c GNU General Public License for more details.
++c
++c You should have received a copy of the GNU General Public License
++c along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++        dimension foo(4294967296_8:4294967297_8)
++        dimension bar(-4294967297_8:-4294967296_8)
++        bar = 42
++        foo=bar
++        stop
++        end
++
+-- 
+2.14.3
 

@@ -1,12 +1,14 @@
+From 2f8f9053a5b2630408c2a32ff6ba04a5067ab8f7 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: [patch 3/3] attach-fail-reasons: SELinux deny_ptrace
+Subject: attach-fail-reasons: SELinux deny_ptrace
 
 FileName: gdb-attach-fail-reasons-5of5.patch
 
+;; Print reasons for failed attach/spawn incl. SELinux deny_ptrace (BZ 786878).
+;;=push+jan
 
 http://sourceware.org/ml/gdb-patches/2012-03/msg00171.html
-
 
 Hi,
 
@@ -16,10 +18,8 @@ and here is the last bit for new SELinux 'deny_ptrace':
 As even PTRACE_TRACEME fails in such case it needs to install hook for even
 that event.
 
-
 Thanks,
 Jan
-
 
 gdb/
 2012-03-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -43,185 +43,23 @@ gdb/gdbserver/
 	* linux-low.c (linux_traceme): New function.
 	(linux_create_inferior, linux_tracefork_child): Call it instead of
 	direct ptrace.
+---
+ gdb/config.in              |  6 +++++
+ gdb/configure              | 58 ++++++++++++++++++++++++++++++++++++++++++++++
+ gdb/configure.ac           |  4 ++++
+ gdb/gdbserver/config.in    |  6 +++++
+ gdb/gdbserver/configure    | 58 ++++++++++++++++++++++++++++++++++++++++++++++
+ gdb/gdbserver/configure.ac |  4 ++++
+ gdb/gdbserver/linux-low.c  | 16 ++++++++++++-
+ gdb/linux-nat.c            | 24 ++++++++++++++++++-
+ gdb/nat/linux-ptrace.c     | 22 ++++++++++++++++++
+ gdb/nat/linux-ptrace.h     |  1 +
+ 10 files changed, 197 insertions(+), 2 deletions(-)
 
-Index: gdb-7.12.50.20170226/gdb/nat/linux-ptrace.c
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/nat/linux-ptrace.c	2017-02-26 21:27:14.780009449 +0100
-+++ gdb-7.12.50.20170226/gdb/nat/linux-ptrace.c	2017-02-26 21:27:18.838038193 +0100
-@@ -27,6 +27,10 @@
- #include <sys/procfs.h>
- #endif
- 
-+#ifdef HAVE_SELINUX_SELINUX_H
-+# include <selinux/selinux.h>
-+#endif /* HAVE_SELINUX_SELINUX_H */
-+
- /* Stores the ptrace options supported by the running kernel.
-    A value of -1 means we did not check for features yet.  A value
-    of 0 means there are no supported features.  */
-@@ -51,6 +55,8 @@
-     buffer_xml_printf (buffer, _("process %d is a zombie "
- 				 "- the process has already terminated"),
- 		       (int) pid);
-+
-+  linux_ptrace_create_warnings (buffer);
- }
- 
- /* See linux-ptrace.h.  */
-@@ -594,6 +600,22 @@
-   linux_ptrace_test_ret_to_nx ();
- }
- 
-+/* Print all possible reasons we could fail to create a traced process.  */
-+
-+void
-+linux_ptrace_create_warnings (struct buffer *buffer)
-+{
-+#ifdef HAVE_LIBSELINUX
-+  /* -1 is returned for errors, 0 if it has no effect, 1 if PTRACE_ATTACH is
-+     forbidden.  */
-+  if (security_get_boolean_active ("deny_ptrace") == 1)
-+    buffer_xml_printf (buffer,
-+		       _("the SELinux boolean 'deny_ptrace' is enabled, "
-+			 "you can disable this process attach protection by: "
-+			 "(gdb) shell sudo setsebool deny_ptrace=0"));
-+#endif /* HAVE_LIBSELINUX */
-+}
-+
- /* Extract extended ptrace event from wait status.  */
- 
- int
-Index: gdb-7.12.50.20170226/gdb/nat/linux-ptrace.h
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/nat/linux-ptrace.h	2017-02-26 21:27:14.780009449 +0100
-+++ gdb-7.12.50.20170226/gdb/nat/linux-ptrace.h	2017-02-26 21:27:18.838038193 +0100
-@@ -185,6 +185,7 @@
- extern char *linux_ptrace_attach_fail_reason_string (ptid_t ptid, int err);
- 
- extern void linux_ptrace_init_warnings (void);
-+extern void linux_ptrace_create_warnings (struct buffer *buffer);
- extern void linux_check_ptrace_features (void);
- extern void linux_enable_event_reporting (pid_t pid, int attached);
- extern void linux_disable_event_reporting (pid_t pid);
-Index: gdb-7.12.50.20170226/gdb/configure.ac
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/configure.ac	2017-02-26 21:27:14.781009456 +0100
-+++ gdb-7.12.50.20170226/gdb/configure.ac	2017-02-26 21:27:18.839038200 +0100
-@@ -2092,6 +2092,10 @@
- esac
- AC_DEFINE_UNQUOTED(GDBINIT,"$gdbinit",[The .gdbinit filename.])
- 
-+dnl Check security_get_boolean_active availability.
-+AC_CHECK_HEADERS(selinux/selinux.h)
-+AC_CHECK_LIB(selinux, security_get_boolean_active)
-+
- dnl Handle optional features that can be enabled.
- 
- # Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,
-Index: gdb-7.12.50.20170226/gdb/gdbserver/configure.ac
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/gdbserver/configure.ac	2017-02-26 21:27:14.781009456 +0100
-+++ gdb-7.12.50.20170226/gdb/gdbserver/configure.ac	2017-02-26 21:27:18.839038200 +0100
-@@ -469,6 +469,10 @@
-    fi
- fi
- 
-+dnl Check security_get_boolean_active availability.
-+AC_CHECK_HEADERS(selinux/selinux.h)
-+AC_CHECK_LIB(selinux, security_get_boolean_active)
-+
- AC_SUBST(GDBSERVER_DEPFILES)
- AC_SUBST(GDBSERVER_LIBS)
- AC_SUBST(srv_xmlbuiltin)
-Index: gdb-7.12.50.20170226/gdb/gdbserver/linux-low.c
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/gdbserver/linux-low.c	2017-02-26 21:27:14.783009470 +0100
-+++ gdb-7.12.50.20170226/gdb/gdbserver/linux-low.c	2017-02-26 21:27:18.841038214 +0100
-@@ -946,6 +946,29 @@
-   return lwp;
- }
- 
-+/* Execute PTRACE_TRACEME with error checking.  */
-+
-+static void
-+linux_traceme (const char *program)
-+{
-+  int save_errno;
-+  struct buffer buffer;
-+
-+  errno = 0;
-+  if (ptrace (PTRACE_TRACEME, 0,
-+	      (PTRACE_TYPE_ARG3) 0, (PTRACE_TYPE_ARG4) 0) == 0)
-+    return;
-+
-+  save_errno = errno;
-+  buffer_init (&buffer);
-+  linux_ptrace_create_warnings (&buffer);
-+  buffer_grow_str0 (&buffer, "");
-+  fprintf (stderr, _("%sCannot trace created process %s: %s.\n"),
-+	   buffer_finish (&buffer), program, strerror (save_errno));
-+  fflush (stderr);
-+  _exit (0177);
-+}
-+
- /* Start an inferior process and returns its pid.
-    ALLARGS is a vector of program-name and args. */
- 
-@@ -969,7 +992,7 @@
-   if (pid == 0)
-     {
-       close_most_fds ();
--      ptrace (PTRACE_TRACEME, 0, (PTRACE_TYPE_ARG3) 0, (PTRACE_TYPE_ARG4) 0);
-+      linux_traceme (program);
- 
-       setpgid (0, 0);
- 
-Index: gdb-7.12.50.20170226/gdb/linux-nat.c
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/linux-nat.c	2017-02-26 21:27:14.785009484 +0100
-+++ gdb-7.12.50.20170226/gdb/linux-nat.c	2017-02-26 21:27:18.842038221 +0100
-@@ -1110,6 +1110,7 @@
- {
-   struct cleanup *restore_personality
-     = maybe_disable_address_space_randomization (disable_randomization);
-+  volatile struct gdb_exception ex;
- 
-   /* The fork_child mechanism is synchronous and calls target_wait, so
-      we have to mask the async mode.  */
-@@ -1117,7 +1118,28 @@
-   /* Make sure we report all signals during startup.  */
-   linux_nat_pass_signals (ops, 0, NULL);
- 
--  linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
-+  TRY
-+    {
-+      linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
-+    }
-+  CATCH (ex, RETURN_MASK_ERROR)
-+    {
-+      struct buffer buffer;
-+      char *message, *buffer_s;
-+
-+      message = xstrdup (ex.message);
-+      make_cleanup (xfree, message);
-+
-+      buffer_init (&buffer);
-+      linux_ptrace_create_warnings (&buffer);
-+
-+      buffer_grow_str0 (&buffer, "");
-+      buffer_s = buffer_finish (&buffer);
-+      make_cleanup (xfree, buffer_s);
-+
-+      throw_error (ex.error, "%s%s", buffer_s, message);
-+    }
-+  END_CATCH
- 
-   do_cleanups (restore_personality);
- }
-Index: gdb-7.12.50.20170226/gdb/config.in
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/config.in	2017-02-26 21:27:14.786009491 +0100
-+++ gdb-7.12.50.20170226/gdb/config.in	2017-02-26 21:27:18.842038221 +0100
+diff --git a/gdb/config.in b/gdb/config.in
+index edd7028f76..4de3e842d1 100644
+--- a/gdb/config.in
++++ b/gdb/config.in
 @@ -270,6 +270,9 @@
  /* Define if librpm library is being used. */
  #undef HAVE_LIBRPM
@@ -232,7 +70,7 @@ Index: gdb-7.12.50.20170226/gdb/config.in
  /* Define to 1 if you have the <libunwind-ia64.h> header file. */
  #undef HAVE_LIBUNWIND_IA64_H
  
-@@ -402,6 +405,9 @@
+@@ -393,6 +396,9 @@
  /* Define to 1 if you have the `scm_new_smob' function. */
  #undef HAVE_SCM_NEW_SMOB
  
@@ -242,11 +80,11 @@ Index: gdb-7.12.50.20170226/gdb/config.in
  /* Define to 1 if you have the `setlocale' function. */
  #undef HAVE_SETLOCALE
  
-Index: gdb-7.12.50.20170226/gdb/configure
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/configure	2017-02-26 21:27:14.790009519 +0100
-+++ gdb-7.12.50.20170226/gdb/configure	2017-02-26 21:27:18.846038249 +0100
-@@ -15492,6 +15492,64 @@
+diff --git a/gdb/configure b/gdb/configure
+index e314e28ff3..d99f28b9f2 100755
+--- a/gdb/configure
++++ b/gdb/configure
+@@ -15679,6 +15679,64 @@ cat >>confdefs.h <<_ACEOF
  _ACEOF
  
  
@@ -311,11 +149,26 @@ Index: gdb-7.12.50.20170226/gdb/configure
  
  # Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,
  # except that the argument to --with-sysroot is optional.
-Index: gdb-7.12.50.20170226/gdb/gdbserver/config.in
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/gdbserver/config.in	2017-02-26 21:27:14.791009527 +0100
-+++ gdb-7.12.50.20170226/gdb/gdbserver/config.in	2017-02-26 21:27:18.846038249 +0100
-@@ -123,6 +123,9 @@
+diff --git a/gdb/configure.ac b/gdb/configure.ac
+index 9de441fe79..830618dbe5 100644
+--- a/gdb/configure.ac
++++ b/gdb/configure.ac
+@@ -2042,6 +2042,10 @@ case $host_os in
+ esac
+ AC_DEFINE_UNQUOTED(GDBINIT,"$gdbinit",[The .gdbinit filename.])
+ 
++dnl Check security_get_boolean_active availability.
++AC_CHECK_HEADERS(selinux/selinux.h)
++AC_CHECK_LIB(selinux, security_get_boolean_active)
++
+ dnl Handle optional features that can be enabled.
+ 
+ # Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,
+diff --git a/gdb/gdbserver/config.in b/gdb/gdbserver/config.in
+index dda7c1f150..b2a34b92ce 100644
+--- a/gdb/gdbserver/config.in
++++ b/gdb/gdbserver/config.in
+@@ -126,6 +126,9 @@
  /* Define to 1 if you have the `mcheck' library (-lmcheck). */
  #undef HAVE_LIBMCHECK
  
@@ -325,7 +178,7 @@ Index: gdb-7.12.50.20170226/gdb/gdbserver/config.in
  /* Define if the target supports branch tracing. */
  #undef HAVE_LINUX_BTRACE
  
-@@ -199,6 +202,9 @@
+@@ -202,6 +205,9 @@
  /* Define to 1 if you have the `pwrite' function. */
  #undef HAVE_PWRITE
  
@@ -335,11 +188,11 @@ Index: gdb-7.12.50.20170226/gdb/gdbserver/config.in
  /* Define to 1 if you have the `setns' function. */
  #undef HAVE_SETNS
  
-Index: gdb-7.12.50.20170226/gdb/gdbserver/configure
-===================================================================
---- gdb-7.12.50.20170226.orig/gdb/gdbserver/configure	2017-02-26 21:27:14.793009541 +0100
-+++ gdb-7.12.50.20170226/gdb/gdbserver/configure	2017-02-26 21:27:18.848038263 +0100
-@@ -8429,6 +8429,64 @@
+diff --git a/gdb/gdbserver/configure b/gdb/gdbserver/configure
+index 835dcca314..9028c82b01 100755
+--- a/gdb/gdbserver/configure
++++ b/gdb/gdbserver/configure
+@@ -8452,6 +8452,64 @@ if $want_ipa ; then
     fi
  fi
  
@@ -404,3 +257,142 @@ Index: gdb-7.12.50.20170226/gdb/gdbserver/configure
  
  
  
+diff --git a/gdb/gdbserver/configure.ac b/gdb/gdbserver/configure.ac
+index 456d3b360a..0074c437f1 100644
+--- a/gdb/gdbserver/configure.ac
++++ b/gdb/gdbserver/configure.ac
+@@ -486,6 +486,10 @@ if $want_ipa ; then
+    fi
+ fi
+ 
++dnl Check security_get_boolean_active availability.
++AC_CHECK_HEADERS(selinux/selinux.h)
++AC_CHECK_LIB(selinux, security_get_boolean_active)
++
+ AC_SUBST(GDBSERVER_DEPFILES)
+ AC_SUBST(GDBSERVER_LIBS)
+ AC_SUBST(srv_xmlbuiltin)
+diff --git a/gdb/gdbserver/linux-low.c b/gdb/gdbserver/linux-low.c
+index f6a52d5859..ab3be27142 100644
+--- a/gdb/gdbserver/linux-low.c
++++ b/gdb/gdbserver/linux-low.c
+@@ -963,7 +963,21 @@ linux_ptrace_fun ()
+ {
+   if (ptrace (PTRACE_TRACEME, 0, (PTRACE_TYPE_ARG3) 0,
+ 	      (PTRACE_TYPE_ARG4) 0) < 0)
+-    trace_start_error_with_name ("ptrace");
++    {
++      int save_errno = errno;
++      struct buffer buffer;
++
++      buffer_init (&buffer);
++      linux_ptrace_create_warnings (&buffer);
++      buffer_grow_str0 (&buffer, "");
++
++      std::string msg
++	= string_printf (_("%sCannot trace created process"),
++			 buffer_finish (&buffer));
++
++      errno = save_errno;
++      trace_start_error_with_name (msg.c_str ());
++    }
+ 
+   if (setpgid (0, 0) < 0)
+     trace_start_error_with_name ("setpgid");
+diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
+index 96cb21a2cf..6040c1f129 100644
+--- a/gdb/linux-nat.c
++++ b/gdb/linux-nat.c
+@@ -1127,7 +1127,29 @@ linux_nat_create_inferior (struct target_ops *ops,
+   /* Make sure we report all signals during startup.  */
+   linux_nat_pass_signals (ops, 0, NULL);
+ 
+-  linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
++  volatile struct gdb_exception ex;
++  TRY
++    {
++      linux_ops->to_create_inferior (ops, exec_file, allargs, env, from_tty);
++    }
++  CATCH (ex, RETURN_MASK_ERROR)
++    {
++      struct buffer buffer;
++      char *message, *buffer_s;
++
++      message = xstrdup (ex.message);
++      make_cleanup (xfree, message);
++
++      buffer_init (&buffer);
++      linux_ptrace_create_warnings (&buffer);
++
++      buffer_grow_str0 (&buffer, "");
++      buffer_s = buffer_finish (&buffer);
++      make_cleanup (xfree, buffer_s);
++
++      throw_error (ex.error, "%s%s", buffer_s, message);
++    }
++  END_CATCH
+ }
+ 
+ /* Callback for linux_proc_attach_tgid_threads.  Attach to PTID if not
+diff --git a/gdb/nat/linux-ptrace.c b/gdb/nat/linux-ptrace.c
+index 438177fa76..ab6ae86400 100644
+--- a/gdb/nat/linux-ptrace.c
++++ b/gdb/nat/linux-ptrace.c
+@@ -27,6 +27,10 @@
+ #include <sys/procfs.h>
+ #endif
+ 
++#ifdef HAVE_SELINUX_SELINUX_H
++# include <selinux/selinux.h>
++#endif /* HAVE_SELINUX_SELINUX_H */
++
+ /* Stores the ptrace options supported by the running kernel.
+    A value of -1 means we did not check for features yet.  A value
+    of 0 means there are no supported features.  */
+@@ -51,6 +55,8 @@ linux_ptrace_attach_fail_reason (pid_t pid, struct buffer *buffer)
+     buffer_xml_printf (buffer, _("process %d is a zombie "
+ 				 "- the process has already terminated"),
+ 		       (int) pid);
++
++  linux_ptrace_create_warnings (buffer);
+ }
+ 
+ /* See linux-ptrace.h.  */
+@@ -594,6 +600,22 @@ linux_ptrace_init_warnings (void)
+   linux_ptrace_test_ret_to_nx ();
+ }
+ 
++/* Print all possible reasons we could fail to create a traced process.  */
++
++void
++linux_ptrace_create_warnings (struct buffer *buffer)
++{
++#ifdef HAVE_LIBSELINUX
++  /* -1 is returned for errors, 0 if it has no effect, 1 if PTRACE_ATTACH is
++     forbidden.  */
++  if (security_get_boolean_active ("deny_ptrace") == 1)
++    buffer_xml_printf (buffer,
++		       _("the SELinux boolean 'deny_ptrace' is enabled, "
++			 "you can disable this process attach protection by: "
++			 "(gdb) shell sudo setsebool deny_ptrace=0"));
++#endif /* HAVE_LIBSELINUX */
++}
++
+ /* Extract extended ptrace event from wait status.  */
+ 
+ int
+diff --git a/gdb/nat/linux-ptrace.h b/gdb/nat/linux-ptrace.h
+index 59549452c0..b951492102 100644
+--- a/gdb/nat/linux-ptrace.h
++++ b/gdb/nat/linux-ptrace.h
+@@ -185,6 +185,7 @@ extern void linux_ptrace_attach_fail_reason (pid_t pid, struct buffer *buffer);
+ extern char *linux_ptrace_attach_fail_reason_string (ptid_t ptid, int err);
+ 
+ extern void linux_ptrace_init_warnings (void);
++extern void linux_ptrace_create_warnings (struct buffer *buffer);
+ extern void linux_check_ptrace_features (void);
+ extern void linux_enable_event_reporting (pid_t pid, int attached);
+ extern void linux_disable_event_reporting (pid_t pid);
+-- 
+2.14.3
+

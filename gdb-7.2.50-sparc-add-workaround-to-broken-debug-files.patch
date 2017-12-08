@@ -1,14 +1,30 @@
+From e803da95eb585d32f8c8f793445982827255f6df Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
 FileName: gdb-7.2.50-sparc-add-workaround-to-broken-debug-files.patch
 
+;; Toolchain on sparc is slightly broken and debuginfo files are generated
+;; with non 64bit aligned tables/offsets.
+;; See for example readelf -S ../Xvnc.debug.
+;;
+;; As a consenquence calculation of sectp->filepos as used in
+;; dwarf2_read_section (gdb/dwarf2read.c:1525) will return a non aligned buffer
+;; that cannot be used directly as done with MMAP.
+;; Usage will result in a BusError.
+;;
+;; While we figure out what's wrong in the toolchain and do a full archive
+;; rebuild to fix it, we need to be able to use gdb :)
+;;=push
+---
+ gdb/gdb_bfd.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Index: gdb-7.9.90.20150709/gdb/gdb_bfd.c
-===================================================================
---- gdb-7.9.90.20150709.orig/gdb/gdb_bfd.c	2015-07-09 18:23:59.344017882 +0200
-+++ gdb-7.9.90.20150709/gdb/gdb_bfd.c	2015-07-09 18:24:06.986083071 +0200
+diff --git a/gdb/gdb_bfd.c b/gdb/gdb_bfd.c
+index cc02740c1a..24155e7c55 100644
+--- a/gdb/gdb_bfd.c
++++ b/gdb/gdb_bfd.c
 @@ -24,12 +24,14 @@
  #include "hashtab.h"
  #include "filestuff.h"
@@ -24,7 +40,7 @@ Index: gdb-7.9.90.20150709/gdb/gdb_bfd.c
  #include "target.h"
  #include "gdb/fileio.h"
  #include "inferior.h"
-@@ -397,6 +399,7 @@ free_one_bfd_section (bfd *abfd, asectio
+@@ -484,6 +486,7 @@ free_one_bfd_section (bfd *abfd, asection *sectp, void *ignore)
  
    if (sect != NULL && sect->data != NULL)
      {
@@ -32,15 +48,15 @@ Index: gdb-7.9.90.20150709/gdb/gdb_bfd.c
  #ifdef HAVE_MMAP
        if (sect->map_addr != NULL)
  	{
-@@ -407,6 +410,7 @@ free_one_bfd_section (bfd *abfd, asectio
+@@ -493,6 +496,7 @@ free_one_bfd_section (bfd *abfd, asection *sectp, void *ignore)
+ 	  gdb_assert (res == 0);
  	}
        else
- #endif
 +#endif
+ #endif
  	xfree (sect->data);
      }
- }
-@@ -558,6 +562,7 @@ gdb_bfd_map_section (asection *sectp, bf
+@@ -659,6 +663,7 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
    if (descriptor->data != NULL)
      goto done;
  
@@ -48,7 +64,7 @@ Index: gdb-7.9.90.20150709/gdb/gdb_bfd.c
  #ifdef HAVE_MMAP
    if (!bfd_is_section_compressed (abfd, sectp))
      {
-@@ -592,6 +597,7 @@ gdb_bfd_map_section (asection *sectp, bf
+@@ -693,6 +698,7 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
  	}
      }
  #endif /* HAVE_MMAP */
@@ -56,3 +72,6 @@ Index: gdb-7.9.90.20150709/gdb/gdb_bfd.c
  
    /* Handle compressed sections, or ordinary uncompressed sections in
       the no-mmap case.  */
+-- 
+2.14.3
+

@@ -1,9 +1,12 @@
+From 37503cd77a1aba329b10bb9ccd34fb01e7449e39 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-follow-child-stale-parent.patch
 
 FileName: gdb-follow-child-stale-parent.patch
 
+;; Fix regression by python on ia64 due to stale current frame.
+;;=push+jan
 
 Problem occurs with python and its get_current_arch () as it selects
 selected_frame and current_frame while still inferior_ptid is valid for the
@@ -19,10 +22,15 @@ unwinders try to access it, breaking:
   +FAIL: gdb.threads/watchpoint-fork.exp: child: singlethreaded: breakpoint after the second fork
   +FAIL: gdb.threads/watchpoint-fork.exp: child: singlethreaded: watchpoint after the second fork
   +FAIL: gdb.threads/watchpoint-fork.exp: child: singlethreaded: finish
+---
+ gdb/infrun.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
---- ./gdb/infrun.c	2009-12-21 20:26:30.000000000 +0100
-+++ ./gdb/infrun.c	2009-12-21 20:26:11.000000000 +0100
-@@ -375,6 +375,9 @@ follow_fork (void)
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index 8c2c424883..c20a02e600 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -749,6 +749,9 @@ follow_fork (void)
  	  }
  	else
  	  {
@@ -32,3 +40,6 @@ unwinders try to access it, breaking:
  	    /* This pending follow fork event is now handled, one way
  	       or another.  The previous selected thread may be gone
  	       from the lists by now, but if it is still around, need
+-- 
+2.14.3
+

@@ -1,14 +1,24 @@
+From 2e4efbbc861186e5f87c7b2619b171b87a94ca9c Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-6.8-attach-signalled-detach-stopped.patch
 
 FileName: gdb-6.8-attach-signalled-detach-stopped.patch
 
-Index: gdb-7.99.90.20170420/gdb/infrun.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/infrun.c	2017-04-20 23:19:16.056434309 +0200
-+++ gdb-7.99.90.20170420/gdb/infrun.c	2017-04-20 23:19:22.932480367 +0200
-@@ -620,6 +620,13 @@
+;; [RHEL5,RHEL6] Fix attaching to stopped processes.
+;; [RHEL5] Workaround kernel for detaching SIGSTOPped processes (BZ 809382).
+;;=fedora
+---
+ gdb/infrun.c                                 |  7 ++++
+ gdb/linux-nat.c                              | 45 +++++++++++++++++++++
+ gdb/testsuite/gdb.threads/attach-stopped.exp | 60 +++++++++++++++++++++++++++-
+ 3 files changed, 111 insertions(+), 1 deletion(-)
+
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index c20a02e600..299585f350 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -606,6 +606,13 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
  				target_pid_to_str (process_ptid));
  	    }
  
@@ -22,11 +32,11 @@ Index: gdb-7.99.90.20170420/gdb/infrun.c
  	  target_detach (NULL, 0);
  	}
  
-Index: gdb-7.99.90.20170420/gdb/linux-nat.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/linux-nat.c	2017-04-20 23:19:16.058434322 +0200
-+++ gdb-7.99.90.20170420/gdb/linux-nat.c	2017-04-20 23:19:22.933480373 +0200
-@@ -194,6 +194,11 @@
+diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
+index 6040c1f129..667e61e701 100644
+--- a/gdb/linux-nat.c
++++ b/gdb/linux-nat.c
+@@ -194,6 +194,11 @@ enum tribool have_ptrace_getregset = TRIBOOL_UNKNOWN;
  static struct target_ops *linux_ops;
  static struct target_ops linux_ops_saved;
  
@@ -38,7 +48,7 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
  /* The method to call, if any, when a new thread is attached.  */
  static void (*linux_nat_new_thread) (struct lwp_info *);
  
-@@ -1055,6 +1060,9 @@
+@@ -1065,6 +1070,9 @@ linux_nat_post_attach_wait (ptid_t ptid, int *signalled)
        if (debug_linux_nat)
  	fprintf_unfiltered (gdb_stdlog,
  			    "LNPAW: Attaching to a stopped process\n");
@@ -48,7 +58,7 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
  
        /* The process is definitely stopped.  It is in a job control
  	 stop, unless the kernel predates the TASK_STOPPED /
-@@ -1412,6 +1420,25 @@
+@@ -1420,6 +1428,25 @@ get_detach_signal (struct lwp_info *lp)
        return gdb_signal_to_host (signo);
      }
  
@@ -74,7 +84,7 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
    return 0;
  }
  
-@@ -1570,6 +1597,10 @@
+@@ -1578,6 +1605,10 @@ linux_nat_detach (struct target_ops *ops, const char *args, int from_tty)
        detach_one_lwp (main_lwp, &signo);
  
        inf_ptrace_detach_success (ops);
@@ -85,7 +95,7 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
      }
  }
  
-@@ -1830,6 +1861,16 @@
+@@ -1838,6 +1869,16 @@ linux_nat_resume (struct target_ops *ops,
        return;
      }
  
@@ -102,7 +112,7 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
    if (resume_many)
      iterate_over_lwps (ptid, linux_nat_resume_callback, lp);
  
-@@ -3826,6 +3867,10 @@
+@@ -3830,6 +3871,10 @@ linux_nat_mourn_inferior (struct target_ops *ops)
  
    /* Let the arch-specific native code know this process is gone.  */
    linux_nat_forget_process (pid);
@@ -113,11 +123,11 @@ Index: gdb-7.99.90.20170420/gdb/linux-nat.c
  }
  
  /* Convert a native/host siginfo object, into/from the siginfo in the
-Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.threads/attach-stopped.exp
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/testsuite/gdb.threads/attach-stopped.exp	2017-04-20 23:19:16.059434329 +0200
-+++ gdb-7.99.90.20170420/gdb/testsuite/gdb.threads/attach-stopped.exp	2017-04-20 23:19:22.933480373 +0200
-@@ -56,7 +56,65 @@
+diff --git a/gdb/testsuite/gdb.threads/attach-stopped.exp b/gdb/testsuite/gdb.threads/attach-stopped.exp
+index 15a0352fc7..30dee99893 100644
+--- a/gdb/testsuite/gdb.threads/attach-stopped.exp
++++ b/gdb/testsuite/gdb.threads/attach-stopped.exp
+@@ -56,7 +56,65 @@ proc corefunc { threadtype } {
      gdb_reinitialize_dir $srcdir/$subdir
      gdb_load ${binfile}
  
@@ -184,3 +194,6 @@ Index: gdb-7.99.90.20170420/gdb/testsuite/gdb.threads/attach-stopped.exp
         
      set test "$threadtype: attach2 to stopped, after setting file"
      gdb_test_multiple "attach $testpid" "$test" {
+-- 
+2.14.3
+

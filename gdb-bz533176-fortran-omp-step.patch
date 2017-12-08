@@ -1,9 +1,12 @@
+From 02e52bff09dbf734e16f57c0c75720af272023c4 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-bz533176-fortran-omp-step.patch
 
 FileName: gdb-bz533176-fortran-omp-step.patch
 
+;; Fix stepping with OMP parallel Fortran sections (BZ 533176).
+;;=push+jan: It requires some better DWARF annotations.
 
 https://bugzilla.redhat.com/show_bug.cgi?id=533176#c4
 
@@ -25,14 +28,19 @@ upstream) or "step" (default in F/RHEL) the simultaneous execution of the
 threads is inconvenient.  Setting it to "on" will lockup the debugging as the
 threads need to get synchronized at some point.  This is a more general
 debugging problem of GOMP outside of the scope of this Bug.
+---
+ gdb/infrun.c                           | 11 +++++++++++
+ gdb/testsuite/gdb.fortran/omp-step.exp | 31 +++++++++++++++++++++++++++++++
+ gdb/testsuite/gdb.fortran/omp-step.f90 | 32 ++++++++++++++++++++++++++++++++
+ 3 files changed, 74 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.fortran/omp-step.exp
+ create mode 100644 gdb/testsuite/gdb.fortran/omp-step.f90
 
-
-
-Index: gdb-7.7.90.20140613/gdb/infrun.c
-===================================================================
---- gdb-7.7.90.20140613.orig/gdb/infrun.c	2014-06-13 21:59:10.835805512 +0200
-+++ gdb-7.7.90.20140613/gdb/infrun.c	2014-06-13 21:59:31.064829121 +0200
-@@ -4820,6 +4820,16 @@ process_event_stop_test (struct executio
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index db742f7398..8c2c424883 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -6663,6 +6663,16 @@ process_event_stop_test (struct execution_control_state *ecs)
  
        if (ecs->event_thread->control.step_over_calls == STEP_OVER_ALL)
  	{
@@ -49,7 +57,7 @@ Index: gdb-7.7.90.20140613/gdb/infrun.c
  	  /* We're doing a "next".
  
  	     Normal (forward) execution: set a breakpoint at the
-@@ -4855,6 +4865,7 @@ process_event_stop_test (struct executio
+@@ -6696,6 +6706,7 @@ process_event_stop_test (struct execution_control_state *ecs)
  
  	  keep_going (ecs);
  	  return;
@@ -57,10 +65,11 @@ Index: gdb-7.7.90.20140613/gdb/infrun.c
  	}
  
        /* If we are in a function call trampoline (a stub between the
-Index: gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.exp	2014-06-13 21:59:22.801819481 +0200
+diff --git a/gdb/testsuite/gdb.fortran/omp-step.exp b/gdb/testsuite/gdb.fortran/omp-step.exp
+new file mode 100644
+index 0000000000..66440a7507
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/omp-step.exp
 @@ -0,0 +1,31 @@
 +# Copyright 2009 Free Software Foundation, Inc.
 +
@@ -93,10 +102,11 @@ Index: gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.exp
 +
 +gdb_breakpoint [gdb_get_line_number "success"]
 +gdb_continue_to_breakpoint "success" ".*success.*"
-Index: gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.f90
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.f90	2014-06-13 21:59:22.801819481 +0200
+diff --git a/gdb/testsuite/gdb.fortran/omp-step.f90 b/gdb/testsuite/gdb.fortran/omp-step.f90
+new file mode 100644
+index 0000000000..a0cfb37014
+--- /dev/null
++++ b/gdb/testsuite/gdb.fortran/omp-step.f90
 @@ -0,0 +1,32 @@
 +! Copyright 2009 Free Software Foundation, Inc.
 +
@@ -130,3 +140,6 @@ Index: gdb-7.7.90.20140613/gdb/testsuite/gdb.fortran/omp-step.f90
 +      end do
 +      print *, "success"
 +      end
+-- 
+2.14.3
+

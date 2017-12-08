@@ -1,12 +1,15 @@
+From 694123aad6bdf3a1cb753e380f2b866de119ced7 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: [PATCH 4/4] Bitpos expansion - tdep changes
+Subject: Bitpos expansion - tdep changes
 
 FileName: gdb-rhbz795424-bitpos-23of25.patch
 
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
+
 http://sourceware.org/ml/gdb-patches/2012-09/msg00630.html
-
-
 
 --MP_/X_WjDOvz/B_fvlsrmCwRdxe
 Content-Type: text/plain; charset=US-ASCII
@@ -142,12 +145,48 @@ gdb/ChangeLog
 Content-Type: text/x-patch
 Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename=bitpos-tdep.patch
+---
+ gdb/alpha-tdep.c         | 14 +++++++-------
+ gdb/amd64-tdep.c         |  8 ++++----
+ gdb/amd64-windows-tdep.c |  2 +-
+ gdb/arm-tdep.c           | 20 +++++++++++---------
+ gdb/avr-tdep.c           | 10 +++++-----
+ gdb/bfin-tdep.c          |  4 ++--
+ gdb/cris-tdep.c          | 12 ++++++------
+ gdb/h8300-tdep.c         |  8 ++++----
+ gdb/hppa-tdep.c          |  4 ++--
+ gdb/i386-darwin-tdep.c   |  2 +-
+ gdb/i386-tdep.c          | 14 +++++++-------
+ gdb/iq2000-tdep.c        |  5 +++--
+ gdb/m32r-tdep.c          |  2 +-
+ gdb/m68k-tdep.c          |  8 ++++----
+ gdb/m88k-tdep.c          |  8 ++++----
+ gdb/mep-tdep.c           |  2 +-
+ gdb/mips-tdep.c          | 48 ++++++++++++++++++++++++------------------------
+ gdb/mn10300-tdep.c       |  2 +-
+ gdb/mt-tdep.c            |  4 ++--
+ gdb/ppc-sysv-tdep.c      | 23 ++++++++++++-----------
+ gdb/rl78-tdep.c          |  4 ++--
+ gdb/rs6000-aix-tdep.c    |  6 +++---
+ gdb/s390-linux-tdep.c    |  6 +++---
+ gdb/score-tdep.c         |  2 +-
+ gdb/sh-tdep.c            | 10 ++++++----
+ gdb/sh64-tdep.c          |  4 ++--
+ gdb/sparc64-tdep.c       | 12 ++++++------
+ gdb/spu-tdep.c           |  4 ++--
+ gdb/tic6x-tdep.c         |  9 +++++----
+ gdb/tilegx-tdep.c        |  2 +-
+ gdb/v850-tdep.c          |  4 ++--
+ gdb/vax-tdep.c           |  4 ++--
+ gdb/xstormy16-tdep.c     |  5 +++--
+ gdb/xtensa-tdep.c        | 22 +++++++++++-----------
+ 34 files changed, 151 insertions(+), 143 deletions(-)
 
-Index: gdb-7.99.90.20170420/gdb/alpha-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/alpha-tdep.c	2017-04-20 23:12:07.894566371 +0200
-+++ gdb-7.99.90.20170420/gdb/alpha-tdep.c	2017-04-20 23:12:11.228588703 +0200
-@@ -300,17 +300,17 @@
+diff --git a/gdb/alpha-tdep.c b/gdb/alpha-tdep.c
+index 6fbf41bcdc..e9ea0b4ba1 100644
+--- a/gdb/alpha-tdep.c
++++ b/gdb/alpha-tdep.c
+@@ -301,17 +301,17 @@ alpha_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  {
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int i;
@@ -169,7 +208,7 @@ Index: gdb-7.99.90.20170420/gdb/alpha-tdep.c
    CORE_ADDR func_addr = find_function_addr (function, NULL);
  
    /* The ABI places the address of the called function in T12.  */
-@@ -430,8 +430,8 @@
+@@ -431,8 +431,8 @@ alpha_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    for (i = nargs; m_arg--, --i >= 0;)
      {
        const gdb_byte *contents = m_arg->contents;
@@ -180,7 +219,7 @@ Index: gdb-7.99.90.20170420/gdb/alpha-tdep.c
  
        /* Copy the bytes destined for registers into arg_reg_buffer.  */
        if (offset < sizeof(arg_reg_buffer))
-@@ -443,7 +443,7 @@
+@@ -444,7 +444,7 @@ alpha_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  	    }
  	  else
  	    {
@@ -189,33 +228,11 @@ Index: gdb-7.99.90.20170420/gdb/alpha-tdep.c
  	      memcpy (arg_reg_buffer + offset, contents, tlen);
  	      offset += tlen;
  	      contents += tlen;
-Index: gdb-7.99.90.20170420/gdb/amd64-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/amd64-tdep.c	2017-04-20 23:12:07.897566391 +0200
-+++ gdb-7.99.90.20170420/gdb/amd64-tdep.c	2017-04-20 23:12:11.229588710 +0200
-@@ -735,7 +735,7 @@
- 		    gdb_byte *readbuf, const gdb_byte *writebuf)
- {
-   enum amd64_reg_class theclass[2];
--  int len = TYPE_LENGTH (type);
-+  LONGEST len = TYPE_LENGTH (type);
-   static int integer_regnum[] = { AMD64_RAX_REGNUM, AMD64_RDX_REGNUM };
-   static int sse_regnum[] = { AMD64_XMM0_REGNUM, AMD64_XMM1_REGNUM };
-   int integer_reg = 0;
-@@ -852,10 +852,10 @@
-       gdb_assert (regnum != -1);
- 
-       if (readbuf)
--	regcache_raw_read_part (regcache, regnum, offset, std::min (len, 8),
-+	regcache_raw_read_part (regcache, regnum, offset, std::min (len, (LONGEST) 8),
- 				readbuf + i * 8);
-       if (writebuf)
--	regcache_raw_write_part (regcache, regnum, offset, std::min (len, 8),
-+	regcache_raw_write_part (regcache, regnum, offset, std::min (len, (LONGEST) 8),
- 				 writebuf + i * 8);
-     }
- 
-@@ -886,8 +886,8 @@
+diff --git a/gdb/amd64-tdep.c b/gdb/amd64-tdep.c
+index 6f998d2303..00c8dd90d0 100644
+--- a/gdb/amd64-tdep.c
++++ b/gdb/amd64-tdep.c
+@@ -880,8 +880,8 @@ amd64_push_arguments (struct regcache *regcache, int nargs,
    };
    struct value **stack_args = XALLOCAVEC (struct value *, nargs);
    int num_stack_args = 0;
@@ -226,7 +243,7 @@ Index: gdb-7.99.90.20170420/gdb/amd64-tdep.c
    int integer_reg = 0;
    int sse_reg = 0;
    int i;
-@@ -899,7 +899,7 @@
+@@ -893,7 +893,7 @@ amd64_push_arguments (struct regcache *regcache, int nargs,
    for (i = 0; i < nargs; i++)
      {
        struct type *type = value_type (args[i]);
@@ -235,7 +252,7 @@ Index: gdb-7.99.90.20170420/gdb/amd64-tdep.c
        enum amd64_reg_class theclass[2];
        int needed_integer_regs = 0;
        int needed_sse_regs = 0;
-@@ -963,7 +963,7 @@
+@@ -957,7 +957,7 @@ amd64_push_arguments (struct regcache *regcache, int nargs,
  
  	      gdb_assert (regnum != -1);
  	      memset (buf, 0, sizeof buf);
@@ -244,11 +261,11 @@ Index: gdb-7.99.90.20170420/gdb/amd64-tdep.c
  	      regcache_raw_write_part (regcache, regnum, offset, 8, buf);
  	    }
  	}
-Index: gdb-7.99.90.20170420/gdb/amd64-windows-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/amd64-windows-tdep.c	2017-04-20 23:12:07.897566391 +0200
-+++ gdb-7.99.90.20170420/gdb/amd64-windows-tdep.c	2017-04-20 23:12:11.230588717 +0200
-@@ -290,7 +290,7 @@
+diff --git a/gdb/amd64-windows-tdep.c b/gdb/amd64-windows-tdep.c
+index 975c6848a4..a0eedb2a9b 100644
+--- a/gdb/amd64-windows-tdep.c
++++ b/gdb/amd64-windows-tdep.c
+@@ -291,7 +291,7 @@ amd64_windows_return_value (struct gdbarch *gdbarch, struct value *function,
  			    struct type *type, struct regcache *regcache,
  			    gdb_byte *readbuf, const gdb_byte *writebuf)
  {
@@ -257,11 +274,11 @@ Index: gdb-7.99.90.20170420/gdb/amd64-windows-tdep.c
    int regnum = -1;
  
    /* See if our value is returned through a register.  If it is, then
-Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/arm-tdep.c	2017-04-20 23:12:07.905566445 +0200
-+++ gdb-7.99.90.20170420/gdb/arm-tdep.c	2017-04-20 23:12:11.233588737 +0200
-@@ -3492,7 +3492,7 @@
+diff --git a/gdb/arm-tdep.c b/gdb/arm-tdep.c
+index 54c6392ba7..39dcdb73ff 100644
+--- a/gdb/arm-tdep.c
++++ b/gdb/arm-tdep.c
+@@ -3477,7 +3477,7 @@ arm_vfp_cprc_reg_char (enum arm_vfp_cprc_base_type b)
     array).  Vector types are not currently supported, matching the
     generic AAPCS support.  */
  
@@ -270,7 +287,7 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
  arm_vfp_cprc_sub_candidate (struct type *t,
  			    enum arm_vfp_cprc_base_type *base_type)
  {
-@@ -3575,7 +3575,7 @@
+@@ -3560,7 +3560,7 @@ arm_vfp_cprc_sub_candidate (struct type *t,
  	  }
  	else
  	  {
@@ -279,7 +296,7 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
  	    unsigned unitlen;
  
  	    count = arm_vfp_cprc_sub_candidate (TYPE_TARGET_TYPE (t),
-@@ -3598,12 +3598,12 @@
+@@ -3583,12 +3583,12 @@ arm_vfp_cprc_sub_candidate (struct type *t,
  
      case TYPE_CODE_STRUCT:
        {
@@ -294,7 +311,7 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
  
  	    if (!field_is_static (&TYPE_FIELD (t, i)))
  	      sub_count = arm_vfp_cprc_sub_candidate (TYPE_FIELD_TYPE (t, i),
-@@ -3627,13 +3627,15 @@
+@@ -3612,13 +3612,15 @@ arm_vfp_cprc_sub_candidate (struct type *t,
  
      case TYPE_CODE_UNION:
        {
@@ -313,7 +330,7 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
  	    if (sub_count == -1)
  	      return -1;
  	    count = (count > sub_count ? count : sub_count);
-@@ -3669,7 +3671,7 @@
+@@ -3654,7 +3656,7 @@ arm_vfp_call_candidate (struct type *t, enum arm_vfp_cprc_base_type *base_type,
  			int *count)
  {
    enum arm_vfp_cprc_base_type b = VFP_CPRC_UNKNOWN;
@@ -322,7 +339,7 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
    if (c <= 0 || c > 4)
      return 0;
    *base_type = b;
-@@ -3750,7 +3752,7 @@
+@@ -3735,7 +3737,7 @@ arm_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
    for (argnum = 0; argnum < nargs; argnum++)
      {
@@ -331,11 +348,11 @@ Index: gdb-7.99.90.20170420/gdb/arm-tdep.c
        struct type *arg_type;
        struct type *target_type;
        enum type_code typecode;
-Index: gdb-7.99.90.20170420/gdb/avr-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/avr-tdep.c	2017-04-20 23:12:07.907566458 +0200
-+++ gdb-7.99.90.20170420/gdb/avr-tdep.c	2017-04-20 23:12:11.234588743 +0200
-@@ -1191,13 +1191,13 @@
+diff --git a/gdb/avr-tdep.c b/gdb/avr-tdep.c
+index f4ce2706d4..9bd51fd643 100644
+--- a/gdb/avr-tdep.c
++++ b/gdb/avr-tdep.c
+@@ -1191,13 +1191,13 @@ avr_dummy_id (struct gdbarch *gdbarch, struct frame_info *this_frame)
  
  struct stack_item
  {
@@ -351,7 +368,7 @@ Index: gdb-7.99.90.20170420/gdb/avr-tdep.c
  {
    struct stack_item *si;
    si = XNEW (struct stack_item);
-@@ -1285,12 +1285,12 @@
+@@ -1285,12 +1285,12 @@ avr_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
    for (i = 0; i < nargs; i++)
      {
@@ -367,11 +384,11 @@ Index: gdb-7.99.90.20170420/gdb/avr-tdep.c
  
        /* Calculate the potential last register needed.
           E.g. For length 2, registers regnum and regnum-1 (say 25 and 24)
-Index: gdb-7.99.90.20170420/gdb/bfin-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/bfin-tdep.c	2017-04-20 23:12:07.907566458 +0200
-+++ gdb-7.99.90.20170420/gdb/bfin-tdep.c	2017-04-20 23:12:11.234588743 +0200
-@@ -504,7 +504,7 @@
+diff --git a/gdb/bfin-tdep.c b/gdb/bfin-tdep.c
+index f9594d7947..1628f2a820 100644
+--- a/gdb/bfin-tdep.c
++++ b/gdb/bfin-tdep.c
+@@ -504,7 +504,7 @@ bfin_push_dummy_call (struct gdbarch *gdbarch,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int i;
    long reg_r0, reg_r1, reg_r2;
@@ -380,7 +397,7 @@ Index: gdb-7.99.90.20170420/gdb/bfin-tdep.c
  
    for (i = nargs - 1; i >= 0; i--)
      {
-@@ -526,7 +526,7 @@
+@@ -526,7 +526,7 @@ bfin_push_dummy_call (struct gdbarch *gdbarch,
      {
        struct type *value_type = value_enclosing_type (args[i]);
        struct type *arg_type = check_typedef (value_type);
@@ -389,11 +406,11 @@ Index: gdb-7.99.90.20170420/gdb/bfin-tdep.c
  
        sp -= container_len;
        write_memory (sp, value_contents (args[i]), container_len);
-Index: gdb-7.99.90.20170420/gdb/cris-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/cris-tdep.c	2017-04-20 23:12:07.909566471 +0200
-+++ gdb-7.99.90.20170420/gdb/cris-tdep.c	2017-04-20 23:12:11.235588750 +0200
-@@ -663,13 +663,13 @@
+diff --git a/gdb/cris-tdep.c b/gdb/cris-tdep.c
+index 9fbb8b4fac..82f25084bd 100644
+--- a/gdb/cris-tdep.c
++++ b/gdb/cris-tdep.c
+@@ -663,13 +663,13 @@ static CORE_ADDR cris_unwind_sp (struct gdbarch *gdbarch,
  
  struct stack_item
  {
@@ -409,7 +426,7 @@ Index: gdb-7.99.90.20170420/gdb/cris-tdep.c
  {
    struct stack_item *si = XNEW (struct stack_item);
    si->data = (gdb_byte *) xmalloc (len);
-@@ -833,13 +833,13 @@
+@@ -833,13 +833,13 @@ cris_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
    for (argnum = 0; argnum < nargs; argnum++)
      {
@@ -427,11 +444,11 @@ Index: gdb-7.99.90.20170420/gdb/cris-tdep.c
        
        /* How may registers worth of storage do we need for this argument?  */
        reg_demand = (len / 4) + (len % 4 != 0 ? 1 : 0);
-Index: gdb-7.99.90.20170420/gdb/h8300-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/h8300-tdep.c	2017-04-20 23:12:07.910566478 +0200
-+++ gdb-7.99.90.20170420/gdb/h8300-tdep.c	2017-04-20 23:12:11.235588750 +0200
-@@ -637,7 +637,7 @@
+diff --git a/gdb/h8300-tdep.c b/gdb/h8300-tdep.c
+index acc2da93a4..9e380e12ba 100644
+--- a/gdb/h8300-tdep.c
++++ b/gdb/h8300-tdep.c
+@@ -637,7 +637,7 @@ h8300_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  		       int struct_return, CORE_ADDR struct_addr)
  {
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
@@ -440,9 +457,9 @@ Index: gdb-7.99.90.20170420/gdb/h8300-tdep.c
    int wordsize = BINWORD (gdbarch);
    int reg = E_ARG0_REGNUM;
    int argument;
-@@ -664,11 +664,11 @@
+@@ -663,11 +663,11 @@ h8300_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
+   for (argument = 0; argument < nargs; argument++)
      {
-       struct cleanup *back_to;
        struct type *type = value_type (args[argument]);
 -      int len = TYPE_LENGTH (type);
 +      ssize_t len = TYPE_LENGTH (type);
@@ -451,10 +468,10 @@ Index: gdb-7.99.90.20170420/gdb/h8300-tdep.c
        /* Pad the argument appropriately.  */
 -      int padded_len = align_up (len, wordsize);
 +      ssize_t padded_len = align_up (len, wordsize);
-       gdb_byte *padded = (gdb_byte *) xmalloc (padded_len);
-       back_to = make_cleanup (xfree, padded);
+       /* Use std::vector here to get zero initialization.  */
+       std::vector<gdb_byte> padded (padded_len);
  
-@@ -697,7 +697,7 @@
+@@ -696,7 +696,7 @@ h8300_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  	      /* Heavens to Betsy --- it's really going in registers!
  	         Note that on the h8/300s, there are gaps between the
  	         registers in the register file.  */
@@ -463,11 +480,11 @@ Index: gdb-7.99.90.20170420/gdb/h8300-tdep.c
  
  	      for (offset = 0; offset < padded_len; offset += wordsize)
  		{
-Index: gdb-7.99.90.20170420/gdb/hppa-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/hppa-tdep.c	2017-04-20 23:12:07.911566485 +0200
-+++ gdb-7.99.90.20170420/gdb/hppa-tdep.c	2017-04-20 23:12:11.236588757 +0200
-@@ -989,7 +989,7 @@
+diff --git a/gdb/hppa-tdep.c b/gdb/hppa-tdep.c
+index 141399f6a3..8223f84da4 100644
+--- a/gdb/hppa-tdep.c
++++ b/gdb/hppa-tdep.c
+@@ -989,7 +989,7 @@ hppa64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
      {
        struct value *arg = args[i];
        struct type *type = value_type (arg);
@@ -476,7 +493,7 @@ Index: gdb-7.99.90.20170420/gdb/hppa-tdep.c
        const bfd_byte *valbuf;
        bfd_byte fptrbuf[8];
        int regnum;
-@@ -1184,7 +1184,7 @@
+@@ -1184,7 +1184,7 @@ hppa64_return_value (struct gdbarch *gdbarch, struct value *function,
  		     struct type *type, struct regcache *regcache,
  		     gdb_byte *readbuf, const gdb_byte *writebuf)
  {
@@ -485,11 +502,11 @@ Index: gdb-7.99.90.20170420/gdb/hppa-tdep.c
    int regnum, offset;
  
    if (len > 16)
-Index: gdb-7.99.90.20170420/gdb/i386-darwin-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/i386-darwin-tdep.c	2017-04-20 23:12:07.912566492 +0200
-+++ gdb-7.99.90.20170420/gdb/i386-darwin-tdep.c	2017-04-20 23:12:11.237588763 +0200
-@@ -167,7 +167,7 @@
+diff --git a/gdb/i386-darwin-tdep.c b/gdb/i386-darwin-tdep.c
+index c642040432..1b30a50639 100644
+--- a/gdb/i386-darwin-tdep.c
++++ b/gdb/i386-darwin-tdep.c
+@@ -166,7 +166,7 @@ i386_darwin_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
    for (write_pass = 0; write_pass < 2; write_pass++)
      {
@@ -498,11 +515,11 @@ Index: gdb-7.99.90.20170420/gdb/i386-darwin-tdep.c
        int num_m128 = 0;
  
        if (struct_return)
-Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/i386-tdep.c	2017-04-20 23:12:07.917566525 +0200
-+++ gdb-7.99.90.20170420/gdb/i386-tdep.c	2017-04-20 23:12:11.239588777 +0200
-@@ -2682,7 +2682,7 @@
+diff --git a/gdb/i386-tdep.c b/gdb/i386-tdep.c
+index d4f61eec76..5f6e31c9b3 100644
+--- a/gdb/i386-tdep.c
++++ b/gdb/i386-tdep.c
+@@ -2677,7 +2677,7 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    gdb_byte buf[4];
    int i;
    int write_pass;
@@ -511,7 +528,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
    /* BND registers can be in arbitrary values at the moment of the
       inferior call.  This can cause boundary violations that are not
-@@ -2697,7 +2697,7 @@
+@@ -2692,7 +2692,7 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
    for (write_pass = 0; write_pass < 2; write_pass++)
      {
@@ -520,7 +537,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
        if (struct_return)
  	{
-@@ -2714,7 +2714,7 @@
+@@ -2709,7 +2709,7 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  
        for (i = 0; i < nargs; i++)
  	{
@@ -529,7 +546,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
  	  if (write_pass)
  	    {
-@@ -2921,7 +2921,7 @@
+@@ -2916,7 +2916,7 @@ i386_reg_struct_return_p (struct gdbarch *gdbarch, struct type *type)
  {
    struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
    enum type_code code = TYPE_CODE (type);
@@ -538,7 +555,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
    gdb_assert (code == TYPE_CODE_STRUCT
                || code == TYPE_CODE_UNION
-@@ -3743,7 +3743,7 @@
+@@ -3738,7 +3738,7 @@ static int
  i386_convert_register_p (struct gdbarch *gdbarch,
  			 int regnum, struct type *type)
  {
@@ -547,7 +564,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
    /* Values may be spread across multiple registers.  Most debugging
       formats aren't expressive enough to specify the locations, so
-@@ -3776,7 +3776,7 @@
+@@ -3771,7 +3771,7 @@ i386_register_to_value (struct frame_info *frame, int regnum,
  			int *optimizedp, int *unavailablep)
  {
    struct gdbarch *gdbarch = get_frame_arch (frame);
@@ -556,7 +573,7 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
    if (i386_fp_regnum_p (gdbarch, regnum))
      return i387_register_to_value (frame, regnum, type, to,
-@@ -3812,7 +3812,7 @@
+@@ -3807,7 +3807,7 @@ static void
  i386_value_to_register (struct frame_info *frame, int regnum,
  			struct type *type, const gdb_byte *from)
  {
@@ -565,11 +582,11 @@ Index: gdb-7.99.90.20170420/gdb/i386-tdep.c
  
    if (i386_fp_regnum_p (get_frame_arch (frame), regnum))
      {
-Index: gdb-7.99.90.20170420/gdb/iq2000-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/iq2000-tdep.c	2017-04-20 23:12:07.918566532 +0200
-+++ gdb-7.99.90.20170420/gdb/iq2000-tdep.c	2017-04-20 23:12:11.239588777 +0200
-@@ -651,8 +651,9 @@
+diff --git a/gdb/iq2000-tdep.c b/gdb/iq2000-tdep.c
+index e47cc06a1f..7dc999d10e 100644
+--- a/gdb/iq2000-tdep.c
++++ b/gdb/iq2000-tdep.c
+@@ -651,8 +651,9 @@ iq2000_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    const bfd_byte *val;
    bfd_byte buf[4];
    struct type *type;
@@ -581,11 +598,11 @@ Index: gdb-7.99.90.20170420/gdb/iq2000-tdep.c
    /* Used to copy struct arguments into the stack.  */
    CORE_ADDR struct_ptr;
  
-Index: gdb-7.99.90.20170420/gdb/m32r-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/m32r-tdep.c	2017-04-20 23:12:11.239588777 +0200
-+++ gdb-7.99.90.20170420/gdb/m32r-tdep.c	2017-04-20 23:12:30.385717023 +0200
-@@ -681,7 +681,7 @@
+diff --git a/gdb/m32r-tdep.c b/gdb/m32r-tdep.c
+index c00455bb5f..663ca20486 100644
+--- a/gdb/m32r-tdep.c
++++ b/gdb/m32r-tdep.c
+@@ -679,7 +679,7 @@ m32r_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    CORE_ADDR regval;
    gdb_byte *val;
    gdb_byte valbuf[M32R_ARG_REGISTER_SIZE];
@@ -594,11 +611,11 @@ Index: gdb-7.99.90.20170420/gdb/m32r-tdep.c
  
    /* First force sp to a 4-byte alignment.  */
    sp = sp & ~3;
-Index: gdb-7.99.90.20170420/gdb/m68k-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/m68k-tdep.c	2017-04-20 23:12:07.919566538 +0200
-+++ gdb-7.99.90.20170420/gdb/m68k-tdep.c	2017-04-20 23:12:11.240588783 +0200
-@@ -377,7 +377,7 @@
+diff --git a/gdb/m68k-tdep.c b/gdb/m68k-tdep.c
+index 9dc1fe6f01..19c75f21d3 100644
+--- a/gdb/m68k-tdep.c
++++ b/gdb/m68k-tdep.c
+@@ -373,7 +373,7 @@ m68k_reg_struct_return_p (struct gdbarch *gdbarch, struct type *type)
  {
    struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
    enum type_code code = TYPE_CODE (type);
@@ -607,7 +624,7 @@ Index: gdb-7.99.90.20170420/gdb/m68k-tdep.c
  
    gdb_assert (code == TYPE_CODE_STRUCT || code == TYPE_CODE_UNION
  	      || code == TYPE_CODE_COMPLEX);
-@@ -509,9 +509,9 @@
+@@ -505,9 +505,9 @@ m68k_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    for (i = nargs - 1; i >= 0; i--)
      {
        struct type *value_type = value_enclosing_type (args[i]);
@@ -620,13 +637,13 @@ Index: gdb-7.99.90.20170420/gdb/m68k-tdep.c
  
        /* Non-scalars bigger than 4 bytes are left aligned, others are
  	 right aligned.  */
-Index: gdb-7.99.90.20170420/gdb/m88k-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/m88k-tdep.c	2017-04-20 23:12:07.919566538 +0200
-+++ gdb-7.99.90.20170420/gdb/m88k-tdep.c	2017-04-20 23:12:11.240588783 +0200
-@@ -254,13 +254,13 @@
+diff --git a/gdb/m88k-tdep.c b/gdb/m88k-tdep.c
+index 6be27a96c6..8f186c75a2 100644
+--- a/gdb/m88k-tdep.c
++++ b/gdb/m88k-tdep.c
+@@ -254,13 +254,13 @@ m88k_store_arguments (struct regcache *regcache, int nargs,
  {
-   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+   struct gdbarch *gdbarch = regcache->arch ();
    int num_register_words = 0;
 -  int num_stack_words = 0;
 +  LONGEST num_stack_words = 0;
@@ -640,7 +657,7 @@ Index: gdb-7.99.90.20170420/gdb/m88k-tdep.c
  
        if (m88k_integral_or_pointer_p (type) && len < 4)
  	{
-@@ -302,8 +302,8 @@
+@@ -302,8 +302,8 @@ m88k_store_arguments (struct regcache *regcache, int nargs,
      {
        const bfd_byte *valbuf = value_contents (args[i]);
        struct type *type = value_type (args[i]);
@@ -651,11 +668,11 @@ Index: gdb-7.99.90.20170420/gdb/m88k-tdep.c
  
        if (m88k_in_register_p (type))
  	{
-Index: gdb-7.99.90.20170420/gdb/mep-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/mep-tdep.c	2017-04-20 23:12:07.920566545 +0200
-+++ gdb-7.99.90.20170420/gdb/mep-tdep.c	2017-04-20 23:12:11.241588790 +0200
-@@ -2262,7 +2262,7 @@
+diff --git a/gdb/mep-tdep.c b/gdb/mep-tdep.c
+index bf08ca14d2..224642fe42 100644
+--- a/gdb/mep-tdep.c
++++ b/gdb/mep-tdep.c
+@@ -2256,7 +2256,7 @@ push_large_arguments (CORE_ADDR sp, int argc, struct value **argv,
  
    for (i = 0; i < argc; i++)
      {
@@ -664,11 +681,11 @@ Index: gdb-7.99.90.20170420/gdb/mep-tdep.c
  
        if (arg_len > MEP_GPR_SIZE)
          {
-Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/mips-tdep.c	2017-04-20 23:12:07.928566599 +0200
-+++ gdb-7.99.90.20170420/gdb/mips-tdep.c	2017-04-20 23:12:11.243588804 +0200
-@@ -474,7 +474,7 @@
+diff --git a/gdb/mips-tdep.c b/gdb/mips-tdep.c
+index 830535f73d..0aca8ce3e0 100644
+--- a/gdb/mips-tdep.c
++++ b/gdb/mips-tdep.c
+@@ -477,7 +477,7 @@ static void
  mips_xfer_register (struct gdbarch *gdbarch, struct regcache *regcache,
  		    int reg_num, int length,
  		    enum bfd_endian endian, gdb_byte *in,
@@ -677,7 +694,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  {
    int reg_offset = 0;
  
-@@ -497,8 +497,8 @@
+@@ -500,8 +500,8 @@ mips_xfer_register (struct gdbarch *gdbarch, struct regcache *regcache,
      }
    if (mips_debug)
      fprintf_unfiltered (gdb_stderr,
@@ -688,8 +705,8 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
    if (mips_debug && out != NULL)
      {
        int i;
-@@ -4530,13 +4530,13 @@
-       gdb_byte valbuf[MAX_REGISTER_SIZE];
+@@ -4534,13 +4534,13 @@ mips_eabi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
+       gdb_byte ref_valbuf[MAX_MIPS_ABI_REGSIZE];
        struct value *arg = args[argnum];
        struct type *arg_type = check_typedef (value_type (arg));
 -      int len = TYPE_LENGTH (arg_type);
@@ -705,7 +722,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  
        /* The EABI passes structures that do not fit in a register by
           reference.  */
-@@ -4805,7 +4805,7 @@
+@@ -4810,7 +4810,7 @@ mips_eabi_return_value (struct gdbarch *gdbarch, struct value *function,
  
  static int
  mips_n32n64_fp_arg_chunk_p (struct gdbarch *gdbarch, struct type *arg_type,
@@ -714,7 +731,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  {
    int i;
  
-@@ -4820,7 +4820,7 @@
+@@ -4825,7 +4825,7 @@ mips_n32n64_fp_arg_chunk_p (struct gdbarch *gdbarch, struct type *arg_type,
  
    for (i = 0; i < TYPE_NFIELDS (arg_type); i++)
      {
@@ -723,7 +740,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
        struct type *field_type;
  
        /* We're only looking at normal fields.  */
-@@ -4862,7 +4862,7 @@
+@@ -4867,7 +4867,7 @@ mips_n32n64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    int argreg;
    int float_argreg;
    int argnum;
@@ -732,7 +749,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
    int stack_offset = 0;
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    CORE_ADDR func_addr = find_function_addr (function, NULL);
-@@ -5213,11 +5213,11 @@
+@@ -5218,11 +5218,11 @@ mips_n32n64_return_value (struct gdbarch *gdbarch, struct value *function,
  				: MIPS_V0_REGNUM);
  	   field < TYPE_NFIELDS (type); field++, regnum += 2)
  	{
@@ -748,7 +765,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  	  if (TYPE_LENGTH (TYPE_FIELD_TYPE (type, field)) == 16)
  	    {
  	      /* A 16-byte long double field goes in two consecutive
-@@ -5259,8 +5259,8 @@
+@@ -5264,8 +5264,8 @@ mips_n32n64_return_value (struct gdbarch *gdbarch, struct value *function,
  	  if (offset + xfer > TYPE_LENGTH (type))
  	    xfer = TYPE_LENGTH (type) - offset;
  	  if (mips_debug)
@@ -759,7 +776,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  	  mips_xfer_register (gdbarch, regcache,
  			      gdbarch_num_regs (gdbarch) + regnum,
  			      xfer, BFD_ENDIAN_UNKNOWN, readbuf, writebuf,
-@@ -5318,7 +5318,7 @@
+@@ -5323,7 +5323,7 @@ mips_o32_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    int argreg;
    int float_argreg;
    int argnum;
@@ -768,7 +785,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
    int stack_offset = 0;
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    CORE_ADDR func_addr = find_function_addr (function, NULL);
-@@ -5382,13 +5382,13 @@
+@@ -5387,13 +5387,13 @@ mips_o32_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
        const gdb_byte *val;
        struct value *arg = args[argnum];
        struct type *arg_type = check_typedef (value_type (arg));
@@ -785,7 +802,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  
        val = value_contents (arg);
  
-@@ -5843,8 +5843,8 @@
+@@ -5847,8 +5847,8 @@ mips_o64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    int argreg;
    int float_argreg;
    int argnum;
@@ -796,7 +813,7 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    CORE_ADDR func_addr = find_function_addr (function, NULL);
  
-@@ -5904,13 +5904,13 @@
+@@ -5908,13 +5908,13 @@ mips_o64_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
        const gdb_byte *val;
        struct value *arg = args[argnum];
        struct type *arg_type = check_typedef (value_type (arg));
@@ -813,11 +830,11 @@ Index: gdb-7.99.90.20170420/gdb/mips-tdep.c
  
        val = value_contents (arg);
  
-Index: gdb-7.99.90.20170420/gdb/mn10300-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/mn10300-tdep.c	2017-04-20 23:12:07.929566605 +0200
-+++ gdb-7.99.90.20170420/gdb/mn10300-tdep.c	2017-04-20 23:12:11.243588804 +0200
-@@ -1220,7 +1220,7 @@
+diff --git a/gdb/mn10300-tdep.c b/gdb/mn10300-tdep.c
+index eadbbb367e..39d24b2ad1 100644
+--- a/gdb/mn10300-tdep.c
++++ b/gdb/mn10300-tdep.c
+@@ -1212,7 +1212,7 @@ mn10300_push_dummy_call (struct gdbarch *gdbarch,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    const int push_size = register_size (gdbarch, E_PC_REGNUM);
    int regs_used;
@@ -826,11 +843,11 @@ Index: gdb-7.99.90.20170420/gdb/mn10300-tdep.c
    int stack_offset = 0;
    int argnum;
    const gdb_byte *val;
-Index: gdb-7.99.90.20170420/gdb/mt-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/mt-tdep.c	2017-04-20 23:12:07.930566612 +0200
-+++ gdb-7.99.90.20170420/gdb/mt-tdep.c	2017-04-20 23:12:11.244588810 +0200
-@@ -788,9 +788,9 @@
+diff --git a/gdb/mt-tdep.c b/gdb/mt-tdep.c
+index 7992394ca2..5dd20ca8b0 100644
+--- a/gdb/mt-tdep.c
++++ b/gdb/mt-tdep.c
+@@ -789,9 +789,9 @@ mt_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    gdb_byte buf[MT_MAX_STRUCT_SIZE];
    int argreg = MT_1ST_ARGREG;
    int split_param_len = 0;
@@ -842,11 +859,11 @@ Index: gdb-7.99.90.20170420/gdb/mt-tdep.c
    int i, j;
  
    /* First handle however many args we can fit into MT_1ST_ARGREG thru
-Index: gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/ppc-sysv-tdep.c	2017-04-20 23:12:07.931566619 +0200
-+++ gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c	2017-04-20 23:12:11.245588817 +0200
-@@ -67,7 +67,7 @@
+diff --git a/gdb/ppc-sysv-tdep.c b/gdb/ppc-sysv-tdep.c
+index b43f22da17..24820fa6ab 100644
+--- a/gdb/ppc-sysv-tdep.c
++++ b/gdb/ppc-sysv-tdep.c
+@@ -68,7 +68,7 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int opencl_abi = ppc_sysv_use_opencl_abi (value_type (function));
    ULONGEST saved_sp;
@@ -855,7 +872,7 @@ Index: gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c
    int write_pass;
  
    gdb_assert (tdep->wordsize == 4);
-@@ -98,9 +98,9 @@
+@@ -99,9 +99,9 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
        /* Next available vector register for vector arguments.  */
        int vreg = 2;
        /* Arguments start above the "LR save word" and "Back chain".  */
@@ -867,7 +884,7 @@ Index: gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c
  
        /* If the function is returning a `struct', then the first word
           (which will be passed in r3) is used for struct return
-@@ -119,7 +119,7 @@
+@@ -120,7 +120,7 @@ ppc_sysv_abi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  	{
  	  struct value *arg = args[argno];
  	  struct type *type = check_typedef (value_type (arg));
@@ -876,7 +893,7 @@ Index: gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c
  	  const bfd_byte *val = value_contents (arg);
  
  	  if (TYPE_CODE (type) == TYPE_CODE_FLT && len <= 8
-@@ -1284,11 +1284,11 @@
+@@ -1285,11 +1285,11 @@ struct ppc64_sysv_argpos
  
  static void
  ppc64_sysv_abi_push_val (struct gdbarch *gdbarch,
@@ -886,15 +903,61 @@ Index: gdb-7.99.90.20170420/gdb/ppc-sysv-tdep.c
  {
    struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
 -  int offset = 0;
-+  ssize_t offset = 0;
++  LONGEST offset = 0;
  
    /* Enforce alignment of stack location, if requested.  */
    if (align > tdep->wordsize)
-Index: gdb-7.99.90.20170420/gdb/rl78-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/rl78-tdep.c	2017-04-20 23:12:07.931566619 +0200
-+++ gdb-7.99.90.20170420/gdb/rl78-tdep.c	2017-04-20 23:12:11.245588817 +0200
-@@ -1352,8 +1352,8 @@
+@@ -1327,7 +1327,7 @@ ppc64_sysv_abi_push_val (struct gdbarch *gdbarch,
+       if (argpos->regcache && argpos->greg <= 10)
+ 	regcache_cooked_write_part (argpos->regcache,
+ 				    tdep->ppc_gp0_regnum + argpos->greg,
+-				    offset, len, val);
++				    offset, (LONGEST) len, val);
+       argpos->greg++;
+     }
+ }
+@@ -1386,7 +1386,7 @@ ppc64_sysv_abi_push_freg (struct gdbarch *gdbarch,
+       if (argpos->regcache && argpos->freg <= 13)
+ 	{
+ 	  int regnum = tdep->ppc_fp0_regnum + argpos->freg;
+-	  int offset = 0;
++	  LONGEST offset = 0;
+ 
+ 	  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+ 	    offset = 8 - TYPE_LENGTH (type);
+@@ -1836,7 +1836,7 @@ ppc64_sysv_abi_return_value_base (struct gdbarch *gdbarch, struct type *valtype,
+       && TYPE_CODE (valtype) == TYPE_CODE_DECFLOAT)
+     {
+       int regnum = tdep->ppc_fp0_regnum + 1 + index;
+-      int offset = 0;
++      LONGEST offset = 0;
+ 
+       if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+ 	offset = 8 - TYPE_LENGTH (valtype);
+@@ -1912,7 +1912,7 @@ ppc64_sysv_abi_return_value_base (struct gdbarch *gdbarch, struct type *valtype,
+       && TYPE_CODE (valtype) == TYPE_CODE_ARRAY && TYPE_VECTOR (valtype))
+     {
+       int regnum = tdep->ppc_gp0_regnum + 3 + index;
+-      int offset = 0;
++      LONGEST offset = 0;
+ 
+       if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
+ 	offset = 8 - TYPE_LENGTH (valtype);
+@@ -2020,7 +2020,8 @@ ppc64_sysv_abi_return_value (struct gdbarch *gdbarch, struct value *function,
+       && TYPE_LENGTH (TYPE_TARGET_TYPE (valtype)) == 1)
+     {
+       int regnum = tdep->ppc_gp0_regnum + 3;
+-      int offset = (register_size (gdbarch, regnum) - TYPE_LENGTH (valtype));
++      LONGEST offset
++	= (register_size (gdbarch, regnum) - TYPE_LENGTH (valtype));
+ 
+       if (writebuf != NULL)
+ 	regcache_cooked_write_part (regcache, regnum,
+diff --git a/gdb/rl78-tdep.c b/gdb/rl78-tdep.c
+index 19f8098b7b..92a48ba513 100644
+--- a/gdb/rl78-tdep.c
++++ b/gdb/rl78-tdep.c
+@@ -1347,8 +1347,8 @@ rl78_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    for (i = nargs - 1; i >= 0; i--)
      {
        struct type *value_type = value_enclosing_type (args[i]);
@@ -905,11 +968,11 @@ Index: gdb-7.99.90.20170420/gdb/rl78-tdep.c
  
        sp -= container_len;
        write_memory (rl78_make_data_address (sp),
-Index: gdb-7.99.90.20170420/gdb/rs6000-aix-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/rs6000-aix-tdep.c	2017-04-20 23:12:07.932566626 +0200
-+++ gdb-7.99.90.20170420/gdb/rs6000-aix-tdep.c	2017-04-20 23:12:11.245588817 +0200
-@@ -186,9 +186,9 @@
+diff --git a/gdb/rs6000-aix-tdep.c b/gdb/rs6000-aix-tdep.c
+index 8cc7539a8c..fc953c33d4 100644
+--- a/gdb/rs6000-aix-tdep.c
++++ b/gdb/rs6000-aix-tdep.c
+@@ -187,9 +187,9 @@ rs6000_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int ii;
@@ -921,7 +984,7 @@ Index: gdb-7.99.90.20170420/gdb/rs6000-aix-tdep.c
    gdb_byte tmp_buffer[50];
    int f_argno = 0;		/* current floating point argno */
    int wordsize = gdbarch_tdep (gdbarch)->wordsize;
-@@ -319,7 +319,7 @@
+@@ -319,7 +319,7 @@ ran_out_of_registers_for_arguments:
  
    if ((argno < nargs) || argbytes)
      {
@@ -930,11 +993,11 @@ Index: gdb-7.99.90.20170420/gdb/rs6000-aix-tdep.c
  
        if (argbytes)
  	{
-Index: gdb-7.99.90.20170420/gdb/s390-linux-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/s390-linux-tdep.c	2017-04-20 23:12:07.934566639 +0200
-+++ gdb-7.99.90.20170420/gdb/s390-linux-tdep.c	2017-04-20 23:12:11.247588830 +0200
-@@ -3081,7 +3081,7 @@
+diff --git a/gdb/s390-linux-tdep.c b/gdb/s390-linux-tdep.c
+index a0d4cdd740..2617919e8a 100644
+--- a/gdb/s390-linux-tdep.c
++++ b/gdb/s390-linux-tdep.c
+@@ -3132,7 +3132,7 @@ s390_function_arg_vector (struct type *type)
  /* Determine whether N is a power of two.  */
  
  static int
@@ -943,20 +1006,29 @@ Index: gdb-7.99.90.20170420/gdb/s390-linux-tdep.c
  {
    return n && ((n & (n - 1)) == 0);
  }
-@@ -3138,7 +3138,7 @@
+@@ -3189,7 +3189,7 @@ s390_handle_arg (struct s390_arg_state *as, struct value *arg,
  		 enum bfd_endian byte_order, int is_unnamed)
  {
    struct type *type = check_typedef (value_type (arg));
 -  unsigned int length = TYPE_LENGTH (type);
-+  ULONGEST length = TYPE_LENGTH (type);
++  LONGEST length = TYPE_LENGTH (type);
    int write_mode = as->regcache != NULL;
  
    if (s390_function_arg_float (type))
-Index: gdb-7.99.90.20170420/gdb/score-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/score-tdep.c	2017-04-20 23:12:07.935566646 +0200
-+++ gdb-7.99.90.20170420/gdb/score-tdep.c	2017-04-20 23:12:11.248588837 +0200
-@@ -525,7 +525,7 @@
+@@ -3452,7 +3452,7 @@ s390_register_return_value (struct gdbarch *gdbarch, struct type *type,
+ {
+   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+   int word_size = gdbarch_ptr_bit (gdbarch) / 8;
+-  int length = TYPE_LENGTH (type);
++  LONGEST length = TYPE_LENGTH (type);
+   int code = TYPE_CODE (type);
+ 
+   if (code == TYPE_CODE_FLT || code == TYPE_CODE_DECFLOAT)
+diff --git a/gdb/score-tdep.c b/gdb/score-tdep.c
+index 5b68a2b332..9a16cc809e 100644
+--- a/gdb/score-tdep.c
++++ b/gdb/score-tdep.c
+@@ -516,7 +516,7 @@ score_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int argnum;
    int argreg;
@@ -965,11 +1037,11 @@ Index: gdb-7.99.90.20170420/gdb/score-tdep.c
    CORE_ADDR stack_offset = 0;
    CORE_ADDR addr = 0;
  
-Index: gdb-7.99.90.20170420/gdb/sh-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/sh-tdep.c	2017-04-20 23:12:07.936566652 +0200
-+++ gdb-7.99.90.20170420/gdb/sh-tdep.c	2017-04-20 23:12:11.248588837 +0200
-@@ -814,7 +814,7 @@
+diff --git a/gdb/sh-tdep.c b/gdb/sh-tdep.c
+index 23675bb6cc..60cc6d3f4e 100644
+--- a/gdb/sh-tdep.c
++++ b/gdb/sh-tdep.c
+@@ -813,7 +813,7 @@ sh_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
  static int
  sh_use_struct_convention (int renesas_abi, struct type *type)
  {
@@ -978,7 +1050,7 @@ Index: gdb-7.99.90.20170420/gdb/sh-tdep.c
    int nelem = TYPE_NFIELDS (type);
  
    /* The Renesas ABI returns aggregate types always on stack.  */
-@@ -916,7 +916,7 @@
+@@ -915,7 +915,7 @@ sh_frame_align (struct gdbarch *ignore, CORE_ADDR sp)
  
  /* Helper function to justify value in register according to endianess.  */
  static const gdb_byte *
@@ -987,7 +1059,7 @@ Index: gdb-7.99.90.20170420/gdb/sh-tdep.c
  {
    static gdb_byte valbuf[4];
  
-@@ -1076,7 +1076,8 @@
+@@ -1075,7 +1075,8 @@ sh_push_dummy_call_fpu (struct gdbarch *gdbarch,
    struct type *type;
    CORE_ADDR regval;
    const gdb_byte *val;
@@ -997,7 +1069,7 @@ Index: gdb-7.99.90.20170420/gdb/sh-tdep.c
    int pass_on_stack = 0;
    int treat_as_flt;
    int last_reg_arg = INT_MAX;
-@@ -1217,7 +1218,8 @@
+@@ -1216,7 +1217,8 @@ sh_push_dummy_call_nofpu (struct gdbarch *gdbarch,
    struct type *type;
    CORE_ADDR regval;
    const gdb_byte *val;
@@ -1007,11 +1079,11 @@ Index: gdb-7.99.90.20170420/gdb/sh-tdep.c
    int pass_on_stack = 0;
    int last_reg_arg = INT_MAX;
  
-Index: gdb-7.99.90.20170420/gdb/sh64-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/sh64-tdep.c	2017-04-20 23:12:07.937566659 +0200
-+++ gdb-7.99.90.20170420/gdb/sh64-tdep.c	2017-04-20 23:12:11.249588844 +0200
-@@ -1062,7 +1062,7 @@
+diff --git a/gdb/sh64-tdep.c b/gdb/sh64-tdep.c
+index 3004f15b03..01d0ca870c 100644
+--- a/gdb/sh64-tdep.c
++++ b/gdb/sh64-tdep.c
+@@ -1079,7 +1079,7 @@ sh64_push_dummy_call (struct gdbarch *gdbarch,
  		      CORE_ADDR struct_addr)
  {
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
@@ -1020,7 +1092,7 @@ Index: gdb-7.99.90.20170420/gdb/sh64-tdep.c
    int int_argreg;
    int float_arg_index = 0;
    int double_arg_index = 0;
-@@ -1071,7 +1071,7 @@
+@@ -1088,7 +1088,7 @@ sh64_push_dummy_call (struct gdbarch *gdbarch,
    CORE_ADDR regval;
    const gdb_byte *val;
    gdb_byte valbuf[8];
@@ -1029,34 +1101,20 @@ Index: gdb-7.99.90.20170420/gdb/sh64-tdep.c
    int argreg_size;
    int fp_args[12];
  
-Index: gdb-7.99.90.20170420/gdb/sparc-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/sparc-tdep.c	2017-04-20 23:12:07.938566666 +0200
-+++ gdb-7.99.90.20170420/gdb/sparc-tdep.c	2017-04-20 23:12:11.249588844 +0200
-@@ -567,7 +567,7 @@
-   for (i = 0; i < nargs; i++)
-     {
-       struct type *type = value_type (args[i]);
--      int len = TYPE_LENGTH (type);
-+      LONGEST len = TYPE_LENGTH (type);
- 
-       if (sparc_structure_or_union_p (type)
- 	  || (sparc_floating_p (type) && len == 16)
-Index: gdb-7.99.90.20170420/gdb/sparc64-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/sparc64-tdep.c	2017-04-20 23:12:07.939566672 +0200
-+++ gdb-7.99.90.20170420/gdb/sparc64-tdep.c	2017-04-20 23:12:11.250588851 +0200
-@@ -696,7 +696,8 @@
+diff --git a/gdb/sparc64-tdep.c b/gdb/sparc64-tdep.c
+index 55aef132d9..ce1cf41d2f 100644
+--- a/gdb/sparc64-tdep.c
++++ b/gdb/sparc64-tdep.c
+@@ -1205,7 +1205,7 @@ sparc64_16_byte_align_p (struct type *type)
  
  static void
  sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
 -			       const gdb_byte *valbuf, int element, int bitpos)
-+			       const gdb_byte *valbuf, int element,
-+			       LONGEST bitpos)
++			       const gdb_byte *valbuf, int element, LONGEST bitpos)
  {
-   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+   struct gdbarch *gdbarch = regcache->arch ();
    int len = TYPE_LENGTH (type);
-@@ -740,7 +741,7 @@
+@@ -1265,7 +1265,7 @@ sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
        for (i = 0; i < TYPE_NFIELDS (type); i++)
  	{
  	  struct type *subtype = check_typedef (TYPE_FIELD_TYPE (type, i));
@@ -1065,16 +1123,16 @@ Index: gdb-7.99.90.20170420/gdb/sparc64-tdep.c
  
  	  sparc64_store_floating_fields (regcache, subtype, valbuf,
  					 element, subpos);
-@@ -772,7 +773,7 @@
+@@ -1297,7 +1297,7 @@ sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
  
  static void
  sparc64_extract_floating_fields (struct regcache *regcache, struct type *type,
 -				 gdb_byte *valbuf, int bitpos)
 +				 gdb_byte *valbuf, LONGEST bitpos)
  {
-   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+   struct gdbarch *gdbarch = regcache->arch ();
  
-@@ -812,7 +813,7 @@
+@@ -1353,7 +1353,7 @@ sparc64_extract_floating_fields (struct regcache *regcache, struct type *type,
        for (i = 0; i < TYPE_NFIELDS (type); i++)
  	{
  	  struct type *subtype = check_typedef (TYPE_FIELD_TYPE (type, i));
@@ -1083,7 +1141,7 @@ Index: gdb-7.99.90.20170420/gdb/sparc64-tdep.c
  
  	  sparc64_extract_floating_fields (regcache, subtype, valbuf, subpos);
  	}
-@@ -845,7 +846,7 @@
+@@ -1386,7 +1386,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
    for (i = 0; i < nargs; i++)
      {
        struct type *type = value_type (args[i]);
@@ -1092,7 +1150,7 @@ Index: gdb-7.99.90.20170420/gdb/sparc64-tdep.c
  
        if (sparc64_structure_or_union_p (type)
  	  || (sparc64_complex_floating_p (type) && len == 32))
-@@ -945,7 +946,7 @@
+@@ -1486,7 +1486,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
      {
        const gdb_byte *valbuf = value_contents (args[i]);
        struct type *type = value_type (args[i]);
@@ -1101,11 +1159,11 @@ Index: gdb-7.99.90.20170420/gdb/sparc64-tdep.c
        int regnum = -1;
        gdb_byte buf[16];
  
-Index: gdb-7.99.90.20170420/gdb/spu-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/spu-tdep.c	2017-04-20 23:12:07.940566679 +0200
-+++ gdb-7.99.90.20170420/gdb/spu-tdep.c	2017-04-20 23:12:11.251588857 +0200
-@@ -1431,7 +1431,7 @@
+diff --git a/gdb/spu-tdep.c b/gdb/spu-tdep.c
+index 34a536a260..4b39b1785e 100644
+--- a/gdb/spu-tdep.c
++++ b/gdb/spu-tdep.c
+@@ -1430,7 +1430,7 @@ spu_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
        struct value *arg = args[i];
        struct type *type = check_typedef (value_type (arg));
        const gdb_byte *contents = value_contents (arg);
@@ -1114,7 +1172,7 @@ Index: gdb-7.99.90.20170420/gdb/spu-tdep.c
  
        /* If the argument doesn't wholly fit into registers, it and
  	 all subsequent arguments go to the stack.  */
-@@ -1463,7 +1463,7 @@
+@@ -1462,7 +1462,7 @@ spu_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  	{
  	  struct value *arg = args[i];
  	  struct type *type = check_typedef (value_type (arg));
@@ -1123,11 +1181,11 @@ Index: gdb-7.99.90.20170420/gdb/spu-tdep.c
  	  int preferred_slot;
  	  
  	  if (spu_scalar_value_p (type))
-Index: gdb-7.99.90.20170420/gdb/tic6x-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/tic6x-tdep.c	2017-04-20 23:12:07.940566679 +0200
-+++ gdb-7.99.90.20170420/gdb/tic6x-tdep.c	2017-04-20 23:12:11.251588857 +0200
-@@ -899,7 +899,7 @@
+diff --git a/gdb/tic6x-tdep.c b/gdb/tic6x-tdep.c
+index 66f2259612..3c7f55f500 100644
+--- a/gdb/tic6x-tdep.c
++++ b/gdb/tic6x-tdep.c
+@@ -883,7 +883,7 @@ tic6x_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    int argreg = 0;
    int argnum;
    int stack_offset = 4;
@@ -1136,7 +1194,7 @@ Index: gdb-7.99.90.20170420/gdb/tic6x-tdep.c
    CORE_ADDR func_addr = find_function_addr (function, NULL);
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    struct type *func_type = value_type (function);
-@@ -933,7 +933,7 @@
+@@ -917,7 +917,7 @@ tic6x_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
    /* Now make space on the stack for the args.  */
    for (argnum = 0; argnum < nargs; argnum++)
      {
@@ -1145,7 +1203,7 @@ Index: gdb-7.99.90.20170420/gdb/tic6x-tdep.c
        if (argnum >= 10 - argreg)
  	references_offset += len;
        stack_offset += len;
-@@ -952,7 +952,7 @@
+@@ -936,7 +936,7 @@ tic6x_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
        const gdb_byte *val;
        struct value *arg = args[argnum];
        struct type *arg_type = check_typedef (value_type (arg));
@@ -1154,7 +1212,7 @@ Index: gdb-7.99.90.20170420/gdb/tic6x-tdep.c
        enum type_code typecode = TYPE_CODE (arg_type);
  
        val = value_contents (arg);
-@@ -1112,7 +1112,8 @@
+@@ -1096,7 +1096,8 @@ tic6x_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
  	    }
  	  else
  	    internal_error (__FILE__, __LINE__,
@@ -1164,11 +1222,11 @@ Index: gdb-7.99.90.20170420/gdb/tic6x-tdep.c
  
  	  addr = sp + stack_offset;
  	  write_memory (addr, val, len);
-Index: gdb-7.99.90.20170420/gdb/tilegx-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/tilegx-tdep.c	2017-04-20 23:12:07.941566686 +0200
-+++ gdb-7.99.90.20170420/gdb/tilegx-tdep.c	2017-04-20 23:12:11.251588857 +0200
-@@ -289,7 +289,7 @@
+diff --git a/gdb/tilegx-tdep.c b/gdb/tilegx-tdep.c
+index 3a630c33d8..33a3caafcf 100644
+--- a/gdb/tilegx-tdep.c
++++ b/gdb/tilegx-tdep.c
+@@ -288,7 +288,7 @@ tilegx_push_dummy_call (struct gdbarch *gdbarch,
    CORE_ADDR stack_dest = sp;
    int argreg = TILEGX_R0_REGNUM;
    int i, j;
@@ -1177,11 +1235,11 @@ Index: gdb-7.99.90.20170420/gdb/tilegx-tdep.c
    static const gdb_byte four_zero_words[16] = { 0 };
  
    /* If struct_return is 1, then the struct return address will
-Index: gdb-7.99.90.20170420/gdb/v850-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/v850-tdep.c	2017-04-20 23:12:07.941566686 +0200
-+++ gdb-7.99.90.20170420/gdb/v850-tdep.c	2017-04-20 23:12:11.252588864 +0200
-@@ -1019,7 +1019,7 @@
+diff --git a/gdb/v850-tdep.c b/gdb/v850-tdep.c
+index 065cc9b882..79b877325b 100644
+--- a/gdb/v850-tdep.c
++++ b/gdb/v850-tdep.c
+@@ -1019,7 +1019,7 @@ v850_push_dummy_call (struct gdbarch *gdbarch,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int argreg;
    int argnum;
@@ -1190,7 +1248,7 @@ Index: gdb-7.99.90.20170420/gdb/v850-tdep.c
    int stack_offset;
  
    if (gdbarch_tdep (gdbarch)->abi == V850_ABI_RH850)
-@@ -1047,7 +1047,7 @@
+@@ -1047,7 +1047,7 @@ v850_push_dummy_call (struct gdbarch *gdbarch,
       in four registers available.  Loop thru args from first to last.  */
    for (argnum = 0; argnum < nargs; argnum++)
      {
@@ -1199,12 +1257,12 @@ Index: gdb-7.99.90.20170420/gdb/v850-tdep.c
        gdb_byte *val;
        gdb_byte valbuf[v850_reg_size];
  
-Index: gdb-7.99.90.20170420/gdb/vax-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/vax-tdep.c	2017-04-20 23:12:07.942566692 +0200
-+++ gdb-7.99.90.20170420/gdb/vax-tdep.c	2017-04-20 23:12:11.252588864 +0200
-@@ -111,7 +111,7 @@
-   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+diff --git a/gdb/vax-tdep.c b/gdb/vax-tdep.c
+index f31acc8f01..03d7c61dcd 100644
+--- a/gdb/vax-tdep.c
++++ b/gdb/vax-tdep.c
+@@ -110,7 +110,7 @@ vax_store_arguments (struct regcache *regcache, int nargs,
+   struct gdbarch *gdbarch = regcache->arch ();
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    gdb_byte buf[4];
 -  int count = 0;
@@ -1212,7 +1270,7 @@ Index: gdb-7.99.90.20170420/gdb/vax-tdep.c
    int i;
  
    /* We create an argument list on the stack, and make the argument
-@@ -120,7 +120,7 @@
+@@ -119,7 +119,7 @@ vax_store_arguments (struct regcache *regcache, int nargs,
    /* Push arguments in reverse order.  */
    for (i = nargs - 1; i >= 0; i--)
      {
@@ -1221,11 +1279,11 @@ Index: gdb-7.99.90.20170420/gdb/vax-tdep.c
  
        sp -= (len + 3) & ~3;
        count += (len + 3) / 4;
-Index: gdb-7.99.90.20170420/gdb/xstormy16-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/xstormy16-tdep.c	2017-04-20 23:12:07.942566692 +0200
-+++ gdb-7.99.90.20170420/gdb/xstormy16-tdep.c	2017-04-20 23:12:11.252588864 +0200
-@@ -233,8 +233,9 @@
+diff --git a/gdb/xstormy16-tdep.c b/gdb/xstormy16-tdep.c
+index 153375a1bd..5ae186d7fb 100644
+--- a/gdb/xstormy16-tdep.c
++++ b/gdb/xstormy16-tdep.c
+@@ -232,8 +232,9 @@ xstormy16_push_dummy_call (struct gdbarch *gdbarch,
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    CORE_ADDR stack_dest = sp;
    int argreg = E_1ST_ARG_REGNUM;
@@ -1237,11 +1295,11 @@ Index: gdb-7.99.90.20170420/gdb/xstormy16-tdep.c
    const gdb_byte *val;
    gdb_byte buf[xstormy16_pc_size];
  
-Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
-===================================================================
---- gdb-7.99.90.20170420.orig/gdb/xtensa-tdep.c	2017-04-20 23:12:07.944566706 +0200
-+++ gdb-7.99.90.20170420/gdb/xtensa-tdep.c	2017-04-20 23:12:11.253588870 +0200
-@@ -1637,8 +1637,7 @@
+diff --git a/gdb/xtensa-tdep.c b/gdb/xtensa-tdep.c
+index 0b0ec2e416..9b538c6d7d 100644
+--- a/gdb/xtensa-tdep.c
++++ b/gdb/xtensa-tdep.c
+@@ -1632,8 +1632,7 @@ xtensa_store_return_value (struct type *type,
  
        if (len > (callsize > 8 ? 8 : 16))
  	internal_error (__FILE__, __LINE__,
@@ -1251,7 +1309,7 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
        areg = arreg_number (gdbarch,
  			   gdbarch_tdep (gdbarch)->a0_base + 2 + callsize, wb);
  
-@@ -1712,18 +1711,18 @@
+@@ -1707,18 +1706,18 @@ xtensa_push_dummy_call (struct gdbarch *gdbarch,
  {
    enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
    int i;
@@ -1273,7 +1331,7 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
        int regno;		/* regno if in register.  */
      } u;
    };
-@@ -1747,9 +1746,10 @@
+@@ -1742,9 +1741,10 @@ xtensa_push_dummy_call (struct gdbarch *gdbarch,
          {
  	  struct value *arg = args[i];
  	  struct type *arg_type = check_typedef (value_type (arg));
@@ -1287,7 +1345,7 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
  	  switch (TYPE_CODE (arg_type))
  	    {
  	    case TYPE_CODE_INT:
-@@ -1819,8 +1819,8 @@
+@@ -1814,8 +1814,8 @@ xtensa_push_dummy_call (struct gdbarch *gdbarch,
  	  info->align = TYPE_LENGTH (builtin_type (gdbarch)->builtin_long);
  	  break;
  	}
@@ -1297,7 +1355,7 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
  
        /* Align size and onstack_size.  */
        size = (size + info->align - 1) & ~(info->align - 1);
-@@ -1865,7 +1865,7 @@
+@@ -1860,7 +1860,7 @@ xtensa_push_dummy_call (struct gdbarch *gdbarch,
  
        if (info->onstack)
  	{
@@ -1306,7 +1364,7 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
  	  CORE_ADDR offset = sp + info->u.offset;
  
  	  /* Odd-sized structs are aligned to the lower side of a memory
-@@ -1881,7 +1881,7 @@
+@@ -1876,7 +1876,7 @@ xtensa_push_dummy_call (struct gdbarch *gdbarch,
  	}
        else
  	{
@@ -1315,3 +1373,6 @@ Index: gdb-7.99.90.20170420/gdb/xtensa-tdep.c
  	  const bfd_byte *cp = info->contents;
  	  int r = info->u.regno;
  
+-- 
+2.14.3
+

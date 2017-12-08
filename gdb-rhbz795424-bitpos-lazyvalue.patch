@@ -1,110 +1,29 @@
+From 579fd09b4223d1a3a05573d7d38ddaefb4c01a87 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-rhbz795424-bitpos-lazyvalue.patch
 
 FileName: gdb-rhbz795424-bitpos-lazyvalue.patch
 
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.exp	2016-07-03 15:00:57.617347850 +0200
-@@ -0,0 +1,59 @@
-+# This testcase is part of GDB, the GNU debugger.
-+
-+# Copyright 2012 Free Software Foundation, Inc.
-+
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 3 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+standard_testfile .c longest-types-64bit.S
-+
-+proc test { name } { with_test_prefix $name {
-+    # 64-bit array size should not overflow
-+    gdb_test "print &f->buf" {= \(char \(\*\)\[1099494850560\]\) 0x0}
-+
-+    # The offset should not overflow
-+    gdb_test "print &f->buf2" {= \(char \(\*\)\[2\]\) 0xffff000000}
-+}}
-+
-+
-+# Test 64-bit file first as it is not compiled so its compilation never fails.
-+
-+set file64bitbz2uu ${srcdir}/${subdir}/${testfile}.bz2.uu
-+set file64bit [standard_output_file ${testfile}]
-+
-+if {[catch "system \"uudecode -o - ${file64bitbz2uu} | bzip2 -dc >${file64bit}\""] != 0} {
-+    untested "failed uudecode or bzip2"
-+    return -1
-+}
-+file stat ${file64bit} file64bitstat
-+if {$file64bitstat(size) != 9501} {
-+    untested "uudecode or bzip2 produce invalid result"
-+    return -1
-+}
-+
-+clean_restart ${file64bit}
-+
-+#if { [prepare_for_testing ${testfile}.exp ${testfile} $srcfile2 {nodebug}] } {
-+#    return -1
-+#}
-+
-+test "64bit"
-+
-+
-+# And here is the native build test.
-+
-+if { [prepare_for_testing ${testfile}.exp ${testfile} $srcfile {debug quiet}] } {
-+    return -1
-+}
-+
-+test "native"
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.c	2016-07-03 15:00:57.618347859 +0200
-@@ -0,0 +1,28 @@
-+/* This testcase is part of GDB, the GNU debugger.
-+
-+   Copyright 2012 Free Software Foundation, Inc.
-+
-+   This program is free software; you can redistribute it and/or modify
-+   it under the terms of the GNU General Public License as published by
-+   the Free Software Foundation; either version 3 of the License, or
-+   (at your option) any later version.
-+
-+   This program is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+   GNU General Public License for more details.
-+
-+   You should have received a copy of the GNU General Public License
-+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-+
-+struct foo
-+{
-+  char buf[0xffff000000];
-+  char buf2[2];
-+} *f;
-+
-+int
-+main (void)
-+{
-+  return 0;
-+}
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.S
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.S	2016-07-03 15:00:57.618347859 +0200
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
+---
+ gdb/testsuite/gdb.base/longest-types-64bit.S      | 249 ++++++++++++++++++++++
+ gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu |  67 ++++++
+ gdb/testsuite/gdb.base/longest-types-64bit.c      |  28 +++
+ gdb/testsuite/gdb.base/longest-types-64bit.exp    |  59 +++++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.base/longest-types-64bit.S
+ create mode 100644 gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu
+ create mode 100644 gdb/testsuite/gdb.base/longest-types-64bit.c
+ create mode 100644 gdb/testsuite/gdb.base/longest-types-64bit.exp
+
+diff --git a/gdb/testsuite/gdb.base/longest-types-64bit.S b/gdb/testsuite/gdb.base/longest-types-64bit.S
+new file mode 100644
+index 0000000000..336d3fdb7a
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/longest-types-64bit.S
 @@ -0,0 +1,249 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -355,10 +274,11 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.S
 +	.string	"char"
 +	.ident	"GCC: (GNU) 4.7.3 20121109 (prerelease)"
 +	.section	.note.GNU-stack,"",@progbits
-Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu	2016-07-03 15:00:57.618347859 +0200
+diff --git a/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu b/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu
+new file mode 100644
+index 0000000000..4007da2917
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu
 @@ -0,0 +1,67 @@
 +begin 755 gdb.base/longest-types-64bit.bz2
 +M0EIH.3%!62936<'N#OH`"G/________^______?_Y______//]7SQD5'^/_%
@@ -427,3 +347,105 @@ Index: gdb-7.11.50.20160630/gdb/testsuite/gdb.base/longest-types-64bit.bz2.uu
 +?<55!2^6_8J$)-O<>\H0U/6Q^>UG0%W)%.%"0P>X.^@``
 +`
 +end
+diff --git a/gdb/testsuite/gdb.base/longest-types-64bit.c b/gdb/testsuite/gdb.base/longest-types-64bit.c
+new file mode 100644
+index 0000000000..1394c08bdc
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/longest-types-64bit.c
+@@ -0,0 +1,28 @@
++/* This testcase is part of GDB, the GNU debugger.
++
++   Copyright 2012 Free Software Foundation, Inc.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3 of the License, or
++   (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
++
++struct foo
++{
++  char buf[0xffff000000];
++  char buf2[2];
++} *f;
++
++int
++main (void)
++{
++  return 0;
++}
+diff --git a/gdb/testsuite/gdb.base/longest-types-64bit.exp b/gdb/testsuite/gdb.base/longest-types-64bit.exp
+new file mode 100644
+index 0000000000..4871dec72f
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/longest-types-64bit.exp
+@@ -0,0 +1,59 @@
++# This testcase is part of GDB, the GNU debugger.
++
++# Copyright 2012 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++standard_testfile .c longest-types-64bit.S
++
++proc test { name } { with_test_prefix $name {
++    # 64-bit array size should not overflow
++    gdb_test "print &f->buf" {= \(char \(\*\)\[1099494850560\]\) 0x0}
++
++    # The offset should not overflow
++    gdb_test "print &f->buf2" {= \(char \(\*\)\[2\]\) 0xffff000000}
++}}
++
++
++# Test 64-bit file first as it is not compiled so its compilation never fails.
++
++set file64bitbz2uu ${srcdir}/${subdir}/${testfile}.bz2.uu
++set file64bit [standard_output_file ${testfile}]
++
++if {[catch "system \"uudecode -o - ${file64bitbz2uu} | bzip2 -dc >${file64bit}\""] != 0} {
++    untested "failed uudecode or bzip2"
++    return -1
++}
++file stat ${file64bit} file64bitstat
++if {$file64bitstat(size) != 9501} {
++    untested "uudecode or bzip2 produce invalid result"
++    return -1
++}
++
++clean_restart ${file64bit}
++
++#if { [prepare_for_testing ${testfile}.exp ${testfile} $srcfile2 {nodebug}] } {
++#    return -1
++#}
++
++test "64bit"
++
++
++# And here is the native build test.
++
++if { [prepare_for_testing ${testfile}.exp ${testfile} $srcfile {debug quiet}] } {
++    return -1
++}
++
++test "native"
+-- 
+2.14.3
+

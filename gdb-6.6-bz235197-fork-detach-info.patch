@@ -1,19 +1,66 @@
+From 57e6b14abc3acde3321011b12a3ba04483119abd Mon Sep 17 00:00:00 2001
 From: Jan Kratochvil <jan.kratochvil@redhat.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-6.6-bz235197-fork-detach-info.patch
 
 FileName: gdb-6.6-bz235197-fork-detach-info.patch
 
+;; Notify user of a child forked process being detached (BZ 235197).
+;;=push+jan: This is more about discussion if/what should be printed.
 
 2008-03-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Port to GDB-6.8pre.
 	Remove the `[' character from the GDB-6.8 default message.
+---
+ gdb/infrun.c                             |  2 +-
+ gdb/testsuite/gdb.base/catch-syscall.exp |  4 +--
+ gdb/testsuite/gdb.base/fork-detach.c     | 57 ++++++++++++++++++++++++++++++++
+ gdb/testsuite/gdb.base/fork-detach.exp   | 36 ++++++++++++++++++++
+ 4 files changed, 96 insertions(+), 3 deletions(-)
+ create mode 100644 gdb/testsuite/gdb.base/fork-detach.c
+ create mode 100644 gdb/testsuite/gdb.base/fork-detach.exp
 
-Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.c	2016-02-15 23:25:36.686600598 +0100
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+index d7df3c7d57..a8a26fc36d 100644
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -461,7 +461,7 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
+ 	      remove_breakpoints_pid (ptid_get_pid (inferior_ptid));
+ 	    }
+ 
+-	  if (info_verbose || debug_infrun)
++	  if (1 /* Fedora Bug 235197 */ || info_verbose || debug_infrun)
+ 	    {
+ 	      /* Ensure that we have a process ptid.  */
+ 	      ptid_t process_ptid = pid_to_ptid (ptid_get_pid (child_ptid));
+diff --git a/gdb/testsuite/gdb.base/catch-syscall.exp b/gdb/testsuite/gdb.base/catch-syscall.exp
+index 595ccbeae0..c9dbc3aba2 100644
+--- a/gdb/testsuite/gdb.base/catch-syscall.exp
++++ b/gdb/testsuite/gdb.base/catch-syscall.exp
+@@ -179,7 +179,7 @@ proc check_for_program_end {} {
+     # Deleting the catchpoints
+     delete_breakpoints
+ 
+-    gdb_continue_to_end
++    gdb_continue_to_end "" continue 1
+ }
+ 
+ proc test_catch_syscall_without_args {} {
+@@ -250,7 +250,7 @@ proc test_catch_syscall_with_wrong_args {} {
+ 	# If it doesn't, everything is right (since we don't have
+ 	# a syscall named "mlock" in it).  Otherwise, this is a failure.
+ 	set thistest "catch syscall with unused syscall ($syscall_name)"
+-	gdb_continue_to_end $thistest
++	gdb_continue_to_end $thistest continue 1
+     }
+ }
+ 
+diff --git a/gdb/testsuite/gdb.base/fork-detach.c b/gdb/testsuite/gdb.base/fork-detach.c
+new file mode 100644
+index 0000000000..0ba8f465f3
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/fork-detach.c
 @@ -0,0 +1,57 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -72,10 +119,11 @@ Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.c
 +    }
 +  return 0;
 +}
-Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.exp	2016-02-15 23:27:55.792588265 +0100
+diff --git a/gdb/testsuite/gdb.base/fork-detach.exp b/gdb/testsuite/gdb.base/fork-detach.exp
+new file mode 100644
+index 0000000000..1f1fcef6c4
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/fork-detach.exp
 @@ -0,0 +1,36 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -113,38 +161,6 @@ Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.base/fork-detach.exp
 +gdb_test "" \
 +         "Detaching after fork from child process.*\\\[Inferior .* exited normally\\\]" \
 +         "Info message caught"
-Index: gdb-7.10.90.20160211/gdb/infrun.c
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/infrun.c	2016-02-15 23:25:01.432350289 +0100
-+++ gdb-7.10.90.20160211/gdb/infrun.c	2016-02-15 23:27:49.274541986 +0100
-@@ -478,7 +478,7 @@
- 	      remove_breakpoints_pid (ptid_get_pid (inferior_ptid));
- 	    }
- 
--	  if (info_verbose || debug_infrun)
-+	  if (1 /* Fedora Bug 235197 */ || info_verbose || debug_infrun)
- 	    {
- 	      /* Ensure that we have a process ptid.  */
- 	      ptid_t process_ptid = pid_to_ptid (ptid_get_pid (child_ptid));
-Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.base/catch-syscall.exp
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/testsuite/gdb.base/catch-syscall.exp	2016-02-15 23:25:01.432350289 +0100
-+++ gdb-7.10.90.20160211/gdb/testsuite/gdb.base/catch-syscall.exp	2016-02-15 23:25:36.689600619 +0100
-@@ -165,7 +165,7 @@
-     # Deleting the catchpoints
-     delete_breakpoints
- 
--    gdb_continue_to_end
-+    gdb_continue_to_end "" continue 1
- }
- 
- proc test_catch_syscall_without_args {} {
-@@ -236,7 +236,7 @@
- 	# If it doesn't, everything is right (since we don't have
- 	# a syscall named "mlock" in it).  Otherwise, this is a failure.
- 	set thistest "catch syscall with unused syscall ($syscall_name)"
--	gdb_continue_to_end $thistest
-+	gdb_continue_to_end $thistest continue 1
-     }
- }
- 
+-- 
+2.14.3
+

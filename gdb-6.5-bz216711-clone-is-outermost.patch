@@ -1,9 +1,12 @@
+From c0f75843ac7b311bc8e0faef1d7d3d5e2e549df3 Mon Sep 17 00:00:00 2001
 From: Jan Kratochvil <jan.kratochvil@redhat.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-6.5-bz216711-clone-is-outermost.patch
 
 FileName: gdb-6.5-bz216711-clone-is-outermost.patch
 
+;; Fix bogus 0x0 unwind of the thread's topmost function clone(3) (BZ 216711).
+;;=fedora
 
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=216711
 
@@ -29,12 +32,22 @@ instead.
 2007-10-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Port to GDB-6.7.
+---
+ gdb/amd64-linux-tdep.c                      | 76 +++++++++++++++++++++++++++++
+ gdb/amd64-tdep.c                            | 11 +++++
+ gdb/i386-tdep.c                             |  3 ++
+ gdb/i386-tdep.h                             |  3 ++
+ gdb/testsuite/gdb.threads/bt-clone-stop.c   | 39 +++++++++++++++
+ gdb/testsuite/gdb.threads/bt-clone-stop.exp | 61 +++++++++++++++++++++++
+ 6 files changed, 193 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.threads/bt-clone-stop.c
+ create mode 100644 gdb/testsuite/gdb.threads/bt-clone-stop.exp
 
-Index: gdb-7.10.90.20160211/gdb/amd64-linux-tdep.c
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/amd64-linux-tdep.c	2016-02-15 23:37:06.936501443 +0100
-+++ gdb-7.10.90.20160211/gdb/amd64-linux-tdep.c	2016-02-15 23:37:39.928735691 +0100
-@@ -292,6 +292,80 @@
+diff --git a/gdb/amd64-linux-tdep.c b/gdb/amd64-linux-tdep.c
+index 87f09a4542..2a705ea41a 100644
+--- a/gdb/amd64-linux-tdep.c
++++ b/gdb/amd64-linux-tdep.c
+@@ -291,6 +291,80 @@ amd64_linux_register_reggroup_p (struct gdbarch *gdbarch, int regnum,
  
  /* Set the program counter for process PTID to PC.  */
  
@@ -115,7 +128,7 @@ Index: gdb-7.10.90.20160211/gdb/amd64-linux-tdep.c
  static void
  amd64_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
  {
-@@ -1800,6 +1874,8 @@
+@@ -1802,6 +1876,8 @@ amd64_linux_init_abi_common(struct gdbarch_info info, struct gdbarch *gdbarch)
  
    tdep->xsave_xcr0_offset = I386_LINUX_XSAVE_XCR0_OFFSET;
  
@@ -124,11 +137,11 @@ Index: gdb-7.10.90.20160211/gdb/amd64-linux-tdep.c
    /* Add the %orig_rax register used for syscall restarting.  */
    set_gdbarch_write_pc (gdbarch, amd64_linux_write_pc);
  
-Index: gdb-7.10.90.20160211/gdb/amd64-tdep.c
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/amd64-tdep.c	2016-02-15 23:37:06.936501443 +0100
-+++ gdb-7.10.90.20160211/gdb/amd64-tdep.c	2016-02-15 23:37:39.929735698 +0100
-@@ -2494,6 +2494,7 @@
+diff --git a/gdb/amd64-tdep.c b/gdb/amd64-tdep.c
+index bcd37ef048..81fbe52795 100644
+--- a/gdb/amd64-tdep.c
++++ b/gdb/amd64-tdep.c
+@@ -2555,6 +2555,7 @@ amd64_frame_unwind_stop_reason (struct frame_info *this_frame,
  {
    struct amd64_frame_cache *cache =
      amd64_frame_cache (this_frame, this_cache);
@@ -136,7 +149,7 @@ Index: gdb-7.10.90.20160211/gdb/amd64-tdep.c
  
    if (!cache->base_p)
      return UNWIND_UNAVAILABLE;
-@@ -2502,6 +2503,10 @@
+@@ -2563,6 +2564,10 @@ amd64_frame_unwind_stop_reason (struct frame_info *this_frame,
    if (cache->base == 0)
      return UNWIND_OUTERMOST;
  
@@ -147,7 +160,7 @@ Index: gdb-7.10.90.20160211/gdb/amd64-tdep.c
    return UNWIND_NO_REASON;
  }
  
-@@ -2636,6 +2641,7 @@
+@@ -2697,6 +2702,7 @@ amd64_sigtramp_frame_this_id (struct frame_info *this_frame,
  {
    struct amd64_frame_cache *cache =
      amd64_sigtramp_frame_cache (this_frame, this_cache);
@@ -155,7 +168,7 @@ Index: gdb-7.10.90.20160211/gdb/amd64-tdep.c
  
    if (!cache->base_p)
      (*this_id) = frame_id_build_unavailable_stack (get_frame_pc (this_frame));
-@@ -2644,6 +2650,11 @@
+@@ -2705,6 +2711,11 @@ amd64_sigtramp_frame_this_id (struct frame_info *this_frame,
        /* This marks the outermost frame.  */
        return;
      }
@@ -167,11 +180,11 @@ Index: gdb-7.10.90.20160211/gdb/amd64-tdep.c
    else
      (*this_id) = frame_id_build (cache->base + 16, get_frame_pc (this_frame));
  }
-Index: gdb-7.10.90.20160211/gdb/i386-tdep.c
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/i386-tdep.c	2016-02-15 23:37:06.936501443 +0100
-+++ gdb-7.10.90.20160211/gdb/i386-tdep.c	2016-02-15 23:37:39.931735713 +0100
-@@ -8305,6 +8305,9 @@
+diff --git a/gdb/i386-tdep.c b/gdb/i386-tdep.c
+index 81048081ad..290b1c8368 100644
+--- a/gdb/i386-tdep.c
++++ b/gdb/i386-tdep.c
+@@ -8401,6 +8401,9 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
  
    tdep->xsave_xcr0_offset = -1;
  
@@ -181,11 +194,11 @@ Index: gdb-7.10.90.20160211/gdb/i386-tdep.c
    tdep->record_regmap = i386_record_regmap;
  
    set_gdbarch_long_long_align_bit (gdbarch, 32);
-Index: gdb-7.10.90.20160211/gdb/i386-tdep.h
-===================================================================
---- gdb-7.10.90.20160211.orig/gdb/i386-tdep.h	2016-02-15 23:37:06.936501443 +0100
-+++ gdb-7.10.90.20160211/gdb/i386-tdep.h	2016-02-15 23:37:39.932735720 +0100
-@@ -240,6 +240,9 @@
+diff --git a/gdb/i386-tdep.h b/gdb/i386-tdep.h
+index f190bb3002..6fb45ca59c 100644
+--- a/gdb/i386-tdep.h
++++ b/gdb/i386-tdep.h
+@@ -251,6 +251,9 @@ struct gdbarch_tdep
  
    /* Regsets. */
    const struct regset *fpregset;
@@ -195,10 +208,11 @@ Index: gdb-7.10.90.20160211/gdb/i386-tdep.h
  };
  
  /* Floating-point registers.  */
-Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.c	2016-02-15 23:37:39.932735720 +0100
+diff --git a/gdb/testsuite/gdb.threads/bt-clone-stop.c b/gdb/testsuite/gdb.threads/bt-clone-stop.c
+new file mode 100644
+index 0000000000..2ac93f8664
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/bt-clone-stop.c
 @@ -0,0 +1,39 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -239,10 +253,11 @@ Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.c
 +	for (;;)
 +		pause();
 +}
-Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.exp	2016-02-15 23:37:56.197851204 +0100
+diff --git a/gdb/testsuite/gdb.threads/bt-clone-stop.exp b/gdb/testsuite/gdb.threads/bt-clone-stop.exp
+new file mode 100644
+index 0000000000..02728e05b9
+--- /dev/null
++++ b/gdb/testsuite/gdb.threads/bt-clone-stop.exp
 @@ -0,0 +1,61 @@
 +# Copyright 2006 Free Software Foundation, Inc.
 +
@@ -305,3 +320,6 @@ Index: gdb-7.10.90.20160211/gdb/testsuite/gdb.threads/bt-clone-stop.exp
 +    	pass "0x0 entry not found"
 +    }
 +}
+-- 
+2.14.3
+

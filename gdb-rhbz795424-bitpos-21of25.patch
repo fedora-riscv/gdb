@@ -1,12 +1,15 @@
+From 891638de98a5c1aca42533bda15be1ac80bb4c22 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: [PATCH 2/4] Add a check to ensure that a type may fit into host memory
+Subject: Add a check to ensure that a type may fit into host memory
 
 FileName: gdb-rhbz795424-bitpos-21of25.patch
 
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
+
 http://sourceware.org/ml/gdb-patches/2012-09/msg00632.html
-
-
 
 --MP_/PnL6l3LUsXWpZ/olqawWlzb
 Content-Type: text/plain; charset=US-ASCII
@@ -57,12 +60,22 @@ gdb/ChangeLog
 Content-Type: text/x-patch
 Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename=bitpos-ensure-size_t.patch
+---
+ gdb/alpha-tdep.c  |  7 +++++++
+ gdb/cp-valprint.c |  1 +
+ gdb/defs.h        |  2 ++
+ gdb/p-valprint.c  |  1 +
+ gdb/utils.c       | 12 ++++++++++++
+ gdb/valops.c      |  1 +
+ gdb/value.c       |  4 ++++
+ gdb/vax-tdep.c    |  1 +
+ 8 files changed, 29 insertions(+)
 
-Index: gdb-8.0/gdb/alpha-tdep.c
-===================================================================
---- gdb-8.0.orig/gdb/alpha-tdep.c	2017-08-19 20:07:45.469330496 +0200
-+++ gdb-8.0/gdb/alpha-tdep.c	2017-08-19 20:07:50.670379152 +0200
-@@ -414,6 +414,13 @@
+diff --git a/gdb/alpha-tdep.c b/gdb/alpha-tdep.c
+index 3100d72ad1..6fbf41bcdc 100644
+--- a/gdb/alpha-tdep.c
++++ b/gdb/alpha-tdep.c
+@@ -415,6 +415,13 @@ alpha_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
      accumulate_size = 0;
    else
      accumulate_size -= sizeof(arg_reg_buffer);
@@ -76,48 +89,46 @@ Index: gdb-8.0/gdb/alpha-tdep.c
    sp -= accumulate_size;
  
    /* Keep sp aligned to a multiple of 16 as the ABI requires.  */
-Index: gdb-8.0/gdb/cp-valprint.c
-===================================================================
---- gdb-8.0.orig/gdb/cp-valprint.c	2017-08-19 20:07:45.470330505 +0200
-+++ gdb-8.0/gdb/cp-valprint.c	2017-08-19 20:07:50.670379152 +0200
-@@ -537,6 +537,8 @@
- 		  gdb_byte *buf;
- 		  struct cleanup *back_to;
- 
+diff --git a/gdb/cp-valprint.c b/gdb/cp-valprint.c
+index 38beb4d62a..bcb59507bd 100644
+--- a/gdb/cp-valprint.c
++++ b/gdb/cp-valprint.c
+@@ -529,6 +529,7 @@ cp_print_value (struct type *type, struct type *real_type,
+ 	      if ((boffset + offset) < 0
+ 		  || (boffset + offset) >= TYPE_LENGTH (real_type))
+ 		{
 +		  ulongest_fits_host_or_error (TYPE_LENGTH (baseclass));
+ 		  gdb::byte_vector buf (TYPE_LENGTH (baseclass));
+ 
+ 		  if (target_read_memory (address + boffset, buf.data (),
+diff --git a/gdb/defs.h b/gdb/defs.h
+index f76293fedf..27f3becab0 100644
+--- a/gdb/defs.h
++++ b/gdb/defs.h
+@@ -705,4 +705,6 @@ DEF_ENUM_FLAGS_TYPE (enum user_selected_what_flag, user_selected_what);
+ 
+ #include "utils.h"
+ 
++extern void ulongest_fits_host_or_error (ULONGEST num);
 +
- 		  buf = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
- 		  back_to = make_cleanup (xfree, buf);
+ #endif /* #ifndef DEFS_H */
+diff --git a/gdb/p-valprint.c b/gdb/p-valprint.c
+index 3cdc847fe3..8d5b395afd 100644
+--- a/gdb/p-valprint.c
++++ b/gdb/p-valprint.c
+@@ -771,6 +771,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
  
-Index: gdb-8.0/gdb/findcmd.c
-===================================================================
---- gdb-8.0.orig/gdb/findcmd.c	2017-08-19 20:07:45.472330524 +0200
-+++ gdb-8.0/gdb/findcmd.c	2017-08-19 20:07:50.672379171 +0200
-@@ -186,6 +186,7 @@
- 	  size_t current_offset = pattern_buf_end - pattern_buf;
- 
- 	  pattern_buf_size = pattern_buf_size_need * 2;
-+	  ulongest_fits_host_or_error (pattern_buf_size);
- 	  pattern_buf = (gdb_byte *) xrealloc (pattern_buf, pattern_buf_size);
- 	  pattern_buf_end = pattern_buf + current_offset;
- 	}
-Index: gdb-8.0/gdb/p-valprint.c
-===================================================================
---- gdb-8.0.orig/gdb/p-valprint.c	2017-08-19 20:07:45.472330524 +0200
-+++ gdb-8.0/gdb/p-valprint.c	2017-08-19 20:07:50.673379180 +0200
-@@ -772,6 +772,7 @@
- 	      gdb_byte *buf;
- 	      struct cleanup *back_to;
- 
+ 	  if (boffset < 0 || boffset >= TYPE_LENGTH (type))
+ 	    {
 +	      ulongest_fits_host_or_error (TYPE_LENGTH (baseclass));
- 	      buf = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
- 	      back_to = make_cleanup (xfree, buf);
+ 	      buf.resize (TYPE_LENGTH (baseclass));
  
-Index: gdb-8.0/gdb/utils.c
-===================================================================
---- gdb-8.0.orig/gdb/utils.c	2017-08-19 20:07:45.473330533 +0200
-+++ gdb-8.0/gdb/utils.c	2017-08-19 20:07:50.673379180 +0200
-@@ -2776,6 +2776,18 @@
+ 	      base_valaddr = buf.data ();
+diff --git a/gdb/utils.c b/gdb/utils.c
+index 5e99a4d501..f72ddab992 100644
+--- a/gdb/utils.c
++++ b/gdb/utils.c
+@@ -2822,6 +2822,18 @@ string_to_core_addr (const char *my_string)
    return addr;
  }
  
@@ -133,26 +144,26 @@ Index: gdb-8.0/gdb/utils.c
 +	   pulongest (SIZE_MAX / 8));
 +}
 +
- char *
+ gdb::unique_xmalloc_ptr<char>
  gdb_realpath (const char *filename)
  {
-Index: gdb-8.0/gdb/valops.c
-===================================================================
---- gdb-8.0.orig/gdb/valops.c	2017-08-19 20:07:45.474330542 +0200
-+++ gdb-8.0/gdb/valops.c	2017-08-19 20:07:50.674379190 +0200
-@@ -2100,6 +2100,7 @@
- 	      struct cleanup *back_to;
+diff --git a/gdb/valops.c b/gdb/valops.c
+index a7c3613d84..eebcb8e5e1 100644
+--- a/gdb/valops.c
++++ b/gdb/valops.c
+@@ -2087,6 +2087,7 @@ search_struct_method (const char *name, struct value **arg1p,
+ 	    {
  	      CORE_ADDR address;
  
 +	      ulongest_fits_host_or_error (TYPE_LENGTH (baseclass));
- 	      tmp = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
- 	      back_to = make_cleanup (xfree, tmp);
+ 	      gdb::byte_vector tmp (TYPE_LENGTH (baseclass));
  	      address = value_address (*arg1p);
-Index: gdb-8.0/gdb/value.c
-===================================================================
---- gdb-8.0.orig/gdb/value.c	2017-08-19 20:07:45.476330561 +0200
-+++ gdb-8.0/gdb/value.c	2017-08-19 20:07:50.675379199 +0200
-@@ -936,6 +936,7 @@
+ 
+diff --git a/gdb/value.c b/gdb/value.c
+index 0c87ae75ee..105c28bea7 100644
+--- a/gdb/value.c
++++ b/gdb/value.c
+@@ -926,6 +926,7 @@ allocate_value_lazy (struct type *type)
       description correctly.  */
    check_typedef (type);
  
@@ -160,7 +171,7 @@ Index: gdb-8.0/gdb/value.c
    val = XCNEW (struct value);
    val->contents = NULL;
    val->next = all_values;
-@@ -1033,6 +1034,8 @@
+@@ -1023,6 +1024,8 @@ check_type_length_before_alloc (const struct type *type)
  static void
  allocate_value_contents (struct value *val)
  {
@@ -169,7 +180,7 @@ Index: gdb-8.0/gdb/value.c
    if (!val->contents)
      {
        check_type_length_before_alloc (val->enclosing_type);
-@@ -3093,6 +3096,7 @@
+@@ -3015,6 +3018,7 @@ set_value_enclosing_type (struct value *val, struct type *new_encl_type)
    if (TYPE_LENGTH (new_encl_type) > TYPE_LENGTH (value_enclosing_type (val)))
      {
        check_type_length_before_alloc (new_encl_type);
@@ -177,11 +188,11 @@ Index: gdb-8.0/gdb/value.c
        val->contents
  	= (gdb_byte *) xrealloc (val->contents, TYPE_LENGTH (new_encl_type));
      }
-Index: gdb-8.0/gdb/vax-tdep.c
-===================================================================
---- gdb-8.0.orig/gdb/vax-tdep.c	2017-08-19 20:07:45.476330561 +0200
-+++ gdb-8.0/gdb/vax-tdep.c	2017-08-19 20:07:50.675379199 +0200
-@@ -219,6 +219,7 @@
+diff --git a/gdb/vax-tdep.c b/gdb/vax-tdep.c
+index c1f10c8b65..f31acc8f01 100644
+--- a/gdb/vax-tdep.c
++++ b/gdb/vax-tdep.c
+@@ -218,6 +218,7 @@ vax_return_value (struct gdbarch *gdbarch, struct value *function,
  	  ULONGEST addr;
  
  	  regcache_raw_read_unsigned (regcache, VAX_R0_REGNUM, &addr);
@@ -189,14 +200,6 @@ Index: gdb-8.0/gdb/vax-tdep.c
  	  read_memory (addr, readbuf, len);
  	}
  
-Index: gdb-8.0/gdb/defs.h
-===================================================================
---- gdb-8.0.orig/gdb/defs.h	2017-08-19 20:07:45.476330561 +0200
-+++ gdb-8.0/gdb/defs.h	2017-08-19 20:07:50.676379208 +0200
-@@ -750,4 +750,6 @@
- 
- #include "utils.h"
- 
-+extern void ulongest_fits_host_or_error (ULONGEST num);
-+
- #endif /* #ifndef DEFS_H */
+-- 
+2.14.3
+

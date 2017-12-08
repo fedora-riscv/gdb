@@ -1,12 +1,15 @@
+From f487f519fa5965f40049e802c50bceb321153be2 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
-Subject: [PATCH] Expand fortran array bounds sizes to LONGEST
+Subject: Expand fortran array bounds sizes to LONGEST
 
 FileName: gdb-rhbz795424-bitpos-25of25.patch
 
+;; Fix `GDB cannot access struct member whose offset is larger than 256MB'
+;; (RH BZ 795424).
+;;=push
+
 http://sourceware.org/ml/gdb-patches/2012-08/msg00562.html
-
-
 
 --MP_/90J7bck2fqDySEX9JkZtaqL
 Content-Type: text/plain; charset=US-ASCII
@@ -52,12 +55,17 @@ testsuite/ChangeLog:
 Content-Type: text/x-patch
 Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename=f77-bounds.patch
+---
+ gdb/f-lang.h      |  4 ++--
+ gdb/f-typeprint.c | 10 +++++-----
+ gdb/f-valprint.c  |  4 ++--
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-Index: gdb-7.11.90.20160907/gdb/f-lang.h
-===================================================================
---- gdb-7.11.90.20160907.orig/gdb/f-lang.h	2016-09-07 21:48:33.308624019 +0200
-+++ gdb-7.11.90.20160907/gdb/f-lang.h	2016-09-07 21:48:40.967692469 +0200
-@@ -49,9 +49,9 @@
+diff --git a/gdb/f-lang.h b/gdb/f-lang.h
+index fb00f37486..625af96e16 100644
+--- a/gdb/f-lang.h
++++ b/gdb/f-lang.h
+@@ -49,9 +49,9 @@ struct common_block
    struct symbol *contents[1];
  };
  
@@ -69,11 +77,11 @@ Index: gdb-7.11.90.20160907/gdb/f-lang.h
  
  extern void f77_get_dynamic_array_length (struct type *);
  
-Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
-===================================================================
---- gdb-7.11.90.20160907.orig/gdb/f-typeprint.c	2016-09-07 21:48:33.309624028 +0200
-+++ gdb-7.11.90.20160907/gdb/f-typeprint.c	2016-09-07 21:48:40.967692469 +0200
-@@ -147,7 +147,7 @@
+diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
+index dccdfe79c6..418693eaba 100644
+--- a/gdb/f-typeprint.c
++++ b/gdb/f-typeprint.c
+@@ -149,7 +149,7 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
  			     int show, int passed_a_ptr, int demangled_args,
  			     int arrayprint_recurse_level, int print_rank_only)
  {
@@ -82,7 +90,7 @@ Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
  
    /* No static variables are permitted as an error call may occur during
       execution of this function.  */
-@@ -194,7 +194,7 @@
+@@ -196,7 +196,7 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
  	{
  	  lower_bound = f77_get_lowerbound (type);
  	  if (lower_bound != 1)	/* Not the default.  */
@@ -91,7 +99,7 @@ Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
  
  	  /* Make sure that, if we have an assumed size array, we
  	       print out a warning and print the upperbound as '*'.  */
-@@ -204,7 +204,7 @@
+@@ -206,7 +206,7 @@ f_type_print_varspec_suffix (struct type *type, struct ui_file *stream,
  	  else
  	    {
  	      upper_bound = f77_get_upperbound (type);
@@ -100,7 +108,7 @@ Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
  	    }
  	}
  
-@@ -276,7 +276,7 @@
+@@ -278,7 +278,7 @@ void
  f_type_print_base (struct type *type, struct ui_file *stream, int show,
  		   int level)
  {
@@ -109,7 +117,7 @@ Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
    int index;
  
    QUIT;
-@@ -358,7 +358,7 @@
+@@ -365,7 +365,7 @@ f_type_print_base (struct type *type, struct ui_file *stream, int show,
        else
  	{
  	  upper_bound = f77_get_upperbound (type);
@@ -118,11 +126,11 @@ Index: gdb-7.11.90.20160907/gdb/f-typeprint.c
  	}
        break;
  
-Index: gdb-7.11.90.20160907/gdb/f-valprint.c
-===================================================================
---- gdb-7.11.90.20160907.orig/gdb/f-valprint.c	2016-09-07 21:48:33.309624028 +0200
-+++ gdb-7.11.90.20160907/gdb/f-valprint.c	2016-09-07 21:48:40.967692469 +0200
-@@ -43,7 +43,7 @@
+diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
+index 4ce78b1d52..10c574c7fa 100644
+--- a/gdb/f-valprint.c
++++ b/gdb/f-valprint.c
+@@ -41,7 +41,7 @@ LONGEST f77_array_offset_tbl[MAX_FORTRAN_DIMS + 1][2];
  /* Array which holds offsets to be applied to get a row's elements
     for a given array.  Array also holds the size of each subarray.  */
  
@@ -131,7 +139,7 @@ Index: gdb-7.11.90.20160907/gdb/f-valprint.c
  f77_get_lowerbound (struct type *type)
  {
    if (TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED (type))
-@@ -52,7 +52,7 @@
+@@ -50,7 +50,7 @@ f77_get_lowerbound (struct type *type)
    return TYPE_ARRAY_LOWER_BOUND_VALUE (type);
  }
  
@@ -140,3 +148,6 @@ Index: gdb-7.11.90.20160907/gdb/f-valprint.c
  f77_get_upperbound (struct type *type)
  {
    if (TYPE_ARRAY_UPPER_BOUND_IS_UNDEFINED (type))
+-- 
+2.14.3
+

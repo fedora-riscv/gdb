@@ -1,8 +1,12 @@
+From 6f9560ad830dbad83429859b2392831463f0fc96 Mon Sep 17 00:00:00 2001
 From: Fedora GDB patches <invalid@email.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-6.8-quit-never-aborts.patch
 
 FileName: gdb-6.8-quit-never-aborts.patch
+
+;; Make the GDB quit processing non-abortable to cleanup everything properly.
+;;=fedora: It was useful only after gdb-6.8-attach-signalled-detach-stopped.patch .
 
 We may abort the process of detaching threads with multiple SIGINTs - which are
 being sent during a testcase terminating its child GDB.
@@ -10,12 +14,18 @@ being sent during a testcase terminating its child GDB.
 Some of the threads may not be properly PTRACE_DETACHed which hurts if they
 should have been detached with SIGSTOP (as they are accidentally left running
 on the debugger termination).
+---
+ gdb/defs.h      | 4 ++++
+ gdb/extension.c | 5 +++++
+ gdb/top.c       | 6 ++++++
+ gdb/utils.c     | 7 +++++++
+ 4 files changed, 22 insertions(+)
 
-Index: gdb-7.12.50.20170207/gdb/defs.h
-===================================================================
---- gdb-7.12.50.20170207.orig/gdb/defs.h	2017-02-26 21:11:35.654350580 +0100
-+++ gdb-7.12.50.20170207/gdb/defs.h	2017-02-26 21:11:52.932473129 +0100
-@@ -169,6 +169,10 @@
+diff --git a/gdb/defs.h b/gdb/defs.h
+index 27f3becab0..95395b41a3 100644
+--- a/gdb/defs.h
++++ b/gdb/defs.h
+@@ -168,6 +168,10 @@ extern void default_quit_handler (void);
  /* Flag that function quit should call quit_force.  */
  extern volatile int sync_quit_force_run;
  
@@ -26,11 +36,11 @@ Index: gdb-7.12.50.20170207/gdb/defs.h
  extern void quit (void);
  
  /* Helper for the QUIT macro.  */
-Index: gdb-7.12.50.20170207/gdb/extension.c
-===================================================================
---- gdb-7.12.50.20170207.orig/gdb/extension.c	2017-02-26 21:11:35.655350587 +0100
-+++ gdb-7.12.50.20170207/gdb/extension.c	2017-02-26 21:11:52.933473136 +0100
-@@ -830,6 +830,11 @@
+diff --git a/gdb/extension.c b/gdb/extension.c
+index 4ffad038c9..d029a2f23d 100644
+--- a/gdb/extension.c
++++ b/gdb/extension.c
+@@ -830,6 +830,11 @@ check_quit_flag (void)
    int i, result = 0;
    const struct extension_language_defn *extlang;
  
@@ -42,11 +52,11 @@ Index: gdb-7.12.50.20170207/gdb/extension.c
    ALL_ENABLED_EXTENSION_LANGUAGES (i, extlang)
      {
        if (extlang->ops->check_quit_flag != NULL)
-Index: gdb-7.12.50.20170207/gdb/top.c
-===================================================================
---- gdb-7.12.50.20170207.orig/gdb/top.c	2017-02-26 21:11:35.655350587 +0100
-+++ gdb-7.12.50.20170207/gdb/top.c	2017-02-26 21:11:52.933473136 +0100
-@@ -1619,7 +1619,13 @@
+diff --git a/gdb/top.c b/gdb/top.c
+index 8cd7c99346..326c2399b3 100644
+--- a/gdb/top.c
++++ b/gdb/top.c
+@@ -1583,7 +1583,13 @@ quit_force (int *exit_arg, int from_tty)
    qt.args = NULL;
    qt.from_tty = from_tty;
  
@@ -60,13 +70,13 @@ Index: gdb-7.12.50.20170207/gdb/top.c
  
    /* Get out of tfind mode, and kill or detach all inferiors.  */
    TRY
-Index: gdb-7.12.50.20170207/gdb/utils.c
-===================================================================
---- gdb-7.12.50.20170207.orig/gdb/utils.c	2017-02-26 21:11:35.657350601 +0100
-+++ gdb-7.12.50.20170207/gdb/utils.c	2017-02-26 21:11:52.934473143 +0100
-@@ -106,6 +106,13 @@
+diff --git a/gdb/utils.c b/gdb/utils.c
+index f72ddab992..26a923d8b3 100644
+--- a/gdb/utils.c
++++ b/gdb/utils.c
+@@ -107,6 +107,13 @@ static std::chrono::steady_clock::duration prompt_for_continue_wait_time;
  
- int job_control;
+ static int debug_timestamp = 0;
  
 +#ifdef NEED_DETACH_SIGSTOP
 +/* Nonzero means we are already processing the quitting cleanups and we should
@@ -78,3 +88,6 @@ Index: gdb-7.12.50.20170207/gdb/utils.c
  /* Nonzero means that strings with character values >0x7F should be printed
     as octal escapes.  Zero means just print the value (e.g. it's an
     international character, and the terminal or window can cope.)  */
+-- 
+2.14.3
+

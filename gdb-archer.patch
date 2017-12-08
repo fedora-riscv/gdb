@@ -1,3 +1,13 @@
+From a33be5ba95917ec49fc015387bfc9176fc78180c Mon Sep 17 00:00:00 2001
+From: Fedora GDB patches <invalid@email.com>
+Date: Fri, 27 Oct 2017 21:07:50 +0200
+Subject: gdb-archer.patch
+
+FileName: gdb-archer.patch
+
+;; Python patches of: http://sourceware.org/gdb/wiki/ProjectArcher
+;;=push
+
 http://sourceware.org/gdb/wiki/ProjectArcher
 http://sourceware.org/gdb/wiki/ArcherBranchManagement
 
@@ -5,21 +15,33 @@ GIT snapshot:
 commit 718a1618b2f691a7f407213bb50f100ac59f91c3
 
 tromey/python
+---
+ gdb/Makefile.in                             |   6 ++
+ gdb/data-directory/Makefile.in              |   4 +
+ gdb/doc/gdb.texinfo                         |  10 +++
+ gdb/doc/python.texi                         |   2 -
+ gdb/gdb-gdb.gdb.in                          |  10 +++
+ gdb/main.c                                  |  93 ++++++++++++++++++-----
+ gdb/python/lib/gdb/command/ignore_errors.py |  37 +++++++++
+ gdb/python/lib/gdb/command/pahole.py        |  81 ++++++++++++++++++++
+ gdb/python/lib/gdb/function/in_scope.py     |  47 ++++++++++++
+ gdb/python/python-internal.h                |   3 +
+ gdb/python/python.c                         | 113 ++++++++++++++++++++++++++++
+ gdb/python/python.h                         |   2 +
+ gdb/testsuite/gdb.python/py-frame.exp       |   2 +
+ gdb/testsuite/gdb.python/py-value.exp       |  10 +++
+ gdb/varobj.c                                |   8 ++
+ gdb/varobj.h                                |   2 +
+ 16 files changed, 411 insertions(+), 19 deletions(-)
+ create mode 100644 gdb/python/lib/gdb/command/ignore_errors.py
+ create mode 100644 gdb/python/lib/gdb/command/pahole.py
+ create mode 100644 gdb/python/lib/gdb/function/in_scope.py
 
-
-diff --git a/README.archer b/README.archer
-new file mode 100644
-index 0000000..173b8ea
---- /dev/null
-+++ b/README.archer
-@@ -0,0 +1,2 @@
-+This branch originally held the Python code for gdb.  It still exists
-+because a small amount of code here has not yet been merged upstream.
 diff --git a/gdb/Makefile.in b/gdb/Makefile.in
-index 291b1a0..150a8ef 100644
+index edd0b239d4..0c3f89aa7e 100644
 --- a/gdb/Makefile.in
 +++ b/gdb/Makefile.in
-@@ -2350,6 +2350,12 @@ stamp-h: $(srcdir)/config.in config.status
+@@ -2113,6 +2113,12 @@ stamp-h: $(srcdir)/config.in config.status
  	  CONFIG_LINKS= \
  	  $(SHELL) config.status
  
@@ -33,22 +55,19 @@ index 291b1a0..150a8ef 100644
  	$(SHELL) config.status --recheck
  
 diff --git a/gdb/data-directory/Makefile.in b/gdb/data-directory/Makefile.in
-index 304d4b0..d2007a4 100644
+index dadde8895a..19e436d725 100644
 --- a/gdb/data-directory/Makefile.in
 +++ b/gdb/data-directory/Makefile.in
-@@ -77,7 +77,11 @@ PYTHON_FILE_LIST = \
- 	gdb/types.py \
+@@ -80,6 +80,8 @@ PYTHON_FILE_LIST = \
  	gdb/unwinder.py \
  	gdb/xmethod.py \
-+	gdb/types.py \
  	gdb/command/__init__.py \
 +	gdb/command/ignore_errors.py \
 +	gdb/command/pahole.py \
-+	gdb/command/xmethods.py \
  	gdb/command/explore.py \
+ 	gdb/command/backtrace.py \
  	gdb/command/frame_filters.py \
- 	gdb/command/pretty_printers.py \
-@@ -89,6 +93,8 @@ PYTHON_FILE_LIST = \
+@@ -92,6 +94,8 @@ PYTHON_FILE_LIST = \
  	gdb/function/as_string.py \
  	gdb/function/caller_is.py \
  	gdb/function/strfns.py \
@@ -58,10 +77,10 @@ index 304d4b0..d2007a4 100644
  	gdb/printer/bound_registers.py
  
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
-index 300d78e..699f2cb 100644
+index a79c686f0b..d13d4dd945 100644
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -1230,6 +1230,16 @@ for remote debugging.
+@@ -1240,6 +1240,16 @@ for remote debugging.
  Run using @var{device} for your program's standard input and output.
  @c FIXME: kingdon thinks there is more to -tty.  Investigate.
  
@@ -79,7 +98,7 @@ index 300d78e..699f2cb 100644
  @item -tui
  @cindex @code{--tui}
 diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
-index ce5810e..4ceb108 100644
+index 01243c7c7d..eb7bf3ca05 100644
 --- a/gdb/doc/python.texi
 +++ b/gdb/doc/python.texi
 @@ -88,8 +88,6 @@ containing @code{end}.  For example:
@@ -92,7 +111,7 @@ index ce5810e..4ceb108 100644
  >end
  23
 diff --git a/gdb/gdb-gdb.gdb.in b/gdb/gdb-gdb.gdb.in
-index 05a38b2..9801fdf 100644
+index 05a38b2670..9801fdff67 100644
 --- a/gdb/gdb-gdb.gdb.in
 +++ b/gdb/gdb-gdb.gdb.in
 @@ -1,5 +1,15 @@
@@ -112,7 +131,7 @@ index 05a38b2..9801fdf 100644
    set variable $gdb_init_done = 1
  
 diff --git a/gdb/main.c b/gdb/main.c
-index df4b111..6aca8b0 100644
+index df1f12bd79..a530a632bf 100644
 --- a/gdb/main.c
 +++ b/gdb/main.c
 @@ -33,6 +33,7 @@
@@ -123,8 +142,8 @@ index df4b111..6aca8b0 100644
  #include "source.h"
  #include "cli/cli-cmds.h"
  #include "objfiles.h"
-@@ -459,7 +460,7 @@ struct cmdarg
- };
+@@ -478,7 +479,7 @@ exec_or_core_file_attach (const char *filename, int from_tty)
+ }
  
  static void
 -captured_main_1 (struct captured_main_args *context)
@@ -132,7 +151,7 @@ index df4b111..6aca8b0 100644
  {
    int argc = context->argc;
    char **argv = context->argv;
-@@ -676,10 +677,14 @@ captured_main_1 (struct captured_main_args *context)
+@@ -695,10 +696,14 @@ captured_main_1 (struct captured_main_args *context)
        {"args", no_argument, &set_args, 1},
        {"l", required_argument, 0, 'l'},
        {"return-child-result", no_argument, &return_child_result, 1},
@@ -148,7 +167,7 @@ index df4b111..6aca8b0 100644
        {
  	int option_index;
  
-@@ -697,6 +702,9 @@ captured_main_1 (struct captured_main_args *context)
+@@ -716,6 +721,9 @@ captured_main_1 (struct captured_main_args *context)
  	  case 0:
  	    /* Long option that just sets a flag.  */
  	    break;
@@ -158,7 +177,7 @@ index df4b111..6aca8b0 100644
  	  case OPT_SE:
  	    symarg = optarg;
  	    execarg = optarg;
-@@ -855,7 +863,31 @@ captured_main_1 (struct captured_main_args *context)
+@@ -888,7 +896,31 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Now that gdb_init has created the initial inferior, we're in
       position to set args for that inferior.  */
@@ -191,7 +210,7 @@ index df4b111..6aca8b0 100644
      {
        /* The remaining options are the command-line options for the
  	 inferior.  The first one is the sym/exec file, and the rest
-@@ -1125,7 +1157,8 @@ captured_main_1 (struct captured_main_args *context)
+@@ -1178,7 +1210,8 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Read in the old history after all the command files have been
       read.  */
@@ -201,7 +220,7 @@ index df4b111..6aca8b0 100644
  
    if (batch_flag)
      {
-@@ -1138,16 +1171,29 @@ static void
+@@ -1191,24 +1224,37 @@ static void
  captured_main (void *data)
  {
    struct captured_main_args *context = (struct captured_main_args *) data;
@@ -217,7 +236,12 @@ index df4b111..6aca8b0 100644
 -  while (1)
 +#if HAVE_PYTHON
 +  if (python_script)
-+    {
+     {
+-      TRY
+-	{
+-	  captured_command_loop ();
+-	}
+-      CATCH (ex, RETURN_MASK_ALL)
 +      extern int pagination_enabled;
 +      pagination_enabled = 0;
 +      run_python_script (context->argc - optind, &context->argv[optind]);
@@ -225,20 +249,29 @@ index df4b111..6aca8b0 100644
 +    }
 +  else
 +#endif
-     {
--      catch_errors (captured_command_loop, 0, "", RETURN_MASK_ALL);
++    {
 +      /* NOTE: cagney/1999-11-07: There is probably no reason for not
 +	 moving this loop and the code found in captured_command_loop()
 +	 into the command_loop() proper.  The main thing holding back that
 +	 change - SET_TOP_LEVEL() - has been eliminated. */
 +      while (1)
-+	{
-+	  catch_errors (captured_command_loop, 0, "", RETURN_MASK_ALL);
-+	}
+ 	{
+-	  exception_print (gdb_stderr, ex);
++	  TRY
++	    {
++	      captured_command_loop ();
++	    }
++	  CATCH (ex, RETURN_MASK_ALL)
++	    {
++	      exception_print (gdb_stderr, ex);
++	    }
++	  END_CATCH
+ 	}
+-      END_CATCH
      }
    /* No exit -- exit is through quit_command.  */
  }
-@@ -1190,6 +1236,12 @@ print_gdb_help (struct ui_file *stream)
+@@ -1251,6 +1297,12 @@ print_gdb_help (struct ui_file *stream)
    fputs_unfiltered (_("\
  This is the GNU debugger.  Usage:\n\n\
      gdb [options] [executable-file [core-file or process-id]]\n\
@@ -251,7 +284,7 @@ index df4b111..6aca8b0 100644
      gdb [options] --args executable-file [inferior-arguments ...]\n\n\
  "), stream);
    fputs_unfiltered (_("\
-@@ -1234,6 +1286,13 @@ Output and user interface control:\n\n\
+@@ -1296,6 +1348,13 @@ Output and user interface control:\n\n\
  #endif
    fputs_unfiltered (_("\
    --dbx              DBX compatibility mode.\n\
@@ -267,7 +300,7 @@ index df4b111..6aca8b0 100644
  "), stream);
 diff --git a/gdb/python/lib/gdb/command/ignore_errors.py b/gdb/python/lib/gdb/command/ignore_errors.py
 new file mode 100644
-index 0000000..6fa48ff
+index 0000000000..6fa48ff081
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/ignore_errors.py
 @@ -0,0 +1,37 @@
@@ -310,7 +343,7 @@ index 0000000..6fa48ff
 +IgnoreErrorsCommand ()
 diff --git a/gdb/python/lib/gdb/command/pahole.py b/gdb/python/lib/gdb/command/pahole.py
 new file mode 100644
-index 0000000..e08eaf5
+index 0000000000..e08eaf5ca8
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/pahole.py
 @@ -0,0 +1,81 @@
@@ -397,7 +430,7 @@ index 0000000..e08eaf5
 +Pahole()
 diff --git a/gdb/python/lib/gdb/function/in_scope.py b/gdb/python/lib/gdb/function/in_scope.py
 new file mode 100644
-index 0000000..8742680
+index 0000000000..8742680614
 --- /dev/null
 +++ b/gdb/python/lib/gdb/function/in_scope.py
 @@ -0,0 +1,47 @@
@@ -449,10 +482,10 @@ index 0000000..8742680
 +
 +InScope ()
 diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
-index e84c8d2..69305b4 100644
+index f099ae437f..468b0ebd92 100644
 --- a/gdb/python/python-internal.h
 +++ b/gdb/python/python-internal.h
-@@ -672,6 +672,9 @@ class gdbpy_enter_varobj : public gdbpy_enter
+@@ -651,6 +651,9 @@ class gdbpy_enter_varobj : public gdbpy_enter
  
  };
  
@@ -463,7 +496,7 @@ index e84c8d2..69305b4 100644
  extern const struct language_defn *python_language;
  
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index 7e0c507..a67fbc3 100644
+index 0f71a4335e..03f6c55d40 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
 @@ -95,6 +95,8 @@ const struct extension_language_defn extension_language_python =
@@ -505,7 +538,7 @@ index 7e0c507..a67fbc3 100644
  /* Set the quit flag.  */
  
  static void
-@@ -1187,6 +1212,92 @@ gdbpy_print_stack (void)
+@@ -1356,6 +1381,92 @@ gdbpy_print_stack (void)
  
  /* Return the current Progspace.
     There always is one.  */
@@ -598,7 +631,7 @@ index 7e0c507..a67fbc3 100644
  
  static PyObject *
  gdbpy_get_current_progspace (PyObject *unused1, PyObject *unused2)
-@@ -1881,6 +1992,8 @@ PyMethodDef python_GdbMethods[] =
+@@ -2035,6 +2146,8 @@ PyMethodDef python_GdbMethods[] =
  Evaluate command, a string, as a gdb CLI command.  Optionally returns\n\
  a Python String containing the output of the command if to_string is\n\
  set to True." },
@@ -608,7 +641,7 @@ index 7e0c507..a67fbc3 100644
      "Return a gdb parameter's value" },
  
 diff --git a/gdb/python/python.h b/gdb/python/python.h
-index e407faa..fc1c632 100644
+index e407faabfd..fc1c6326a2 100644
 --- a/gdb/python/python.h
 +++ b/gdb/python/python.h
 @@ -25,4 +25,6 @@
@@ -619,7 +652,7 @@ index e407faa..fc1c632 100644
 +
  #endif /* GDB_PYTHON_H */
 diff --git a/gdb/testsuite/gdb.python/py-frame.exp b/gdb/testsuite/gdb.python/py-frame.exp
-index f5d4a3c..3546f7b 100644
+index f5d4a3cc12..3546f7ba2a 100644
 --- a/gdb/testsuite/gdb.python/py-frame.exp
 +++ b/gdb/testsuite/gdb.python/py-frame.exp
 @@ -95,6 +95,8 @@ gdb_test "python print ('result = %s' % f0.read_var ('a'))" " = 1" "test Frame.r
@@ -632,7 +665,7 @@ index f5d4a3c..3546f7b 100644
  gdb_test "python print ('result = %s' % (gdb.selected_frame ().read_register ('sp') == gdb.parse_and_eval ('\$sp')))" \
    " = True" \
 diff --git a/gdb/testsuite/gdb.python/py-value.exp b/gdb/testsuite/gdb.python/py-value.exp
-index 1781887..8a2ddd6 100644
+index 1781887c4a..8a2ddd6fae 100644
 --- a/gdb/testsuite/gdb.python/py-value.exp
 +++ b/gdb/testsuite/gdb.python/py-value.exp
 @@ -384,6 +384,15 @@ proc test_value_after_death {} {
@@ -660,10 +693,10 @@ index 1781887..8a2ddd6 100644
  # Test either C or C++ values. 
  
 diff --git a/gdb/varobj.c b/gdb/varobj.c
-index 5f21d84..18506f1 100644
+index 93b97f6f70..753c6596b3 100644
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
-@@ -226,6 +226,14 @@ is_root_p (const struct varobj *var)
+@@ -217,6 +217,14 @@ is_root_p (const struct varobj *var)
  }
  
  #ifdef HAVE_PYTHON
@@ -679,15 +712,18 @@ index 5f21d84..18506f1 100644
  /* See python-internal.h.  */
  gdbpy_enter_varobj::gdbpy_enter_varobj (const struct varobj *var)
 diff --git a/gdb/varobj.h b/gdb/varobj.h
-index e35c1b8..12339d1 100644
+index 9163a34fd0..ed51b6ad34 100644
 --- a/gdb/varobj.h
 +++ b/gdb/varobj.h
-@@ -320,6 +320,8 @@ extern int varobj_has_more (const struct varobj *var, int to);
+@@ -327,6 +327,8 @@ extern bool varobj_has_more (const struct varobj *var, int to);
  
- extern int varobj_is_dynamic_p (const struct varobj *var);
+ extern bool varobj_is_dynamic_p (const struct varobj *var);
  
 +extern struct cleanup *varobj_ensure_python_env (const struct varobj *var);
 +
- extern int varobj_default_value_is_changeable_p (const struct varobj *var);
- extern int varobj_value_is_changeable_p (const struct varobj *var);
+ extern bool varobj_default_value_is_changeable_p (const struct varobj *var);
+ extern bool varobj_value_is_changeable_p (const struct varobj *var);
  
+-- 
+2.14.3
+

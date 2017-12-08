@@ -1,8 +1,12 @@
+From 599be587bb5eed8a8c3908f52d75c1e93543ee5d Mon Sep 17 00:00:00 2001
 From: Jan Kratochvil <jan.kratochvil@redhat.com>
 Date: Fri, 27 Oct 2017 21:07:50 +0200
 Subject: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
 
 FileName: gdb-6.5-bz185337-resolve-tls-without-debuginfo-v2.patch
+
+;; Support TLS symbols (+`errno' suggestion if no pthread is found) (BZ 185337).
+;;=push+jan: It should be replaced by Infinity project.
 
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=185337
 
@@ -30,7 +34,6 @@ call invalidates `struct frame *' in the callers - RH BZ 690908.
 
 https://bugzilla.redhat.com/show_bug.cgi?id=1166549
 
-
 2007-11-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* ./gdb/dwarf2read.c (read_partial_die, dwarf2_linkage_name): Prefer
@@ -39,12 +42,23 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1166549
 glibc-debuginfo-2.7-2.x86_64: /usr/lib/debug/lib64/libc.so.6.debug:
   <81a2>     DW_AT_name        : (indirect string, offset: 0x280e): __errno_location
   <81a8>     DW_AT_MIPS_linkage_name: (indirect string, offset: 0x2808): *__GI___errno_location
+---
+ gdb/printcmd.c                          |  4 ++
+ gdb/testsuite/gdb.dwarf2/dw2-errno.c    | 28 +++++++++++++
+ gdb/testsuite/gdb.dwarf2/dw2-errno.exp  | 60 ++++++++++++++++++++++++++++
+ gdb/testsuite/gdb.dwarf2/dw2-errno2.c   | 28 +++++++++++++
+ gdb/testsuite/gdb.dwarf2/dw2-errno2.exp | 71 +++++++++++++++++++++++++++++++++
+ 5 files changed, 191 insertions(+)
+ create mode 100644 gdb/testsuite/gdb.dwarf2/dw2-errno.c
+ create mode 100644 gdb/testsuite/gdb.dwarf2/dw2-errno.exp
+ create mode 100644 gdb/testsuite/gdb.dwarf2/dw2-errno2.c
+ create mode 100644 gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 
-Index: gdb-7.12.50.20170207/gdb/printcmd.c
-===================================================================
---- gdb-7.12.50.20170207.orig/gdb/printcmd.c	2017-02-07 21:06:20.196593884 +0100
-+++ gdb-7.12.50.20170207/gdb/printcmd.c	2017-02-07 21:07:10.230973906 +0100
-@@ -1258,6 +1258,10 @@
+diff --git a/gdb/printcmd.c b/gdb/printcmd.c
+index 20e5bda11e..38642641b9 100644
+--- a/gdb/printcmd.c
++++ b/gdb/printcmd.c
+@@ -1210,6 +1210,10 @@ print_command_1 (const char *exp, int voidprint)
  
    if (exp && *exp)
      {
@@ -55,10 +69,11 @@ Index: gdb-7.12.50.20170207/gdb/printcmd.c
        expression_up expr = parse_expression (exp);
        val = evaluate_expression (expr.get ());
      }
-Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.c	2017-02-07 21:06:20.196593884 +0100
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-errno.c b/gdb/testsuite/gdb.dwarf2/dw2-errno.c
+new file mode 100644
+index 0000000000..7bd10d0978
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-errno.c
 @@ -0,0 +1,28 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -88,10 +103,11 @@ Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.c
 +
 +  return 0;	/* breakpoint */
 +}
-Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.exp	2017-02-07 21:06:20.196593884 +0100
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-errno.exp b/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
+new file mode 100644
+index 0000000000..1f13cc1323
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
 @@ -0,0 +1,60 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -153,10 +169,11 @@ Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno.exp
 +
 +# TODO: Test the error on resolving ERRNO with only libc loaded.
 +# Just how to find the current libc filename?
-Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.c
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.c	2017-02-07 21:06:20.196593884 +0100
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-errno2.c b/gdb/testsuite/gdb.dwarf2/dw2-errno2.c
+new file mode 100644
+index 0000000000..7bd10d0978
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-errno2.c
 @@ -0,0 +1,28 @@
 +/* This testcase is part of GDB, the GNU debugger.
 +
@@ -186,10 +203,11 @@ Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.c
 +
 +  return 0;	/* breakpoint */
 +}
-Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp	2017-02-07 21:06:20.197593892 +0100
+diff --git a/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp b/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
+new file mode 100644
+index 0000000000..0f6e66870b
+--- /dev/null
++++ b/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 @@ -0,0 +1,71 @@
 +# Copyright 2007 Free Software Foundation, Inc.
 +
@@ -231,7 +249,7 @@ Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 +    if $do_xfail {
 +	setup_xfail "*-*-*"
 +    }
-+    gdb_test "print errno" ".* = 42" "print errno for core"
++    gdb_test "print (int) errno" ".* = 42" "print errno for core"
 +}}
 +
 +set variant g2thrN
@@ -262,3 +280,6 @@ Index: gdb-7.12.50.20170207/gdb/testsuite/gdb.dwarf2/dw2-errno2.exp
 +
 +# TODO: Test the error on resolving ERRNO with only libc loaded.
 +# Just how to find the current libc filename?
+-- 
+2.14.3
+
