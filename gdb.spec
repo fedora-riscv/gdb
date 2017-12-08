@@ -189,7 +189,9 @@ Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
-%include _gdb.spec.Patch.include
+Source8: _gdb.spec.Patch.include
+Source9: _gdb.spec.patch.include
+%include %{SOURCE8}
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -421,7 +423,7 @@ find -name "*.info*"|xargs rm -f
 
 # Include the auto-generated "%patch" directives.
 # See README.local-patches for more details.
-%include _gdb.spec.patch.include
+%include %{SOURCE9}
 
 %if 0%{!?el6:1}
 for i in \
