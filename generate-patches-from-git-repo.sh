@@ -62,7 +62,13 @@ rm -f $temp_PATCH_file $temp_patch_file $temp_patch_order_file
 for c in `git rev-list --reverse ${common_ancestor}..HEAD` ; do
     fname=`git log -1 --pretty='format:%b' $c | sed -n 's/^FileName: \(.*\)$/\1/p'`
     test -z $fname && die "Could not determine FileName of commit $c."
-    git format-patch --keep -1 --stdout $c > ../$fname
+    # Because git-format-patch generates patches with the first line
+    # containing the commit hash, every time we do a git-format-patch
+    # here we will have a different .patch file from what we had
+    # before, even if nothing has changed.  This is bad, so we replace
+    # the commit hash by something constant (the string
+    # "FEDORA_PATCHES").
+    git format-patch --keep -1 --stdout $c | sed '1 s/^From \([0-9a-f]\+\) \(.*\)/From FEDORA_PATCHES \2/' > ../$fname
     (cd .. && git add $fname)
 
     cat >> $temp_PATCH_file <<EOF

@@ -26,13 +26,14 @@ Version: 8.0.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 34%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
-Source: #ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+Source: %{tarname}.tar.xz
+#Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -1016,6 +1017,12 @@ then
 fi
 
 %changelog
+* Sun Dec 10 2017 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.50.20171204-34.fc26
+- chmod +x on the generate-*.sh script.s
+- Remove references to gdb-8.0.1 from 'sources' and '.gitignore'.
+- Regenerate first line of the patches (remove commit hash).
+- Fix empty Source line.
+
 * Thu Dec  7 2017 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.50.20171204-33.fc26
 - Rebase to FSF GDB 8.0.50.20171204 (8.1pre).
 - Implemented new method for dealing with local patches.
