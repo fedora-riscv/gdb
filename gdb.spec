@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20171204
+%global snapsrc    20171213
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.0.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1017,6 +1017,9 @@ then
 fi
 
 %changelog
+* Sat Dec 16 2017 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.50.20171204-35.fc26
+- Rebase to FSF GDB 8.0.50.20171213 (8.1pre).
+
 * Sun Dec 10 2017 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.50.20171204-34.fc26
 - chmod +x on the generate-*.sh script.s
 - Remove references to gdb-8.0.1 from 'sources' and '.gitignore'.
