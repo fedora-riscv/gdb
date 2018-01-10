@@ -34,24 +34,24 @@ git diff --stat -p gdb/master...gdb/users/bheckel/fortran-vla-strings
 ---
  gdb/NEWS                                  |   2 +
  gdb/c-valprint.c                          |  22 ++++
- gdb/dwarf2read.c                          | 160 +++++++++++++++++++++++++-----
+ gdb/dwarf2read.c                          | 163 +++++++++++++++++++++++++-----
  gdb/f-typeprint.c                         |  93 +++++++++--------
- gdb/gdbtypes.c                            |  44 +++++++-
+ gdb/gdbtypes.c                            |  40 +++++++-
  gdb/testsuite/gdb.cp/vla-cxx.cc           |   9 ++
  gdb/testsuite/gdb.cp/vla-cxx.exp          |   9 ++
  gdb/testsuite/gdb.fortran/pointers.exp    | 143 ++++++++++++++++++++++++++
  gdb/testsuite/gdb.fortran/pointers.f90    | 109 ++++++++++++++++++++
- gdb/testsuite/gdb.fortran/print_type.exp  | 100 +++++++++++++++++++
+ gdb/testsuite/gdb.fortran/print_type.exp  | 100 ++++++++++++++++++
  gdb/testsuite/gdb.fortran/vla-ptype.exp   |  12 +--
  gdb/testsuite/gdb.fortran/vla-strings.exp | 103 +++++++++++++++++++
- gdb/testsuite/gdb.fortran/vla-strings.f90 |  39 ++++++++
+ gdb/testsuite/gdb.fortran/vla-strings.f90 |  39 +++++++
  gdb/testsuite/gdb.fortran/vla-type.exp    |   7 +-
  gdb/testsuite/gdb.fortran/vla-value.exp   |   4 +-
  gdb/testsuite/gdb.mi/mi-vla-fortran.exp   |   8 +-
  gdb/typeprint.c                           |  19 ++++
  gdb/valops.c                              |  16 ++-
  gdb/valprint.c                            |   6 --
- 19 files changed, 807 insertions(+), 98 deletions(-)
+ 19 files changed, 807 insertions(+), 97 deletions(-)
  create mode 100644 gdb/testsuite/gdb.fortran/pointers.exp
  create mode 100644 gdb/testsuite/gdb.fortran/pointers.f90
  create mode 100644 gdb/testsuite/gdb.fortran/print_type.exp
@@ -59,7 +59,7 @@ git diff --stat -p gdb/master...gdb/users/bheckel/fortran-vla-strings
  create mode 100644 gdb/testsuite/gdb.fortran/vla-strings.f90
 
 diff --git a/gdb/NEWS b/gdb/NEWS
-index c6fe297159..c0830619fe 100644
+index 14fcdf8674..6b45cc27db 100644
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
 @@ -1,6 +1,8 @@
@@ -70,12 +70,12 @@ index c6fe297159..c0830619fe 100644
 +
  *** Changes since GDB 8.0
  
- * New "--readnever" command line option instructs GDB to not read each
+ * GDB now supports dynamically creating arbitrary register groups specified
 diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
-index 653fed657a..96e6c597cf 100644
+index c4c0918e26..3904fab260 100644
 --- a/gdb/c-valprint.c
 +++ b/gdb/c-valprint.c
-@@ -650,6 +650,28 @@ c_value_print (struct value *val, struct ui_file *stream,
+@@ -653,6 +653,28 @@ c_value_print (struct value *val, struct ui_file *stream,
        else
  	{
  	  /* normal case */
@@ -105,7 +105,7 @@ index 653fed657a..96e6c597cf 100644
  	  type_print (value_type (val), "", stream, -1);
  	  fprintf_filtered (stream, ") ");
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 3f04c6f8d4..f32b115500 100644
+index 59e749e416..a1bc7eda75 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -2077,7 +2077,8 @@ static void read_signatured_type (struct signatured_type *);
@@ -118,7 +118,7 @@ index 3f04c6f8d4..f32b115500 100644
  
  /* memory allocation interface */
  
-@@ -13735,7 +13736,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -13747,7 +13748,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
      {
        newobj->static_link
  	= XOBNEW (&objfile->objfile_obstack, struct dynamic_prop);
@@ -127,7 +127,17 @@ index 3f04c6f8d4..f32b115500 100644
      }
  
    cu->list_in_scope = &local_symbols;
-@@ -17046,29 +17047,94 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -16329,7 +16330,8 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+ 
+       byte_stride_prop
+ 	= (struct dynamic_prop *) alloca (sizeof (struct dynamic_prop));
+-      stride_ok = attr_to_dynamic_prop (attr, die, cu, byte_stride_prop);
++      stride_ok = attr_to_dynamic_prop (attr, die, cu, byte_stride_prop,
++					NULL, 0);
+       if (!stride_ok)
+ 	{
+ 	  complaint (&symfile_complaints,
+@@ -17077,29 +17079,94 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -233,7 +243,7 @@ index 3f04c6f8d4..f32b115500 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -17417,7 +17483,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17448,7 +17515,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
  
  static int
  attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
@@ -243,7 +253,7 @@ index 3f04c6f8d4..f32b115500 100644
  {
    struct dwarf2_property_baton *baton;
    struct obstack *obstack = &cu->objfile->objfile_obstack;
-@@ -17427,14 +17494,33 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -17458,14 +17526,33 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  
    if (attr_form_is_block (attr))
      {
@@ -281,7 +291,7 @@ index 3f04c6f8d4..f32b115500 100644
      }
    else if (attr_form_is_ref (attr))
      {
-@@ -17467,8 +17553,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -17498,8 +17585,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  		baton = XOBNEW (obstack, struct dwarf2_property_baton);
  		baton->referenced_type = die_type (target_die, target_cu);
  		baton->locexpr.per_cu = cu->per_cu;
@@ -312,7 +322,7 @@ index 3f04c6f8d4..f32b115500 100644
  		prop->data.baton = baton;
  		prop->kind = PROP_LOCEXPR;
  		gdb_assert (prop->data.baton != NULL);
-@@ -17579,24 +17685,24 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17610,24 +17717,24 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
    if (attr)
@@ -341,7 +351,7 @@ index 3f04c6f8d4..f32b115500 100644
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -25183,7 +25289,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25225,7 +25332,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    attr = dwarf2_attr (die, DW_AT_allocated, cu);
    if (attr_form_is_block (attr))
      {
@@ -350,7 +360,7 @@ index 3f04c6f8d4..f32b115500 100644
          add_dyn_prop (DYN_PROP_ALLOCATED, prop, type, objfile);
      }
    else if (attr != NULL)
-@@ -25198,7 +25304,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25240,7 +25347,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    attr = dwarf2_attr (die, DW_AT_associated, cu);
    if (attr_form_is_block (attr))
      {
@@ -359,7 +369,7 @@ index 3f04c6f8d4..f32b115500 100644
          add_dyn_prop (DYN_PROP_ASSOCIATED, prop, type, objfile);
      }
    else if (attr != NULL)
-@@ -25211,7 +25317,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25253,7 +25360,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    /* Read DW_AT_data_location and set in type.  */
    attr = dwarf2_attr (die, DW_AT_data_location, cu);
@@ -369,7 +379,7 @@ index 3f04c6f8d4..f32b115500 100644
  
    if (dwarf2_per_objfile->die_type_hash == NULL)
 diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
-index 9d9a1f30b9..dccdfe79c6 100644
+index f14f1811f4..4f6a0ed09a 100644
 --- a/gdb/f-typeprint.c
 +++ b/gdb/f-typeprint.c
 @@ -37,7 +37,7 @@ static void f_type_print_args (struct type *, struct ui_file *);
@@ -522,10 +532,10 @@ index 9d9a1f30b9..dccdfe79c6 100644
  	    }
  	  fprintfi_filtered (level, stream, "End Type ");
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 63ada5a46c..a25e0a84e9 100644
+index 519dfebba8..b731a2f2c6 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
-@@ -1842,7 +1842,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1877,7 +1877,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
    type = check_typedef (type);
  
    /* We only want to recognize references at the outermost level.  */
@@ -535,7 +545,7 @@ index 63ada5a46c..a25e0a84e9 100644
      type = check_typedef (TYPE_TARGET_TYPE (type));
  
    /* Types that have a dynamic TYPE_DATA_LOCATION are considered
-@@ -1876,6 +1877,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1911,6 +1912,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
        }
  
      case TYPE_CODE_ARRAY:
@@ -543,9 +553,9 @@ index 63ada5a46c..a25e0a84e9 100644
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
-@@ -1988,7 +1990,8 @@ resolve_dynamic_array (struct type *type,
-   struct type *ary_dim;
+@@ -2029,7 +2031,8 @@ resolve_dynamic_array (struct type *type,
    struct dynamic_prop *prop;
+   unsigned int bit_stride = 0;
  
 -  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY);
 +  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY
@@ -553,7 +563,7 @@ index 63ada5a46c..a25e0a84e9 100644
  
    type = copy_type (type);
  
-@@ -2013,13 +2016,17 @@ resolve_dynamic_array (struct type *type,
+@@ -2054,11 +2057,15 @@ resolve_dynamic_array (struct type *type,
  
    ary_dim = check_typedef (TYPE_TARGET_TYPE (elt_type));
  
@@ -564,17 +574,13 @@ index 63ada5a46c..a25e0a84e9 100644
    else
      elt_type = TYPE_TARGET_TYPE (type);
  
--  return create_array_type_with_stride (type, elt_type, range_type,
--                                        TYPE_FIELD_BITSIZE (type, 0));
 +  if (TYPE_CODE (type) == TYPE_CODE_STRING)
 +    return create_string_type (type, elt_type, range_type);
-+  else
-+    return create_array_type_with_stride (type, elt_type, range_type,
-+					  TYPE_FIELD_BITSIZE (type, 0));
- }
- 
- /* Resolve dynamic bounds of members of the union TYPE to static
-@@ -2149,6 +2156,28 @@ resolve_dynamic_struct (struct type *type,
++
+   prop = get_dyn_prop (DYN_PROP_BYTE_STRIDE, type);
+   if (prop != NULL)
+     {
+@@ -2213,6 +2220,28 @@ resolve_dynamic_struct (struct type *type,
    return resolved_type;
  }
  
@@ -603,7 +609,7 @@ index 63ada5a46c..a25e0a84e9 100644
  /* Worker for resolved_dynamic_type.  */
  
  static struct type *
-@@ -2197,7 +2226,12 @@ resolve_dynamic_type_internal (struct type *type,
+@@ -2261,7 +2290,12 @@ resolve_dynamic_type_internal (struct type *type,
  	    break;
  	  }
  
@@ -617,7 +623,7 @@ index 63ada5a46c..a25e0a84e9 100644
  	  break;
  
 diff --git a/gdb/testsuite/gdb.cp/vla-cxx.cc b/gdb/testsuite/gdb.cp/vla-cxx.cc
-index 83bd24b190..15c683e89c 100644
+index 1b5b27bf3d..06198b41e0 100644
 --- a/gdb/testsuite/gdb.cp/vla-cxx.cc
 +++ b/gdb/testsuite/gdb.cp/vla-cxx.cc
 @@ -15,6 +15,10 @@
@@ -649,7 +655,7 @@ index 83bd24b190..15c683e89c 100644
    return vla[2];
  }
 diff --git a/gdb/testsuite/gdb.cp/vla-cxx.exp b/gdb/testsuite/gdb.cp/vla-cxx.exp
-index a8d811dcf2..04b4ae6e10 100644
+index ac87499d49..dacbfb6ca0 100644
 --- a/gdb/testsuite/gdb.cp/vla-cxx.exp
 +++ b/gdb/testsuite/gdb.cp/vla-cxx.exp
 @@ -23,6 +23,12 @@ if ![runto_main] {
@@ -1043,7 +1049,7 @@ index 0000000000..45b4968f6c
 +}
 +gdb_test "ptype realp" "type = PTR TO -> \\( $real \\)"
 diff --git a/gdb/testsuite/gdb.fortran/vla-ptype.exp b/gdb/testsuite/gdb.fortran/vla-ptype.exp
-index 76f47708d8..eea93534d2 100644
+index 5351a0aa2e..fa248c5a0c 100644
 --- a/gdb/testsuite/gdb.fortran/vla-ptype.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-ptype.exp
 @@ -32,9 +32,9 @@ set real [fortran_real4]
@@ -1238,7 +1244,7 @@ index 0000000000..3c22735fdb
 +  l = associated(var_char_p)              ! var_char_p-not-associated
 +end program vla_strings
 diff --git a/gdb/testsuite/gdb.fortran/vla-type.exp b/gdb/testsuite/gdb.fortran/vla-type.exp
-index 6728b48be7..87aac396a2 100755
+index aff0d5a258..6f2d6a4009 100755
 --- a/gdb/testsuite/gdb.fortran/vla-type.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-type.exp
 @@ -132,7 +132,10 @@ gdb_test "ptype fivearr(2)%tone" \
@@ -1263,7 +1269,7 @@ index 6728b48be7..87aac396a2 100755
           "ptype fivedynarr(2)%tone, not allocated"
  
 diff --git a/gdb/testsuite/gdb.fortran/vla-value.exp b/gdb/testsuite/gdb.fortran/vla-value.exp
-index 60022c5f62..7f03b76cd1 100644
+index 4b1842e38c..5a831a3964 100644
 --- a/gdb/testsuite/gdb.fortran/vla-value.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-value.exp
 @@ -35,7 +35,7 @@ gdb_breakpoint [gdb_get_line_number "vla1-init"]
@@ -1285,7 +1291,7 @@ index 60022c5f62..7f03b76cd1 100644
  gdb_test "print pvla(1, 3, 8)" "no such vector element \\\(vector not associated\\\)" \
    "print undefined pvla(1,3,8)"
 diff --git a/gdb/testsuite/gdb.mi/mi-vla-fortran.exp b/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
-index bee6ebe156..f6eb0469a9 100644
+index b6e777235c..14b611f7b5 100644
 --- a/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
 +++ b/gdb/testsuite/gdb.mi/mi-vla-fortran.exp
 @@ -51,10 +51,10 @@ mi_expect_stop "breakpoint-hit" "vla" "" ".*vla.f90" "$bp_lineno" \
@@ -1315,10 +1321,10 @@ index bee6ebe156..f6eb0469a9 100644
  	mi_gdb_test "582-var-show-format pvla2_not_associated" \
  	    "582\\^done,format=\"natural\"" \
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
-index 9d9d6f5a49..7dd978013a 100644
+index 9a125076a1..586f644c49 100644
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
-@@ -513,6 +513,25 @@ whatis_exp (const char *exp, int show)
+@@ -534,6 +534,25 @@ whatis_exp (const char *exp, int show)
        printf_filtered (" */\n");    
      }
  
@@ -1345,7 +1351,7 @@ index 9d9d6f5a49..7dd978013a 100644
    printf_filtered ("\n");
  
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 4715912b94..4ecfa9fd96 100644
+index 4cd4fd96ae..9b25980090 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -1564,6 +1564,19 @@ value_ind (struct value *arg1)
@@ -1379,7 +1385,7 @@ index 4715912b94..4ecfa9fd96 100644
        enc_type = value_type (arg2);
        return readjust_indirect_value_type (arg2, enc_type, base_type, arg1);
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index 9b07221f1f..20e3a4178b 100644
+index b19123f23e..d01d02fc09 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
 @@ -1111,12 +1111,6 @@ value_check_printable (struct value *val, struct ui_file *stream,
