@@ -737,6 +737,10 @@ Patch1259: gdb-rhbz1498758-5of5.patch
 Patch1261: gdb-rhbz1228556-bpt-inlined-func-name-1of2.patch
 Patch1262: gdb-rhbz1228556-bpt-inlined-func-name-2of2.patch
 
+# Fix random 'FAIL: libstdc++-prettyprinters/80276.cc whatis p4' (GCC
+# PR83906) (Pedro Alves).
+Patch1263: gdb-random-libstdcpp-prettyprinters-fail.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1149,6 +1153,7 @@ done
 %patch1259 -p1
 %patch1261 -p1
 %patch1262 -p1
+%patch1263 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
