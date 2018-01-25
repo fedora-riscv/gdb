@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 34%{?dist}
+Release: 35%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1736,7 +1736,10 @@ then
 fi
 
 %changelog
-* Wed Jan 24 2018 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.0.1-34
+* Thu Jan 25 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.1-35.fc27
+- Add %patch directive to the commit below.
+
+* Wed Jan 24 2018 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.0.1-34.fc27
 - Fix random 'FAIL: libstdc++-prettyprinters/80276.cc whatis p4' (GCC PR83906)
   (Pedro Alves).
 
