@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1017,6 +1017,9 @@ then
 fi
 
 %changelog
+* Sun Feb  4 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-4.fc28
+- Fix -D_GLIBCXX_DEBUG gdb-add-index regression (RH BZ 1540559).
+
 * Wed Jan 31 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1-3.fc26
 - Rebase to FSF GDB 8.1.
 
