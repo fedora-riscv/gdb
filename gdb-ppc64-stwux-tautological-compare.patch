@@ -1,0 +1,56 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Sun, 4 Feb 2018 21:42:18 +0100
+Subject: gdb-ppc64-stwux-tautological-compare.patch
+
+FileName: gdb-ppc64-stwux-tautological-compare.patch
+
+;; Fix ppc64 stwux encoding as found by gcc-8.0 -Werror=tautological-compare.
+
+[patch] ppc64: Fix stwux encoding
+https://sourceware.org/ml/gdb-patches/2018-02/msg00058.html
+
+with gcc-8.0.1-0.9.fc28.x86_64 I get:
+
+../../gdb/rs6000-tdep.c: In function 'CORE_ADDR skip_prologue(gdbarch*, CORE_ADDR, CORE_ADDR, rs6000_framedata*)':
+../../gdb/rs6000-tdep.c:1911:34: error: bitwise comparison always evaluates to false [-Werror=tautological-compare]
+       else if ((op & 0xfc1f016a) == 0x7c01016e)
+                ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+
+The code is there since:
+	commit 98f08d3d9b69b344bb8b0cd2a4bda1cf4d966e20
+	Author: Kevin Buettner <kevinb@redhat.com>
+	Date:   Thu May 29 19:47:14 2003 +0000
+		    From Jimi X <jimix@watson.ibm.com>:
+		    * rs6000-tdep.c (skip_prologue): Improve support for 64-bit code.
+So I do not think we can find the original author.
+
+https://www.ibm.com/support/knowledgecenter/en/ssw_aix_72/com.ibm.aix.alangref/idalangref_stwux_stux_instrs.htm
+says
+	bit 21 - 30 = 183
+	Those are bits 1..10 in normal bit order: 183<<1 = 0x16e
+
+gdb/ChangeLog
+2018-02-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* rs6000-tdep.c (skip_prologue): Fix stwux encoding.
+---
+ gdb/rs6000-tdep.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gdb/rs6000-tdep.c b/gdb/rs6000-tdep.c
+index 23d0db3b8f..5275ff5b91 100644
+--- a/gdb/rs6000-tdep.c
++++ b/gdb/rs6000-tdep.c
+@@ -1908,7 +1908,7 @@ skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc, CORE_ADDR lim_pc,
+ 	  offset = fdata->offset;
+ 	  continue;
+ 	}
+-      else if ((op & 0xfc1f016a) == 0x7c01016e)
++      else if ((op & 0xfc1f016e) == 0x7c01016e)
+ 	{			/* stwux rX,r1,rY */
+ 	  /* No way to figure out what r1 is going to be.  */
+ 	  fdata->frameless = 0;
+-- 
+2.14.3
+

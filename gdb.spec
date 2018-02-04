@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -496,6 +496,16 @@ cd %{gdb_build}$fprofile
 
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
+
+# FIXME: gcc-8.0:
+# ./elf32-target.h:215:4: error: cast between incompatible function types from 'void * (*)(bfd *)' {aka 'void * (*)(struct bfd *)'} to 'asymbol * (*)(bfd *, void *, long unsigned int)' {aka 'struct bfd_symbol * (*)(struct bfd *, void *, long unsigned int)'} [-Werror=cast-function-type]
+#    ((asymbol * (*) (bfd *, void *, unsigned long)) bfd_nullvoidptr)
+CFLAGS="$CFLAGS -Wno-error=cast-function-type"
+
+# FIXME: gcc-8.0:
+# linux-tdep.c:1767:11: error: ‘char* strncpy(char*, const char*, size_t)’ specified bound 17 equals destination size [-Werror=stringop-truncation]
+#    strncpy (p->pr_fname, basename, sizeof (p->pr_fname));
+CFLAGS="$CFLAGS -Wno-error=stringop-truncation"
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
@@ -1017,6 +1027,10 @@ then
 fi
 
 %changelog
+* Sun Feb  4 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-5.fc28
+- Workaround gcc-8.0: -Wno-error=cast-function-type,stringop-truncation
+- Fix ppc64 stwux encoding as found by gcc-8.0 -Werror=tautological-compare.
+
 * Sun Feb  4 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-4.fc28
 - Fix -D_GLIBCXX_DEBUG gdb-add-index regression (RH BZ 1540559).
 
