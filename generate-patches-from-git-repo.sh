@@ -14,14 +14,15 @@ usage ()
 $0 -- Generate .patch files for a RPM package from a git repository
 
 Usage:
-  $0 <REPOSITORY> [<COMMIT_OR_TAG>]
+  $0 <REPOSITORY> [<COMMIT_OR_TAG_OR_BRANCH>]
 
 <REPOSITORY> is the directory where the rebase was performed.
 
-<COMMIT_OR_TAG> is the commit or tag against which the rebase was
-performed.  It is optional, and if not provided "origin/master" will
-be used.  This script will then use 'git merge-base' to find the most
-recent common ancestor between HEAD and COMMIT_OR_TAG.
+<COMMIT_OR_TAG_OR_BRANCH> is the commit or tag or branch against which
+the rebase was performed.  It generally just needs to be provided if
+the file "_git_upstream_commit" doesn't exist, or if you are doing a
+rebase.  This script will then use 'git merge-base' to find the most
+recent common ancestor between HEAD and COMMIT_OR_TAG_OR_BRANCH.
 
 Options are:
 
@@ -35,10 +36,12 @@ test -f gdb.spec || die "This script needs to run from the same directory as gdb
 test -z $1 && die "You need to specify the repository."
 test "$1" = "-h" && usage
 
-commit_or_tag="origin/master"
+commit_or_tag="`cat _git_upstream_commit`"
 if test ! -z "$2" ; then
     commit_or_tag="$2"
 fi
+
+test -z $commit_or_tag && die "Because the '_git_upstream_commit' file doesn't exist, you need to specify a commit/tag/branch."
 
 test -d $1 || die "$1 is not a directory."
 
