@@ -1,0 +1,229 @@
+From: Pedro Alves <palves at redhat dot com>
+To: gdb-patches at sourceware dot org
+Subject: [PATCH] Fix GCC PR83906 - [8 Regression] Random FAIL: libstdc++-prettyprinters/80276.cc whatis p4
+Date: Wed, 24 Jan 2018 17:27:22 +0000
+Message-Id: <20180124172722.31553-1-palves@redhat.com>
+
+GCC PR83906 [1] is about a GCC/libstdc++ GDB/Python type printer
+testcase failing randomly, as shown by running (in libstdc++'s
+testsuite):
+
+ make check RUNTESTFLAGS=prettyprinters.exp=80276.cc
+
+in a loop.  Sometimes you get this:
+
+ FAIL: libstdc++-prettyprinters/80276.cc whatis p4
+
+I.e., this:
+ type = std::unique_ptr<std::vector<std::unique_ptr<std::list<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >>[]>>[99]>
+
+instead of this:
+ type = std::unique_ptr<std::vector<std::unique_ptr<std::list<std::string>[]>>[99]>
+
+Jonathan Wakely tracked it on the printer side to this bit in
+libstdc++'s type printer:
+
+            if self.type_obj == type_obj:
+                return strip_inline_namespaces(self.name)
+
+This assumes the two types resolve to the same gdb.Type but some times
+the comparison unexpectedly fails.
+
+Running the testcase manually under Valgrind finds the problem in GDB:
+
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ ==6118== Conditional jump or move depends on uninitialised value(s)
+ ==6118==    at 0x4C35CB0: bcmp (vg_replace_strmem.c:1100)
+ ==6118==    by 0x6F773A: check_types_equal(type*, type*, VEC_type_equality_entry_d**) (gdbtypes.c:3515)
+ ==6118==    by 0x6F7B00: check_types_worklist(VEC_type_equality_entry_d**, bcache*) (gdbtypes.c:3618)
+ ==6118==    by 0x6F7C03: types_deeply_equal(type*, type*) (gdbtypes.c:3655)
+ ==6118==    by 0x4D5B06: typy_richcompare(_object*, _object*, int) (py-type.c:1007)
+ ==6118==    by 0x63D7E6C: PyObject_RichCompare (object.c:961)
+ ==6118==    by 0x646EAEC: PyEval_EvalFrameEx (ceval.c:4960)
+ ==6118==    by 0x646DC08: PyEval_EvalFrameEx (ceval.c:4519)
+ ==6118==    by 0x646DC08: PyEval_EvalFrameEx (ceval.c:4519)
+ ==6118==    by 0x646DC08: PyEval_EvalFrameEx (ceval.c:4519)
+ ==6118==    by 0x646DC08: PyEval_EvalFrameEx (ceval.c:4519)
+ ==6118==    by 0x646DC08: PyEval_EvalFrameEx (ceval.c:4519)
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+That "bcmp" call is really a memcmp call in check_types_equal.  The
+problem is that gdb is memcmp'ing two objects that are equal in value:
+
+ (top-gdb) p *TYPE_RANGE_DATA (type1)
+ $1 = {low = {kind = PROP_CONST, data = {const_val = 0, baton = 0x0}}, high = {kind = PROP_CONST, data = {const_val = 15, baton = 0xf}}, flag_upper_bound_is_count = 0,
+   flag_bound_evaluated = 0}
+ (top-gdb) p *TYPE_RANGE_DATA (type2)
+ $2 = {low = {kind = PROP_CONST, data = {const_val = 0, baton = 0x0}}, high = {kind = PROP_CONST, data = {const_val = 15, baton = 0xf}}, flag_upper_bound_is_count = 0,
+   flag_bound_evaluated = 0}
+
+but differ in padding.  Notice the 4-byte hole:
+
+  (top-gdb) ptype /o range_bounds
+  /* offset    |  size */  type = struct range_bounds {
+  /*    0      |    16 */    struct dynamic_prop {
+  /*    0      |     4 */        dynamic_prop_kind kind;
+  /* XXX  4-byte hole  */
+  /*    8      |     8 */        union dynamic_prop_data {
+  /*                 8 */            LONGEST const_val;
+  /*                 8 */            void *baton;
+
+				     /* total size (bytes):    8 */
+				 } data;
+
+which is filled with garbage:
+
+  (top-gdb) x /40bx TYPE_RANGE_DATA (type1)
+  0x2fa7ea0:      0x01    0x00    0x00    0x00    0x43    0x01    0x00    0x00
+						  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  0x2fa7ea8:      0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+  0x2fa7eb0:      0x01    0x00    0x00    0x00    0xfe    0x7f    0x00    0x00
+  0x2fa7eb8:      0x0f    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+  0x2fa7ec0:      0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+  (top-gdb) x /40bx TYPE_RANGE_DATA (type2)
+  0x20379b0:      0x01    0x00    0x00    0x00    0xfe    0x7f    0x00    0x00
+						  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  0x20379b8:      0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+  0x20379c0:      0x01    0x00    0x00    0x00    0xfe    0x7f    0x00    0x00
+  0x20379c8:      0x0f    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+  0x20379d0:      0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+
+  (top-gdb) p memcmp (TYPE_RANGE_DATA (type1), TYPE_RANGE_DATA (type2), sizeof (*TYPE_RANGE_DATA (type1)))
+  $3 = -187
+
+In some cases objects of type range_bounds are memset when allocated,
+but then their dynamic_prop low/high fields are copied over from some
+template dynamic_prop object that wasn't memset.  E.g.,
+create_static_range_type's low/high locals are left with garbage in
+the padding, and then that padding is copied over to the range_bounds
+object's low/high fields.
+
+At first, I considered making sure to always memset range_bounds
+objects, thinking that maybe type objects are being put in some bcache
+instance somewhere.  But then I hacked bcache/bcache_full to poison
+non-pod types, and made dynamic_prop a non-pod, and GDB still
+compiled.
+
+So given that, it seems safest to not assume padding will always be
+memset, and instead treat them as regular value types, implementing
+(in)equality operators and using those instead of memcmp.
+
+This fixes the random FAILs in GCC's testcase.
+
+[1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83906
+
+gdb/ChangeLog:
+2018-01-24  Pedro Alves  <palves@redhat.com>
+
+	GCC PR libstdc++/83906
+	* gdbtypes.c (operator==(const dynamic_prop &,
+	const dynamic_prop &)): New.
+	(operator==(const range_bounds &, const range_bounds &)): New.
+	(check_types_equal): Use them instead of memcmp.
+	* gdbtypes.h (operator==(const dynamic_prop &,
+	const dynamic_prop &)): Declare.
+	(operator!=(const dynamic_prop &, const dynamic_prop &)): Declare.
+	(operator==(const range_bounds &, const range_bounds &)): Declare.
+	(operator!=(const range_bounds &, const range_bounds &)): Declare.
+---
+ gdb/gdbtypes.c | 41 +++++++++++++++++++++++++++++++++++++++--
+ gdb/gdbtypes.h | 20 ++++++++++++++++++++
+ 2 files changed, 59 insertions(+), 2 deletions(-)
+
+Index: gdb-8.0.1/gdb/gdbtypes.c
+===================================================================
+--- gdb-8.0.1.orig/gdb/gdbtypes.c
++++ gdb-8.0.1/gdb/gdbtypes.c
+@@ -855,6 +855,44 @@ allocate_stub_method (struct type *type)
+   return mtype;
+ }
+ 
++/* See gdbtypes.h.  */
++
++bool
++operator== (const dynamic_prop &l, const dynamic_prop &r)
++{
++  if (l.kind != r.kind)
++    return false;
++
++  switch (l.kind)
++    {
++    case PROP_UNDEFINED:
++      return true;
++    case PROP_CONST:
++      return l.data.const_val == r.data.const_val;
++    case PROP_ADDR_OFFSET:
++    case PROP_LOCEXPR:
++    case PROP_LOCLIST:
++      return l.data.baton == r.data.baton;
++    }
++
++  gdb_assert_not_reached ("unhandled dynamic_prop kind");
++}
++
++/* See gdbtypes.h.  */
++
++bool
++operator== (const range_bounds &l, const range_bounds &r)
++{
++#define FIELD_EQ(FIELD) (l.FIELD == r.FIELD)
++
++  return (FIELD_EQ (low)
++	  && FIELD_EQ (high)
++	  && FIELD_EQ (flag_upper_bound_is_count)
++	  && FIELD_EQ (flag_bound_evaluated));
++
++#undef FIELD_EQ
++}
++
+ /* Create a range type with a dynamic range from LOW_BOUND to
+    HIGH_BOUND, inclusive.  See create_range_type for further details. */
+ 
+@@ -3466,8 +3504,7 @@ check_types_equal (struct type *type1, s
+ 
+   if (TYPE_CODE (type1) == TYPE_CODE_RANGE)
+     {
+-      if (memcmp (TYPE_RANGE_DATA (type1), TYPE_RANGE_DATA (type2),
+-		  sizeof (*TYPE_RANGE_DATA (type1))) != 0)
++      if (*TYPE_RANGE_DATA (type1) != *TYPE_RANGE_DATA (type2))
+ 	return 0;
+     }
+   else
+Index: gdb-8.0.1/gdb/gdbtypes.h
+===================================================================
+--- gdb-8.0.1.orig/gdb/gdbtypes.h
++++ gdb-8.0.1/gdb/gdbtypes.h
+@@ -408,6 +408,16 @@ struct dynamic_prop
+   union dynamic_prop_data data;
+ };
+ 
++/* Compare two dynamic_prop objects for equality.  dynamic_prop
++   instances are equal iff they have the same type and storage.  */
++extern bool operator== (const dynamic_prop &l, const dynamic_prop &r);
++
++/* Compare two dynamic_prop objects for inequality.  */
++static inline bool operator!= (const dynamic_prop &l, const dynamic_prop &r)
++{
++  return !(l == r);
++}
++
+ /* * Define a type's dynamic property node kind.  */
+ enum dynamic_prop_node_kind
+ {
+@@ -568,6 +578,16 @@ struct range_bounds
+   int flag_bound_evaluated : 1;
+ };
+ 
++/* Compare two range_bounds objects for equality.  Simply does
++   memberwise comparison.  */
++extern bool operator== (const range_bounds &l, const range_bounds &r);
++
++/* Compare two range_bounds objects for inequality.  */
++static inline bool operator!= (const range_bounds &l, const range_bounds &r)
++{
++  return !(l == r);
++}
++
+ union type_specific
+ {
+   /* * CPLUS_STUFF is for TYPE_CODE_STRUCT.  It is initialized to

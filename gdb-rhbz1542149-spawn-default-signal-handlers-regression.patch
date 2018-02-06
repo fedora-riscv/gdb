@@ -1,0 +1,320 @@
+commit e379cee61f3890e535e995828e8846b020ef2a32
+Author: Pedro Alves <palves@redhat.com>
+Date:   Fri Jan 5 18:26:18 2018 +0000
+
+    Fix regression: cannot start with LD_PRELOAD=libSegFault.so (PR gdb/18653#c7)
+    
+    At https://sourceware.org/bugzilla/show_bug.cgi?id=18653#c7, Andrew
+    reports that the fix for PR gdb/18653 made GDB useless if you preload
+    libSegFault.so, because GDB internal-errors on startup:
+    
+     $ LD_PRELOAD=libSegFault.so gdb
+     src/gdb/common/signals-state-save-restore.c:64: internal-error: unexpected signal handler
+     A problem internal to GDB has been detected,
+     further debugging may prove unreliable.
+     Aborted (core dumped)
+     $
+    
+    The internal error comes from the code saving the signal dispositions
+    inherited from gdb's parent:
+    
+     (top-gdb) bt
+     #0  0x000000000056b001 in internal_error(char const*, int, char const*, ...) (file=0xaf5f38 "src/gdb/common/signals-state-save-restore.c", line=64, fmt=0xaf5f18 "unexpected signal handler") at src/gdb/common/errors.c:54
+     #1  0x00000000005752c9 in save_original_signals_state() () at src/gdb/common/signals-state-save-restore.c:64
+     #2  0x00000000007425de in captured_main_1(captured_main_args*) (context=0x7fffffffd860)
+         at src/gdb/main.c:509
+     #3  0x0000000000743622 in captured_main(void*) (data=0x7fffffffd860) at src/gdb/main.c:1145
+     During symbol reading, cannot get low and high bounds for subprogram DIE at 24065.
+     #4  0x00000000007436f9 in gdb_main(captured_main_args*) (args=0x7fffffffd860) at src/gdb/main.c:1171
+     #5  0x0000000000413acd in main(int, char**) (argc=1, argv=0x7fffffffd968) at src/gdb/gdb.c:32
+    
+    This commit downgrades the internal error to a warning.  You'll get
+    instead:
+    
+    ~~~
+     $ LD_PRELOAD=libSegFault.so gdb
+     warning: Found custom handler for signal 11 (Segmentation fault) preinstalled.
+     Some signal dispositions inherited from the environment (SIG_DFL/SIG_IGN)
+     won't be propagated to spawned programs.
+     GNU gdb (GDB) 8.0.50.20171213-git
+     Copyright (C) 2017 Free Software Foundation, Inc.
+     License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+     This is free software: you are free to change and redistribute it.
+     There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+     and "show warranty" for details.
+     This GDB was configured as "x86_64-pc-linux-gnu".
+     Type "show configuration" for configuration details.
+     For bug reporting instructions, please see:
+     <http://www.gnu.org/software/gdb/bugs/>.
+     Find the GDB manual and other documentation resources online at:
+     <http://www.gnu.org/software/gdb/documentation/>.
+     For help, type "help".
+     Type "apropos word" to search for commands related to "word"...
+     (gdb)
+    ~~~
+    
+    This also moves the location where save_original_signals_state is
+    called a bit further below (to after option processing), so that "-q"
+    disables the warning:
+    
+    ~~~
+     $ LD_PRELOAD=libSegFault.so gdb -q
+     (gdb)
+    ~~~
+    
+    New testcase included.
+    
+    gdb/ChangeLog:
+    2018-01-05  Pedro Alves  <palves@redhat.com>
+    
+            PR gdb/18653
+            * common/signals-state-save-restore.c
+            (save_original_signals_state): New parameter 'quiet'.  Warn if we
+            find a custom handler preinstalled, instead of internal erroring.
+            But only warn if !quiet.
+            * common/signals-state-save-restore.h
+            (save_original_signals_state): New parameter 'quiet'.
+            * main.c (captured_main_1): Move save_original_signals_state call
+            after option handling, and pass QUIET.
+    
+    gdb/gdbserver/ChangeLog:
+    2018-01-05  Pedro Alves  <palves@redhat.com>
+    
+            PR gdb/18653
+            * server.c (captured_main): Pass quiet=false to
+            save_original_signals_state.
+    
+    gdb/testsuite/ChangeLog:
+    2018-01-05  Pedro Alves  <palves@redhat.com>
+    
+            PR gdb/18653
+            * gdb.base/libsegfault.exp: New.
+
+### a/gdb/ChangeLog
+### b/gdb/ChangeLog
+## -1,3 +1,15 @@
++2018-01-05  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/18653
++	* common/signals-state-save-restore.c
++	(save_original_signals_state): New parameter 'quiet'.  Warn if we
++	find a custom handler preinstalled, instead of internal erroring.
++	But only warn if !quiet.
++	* common/signals-state-save-restore.h
++	(save_original_signals_state): New parameter 'quiet'.
++	* main.c (captured_main_1): Move save_original_signals_state call
++	after option handling, and pass QUIET.
++
+ 2018-01-05  Pedro Alves  <palves@redhat.com>
+ 
+ 	* spu-tdep.c (spu_catch_start): Pass
+--- a/gdb/common/signals-state-save-restore.c
++++ b/gdb/common/signals-state-save-restore.c
+@@ -35,7 +35,7 @@ static sigset_t original_signal_mask;
+ /* See signals-state-save-restore.h.   */
+ 
+ void
+-save_original_signals_state (void)
++save_original_signals_state (bool quiet)
+ {
+ #ifdef HAVE_SIGACTION
+   int i;
+@@ -45,6 +45,8 @@ save_original_signals_state (void)
+   if (res == -1)
+     perror_with_name (("sigprocmask"));
+ 
++  bool found_preinstalled = false;
++
+   for (i = 1; i < NSIG; i++)
+     {
+       struct sigaction *oldact = &original_signal_actions[i];
+@@ -59,9 +61,31 @@ save_original_signals_state (void)
+ 	perror_with_name (("sigaction"));
+ 
+       /* If we find a custom signal handler already installed, then
+-	 this function was called too late.  */
+-      if (oldact->sa_handler != SIG_DFL && oldact->sa_handler != SIG_IGN)
+-	internal_error (__FILE__, __LINE__, _("unexpected signal handler"));
++	 this function was called too late.  This is a warning instead
++	 of an internal error because this can also happen if you
++	 LD_PRELOAD a library that installs a signal handler early via
++	 __attribute__((constructor)), like libSegFault.so.  */
++      if (!quiet
++	  && oldact->sa_handler != SIG_DFL
++	  && oldact->sa_handler != SIG_IGN)
++	{
++	  found_preinstalled = true;
++
++	  /* Use raw fprintf here because we're being called in early
++	     startup, because GDB's filtered streams are are
++	     created.  */
++	  fprintf (stderr,
++		   _("warning: Found custom handler for signal "
++		     "%d (%s) preinstalled.\n"), i,
++		   strsignal (i));
++	}
++    }
++
++  if (found_preinstalled)
++    {
++      fprintf (stderr, _("\
++Some signal dispositions inherited from the environment (SIG_DFL/SIG_IGN)\n\
++won't be propagated to spawned programs.\n"));
+     }
+ #endif
+ }
+--- a/gdb/common/signals-state-save-restore.h
++++ b/gdb/common/signals-state-save-restore.h
+@@ -28,9 +28,10 @@
+    back to what was originally inherited from gdb/gdbserver's parent,
+    just before execing the target program to debug.  */
+ 
+-/* Save the signal state of all signals.  */
++/* Save the signal state of all signals.  If !QUIET, warn if we detect
++   a custom signal handler preinstalled.  */
+ 
+-extern void save_original_signals_state (void);
++extern void save_original_signals_state (bool quiet);
+ 
+ /* Restore the signal state of all signals.  */
+ 
+### a/gdb/gdbserver/ChangeLog
+### b/gdb/gdbserver/ChangeLog
+## -1,3 +1,9 @@
++2018-01-05  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/18653
++	* server.c (captured_main): Pass quiet=false to
++	save_original_signals_state.
++
+ 2018-01-01  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	* gdbreplay.c (gdbreplay_version): Update copyright year in
+--- a/gdb/gdbserver/server.c
++++ b/gdb/gdbserver/server.c
+@@ -3712,7 +3712,7 @@ captured_main (int argc, char *argv[])
+      opened by remote_prepare.  */
+   notice_open_fds ();
+ 
+-  save_original_signals_state ();
++  save_original_signals_state (false);
+ 
+   /* We need to know whether the remote connection is stdio before
+      starting the inferior.  Inferiors created in this scenario have
+--- a/gdb/main.c
++++ b/gdb/main.c
+@@ -506,7 +506,6 @@ captured_main_1 (struct captured_main_args *context)
+ 
+   bfd_init ();
+   notice_open_fds ();
+-  save_original_signals_state ();
+ 
+   saved_command_line = (char *) xstrdup ("");
+ 
+@@ -849,6 +848,8 @@ captured_main_1 (struct captured_main_args *context)
+       quiet = 1;
+   }
+ 
++  save_original_signals_state (quiet);
++
+   /* Try to set up an alternate signal stack for SIGSEGV handlers.  */
+   setup_alternate_signal_stack ();
+ 
+### a/gdb/testsuite/ChangeLog
+### b/gdb/testsuite/ChangeLog
+## -1,3 +1,8 @@
++2018-01-05  Pedro Alves  <palves@redhat.com>
++
++	PR gdb/18653
++	* gdb.base/libsegfault.exp: New.
++
+ 2018-01-05  Joel Brobecker  <brobecker@adacore.com>
+ 
+ 	PR gdb/22670
+--- /dev/null
++++ b/gdb/testsuite/gdb.base/libsegfault.exp
+@@ -0,0 +1,84 @@
++# Copyright 2017-2018 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# This file is part of the gdb testsuite.
++
++# Test that GDB tolerates being started with libSegFault.so preloaded
++# with LD_PRELOAD, and that GDB warns about a custom SIGSEGV custom
++# handler.  See PR gdb/18653
++# <https://sourceware.org/bugzilla/show_bug.cgi?id=18653#c7>.
++
++# We cannot expect remote hosts to see environment variables set on
++# the local machine.
++if { [is_remote host] } {
++    unsupported "can't set environment variables on remote host"
++    return -1
++}
++
++# Spawn GDB with LIB preloaded with LD_PRELOAD.  CMDLINE_OPTS are
++# command line options passed to GDB.
++
++proc gdb_spawn_with_ld_preload {lib cmdline_opts} {
++    global env
++
++    save_vars { env(LD_PRELOAD) } {
++	if { ![info exists env(LD_PRELOAD) ]
++	     || $env(LD_PRELOAD) == "" } {
++	    set env(LD_PRELOAD) "$lib"
++	} else {
++	    append env(LD_PRELOAD) ":$lib"
++	}
++
++	gdb_spawn_with_cmdline_opts $cmdline_opts
++    }
++}
++
++proc test_libsegfault {} {
++    global gdb_prompt
++
++    set libsegfault "libSegFault.so"
++
++    # When started normally, if libSegFault.so is preloaded, GDB
++    # should warn about not being able to propagate the signal
++    # disposition of SIGSEGV.
++    gdb_exit
++    gdb_spawn_with_ld_preload $libsegfault ""
++
++    set test "gdb emits custom handler warning"
++    gdb_test_multiple "" $test {
++	-re "cannot be preloaded.*\r\n$gdb_prompt $" {
++	    # Glibc 2.22 outputs:
++	    # ERROR: ld.so: object 'libSegFault.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
++	    untested "cannot preload libSegFault.so"
++	    return
++	}
++	-re "Found custom handler.*won't be propagated.*\r\n$gdb_prompt $" {
++	    pass $test
++	}
++    }
++
++    # "-q" should disable the warning, though.
++    gdb_exit
++    gdb_spawn_with_ld_preload $libsegfault "-q"
++
++    set test "quiet suppresses custom handler warning"
++    gdb_test_multiple "" $test {
++	-re "^$gdb_prompt $" {
++	    pass $test
++	}
++    }
++}
++
++test_libsegfault

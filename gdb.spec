@@ -26,7 +26,7 @@ Version: 8.0.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 33%{?dist}
+Release: 36%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -737,6 +737,13 @@ Patch1259: gdb-rhbz1498758-5of5.patch
 Patch1261: gdb-rhbz1228556-bpt-inlined-func-name-1of2.patch
 Patch1262: gdb-rhbz1228556-bpt-inlined-func-name-2of2.patch
 
+# Fix random 'FAIL: libstdc++-prettyprinters/80276.cc whatis p4' (GCC
+# PR83906) (Pedro Alves).
+Patch1263: gdb-random-libstdcpp-prettyprinters-fail.patch
+
+# Fix signal handlers regression (RH BZ 1542149, Pedro Alves).
+Patch1270: gdb-rhbz1542149-spawn-default-signal-handlers-regression.patch
+
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
@@ -1149,6 +1156,8 @@ done
 %patch1259 -p1
 %patch1261 -p1
 %patch1262 -p1
+%patch1263 -p1
+%patch1270 -p1
 
 %patch1075 -p1
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
@@ -1731,6 +1740,16 @@ then
 fi
 
 %changelog
+* Tue Feb  6 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-36.fc26
+- Fix signal handlers regression (RH BZ 1542149, Pedro Alves).
+
+* Thu Jan 25 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.0.1-35.fc26
+- Add %patch directive to the commit below.
+
+* Wed Jan 24 2018 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.0.1-34.fc26
+- Fix random 'FAIL: libstdc++-prettyprinters/80276.cc whatis p4' (GCC PR83906)
+  (Pedro Alves).
+
 * Wed Dec  6 2017 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.0.1-33.fc26
 - [rhel7] Fix C++ compiler compatibility.
 
