@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1032,6 +1032,9 @@ then
 fi
 
 %changelog
+* Wed Feb 07 2018 Fedora Release Engineering <releng@fedoraproject.org>
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
+
 * Tue Feb  6 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-6.fc28
 - Fix .spec build compatibility with <=F-27 and <=RHEL-7.
 - [testsuite] Temporarily disable BuildRequires: gcc-go (for RH BZ 1541639).
