@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1032,6 +1032,9 @@ then
 fi
 
 %changelog
+* Fri Feb 09 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org>
+- Escape macros in %%changelog
+
 * Wed Feb 07 2018 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
 
@@ -1719,12 +1722,12 @@ fi
 * Tue Jul  8 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-9.fc21
 - Rebase the Intel VLA patchset.
 - Python completion w/overriden completer (Sergio Durigan Junior, BZ 1075199).
-- Remove %{_bindir}/mono-gdb.py workaround of mono BZ 815501.
+- Remove %%{_bindir}/mono-gdb.py workaround of mono BZ 815501.
 
 * Tue Jul  1 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-8.fc21
-- Do not remove %{_datadir}/gdb/syscalls/ppc*.xml as it is secondary target.
-- Remove: %{_datadir}/gdb/guile
-- Remove: %{_datadir}/gdb/system-gdbinit
+- Do not remove %%{_datadir}/gdb/syscalls/ppc*.xml as it is secondary target.
+- Remove: %%{_datadir}/gdb/guile
+- Remove: %%{_datadir}/gdb/system-gdbinit
 
 * Mon Jun 30 2014 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.7.90.20140627-7.fc21
 - Fix crash on optimized-out entry data values (BZ 1111910).
@@ -1836,7 +1839,7 @@ fi
 - [aarch64] Backport two fixes (BZ 1026484).
 
 * Sun Nov  3 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-14.fc20
-- Fix %{_bindir}gdb-add-index to also use -iex 'set auto-load no'.
+- Fix %%{_bindir}gdb-add-index to also use -iex 'set auto-load no'.
 
 * Wed Oct 30 2013 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.6.50.20130731-13.fc20
 - [rhel5] Fix /etc/gdbinit compatibility with python-2.4.
@@ -2169,7 +2172,7 @@ fi
 - Fix performance regressions with .gdb_index (Tom Tromey, BZ 805274).
 
 * Fri Mar 30 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-34.fc17
-- Fixup %{_datadir}/gdb timestamps for multilib conflicts on RHELs.
+- Fixup %%{_datadir}/gdb timestamps for multilib conflicts on RHELs.
 
 * Mon Mar 26 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120120-33.fc17
 - [vla] Fix regression on no type for subrange from IBM XLF Fortran (BZ 806920).
@@ -2255,7 +2258,7 @@ fi
 - Drop the g77 .spec provisioning as it has been fixed in FSF GDB.
 
 * Thu Jan 19 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-9.fc17
-- Enable smaller %{_bindir}/gdb in future by no longer using -rdynamic.
+- Enable smaller %%{_bindir}/gdb in future by no longer using -rdynamic.
 - Make --enablerepo to use '*-debug*' for RHEL compatibility (BZ 781571).
 - On older RHELs make readline bundled again (BZ 701131).
 - Fix build compatibility with RHEL-5 due to false noarch build.
@@ -2274,7 +2277,7 @@ fi
 - Work around readline-6.2 incompatibility not asking for --more-- (BZ 701131).
 
 * Sat Jan  7 2012 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.4.50.20120103-5.fc17
-- Mark %{_sysconfdir}/gdbinit as %%config(noreplace).
+- Mark %%{_sysconfdir}/gdbinit as %%config(noreplace).
 - Add appropriate: Provides: bundled(librarypackage).
 - Remove excessive explicit Requires: librarypackage.
 
@@ -2461,7 +2464,7 @@ fi
 
 * Fri Jan  7 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110107-9.fc15
 - Remove --with-pythondir as no longer valid.
-- Provide %{_bindir}gdb-add-index even on RHEL-5.
+- Provide %%{_bindir}gdb-add-index even on RHEL-5.
 - Provide again libstdc++ pretty printers for any RHEL.
 
 * Fri Jan  7 2011 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2.50.20110107-8.fc15
@@ -2545,7 +2548,7 @@ fi
 - Remove commented out python libstdc++ .spec code.
 
 * Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-14.fc14
-- Fixup %{_datadir}/gdb/python/gdb timestamps for multilib conflicts.
+- Fixup %%{_datadir}/gdb/python/gdb timestamps for multilib conflicts.
 
 * Sat Sep 25 2010 Jan Kratochvil <jan.kratochvil@redhat.com> - 7.2-13.fc14
 - Fix .gdb_index for big-endian hosts (Tom Tromey).
