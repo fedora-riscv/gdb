@@ -931,9 +931,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/backtrace.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 %endif
 
-%clean
-rm -rf $RPM_BUILD_ROOT
-
 %files
 %defattr(-,root,root)
 # File must begin with "/": {GFDL,COPYING3,COPYING,COPYING.LIB,COPYING3.LIB}
