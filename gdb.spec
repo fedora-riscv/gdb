@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -274,8 +274,6 @@ BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
 # for gcc-java linkage:
 BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
-# FIXME: https://bugzilla.redhat.com/show_bug.cgi?id=1541639
-%if 0
 # Exception for RHEL<=7
 %ifarch aarch64
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
@@ -286,7 +284,6 @@ BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: gcc-go
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
-%endif
 %endif
 %endif
 # archer-sergiodj-stap-patch-split
@@ -1029,10 +1026,13 @@ then
 fi
 
 %changelog
-* Fri Feb 09 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org>
+* Sat Feb 17 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-9.fc28
+- [testsuite] Revert disable of BuildRequires: gcc-go (for RH BZ 1541639).
+
+* Fri Feb 09 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 8.1-8.fc28
 - Escape macros in %%changelog
 
-* Wed Feb 07 2018 Fedora Release Engineering <releng@fedoraproject.org>
+* Wed Feb 07 2018 Fedora Release Engineering <releng@fedoraproject.org> - 8.1-7.fc28
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
 
 * Tue Feb  6 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-6.fc28
