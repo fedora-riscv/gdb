@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1026,6 +1026,9 @@ then
 fi
 
 %changelog
+* Tue Feb 20 2018 Rex Dieter <rdieter@fedoraproject.org> - 8.1-10
+- rebuild (guile)
+
 * Sat Feb 17 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-9.fc28
 - [testsuite] Revert disable of BuildRequires: gcc-go (for RH BZ 1541639).
 
