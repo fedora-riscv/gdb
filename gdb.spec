@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -201,7 +201,7 @@ Source9: _gdb.spec.patch.include
 BuildRequires: readline-devel%{buildisa} >= 6.2-4
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
-BuildRequires: ncurses-devel%{buildisa} texinfo gettext flex bison
+BuildRequires: gcc-c++ ncurses-devel%{buildisa} texinfo gettext flex bison
 BuildRequires: expat-devel%{buildisa}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz-devel%{buildisa}
@@ -1026,7 +1026,11 @@ then
 fi
 
 %changelog
-* Tue Feb 20 2018 Rex Dieter <rdieter@fedoraproject.org> - 8.1-10
+* Sat Mar  3 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-11.fc28
+- Add: BuildRequires: gcc-c++
+  https://fedoraproject.org/wiki/Packaging:C_and_C%2B%2B#BuildRequires_and_Requires
+
+* Tue Feb 20 2018 Rex Dieter <rdieter@fedoraproject.org> - 8.1-10.fc28
 - rebuild (guile)
 
 * Sat Feb 17 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-9.fc28
