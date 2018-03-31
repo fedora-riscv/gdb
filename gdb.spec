@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1026,6 +1026,9 @@ then
 fi
 
 %changelog
+* Sat Mar 31 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-13.fc28
+- Fix PDF build on Rawhide/F-29.
+
 * Fri Mar 23 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-12.fc28
 - Add test: [s390x] Backport arch12 instructions decoding (RH BZ 1553104).
 
