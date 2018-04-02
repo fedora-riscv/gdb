@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -471,7 +471,7 @@ rm -rf readline/*
 mv -f readline-doc readline/doc
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
-rm -rf zlib
+rm -rf zlib texinfo
 
 %build
 rm -rf %{buildroot}
@@ -1026,6 +1026,9 @@ then
 fi
 
 %changelog
+* Mon Apr  2 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-14.fc28
+- Revert 'Fix PDF build on Rawhide/F-29', rm -rf texinfo/ (from RH BZ 1562580).
+
 * Sat Mar 31 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-13.fc28
 - Fix PDF build on Rawhide/F-29.
 
