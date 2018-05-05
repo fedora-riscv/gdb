@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -187,6 +187,9 @@ Patch1044: gdb-pahole-python2.patch
 #Patch1075: gdb-testsuite-readline63-sigint.patch
 ##=fedoratest
 Patch1119: gdb-testsuite-readline63-sigint-revert.patch
+
+# [aarch64] Fix missed unaligned hardware watchpoints (RH BZ 1347993).
+Patch1278: gdb-rhbz1347993-aarch64-hw-watchpoint.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
@@ -412,6 +415,8 @@ tar xzf %{SOURCE7}
 %patch1171 -p1
 )
 %endif
+
+%patch1278 -p1
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 (cd gdb;rm -fv $(perl -pe 's/\\\n/ /' <Makefile.in|sed -n 's/^YYFILES = //p'))
@@ -1026,6 +1031,9 @@ then
 fi
 
 %changelog
+* Sat May  5 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-15.fc28
+- [aarch64] Fix missed unaligned hardware watchpoints (RH BZ 1347993).
+
 * Mon Apr  2 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-14.fc28
 - Revert 'Fix PDF build on Rawhide/F-29', rm -rf texinfo/ (from RH BZ 1562580).
 
