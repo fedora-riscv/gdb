@@ -35,35 +35,6 @@ dbfd7140bf4c0500d1f5d192be781f83f78f7922
  gdb/valops.c                                | 197 +++++++++++--
  gdb/value.h                                 |   2 +
  23 files changed, 1242 insertions(+), 183 deletions(-)
----
- gdb/dwarf2loc.c                             |  46 ++-
- gdb/dwarf2loc.h                             |   6 +
- gdb/dwarf2read.c                            |  13 +-
- gdb/eval.c                                  | 391 +++++++++++++++++++++-----
- gdb/expprint.c                              |  20 +-
- gdb/expression.h                            |  18 +-
- gdb/f-exp.y                                 |  42 ++-
- gdb/f-valprint.c                            |   8 +-
- gdb/gdbtypes.c                              |  34 ++-
- gdb/gdbtypes.h                              |  18 +-
- gdb/parse.c                                 |  24 +-
- gdb/rust-exp.y                              |  12 +-
- gdb/rust-lang.c                             |  17 +-
- gdb/testsuite/gdb.fortran/static-arrays.exp | 421 ++++++++++++++++++++++++++++
- gdb/testsuite/gdb.fortran/static-arrays.f90 |  55 ++++
- gdb/testsuite/gdb.fortran/vla-ptype.exp     |   4 +
- gdb/testsuite/gdb.fortran/vla-sizeof.exp    |   4 +
- gdb/testsuite/gdb.fortran/vla-stride.exp    |  44 +++
- gdb/testsuite/gdb.fortran/vla-stride.f90    |  29 ++
- gdb/testsuite/gdb.fortran/vla.f90           |  10 +
- gdb/valarith.c                              |  10 +-
- gdb/valops.c                                | 199 +++++++++++--
- gdb/value.h                                 |   2 +
- 23 files changed, 1245 insertions(+), 182 deletions(-)
- create mode 100644 gdb/testsuite/gdb.fortran/static-arrays.exp
- create mode 100644 gdb/testsuite/gdb.fortran/static-arrays.f90
- create mode 100644 gdb/testsuite/gdb.fortran/vla-stride.exp
- create mode 100644 gdb/testsuite/gdb.fortran/vla-stride.f90
 
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
 index 51f133f1b5..5105c8d23a 100644
@@ -1136,7 +1107,6 @@ index f7bec33a42..cb924e084d 100644
  	    error (_("High index less than zero"));
 diff --git a/gdb/testsuite/gdb.fortran/static-arrays.exp b/gdb/testsuite/gdb.fortran/static-arrays.exp
 new file mode 100644
-index 0000000000..cc9ecc04ab
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/static-arrays.exp
 @@ -0,0 +1,421 @@
@@ -1563,7 +1533,6 @@ index 0000000000..cc9ecc04ab
 +		"Assignment of value to subarray"
 diff --git a/gdb/testsuite/gdb.fortran/static-arrays.f90 b/gdb/testsuite/gdb.fortran/static-arrays.f90
 new file mode 100644
-index 0000000000..f22fcbe124
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/static-arrays.f90
 @@ -0,0 +1,55 @@
@@ -1648,7 +1617,6 @@ index 3113983ba4..83bc849619 100644
 +gdb_test "print sizeof(vla1)" " = 480" "print sizeof vla1 negative bounds"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.exp b/gdb/testsuite/gdb.fortran/vla-stride.exp
 new file mode 100644
-index 0000000000..dcf15e5daf
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.exp
 @@ -0,0 +1,44 @@
@@ -1698,7 +1666,6 @@ index 0000000000..dcf15e5daf
 +gdb_test "print pvla(1)" " = 5" "print one single-element"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.f90 b/gdb/testsuite/gdb.fortran/vla-stride.f90
 new file mode 100644
-index 0000000000..8d2425222e
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.f90
 @@ -0,0 +1,29 @@
@@ -2016,6 +1983,3 @@ index 7dc67dc721..03ca06448f 100644
  extern struct value *value_literal_complex (struct value *, struct value *,
  					    struct type *);
  
--- 
-2.14.3
-
