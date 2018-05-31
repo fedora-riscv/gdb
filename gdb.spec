@@ -18,22 +18,22 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180109
+%global snapsrc    20180522
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.1
+Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 14%{?dist}
+Release: 15%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
-#Source: % {tarname}.tar.xz
-Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+Source: %{tarname}.tar.xz
+#Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
@@ -1026,6 +1026,9 @@ then
 fi
 
 %changelog
+* Wed May 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180522-15.fc28
+- Rebase to FSF GDB 8.1.50.20180522 (8.2pre).
+
 * Mon Apr  2 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-14.fc28
 - Revert 'Fix PDF build on Rawhide/F-29', rm -rf texinfo/ (from RH BZ 1562580).
 

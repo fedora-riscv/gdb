@@ -14,22 +14,22 @@ gdb returns an incorrect back trace when applying a debuginfo
 https://bugzilla.redhat.com/show_bug.cgi?id=1339862
 
 diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
-index a3399ad8f7..d7eeb6350d 100644
+index aa95bc1ce6..9a7ef10963 100644
 --- a/gdb/solib-svr4.c
 +++ b/gdb/solib-svr4.c
-@@ -1387,14 +1387,27 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
+@@ -1358,14 +1358,27 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
  	}
  
        {
 -	struct bfd_build_id *build_id;
 +	struct bfd_build_id *build_id = NULL;
  
- 	strncpy (newobj->so_original_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
+ 	strncpy (newobj->so_original_name, buffer.get (), SO_NAME_MAX_PATH_SIZE - 1);
  	newobj->so_original_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
  	/* May get overwritten below.  */
  	strcpy (newobj->so_name, newobj->so_original_name);
  
--	build_id = build_id_addr_get (newobj->lm_info->l_ld);
+-	build_id = build_id_addr_get (((lm_info_svr4 *) newobj->lm_info)->l_ld);
 +	/* In the case the main executable was found according to its build-id
 +	   (from a core file) prevent loading a different build of a library
 +	   with accidentally the same SO_NAME.
@@ -47,7 +47,7 @@ index a3399ad8f7..d7eeb6350d 100644
  	if (build_id != NULL)
  	  {
  	    char *name, *build_id_filename;
-@@ -1409,23 +1422,7 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
+@@ -1380,23 +1393,7 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
  		xfree (name);
  	      }
  	    else

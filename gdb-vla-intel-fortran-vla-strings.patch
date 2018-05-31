@@ -33,10 +33,10 @@ git diff --stat -p gdb/master...gdb/users/bheckel/fortran-vla-strings
  20 files changed, 827 insertions(+), 110 deletions(-)
 
 diff --git a/gdb/NEWS b/gdb/NEWS
-index 6c9a2ecefd..f40eb6c390 100644
+index cef558039e..fa4c0382dc 100644
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
-@@ -3,6 +3,8 @@
+@@ -59,6 +59,8 @@ SH-5/SH64 running OpenBSD 	SH-5/SH64 support in sh*-*-openbsd*
  
  *** Changes in GDB 8.1
  
@@ -79,10 +79,10 @@ index c4c0918e26..3904fab260 100644
  	  type_print (value_type (val), "", stream, -1);
  	  fprintf_filtered (stream, ") ");
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 8fc1f7ec45..98e7d842f0 100644
+index a28d0a029e..4006f4a48f 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -2077,7 +2077,8 @@ static void read_signatured_type (struct signatured_type *);
+@@ -1789,7 +1789,8 @@ static void read_signatured_type (struct signatured_type *);
  
  static int attr_to_dynamic_prop (const struct attribute *attr,
  				 struct die_info *die, struct dwarf2_cu *cu,
@@ -92,7 +92,7 @@ index 8fc1f7ec45..98e7d842f0 100644
  
  /* memory allocation interface */
  
-@@ -13745,7 +13746,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -13681,7 +13682,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
      {
        newobj->static_link
  	= XOBNEW (&objfile->objfile_obstack, struct dynamic_prop);
@@ -101,7 +101,7 @@ index 8fc1f7ec45..98e7d842f0 100644
      }
  
    cu->list_in_scope = &local_symbols;
-@@ -16327,7 +16328,8 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -16385,7 +16386,8 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
  
        byte_stride_prop
  	= (struct dynamic_prop *) alloca (sizeof (struct dynamic_prop));
@@ -111,7 +111,7 @@ index 8fc1f7ec45..98e7d842f0 100644
        if (!stride_ok)
  	{
  	  complaint (&symfile_complaints,
-@@ -17075,29 +17077,94 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17156,29 +17158,94 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct gdbarch *gdbarch = get_objfile_arch (objfile);
    struct type *type, *range_type, *index_type, *char_type;
    struct attribute *attr;
@@ -217,7 +217,7 @@ index 8fc1f7ec45..98e7d842f0 100644
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -17446,7 +17513,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17529,7 +17596,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
  
  static int
  attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
@@ -226,8 +226,8 @@ index 8fc1f7ec45..98e7d842f0 100644
 +		      const gdb_byte *additional_data, int additional_data_size)
  {
    struct dwarf2_property_baton *baton;
-   struct obstack *obstack = &cu->objfile->objfile_obstack;
-@@ -17456,14 +17524,33 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+   struct obstack *obstack
+@@ -17540,14 +17608,33 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  
    if (attr_form_is_block (attr))
      {
@@ -243,7 +243,7 @@ index 8fc1f7ec45..98e7d842f0 100644
 +	  gdb_byte *data;
 +
 +	  data = (gdb_byte *) obstack_alloc(
-+	      &cu->objfile->objfile_obstack,
++	      &cu->per_cu->dwarf2_per_objfile->objfile->objfile_obstack,
 +	      DW_BLOCK (attr)->size + additional_data_size);
 +	  memcpy (data, DW_BLOCK (attr)->data, DW_BLOCK (attr)->size);
 +	  memcpy (data + DW_BLOCK (attr)->size, additional_data,
@@ -265,7 +265,7 @@ index 8fc1f7ec45..98e7d842f0 100644
      }
    else if (attr_form_is_ref (attr))
      {
-@@ -17496,8 +17583,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -17580,8 +17667,28 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  		baton = XOBNEW (obstack, struct dwarf2_property_baton);
  		baton->referenced_type = die_type (target_die, target_cu);
  		baton->locexpr.per_cu = cu->per_cu;
@@ -276,7 +276,7 @@ index 8fc1f7ec45..98e7d842f0 100644
 +		  {
 +		    gdb_byte *data;
 +
-+		    data = (gdb_byte *) obstack_alloc (&cu->objfile->objfile_obstack,
++		    data = (gdb_byte *) obstack_alloc (&cu->per_cu->dwarf2_per_objfile->objfile->objfile_obstack,
 +			    DW_BLOCK (target_attr)->size + additional_data_size);
 +		    memcpy (data, DW_BLOCK (target_attr)->data,
 +			    DW_BLOCK (target_attr)->size);
@@ -296,15 +296,16 @@ index 8fc1f7ec45..98e7d842f0 100644
  		prop->data.baton = baton;
  		prop->kind = PROP_LOCEXPR;
  		gdb_assert (prop->data.baton != NULL);
-@@ -17608,24 +17715,24 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17692,7 +17799,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
    if (attr)
 -    if (!attr_to_dynamic_prop (attr, die, cu, &stride))
 +    if (!attr_to_dynamic_prop (attr, die, cu, &stride, NULL, 0))
          complaint (&symfile_complaints, _("Missing DW_AT_byte_stride "
-                   "- DIE at 0x%x [in module %s]"),
-              to_underlying (die->sect_off), objfile_name (cu->objfile));
+                   "- DIE at 0x%s [in module %s]"),
+ 		   sect_offset_str (die->sect_off),
+@@ -17700,7 +17807,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
    if (attr)
@@ -312,8 +313,9 @@ index 8fc1f7ec45..98e7d842f0 100644
 +    attr_to_dynamic_prop (attr, die, cu, &low, NULL, 0);
    else if (!low_default_is_valid)
      complaint (&symfile_complaints, _("Missing DW_AT_lower_bound "
- 				      "- DIE at 0x%x [in module %s]"),
- 	       to_underlying (die->sect_off), objfile_name (cu->objfile));
+ 				      "- DIE at %s [in module %s]"),
+@@ -17708,10 +17815,10 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+ 	       objfile_name (cu->per_cu->dwarf2_per_objfile->objfile));
  
    attr = dwarf2_attr (die, DW_AT_upper_bound, cu);
 -  if (!attr_to_dynamic_prop (attr, die, cu, &high))
@@ -325,31 +327,31 @@ index 8fc1f7ec45..98e7d842f0 100644
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -25223,7 +25330,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25255,7 +25362,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    attr = dwarf2_attr (die, DW_AT_allocated, cu);
    if (attr_form_is_block (attr))
      {
 -      if (attr_to_dynamic_prop (attr, die, cu, &prop))
 +      if (attr_to_dynamic_prop (attr, die, cu, &prop, NULL, 0))
-         add_dyn_prop (DYN_PROP_ALLOCATED, prop, type, objfile);
+         add_dyn_prop (DYN_PROP_ALLOCATED, prop, type);
      }
    else if (attr != NULL)
-@@ -25238,7 +25345,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25270,7 +25377,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    attr = dwarf2_attr (die, DW_AT_associated, cu);
    if (attr_form_is_block (attr))
      {
 -      if (attr_to_dynamic_prop (attr, die, cu, &prop))
 +      if (attr_to_dynamic_prop (attr, die, cu, &prop, NULL, 0))
-         add_dyn_prop (DYN_PROP_ASSOCIATED, prop, type, objfile);
+         add_dyn_prop (DYN_PROP_ASSOCIATED, prop, type);
      }
    else if (attr != NULL)
-@@ -25251,7 +25358,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25283,7 +25390,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
  
    /* Read DW_AT_data_location and set in type.  */
    attr = dwarf2_attr (die, DW_AT_data_location, cu);
 -  if (attr_to_dynamic_prop (attr, die, cu, &prop))
 +  if (attr_to_dynamic_prop (attr, die, cu, &prop, NULL, 0))
-     add_dyn_prop (DYN_PROP_DATA_LOCATION, prop, type, objfile);
+     add_dyn_prop (DYN_PROP_DATA_LOCATION, prop, type);
  
    if (dwarf2_per_objfile->die_type_hash == NULL)
 diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
@@ -506,10 +508,10 @@ index f14f1811f4..4f6a0ed09a 100644
  	    }
  	  fprintfi_filtered (level, stream, "End Type ");
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index a72e2b3e0a..cb5524023f 100644
+index 64711e8cfb..2aa5253100 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
-@@ -1915,7 +1915,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1919,7 +1919,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
    type = check_typedef (type);
  
    /* We only want to recognize references at the outermost level.  */
@@ -519,7 +521,7 @@ index a72e2b3e0a..cb5524023f 100644
      type = check_typedef (TYPE_TARGET_TYPE (type));
  
    /* Types that have a dynamic TYPE_DATA_LOCATION are considered
-@@ -1949,6 +1950,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1953,6 +1954,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
        }
  
      case TYPE_CODE_ARRAY:
@@ -527,7 +529,7 @@ index a72e2b3e0a..cb5524023f 100644
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
-@@ -2067,7 +2069,8 @@ resolve_dynamic_array (struct type *type,
+@@ -2071,7 +2073,8 @@ resolve_dynamic_array (struct type *type,
    struct dynamic_prop *prop;
    unsigned int bit_stride = 0;
  
@@ -537,7 +539,7 @@ index a72e2b3e0a..cb5524023f 100644
  
    type = copy_type (type);
  
-@@ -2092,11 +2095,15 @@ resolve_dynamic_array (struct type *type,
+@@ -2096,11 +2099,15 @@ resolve_dynamic_array (struct type *type,
  
    ary_dim = check_typedef (TYPE_TARGET_TYPE (elt_type));
  
@@ -554,7 +556,7 @@ index a72e2b3e0a..cb5524023f 100644
    prop = get_dyn_prop (DYN_PROP_BYTE_STRIDE, type);
    if (prop != NULL)
      {
-@@ -2251,6 +2258,28 @@ resolve_dynamic_struct (struct type *type,
+@@ -2255,6 +2262,28 @@ resolve_dynamic_struct (struct type *type,
    return resolved_type;
  }
  
@@ -583,7 +585,7 @@ index a72e2b3e0a..cb5524023f 100644
  /* Worker for resolved_dynamic_type.  */
  
  static struct type *
-@@ -2299,7 +2328,12 @@ resolve_dynamic_type_internal (struct type *type,
+@@ -2303,7 +2332,12 @@ resolve_dynamic_type_internal (struct type *type,
  	    break;
  	  }
  
@@ -1290,10 +1292,10 @@ index b6e777235c..14b611f7b5 100644
  	mi_gdb_test "582-var-show-format pvla2_not_associated" \
  	    "582\\^done,format=\"natural\"" \
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
-index c098a3f426..319fbaf94e 100644
+index 222fc0a06b..37021e8d0d 100644
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
-@@ -538,6 +538,25 @@ whatis_exp (const char *exp, int show)
+@@ -464,6 +464,25 @@ whatis_exp (const char *exp, int show)
        printf_filtered (" */\n");    
      }
  
@@ -1318,12 +1320,12 @@ index c098a3f426..319fbaf94e 100644
 +
    LA_PRINT_TYPE (type, "", gdb_stdout, show, 0, &flags);
    printf_filtered ("\n");
- 
+ }
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 4cd4fd96ae..9b25980090 100644
+index 5c35d7a091..9b6600b538 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
-@@ -1564,6 +1564,19 @@ value_ind (struct value *arg1)
+@@ -1565,6 +1565,19 @@ value_ind (struct value *arg1)
    if (TYPE_CODE (base_type) == TYPE_CODE_PTR)
      {
        struct type *enc_type;
@@ -1343,7 +1345,7 @@ index 4cd4fd96ae..9b25980090 100644
  
        /* We may be pointing to something embedded in a larger object.
           Get the real type of the enclosing object.  */
-@@ -1579,8 +1592,7 @@ value_ind (struct value *arg1)
+@@ -1580,8 +1593,7 @@ value_ind (struct value *arg1)
        else
  	/* Retrieve the enclosing object pointed to.  */
  	arg2 = value_at_lazy (enc_type, 
@@ -1354,10 +1356,10 @@ index 4cd4fd96ae..9b25980090 100644
        enc_type = value_type (arg2);
        return readjust_indirect_value_type (arg2, enc_type, base_type, arg1);
 diff --git a/gdb/valprint.c b/gdb/valprint.c
-index b19123f23e..d01d02fc09 100644
+index bed2cecf2c..2537d77c19 100644
 --- a/gdb/valprint.c
 +++ b/gdb/valprint.c
-@@ -1111,12 +1111,6 @@ value_check_printable (struct value *val, struct ui_file *stream,
+@@ -1108,12 +1108,6 @@ value_check_printable (struct value *val, struct ui_file *stream,
        return 0;
      }
  

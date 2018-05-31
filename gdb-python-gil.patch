@@ -9,7 +9,7 @@ FileName: gdb-python-gil.patch
 ;;=push
 
 diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
-index ebd48fffe7..ccf011e35e 100644
+index 4182b60ca3..fb074faf43 100644
 --- a/gdb/doc/python.texi
 +++ b/gdb/doc/python.texi
 @@ -232,6 +232,14 @@ returned as a string.  The default is @code{False}, in which case the
@@ -28,7 +28,7 @@ index ebd48fffe7..ccf011e35e 100644
  
  @findex gdb.breakpoints
 diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
-index c110588f76..89bbc6987b 100644
+index 26400f4fba..b8e2d9049d 100644
 --- a/gdb/python/python-internal.h
 +++ b/gdb/python/python-internal.h
 @@ -148,6 +148,8 @@ typedef int Py_ssize_t;
@@ -41,10 +41,10 @@ index c110588f76..89bbc6987b 100644
  #endif
  
 diff --git a/gdb/python/python.c b/gdb/python/python.c
-index 4844c86c54..610dda828c 100644
+index db37331dc4..4233b37fa8 100644
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
-@@ -554,12 +554,16 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+@@ -556,12 +556,16 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
  {
    const char *arg;
    PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
@@ -65,7 +65,7 @@ index 4844c86c54..610dda828c 100644
      return NULL;
  
    from_tty = 0;
-@@ -580,12 +584,28 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+@@ -582,6 +586,15 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
        to_string = cmp;
      }
  
@@ -81,8 +81,9 @@ index 4844c86c54..610dda828c 100644
    std::string to_string_res;
  
    TRY
-     {
-       struct interp *interp;
+@@ -602,6 +615,13 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+ 
+       counted_command_line lines = read_command_lines_1 (reader, 1, nullptr);
  
 +      /* In the case of long running GDB commands, allow the user to
 +	 release the Python GIL acquired by Python.  Restore the GIL
@@ -94,10 +95,10 @@ index 4844c86c54..610dda828c 100644
        scoped_restore save_async = make_scoped_restore (&current_ui->async, 0);
  
        scoped_restore save_uiout = make_scoped_restore (&current_uiout);
-@@ -600,10 +620,22 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
- 	to_string_res = execute_command_to_string (arg, from_tty);
+@@ -617,10 +637,22 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+ 							    from_tty);
        else
- 	execute_command (arg, from_tty);
+ 	execute_control_commands (lines.get (), from_tty);
 +
 +      /* Reacquire the GIL if it was released earlier.  */
 +      if (release_gil)
