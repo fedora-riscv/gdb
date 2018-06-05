@@ -71,7 +71,7 @@ for c in `git rev-list --reverse ${common_ancestor}..HEAD` ; do
     # before, even if nothing has changed.  This is bad, so we replace
     # the commit hash by something constant (the string
     # "FEDORA_PATCHES").
-    git format-patch --no-signature --no-stat --keep -1 --stdout $c | sed -e '1 s/^From [0-9a-f]\+ \(.*\)/From FEDORA_PATCHES \1/' -e '/^index [0-9a-f]\+\.\.[0-9a-f]\+$/d' > ../$fname
+    git format-patch --no-signature --no-stat --keep -1 --stdout $c | sed -e '1 s/^From [0-9a-f]\+ \(.*\)/From FEDORA_PATCHES \1/' -e '/^index [0-9a-f]\+\.\.[0-9a-f]\+.*$/d' > ../$fname
     (cd .. && git add $fname)
 
     cat >> $temp_PATCH_file <<EOF
