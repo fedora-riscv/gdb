@@ -1,0 +1,74 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Sergio Durigan Junior <sergiodj@redhat.com>
+Date: Tue, 5 Jun 2018 17:55:39 -0400
+Subject: gdb-aarch64-guard-sve-macros.patch
+
+FileName: gdb-aarch64-guard-sve-macros.patch
+
+;; Guard declarations of 'sve_{vq,vl}_from_{vl,vq}' macros on Aarch64
+;; This patch should be removed on the next rebase.
+
+Guard declarations of 'sve_{vq,vl}_from_{vl,vq}' macros on Aarch64 (and unbreak build)
+
+Commit 122394f1476b1c925a281b15399119500c8231c1 ("Function for reading
+the Aarch64 SVE vector length") has added macros to manipulate SVE
+vector sizes based on Linux kernel sources, but did not guard them
+with #ifndef's, which breaks the build when the system headers already
+have these macros:
+
+    CXX    aarch64-linux-nat.o
+  In file included from ../../gdb/aarch64-tdep.h:25,
+                   from ../../gdb/aarch64-linux-nat.c:30:
+  ../../gdb/arch/aarch64.h:79: error: "sve_vq_from_vl" redefined [-Werror]
+   #define sve_vq_from_vl(vl) ((vl) / 0x10)
+
+  In file included from /usr/include/bits/sigcontext.h:30,
+                   from /usr/include/signal.h:291,
+                   from build-gnulib/import/signal.h:52,
+                   from ../../gdb/linux-nat.h:23,
+                   from ../../gdb/aarch64-linux-nat.c:26:
+  /usr/include/asm/sigcontext.h:154: note: this is the location of the previous definition
+   #define sve_vq_from_vl(vl) ((vl) / SVE_VQ_BYTES)
+
+  In file included from ../../gdb/aarch64-tdep.h:25,
+                   from ../../gdb/aarch64-linux-nat.c:30:
+  ../../gdb/arch/aarch64.h:80: error: "sve_vl_from_vq" redefined [-Werror]
+   #define sve_vl_from_vq(vq) ((vq) * 0x10)
+
+  In file included from /usr/include/bits/sigcontext.h:30,
+                   from /usr/include/signal.h:291,
+                   from build-gnulib/import/signal.h:52,
+                   from ../../gdb/linux-nat.h:23,
+                   from ../../gdb/aarch64-linux-nat.c:26:
+  /usr/include/asm/sigcontext.h:155: note: this is the location of the previous definition
+   #define sve_vl_from_vq(vq) ((vq) * SVE_VQ_BYTES)
+
+In order to fix this breakage, this commit guards the declaration of
+the macros using #ifndef's.
+
+gdb/ChangeLog:
+2018-06-06  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* arch/aarch64.h (sve_vg_from_vl): Guard with #ifndef.
+	(sve_vl_from_vg): Likewise.
+	(sve_vq_from_vl): Likewise.
+	(sve_vl_from_vq): Likewise.
+	(sve_vq_from_vg): Likewise.
+	(sve_vg_from_vq): Likewise.
+
+diff --git a/gdb/arch/aarch64.h b/gdb/arch/aarch64.h
+--- a/gdb/arch/aarch64.h
++++ b/gdb/arch/aarch64.h
+@@ -76,8 +76,12 @@ enum aarch64_regnum
+ 
+ #define sve_vg_from_vl(vl)	((vl) / 8)
+ #define sve_vl_from_vg(vg)	((vg) * 8)
++#ifndef sve_vq_from_vl
+ #define sve_vq_from_vl(vl)	((vl) / 0x10)
++#endif
++#ifndef sve_vl_from_vq
+ #define sve_vl_from_vq(vq)	((vq) * 0x10)
++#endif
+ #define sve_vq_from_vg(vg)	(sve_vq_from_vl (sve_vl_from_vg (vg)))
+ #define sve_vg_from_vq(vq)	(sve_vg_from_vl (sve_vl_from_vq (vq)))
+ 
