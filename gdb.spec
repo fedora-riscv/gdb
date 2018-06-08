@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 17%{?dist}
+Release: 18%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1026,6 +1026,9 @@ then
 fi
 
 %changelog
+* Fri Jun  8 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180605-18.fc29
+- Fix Python 3.7 breakage (RH BZ 1577396).
+
 * Tue Jun  5 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180605-17.fc29
 - Rebase to FSF GDB 8.1.50.20180605 (8.2pre).
 
