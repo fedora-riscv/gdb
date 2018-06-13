@@ -1,3 +1,4 @@
+%global _without_python 1
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
 # --with buildisa: Use %%{?_isa} for BuildRequires
@@ -26,7 +27,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1026,6 +1027,9 @@ then
 fi
 
 %changelog
+* Wed Jun 13 2018 Miro Hrončok <mhroncok@redhat.com>
+- Bootstrap for Python 3.7
+
 * Fri Jun  8 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180605-18.fc29
 - Fix Python 3.7 breakage (RH BZ 1577396).
 
