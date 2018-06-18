@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -386,8 +386,13 @@ Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
 Group: Documentation
 BuildArch: noarch
+%if 0%{?scl:1}
+# As of F-28, packages won't need to call /sbin/install-info by hand
+# anymore.  We make an exception for DTS here.
+# https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/thread/MP2QVJZBOJZEOQO2G7UB2HLXKXYPF2G5/
 Requires(post): /sbin/install-info
 Requires(preun): /sbin/install-info
+%endif
 
 %description doc
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -1003,6 +1008,11 @@ done
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 
+%if 0%{?scl:1}
+# As of F-28, packages won't need to call /sbin/install-info by hand
+# anymore.  We make an exception for DTS here.
+# https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/thread/MP2QVJZBOJZEOQO2G7UB2HLXKXYPF2G5/
+
 %post doc
 # This step is part of the installation of the RPM. Not to be confused
 # with the 'make install ' of the build (rpmbuild) process.
@@ -1024,8 +1034,13 @@ then
     /sbin/install-info --delete --info-dir=%{_infodir} %{_infodir}/gdb.info.gz || :
   fi
 fi
+%endif
 
 %changelog
+* Mon Jun 18 2018 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.1.50.20180613-22.fc29
+- Do not run /sbin/install-info when installing the documentation
+  (except for DTS).
+
 * Wed Jun 13 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180613-21.fc29
 - Rebase to FSF GDB 8.1.50.20180613 (8.2pre).
 
