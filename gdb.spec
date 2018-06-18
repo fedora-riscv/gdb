@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180613
+%global snapsrc    20180618
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1037,6 +1037,9 @@ fi
 %endif
 
 %changelog
+* Mon Jun 18 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180618-23.fc29
+- Rebase to FSF GDB 8.1.50.20180618 (8.2pre).
+
 * Mon Jun 18 2018 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.1.50.20180613-22.fc29
 - Do not run /sbin/install-info when installing the documentation
   (except for DTS).
