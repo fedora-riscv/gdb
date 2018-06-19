@@ -63,8 +63,8 @@ temp_patch_order_file=/tmp/_patch_order
 rm -f $temp_PATCH_file $temp_patch_file $temp_patch_order_file
 
 for c in `git rev-list --reverse ${common_ancestor}..HEAD` ; do
-    fname=`git log -1 --pretty='format:%b' $c | sed -n 's/^FileName: \(.*\)$/\1/p'`
-    test -z $fname && die "Could not determine FileName of commit $c."
+    fname=`git log -1 --pretty='format:%s' $c`
+    test -z $fname && die "Could not determine filename for commit $c."
     # Because git-format-patch generates patches with the first line
     # containing the commit hash, every time we do a git-format-patch
     # here we will have a different .patch file from what we had
