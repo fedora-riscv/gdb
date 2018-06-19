@@ -188,9 +188,6 @@ Patch1044: gdb-pahole-python2.patch
 ##=fedoratest
 Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 
-# [aarch64] Fix missed unaligned hardware watchpoints (RH BZ 1347993).
-Patch1278: gdb-rhbz1347993-aarch64-hw-watchpoint.patch
-
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
 Source8: _gdb.spec.Patch.include
@@ -420,8 +417,6 @@ tar xzf %{SOURCE7}
 %patch1171 -p1
 )
 %endif
-
-%patch1278 -p1
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
 (cd gdb;rm -fv $(perl -pe 's/\\\n/ /' <Makefile.in|sed -n 's/^YYFILES = //p'))
