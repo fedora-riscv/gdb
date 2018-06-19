@@ -35,38 +35,8 @@ dbfd7140bf4c0500d1f5d192be781f83f78f7922
  gdb/valops.c                                | 197 +++++++++++--
  gdb/value.h                                 |   2 +
  23 files changed, 1242 insertions(+), 183 deletions(-)
----
- gdb/dwarf2loc.c                             |  46 ++-
- gdb/dwarf2loc.h                             |   6 +
- gdb/dwarf2read.c                            |  13 +-
- gdb/eval.c                                  | 391 +++++++++++++++++++++-----
- gdb/expprint.c                              |  20 +-
- gdb/expression.h                            |  18 +-
- gdb/f-exp.y                                 |  42 ++-
- gdb/f-valprint.c                            |   8 +-
- gdb/gdbtypes.c                              |  34 ++-
- gdb/gdbtypes.h                              |  18 +-
- gdb/parse.c                                 |  24 +-
- gdb/rust-exp.y                              |  12 +-
- gdb/rust-lang.c                             |  17 +-
- gdb/testsuite/gdb.fortran/static-arrays.exp | 421 ++++++++++++++++++++++++++++
- gdb/testsuite/gdb.fortran/static-arrays.f90 |  55 ++++
- gdb/testsuite/gdb.fortran/vla-ptype.exp     |   4 +
- gdb/testsuite/gdb.fortran/vla-sizeof.exp    |   4 +
- gdb/testsuite/gdb.fortran/vla-stride.exp    |  44 +++
- gdb/testsuite/gdb.fortran/vla-stride.f90    |  29 ++
- gdb/testsuite/gdb.fortran/vla.f90           |  10 +
- gdb/valarith.c                              |  10 +-
- gdb/valops.c                                | 199 +++++++++++--
- gdb/value.h                                 |   2 +
- 23 files changed, 1245 insertions(+), 182 deletions(-)
- create mode 100644 gdb/testsuite/gdb.fortran/static-arrays.exp
- create mode 100644 gdb/testsuite/gdb.fortran/static-arrays.f90
- create mode 100644 gdb/testsuite/gdb.fortran/vla-stride.exp
- create mode 100644 gdb/testsuite/gdb.fortran/vla-stride.f90
 
 diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
-index 51f133f1b5..5105c8d23a 100644
 --- a/gdb/dwarf2loc.c
 +++ b/gdb/dwarf2loc.c
 @@ -2601,11 +2601,14 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
@@ -157,7 +127,6 @@ index 51f133f1b5..5105c8d23a 100644
  
  /* See dwarf2loc.h.  */
 diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
-index f82e7b2d11..74f0597359 100644
 --- a/gdb/dwarf2loc.h
 +++ b/gdb/dwarf2loc.h
 @@ -143,6 +143,12 @@ int dwarf2_evaluate_property (const struct dynamic_prop *prop,
@@ -174,7 +143,6 @@ index f82e7b2d11..74f0597359 100644
     property to C code.
  
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
-index 58da0fc1f9..8fc1f7ec45 100644
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
 @@ -17551,7 +17551,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
@@ -220,7 +188,6 @@ index 58da0fc1f9..8fc1f7ec45 100644
    if (high_bound_is_count)
      TYPE_RANGE_DATA (range_type)->flag_upper_bound_is_count = 1;
 diff --git a/gdb/eval.c b/gdb/eval.c
-index 6f74c41b9f..d9bca2791d 100644
 --- a/gdb/eval.c
 +++ b/gdb/eval.c
 @@ -384,29 +384,325 @@ init_array_element (struct value *array, struct value *element,
@@ -649,7 +616,6 @@ index 6f74c41b9f..d9bca2791d 100644
      error (_("Can't get dimensions for a non-array type"));
  
 diff --git a/gdb/expprint.c b/gdb/expprint.c
-index ac5ae0fea1..41bb357a27 100644
 --- a/gdb/expprint.c
 +++ b/gdb/expprint.c
 @@ -581,12 +581,10 @@ print_subexp_standard (struct expression *exp, int *pos,
@@ -703,7 +669,6 @@ index ac5ae0fea1..41bb357a27 100644
        }
        break;
 diff --git a/gdb/expression.h b/gdb/expression.h
-index a783ea5fef..be24792eb6 100644
 --- a/gdb/expression.h
 +++ b/gdb/expression.h
 @@ -153,17 +153,17 @@ extern void dump_raw_expression (struct expression *,
@@ -734,7 +699,6 @@ index a783ea5fef..be24792eb6 100644
  
  #endif /* !defined (EXPRESSION_H) */
 diff --git a/gdb/f-exp.y b/gdb/f-exp.y
-index 6495e03cc5..cd89bb7ca2 100644
 --- a/gdb/f-exp.y
 +++ b/gdb/f-exp.y
 @@ -257,31 +257,63 @@ arglist :	subrange
@@ -807,7 +771,6 @@ index 6495e03cc5..cd89bb7ca2 100644
  	;
  
 diff --git a/gdb/f-valprint.c b/gdb/f-valprint.c
-index 903f2af638..b4067a8460 100644
 --- a/gdb/f-valprint.c
 +++ b/gdb/f-valprint.c
 @@ -119,8 +119,14 @@ f77_print_array_1 (int nss, int ndimensions, struct type *type,
@@ -827,7 +790,6 @@ index 903f2af638..b4067a8460 100644
        for (i = lowerbound;
  	   (i < upperbound + 1 && (*elts) < options->print_max);
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
-index 43fe56e487..a72e2b3e0a 100644
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
 @@ -902,7 +902,8 @@ operator== (const range_bounds &l, const range_bounds &r)
@@ -939,7 +901,6 @@ index 43fe56e487..a72e2b3e0a 100644
    return static_range_type;
  }
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
-index 92ca85c295..179238ce82 100644
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
 @@ -560,6 +560,10 @@ struct range_bounds
@@ -996,7 +957,6 @@ index 92ca85c295..179238ce82 100644
  				       const struct dynamic_prop *);
  
 diff --git a/gdb/parse.c b/gdb/parse.c
-index 8b2bb22c76..e1bf3edbe2 100644
 --- a/gdb/parse.c
 +++ b/gdb/parse.c
 @@ -984,22 +984,20 @@ operator_length_standard (const struct expression *expr, int endpos,
@@ -1034,7 +994,6 @@ index 8b2bb22c76..e1bf3edbe2 100644
        break;
  
 diff --git a/gdb/rust-exp.y b/gdb/rust-exp.y
-index 199e87671e..397a92dfdb 100644
 --- a/gdb/rust-exp.y
 +++ b/gdb/rust-exp.y
 @@ -2448,23 +2448,17 @@ convert_ast_to_expression (struct parser_state *state,
@@ -1065,7 +1024,6 @@ index 199e87671e..397a92dfdb 100644
  	write_exp_elt_opcode (state, OP_RANGE);
  	write_exp_elt_longcst (state, kind);
 diff --git a/gdb/rust-lang.c b/gdb/rust-lang.c
-index f7bec33a42..cb924e084d 100644
 --- a/gdb/rust-lang.c
 +++ b/gdb/rust-lang.c
 @@ -1366,9 +1366,9 @@ rust_range (struct expression *exp, int *pos, enum noside noside)
@@ -1136,7 +1094,6 @@ index f7bec33a42..cb924e084d 100644
  	    error (_("High index less than zero"));
 diff --git a/gdb/testsuite/gdb.fortran/static-arrays.exp b/gdb/testsuite/gdb.fortran/static-arrays.exp
 new file mode 100644
-index 0000000000..cc9ecc04ab
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/static-arrays.exp
 @@ -0,0 +1,421 @@
@@ -1563,7 +1520,6 @@ index 0000000000..cc9ecc04ab
 +		"Assignment of value to subarray"
 diff --git a/gdb/testsuite/gdb.fortran/static-arrays.f90 b/gdb/testsuite/gdb.fortran/static-arrays.f90
 new file mode 100644
-index 0000000000..f22fcbe124
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/static-arrays.f90
 @@ -0,0 +1,55 @@
@@ -1623,7 +1579,6 @@ index 0000000000..f22fcbe124
 +  call sub
 +end
 diff --git a/gdb/testsuite/gdb.fortran/vla-ptype.exp b/gdb/testsuite/gdb.fortran/vla-ptype.exp
-index 5f367348b0..5351a0aa2e 100644
 --- a/gdb/testsuite/gdb.fortran/vla-ptype.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-ptype.exp
 @@ -98,3 +98,7 @@ gdb_test "ptype vla2" "type = <not allocated>" "ptype vla2 not allocated"
@@ -1635,7 +1590,6 @@ index 5f367348b0..5351a0aa2e 100644
 +gdb_continue_to_breakpoint "vla1-neg-bounds"
 +gdb_test "ptype vla1" "type = $real \\(-2:1,-5:4,-3:-1\\)" "ptype vla1 negative bounds"
 diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
-index 3113983ba4..83bc849619 100644
 --- a/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 @@ -44,3 +44,7 @@ gdb_test "print sizeof(pvla)" " = 0" "print sizeof non-associated pvla"
@@ -1648,7 +1602,6 @@ index 3113983ba4..83bc849619 100644
 +gdb_test "print sizeof(vla1)" " = 480" "print sizeof vla1 negative bounds"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.exp b/gdb/testsuite/gdb.fortran/vla-stride.exp
 new file mode 100644
-index 0000000000..dcf15e5daf
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.exp
 @@ -0,0 +1,44 @@
@@ -1698,7 +1651,6 @@ index 0000000000..dcf15e5daf
 +gdb_test "print pvla(1)" " = 5" "print one single-element"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.f90 b/gdb/testsuite/gdb.fortran/vla-stride.f90
 new file mode 100644
-index 0000000000..8d2425222e
 --- /dev/null
 +++ b/gdb/testsuite/gdb.fortran/vla-stride.f90
 @@ -0,0 +1,29 @@
@@ -1732,7 +1684,6 @@ index 0000000000..8d2425222e
 +  pvla => null()        ! single-element
 +end program vla_stride
 diff --git a/gdb/testsuite/gdb.fortran/vla.f90 b/gdb/testsuite/gdb.fortran/vla.f90
-index 508290a36e..d87f59b92b 100644
 --- a/gdb/testsuite/gdb.fortran/vla.f90
 +++ b/gdb/testsuite/gdb.fortran/vla.f90
 @@ -54,4 +54,14 @@ program vla
@@ -1751,7 +1702,6 @@ index 508290a36e..d87f59b92b 100644
 +
  end program vla
 diff --git a/gdb/valarith.c b/gdb/valarith.c
-index 58e3a09c37..035def5466 100644
 --- a/gdb/valarith.c
 +++ b/gdb/valarith.c
 @@ -189,10 +189,16 @@ value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
@@ -1774,7 +1724,6 @@ index 58e3a09c37..035def5466 100644
        if (type_not_associated (array_type))
          error (_("no such vector element (vector not associated)"));
 diff --git a/gdb/valops.c b/gdb/valops.c
-index 9525dc8499..4cd4fd96ae 100644
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
 @@ -3776,56 +3776,195 @@ value_of_this_silent (const struct language_defn *lang)
@@ -2004,7 +1953,6 @@ index 9525dc8499..4cd4fd96ae 100644
  
  /* Create a value for a FORTRAN complex number.  Currently most of the
 diff --git a/gdb/value.h b/gdb/value.h
-index 7dc67dc721..03ca06448f 100644
 --- a/gdb/value.h
 +++ b/gdb/value.h
 @@ -1128,6 +1128,8 @@ extern struct value *varying_to_slice (struct value *);
@@ -2016,6 +1964,3 @@ index 7dc67dc721..03ca06448f 100644
  extern struct value *value_literal_complex (struct value *, struct value *,
  					    struct type *);
  
--- 
-2.14.3
-

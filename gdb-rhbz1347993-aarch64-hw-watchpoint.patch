@@ -95,24 +95,8 @@ Date:   Fri May 4 22:22:04 2018 +0200
             PR breakpoints/19806 and support for PR external/20207.
             * gdb.base/watchpoint-unaligned.c: New file.
             * gdb.base/watchpoint-unaligned.exp: New file.
----
- gdb/NEWS                                        |  10 +
- gdb/aarch64-linux-nat.c                         |  28 ++-
- gdb/common/common-utils.c                       |  20 ++
- gdb/common/common-utils.h                       |  32 +++
- gdb/gdbserver/linux-aarch64-low.c               |  31 ++-
- gdb/nat/aarch64-linux-hw-point.c                | 278 ++++++++++++++++++------
- gdb/nat/aarch64-linux-hw-point.h                |  10 +-
- gdb/testsuite/gdb.base/watchpoint-unaligned.c   |  96 ++++++++
- gdb/testsuite/gdb.base/watchpoint-unaligned.exp | 184 ++++++++++++++++
- gdb/utils.c                                     |  16 --
- gdb/utils.h                                     |  32 ---
- 11 files changed, 609 insertions(+), 128 deletions(-)
- create mode 100644 gdb/testsuite/gdb.base/watchpoint-unaligned.c
- create mode 100644 gdb/testsuite/gdb.base/watchpoint-unaligned.exp
 
 diff --git a/gdb/NEWS b/gdb/NEWS
-index f40eb6c390..b138df9d93 100644
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
 @@ -1,6 +1,16 @@
@@ -133,7 +117,6 @@ index f40eb6c390..b138df9d93 100644
  
  * Fortran: Support pointers to dynamic types.
 diff --git a/gdb/aarch64-linux-nat.c b/gdb/aarch64-linux-nat.c
-index f08bf039e4..f3fcccc1ec 100644
 --- a/gdb/aarch64-linux-nat.c
 +++ b/gdb/aarch64-linux-nat.c
 @@ -735,16 +735,38 @@ aarch64_linux_stopped_data_address (struct target_ops *target,
@@ -179,7 +162,6 @@ index f08bf039e4..f3fcccc1ec 100644
  	}
      }
 diff --git a/gdb/common/common-utils.c b/gdb/common/common-utils.c
-index ae2dd9db2b..24b3936f3d 100644
 --- a/gdb/common/common-utils.c
 +++ b/gdb/common/common-utils.c
 @@ -408,3 +408,23 @@ stringify_argv (const std::vector<char *> &args)
@@ -207,7 +189,6 @@ index ae2dd9db2b..24b3936f3d 100644
 +  return (v & -n);
 +}
 diff --git a/gdb/common/common-utils.h b/gdb/common/common-utils.h
-index 2320318de7..a961514fd6 100644
 --- a/gdb/common/common-utils.h
 +++ b/gdb/common/common-utils.h
 @@ -146,4 +146,36 @@ in_inclusive_range (T value, T low, T high)
@@ -248,7 +229,6 @@ index 2320318de7..a961514fd6 100644
 +
  #endif
 diff --git a/gdb/gdbserver/linux-aarch64-low.c b/gdb/gdbserver/linux-aarch64-low.c
-index eccac4da13..7ea24c2363 100644
 --- a/gdb/gdbserver/linux-aarch64-low.c
 +++ b/gdb/gdbserver/linux-aarch64-low.c
 @@ -360,14 +360,39 @@ aarch64_stopped_data_address (void)
@@ -295,7 +275,6 @@ index eccac4da13..7ea24c2363 100644
  
    return (CORE_ADDR) 0;
 diff --git a/gdb/nat/aarch64-linux-hw-point.c b/gdb/nat/aarch64-linux-hw-point.c
-index e9ebc5fba8..057ad91a6f 100644
 --- a/gdb/nat/aarch64-linux-hw-point.c
 +++ b/gdb/nat/aarch64-linux-hw-point.c
 @@ -34,29 +34,52 @@
@@ -827,7 +806,6 @@ index e9ebc5fba8..057ad91a6f 100644
  }
  
 diff --git a/gdb/nat/aarch64-linux-hw-point.h b/gdb/nat/aarch64-linux-hw-point.h
-index e1d4fc8dbc..b5ba6415c0 100644
 --- a/gdb/nat/aarch64-linux-hw-point.h
 +++ b/gdb/nat/aarch64-linux-hw-point.h
 @@ -77,13 +77,13 @@
@@ -876,7 +854,6 @@ index e1d4fc8dbc..b5ba6415c0 100644
  void aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
 diff --git a/gdb/testsuite/gdb.base/watchpoint-unaligned.c b/gdb/testsuite/gdb.base/watchpoint-unaligned.c
 new file mode 100644
-index 0000000000..8934de214e
 --- /dev/null
 +++ b/gdb/testsuite/gdb.base/watchpoint-unaligned.c
 @@ -0,0 +1,96 @@
@@ -978,7 +955,6 @@ index 0000000000..8934de214e
 +}
 diff --git a/gdb/testsuite/gdb.base/watchpoint-unaligned.exp b/gdb/testsuite/gdb.base/watchpoint-unaligned.exp
 new file mode 100644
-index 0000000000..6bdd4b6d05
 --- /dev/null
 +++ b/gdb/testsuite/gdb.base/watchpoint-unaligned.exp
 @@ -0,0 +1,184 @@
@@ -1167,7 +1143,6 @@ index 0000000000..6bdd4b6d05
 +    gdb_assert $got_hit "size8twice write"
 +}
 diff --git a/gdb/utils.c b/gdb/utils.c
-index 58c0380d17..26ec9f1ee8 100644
 --- a/gdb/utils.c
 +++ b/gdb/utils.c
 @@ -3010,22 +3010,6 @@ gdb_abspath (const char *path)
@@ -1194,7 +1169,6 @@ index 58c0380d17..26ec9f1ee8 100644
     obstack.  The obstack is passed as DATA.  */
  
 diff --git a/gdb/utils.h b/gdb/utils.h
-index b234762929..d01d283baa 100644
 --- a/gdb/utils.h
 +++ b/gdb/utils.h
 @@ -498,38 +498,6 @@ extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
@@ -1236,6 +1210,3 @@ index b234762929..d01d283baa 100644
  /* Resource limits used by getrlimit and setrlimit.  */
  
  enum resource_limit_kind
--- 
-2.14.3
-
