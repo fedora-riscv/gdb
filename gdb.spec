@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1037,6 +1037,11 @@ fi
 %endif
 
 %changelog
+* Tue Jun 19 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1-17.fc28
+- Rework "[aarch64] Fix missed unaligned hardware watchpoints (RH BZ 1347993)."
+- Improve scripts used for patch management.
+- Remove unnecessary cruft from patches.
+
 * Mon Jun 18 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1-16.fc28
 - Do not run /sbin/install-info when installing the documentation
   (except for DTS).
