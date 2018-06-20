@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,6 +245,8 @@ BuildRequires: libipt-devel%{buildisa}
 %endif
 %endif
 %endif
+# See https://bugzilla.redhat.com/show_bug.cgi?id=1593280
+BuildRequires: mpfr-devel%{buildisa}
 
 %if 0%{?_with_testsuite:1}
 
@@ -625,6 +627,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-intel-pt					\
 %endif
+	--with-mpfr						\
 	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
@@ -1037,6 +1040,9 @@ fi
 %endif
 
 %changelog
+* Wed Jun 20 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180618-24.fc29
+- Add BuildRequires: mpfr-devel (RH BZ 1593280).
+
 * Mon Jun 18 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180618-23.fc29
 - Rebase to FSF GDB 8.1.50.20180618 (8.2pre).
 
