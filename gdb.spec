@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180618
+%global snapsrc    20180624
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 25%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1040,6 +1040,9 @@ fi
 %endif
 
 %changelog
+* Sun Jun 24 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180624-25.fc29
+- Rebase to FSF GDB 8.1.50.20180624 (8.2pre).
+
 * Wed Jun 20 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180618-24.fc29
 - Add BuildRequires: mpfr-devel (RH BZ 1593280).
 
