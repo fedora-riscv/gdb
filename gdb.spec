@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180624
+%global snapsrc    20180629
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 26%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -830,7 +830,7 @@ done
 
 %if 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 mkdir -p $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}
-cp -p $RPM_BUILD_DIR/%{gdb_src}/gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
+cp -p ./gdb/gdb-gdb.py $RPM_BUILD_ROOT/usr/lib/debug%{_bindir}/
 for pyo in "" "-O";do
   # RHEL-5: AttributeError: 'module' object has no attribute 'compile_file'
   %{__python} $pyo -c 'import compileall, re, sys; sys.exit (not compileall.compile_dir("'"$RPM_BUILD_ROOT/usr/lib/debug%{_bindir}"'", 1, "'"/usr/lib/debug%{_bindir}"'"))'
@@ -1040,6 +1040,11 @@ fi
 %endif
 
 %changelog
+* Fri Jun 29 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180629-26.fc29
+- Rebase to FSF GDB 8.1.50.20180629 (8.2pre).
+- Remove pahole.py.
+- Adjust handling of gdb-gdb.py.
+
 * Sun Jun 24 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180624-25.fc29
 - Rebase to FSF GDB 8.1.50.20180624 (8.2pre).
 
