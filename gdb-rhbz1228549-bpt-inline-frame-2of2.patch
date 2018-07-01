@@ -1,0 +1,559 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Sat, 30 Jun 2018 21:47:55 +0200
+Subject: gdb-rhbz1228549-bpt-inline-frame-2of2.patch
+
+;; Show inlined function according to breakpoint (RH BZ 1228549).
+
+Don't elide all inlined frames
+
+This patch essentially causes GDB to treat inlined frames like "normal"
+frames from the user's perspective.  This means, for example, that when a
+user sets a breakpoint in an inlined function, GDB will now actually stop
+"in" that function.
+
+Using the test case from breakpoints/17534,
+
+3       static inline void NVIC_EnableIRQ(int IRQn)
+4       {
+5         volatile int y;
+6         y = IRQn;
+7       }
+8
+9       __attribute__( ( always_inline ) ) static inline void __WFI(void)
+10      {
+11          __asm volatile ("nop");
+12      }
+13
+14      int main(void) {
+15
+16          x= 42;
+17
+18          if (x)
+19            NVIC_EnableIRQ(16);
+20          else
+21            NVIC_EnableIRQ(18);
+(gdb) b NVIC_EnableIRQ
+Breakpoint 1 at 0x4003e4: NVIC_EnableIRQ. (2 locations)
+(gdb) r
+Starting program: 17534
+
+Breakpoint 1, main () at 17534.c:19
+19            NVIC_EnableIRQ(16);
+
+Because skip_inline_frames currently skips every inlined frame, GDB "stops"
+in the caller.  This patch adds a new parameter to skip_inline_frames
+that allows us to pass in a bpstat stop chain.  The breakpoint locations
+on the stop chain can be used to determine if we've stopped inside an inline
+function (due to a user breakpoint).  If we have, we do not elide the frame.
+
+With this patch, GDB now reports that the inferior has stopped inside the
+inlined function:
+
+(gdb) r
+Starting program: 17534
+
+Breakpoint 1, NVIC_EnableIRQ (IRQn=16) at 17534.c:6
+6         y = IRQn;
+
+Many thanks to Jan and Pedro for guidance on this.
+
+gdb/ChangeLog:
+
+	* breakpoint.c (build_bpstat_chain): New function, moved from
+	bpstat_stop_status.
+	(bpstat_stop_status): Add optional parameter, `stop_chain'.
+	If no stop chain is passed, call build_bpstat_chain to build it.
+	* breakpoint.h (build_bpstat_chain): Declare.
+	(bpstat_stop_status): Move documentation here from breakpoint.c.
+	* infrun.c (handle_signal_stop): Before eliding inlined frames,
+	build the stop chain and pass it to skip_inline_frames.
+	Pass this stop chain to bpstat_stop_status.
+	* inline-frame.c: Include breakpoint.h.
+	(stopped_by_user_bp_inline_frame): New function.
+	(skip_inline_frames): Add parameter `stop_chain'.
+	Move documention to inline-frame.h.
+	If non-NULL, use stopped_by_user_bp_inline_frame to determine
+	whether the frame should be elided.
+	* inline-frame.h (skip_inline_frames): Add parameter `stop_chain'.
+	Add moved documentation and update for new parameter.
+
+gdb/testsuite/ChangeLog:
+
+	* gdb.ada/bp_inlined_func.exp: Update inlined frame locations
+	in expected breakpoint stop locations.
+	* gdb.dwarf2/implptr.exp (implptr_test_baz): Use up/down to
+	move to proper scope to test variable values.
+	* gdb.opt/inline-break.c (inline_func1, not_inline_func1)
+	(inline_func2, not_inline_func2, inline_func3, not_inline_func3):
+	New functions.
+	(main): Call not_inline_func3.
+	* gdb.opt/inline-break.exp: Start inferior and set breakpoints at
+	inline_func1, inline_func2, and inline_func3.  Test that when each
+	breakpoint is hit, GDB properly reports both the stop location
+	and the backtrace. Repeat tests for temporary breakpoints.
+
+diff --git a/gdb/breakpoint.c b/gdb/breakpoint.c
+--- a/gdb/breakpoint.c
++++ b/gdb/breakpoint.c
+@@ -5342,54 +5342,21 @@ need_moribund_for_location_type (struct bp_location *loc)
+ 	      && !target_supports_stopped_by_hw_breakpoint ()));
+ }
+ 
+-
+-/* Get a bpstat associated with having just stopped at address
+-   BP_ADDR in thread PTID.
+-
+-   Determine whether we stopped at a breakpoint, etc, or whether we
+-   don't understand this stop.  Result is a chain of bpstat's such
+-   that:
+-
+-   if we don't understand the stop, the result is a null pointer.
+-
+-   if we understand why we stopped, the result is not null.
+-
+-   Each element of the chain refers to a particular breakpoint or
+-   watchpoint at which we have stopped.  (We may have stopped for
+-   several reasons concurrently.)
+-
+-   Each element of the chain has valid next, breakpoint_at,
+-   commands, FIXME??? fields.  */
++/* See breakpoint.h.  */
+ 
+ bpstat
+-bpstat_stop_status (const address_space *aspace,
+-		    CORE_ADDR bp_addr, ptid_t ptid,
++build_bpstat_chain (const address_space *aspace, CORE_ADDR bp_addr,
+ 		    const struct target_waitstatus *ws)
+ {
+-  struct breakpoint *b = NULL;
+-  struct bp_location *bl;
+-  struct bp_location *loc;
+-  /* First item of allocated bpstat's.  */
++  struct breakpoint *b;
+   bpstat bs_head = NULL, *bs_link = &bs_head;
+-  /* Pointer to the last thing in the chain currently.  */
+-  bpstat bs;
+-  int ix;
+-  int need_remove_insert;
+-  int removed_any;
+-
+-  /* First, build the bpstat chain with locations that explain a
+-     target stop, while being careful to not set the target running,
+-     as that may invalidate locations (in particular watchpoint
+-     locations are recreated).  Resuming will happen here with
+-     breakpoint conditions or watchpoint expressions that include
+-     inferior function calls.  */
+ 
+   ALL_BREAKPOINTS (b)
+     {
+       if (!breakpoint_enabled (b))
+ 	continue;
+ 
+-      for (bl = b->loc; bl != NULL; bl = bl->next)
++      for (bp_location *bl = b->loc; bl != NULL; bl = bl->next)
+ 	{
+ 	  /* For hardware watchpoints, we look only at the first
+ 	     location.  The watchpoint_check function will work on the
+@@ -5408,8 +5375,8 @@ bpstat_stop_status (const address_space *aspace,
+ 	  /* Come here if it's a watchpoint, or if the break address
+ 	     matches.  */
+ 
+-	  bs = new bpstats (bl, &bs_link);	/* Alloc a bpstat to
+-						   explain stop.  */
++	  bpstat bs = new bpstats (bl, &bs_link);	/* Alloc a bpstat to
++							   explain stop.  */
+ 
+ 	  /* Assume we stop.  Should we find a watchpoint that is not
+ 	     actually triggered, or if the condition of the breakpoint
+@@ -5434,12 +5401,15 @@ bpstat_stop_status (const address_space *aspace,
+   if (!target_supports_stopped_by_sw_breakpoint ()
+       || !target_supports_stopped_by_hw_breakpoint ())
+     {
+-      for (ix = 0; VEC_iterate (bp_location_p, moribund_locations, ix, loc); ++ix)
++      bp_location *loc;
++
++      for (int ix = 0;
++	   VEC_iterate (bp_location_p, moribund_locations, ix, loc); ++ix)
+ 	{
+ 	  if (breakpoint_location_address_match (loc, aspace, bp_addr)
+ 	      && need_moribund_for_location_type (loc))
+ 	    {
+-	      bs = new bpstats (loc, &bs_link);
++	      bpstat bs = new bpstats (loc, &bs_link);
+ 	      /* For hits of moribund locations, we should just proceed.  */
+ 	      bs->stop = 0;
+ 	      bs->print = 0;
+@@ -5448,6 +5418,33 @@ bpstat_stop_status (const address_space *aspace,
+ 	}
+     }
+ 
++  return bs_head;
++}
++
++/* See breakpoint.h.  */
++
++bpstat
++bpstat_stop_status (const address_space *aspace,
++		    CORE_ADDR bp_addr, ptid_t ptid,
++		    const struct target_waitstatus *ws,
++		    bpstat stop_chain)
++{
++  struct breakpoint *b = NULL;
++  /* First item of allocated bpstat's.  */
++  bpstat bs_head = stop_chain;
++  bpstat bs;
++  int need_remove_insert;
++  int removed_any;
++
++  /* First, build the bpstat chain with locations that explain a
++     target stop, while being careful to not set the target running,
++     as that may invalidate locations (in particular watchpoint
++     locations are recreated).  Resuming will happen here with
++     breakpoint conditions or watchpoint expressions that include
++     inferior function calls.  */
++  if (bs_head == NULL)
++    bs_head = build_bpstat_chain (aspace, bp_addr, ws);
++
+   /* A bit of special processing for shlib breakpoints.  We need to
+      process solib loading here, so that the lists of loaded and
+      unloaded libraries are correct before we handle "catch load" and
+diff --git a/gdb/breakpoint.h b/gdb/breakpoint.h
+--- a/gdb/breakpoint.h
++++ b/gdb/breakpoint.h
+@@ -917,9 +917,37 @@ extern void bpstat_clear (bpstat *);
+    is part of the bpstat is copied as well.  */
+ extern bpstat bpstat_copy (bpstat);
+ 
++/* Build the (raw) bpstat chain for the stop information given by ASPACE,
++   BP_ADDR, and WS.  Returns the head of the bpstat chain.  */
++
++extern bpstat build_bpstat_chain (const address_space *aspace,
++				  CORE_ADDR bp_addr,
++				  const struct target_waitstatus *ws);
++
++/* Get a bpstat associated with having just stopped at address
++   BP_ADDR in thread PTID.  STOP_CHAIN may be supplied as a previously
++   computed stop chain or NULL, in which case the stop chain will be
++   computed using build_bpstat_chain.
++
++   Determine whether we stopped at a breakpoint, etc, or whether we
++   don't understand this stop.  Result is a chain of bpstat's such
++   that:
++
++   if we don't understand the stop, the result is a null pointer.
++
++   if we understand why we stopped, the result is not null.
++
++   Each element of the chain refers to a particular breakpoint or
++   watchpoint at which we have stopped.  (We may have stopped for
++   several reasons concurrently.)
++
++   Each element of the chain has valid next, breakpoint_at,
++   commands, FIXME??? fields.  */
++
+ extern bpstat bpstat_stop_status (const address_space *aspace,
+ 				  CORE_ADDR pc, ptid_t ptid,
+-				  const struct target_waitstatus *ws);
++				  const struct target_waitstatus *ws,
++				  bpstat stop_chain = NULL);
+ 
+ /* This bpstat_what stuff tells wait_for_inferior what to do with a
+    breakpoint (a challenging task).
+diff --git a/gdb/infrun.c b/gdb/infrun.c
+--- a/gdb/infrun.c
++++ b/gdb/infrun.c
+@@ -5876,6 +5876,7 @@ handle_signal_stop (struct execution_control_state *ecs)
+   ecs->event_thread->control.stop_step = 0;
+   stop_print_frame = 1;
+   stopped_by_random_signal = 0;
++  bpstat stop_chain = NULL;
+ 
+   /* Hide inlined functions starting here, unless we just performed stepi or
+      nexti.  After stepi and nexti, always show the innermost frame (not any
+@@ -5907,7 +5908,8 @@ handle_signal_stop (struct execution_control_state *ecs)
+ 					     ecs->event_thread->prev_pc,
+ 					     &ecs->ws)))
+ 	{
+-	  skip_inline_frames (ecs->ptid);
++	  stop_chain = build_bpstat_chain (aspace, stop_pc, &ecs->ws);
++	  skip_inline_frames (ecs->ptid, stop_chain);
+ 
+ 	  /* Re-fetch current thread's frame in case that invalidated
+ 	     the frame cache.  */
+@@ -5956,7 +5958,7 @@ handle_signal_stop (struct execution_control_state *ecs)
+      handles this event.  */
+   ecs->event_thread->control.stop_bpstat
+     = bpstat_stop_status (get_current_regcache ()->aspace (),
+-			  stop_pc, ecs->ptid, &ecs->ws);
++			  stop_pc, ecs->ptid, &ecs->ws, stop_chain);
+ 
+   /* Following in case break condition called a
+      function.  */
+diff --git a/gdb/inline-frame.c b/gdb/inline-frame.c
+--- a/gdb/inline-frame.c
++++ b/gdb/inline-frame.c
+@@ -18,6 +18,7 @@
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+ 
+ #include "defs.h"
++#include "breakpoint.h"
+ #include "inline-frame.h"
+ #include "addrmap.h"
+ #include "block.h"
+@@ -296,12 +297,36 @@ block_starting_point_at (CORE_ADDR pc, const struct block *block)
+   return 1;
+ }
+ 
+-/* Skip all inlined functions whose call sites are at the current PC.
+-   Frames for the hidden functions will not appear in the backtrace until the
+-   user steps into them.  */
++/* Loop over the stop chain and determine if execution stopped in an
++   inlined frame because of a user breakpoint.  THIS_PC is the current
++   frame's PC.  */
++
++static bool
++stopped_by_user_bp_inline_frame (CORE_ADDR this_pc, bpstat stop_chain)
++{
++  for (bpstat s = stop_chain; s != NULL; s = s->next)
++    {
++      struct breakpoint *bpt = s->breakpoint_at;
++
++      if (bpt != NULL && user_breakpoint_p (bpt))
++	{
++	  bp_location *loc = s->bp_location_at;
++	  enum bp_loc_type t = loc->loc_type;
++
++	  if (loc->address == this_pc
++	      && (t == bp_loc_software_breakpoint
++		  || t == bp_loc_hardware_breakpoint))
++	    return true;
++	}
++    }
++
++  return false;
++}
++
++/* See inline-frame.h.  */
+ 
+ void
+-skip_inline_frames (ptid_t ptid)
++skip_inline_frames (ptid_t ptid, bpstat stop_chain)
+ {
+   CORE_ADDR this_pc;
+   const struct block *frame_block, *cur_block;
+@@ -327,8 +352,14 @@ skip_inline_frames (ptid_t ptid)
+ 	      if (BLOCK_START (cur_block) == this_pc
+ 		  || block_starting_point_at (this_pc, cur_block))
+ 		{
+-		  skip_count++;
+-		  last_sym = BLOCK_FUNCTION (cur_block);
++		  /* Do not skip the inlined frame if execution
++		     stopped in an inlined frame because of a user
++		     breakpoint.  */
++		  if (!stopped_by_user_bp_inline_frame (this_pc, stop_chain))
++		    {
++		      skip_count++;
++		      last_sym = BLOCK_FUNCTION (cur_block);
++		    }
+ 		}
+ 	      else
+ 		break;
+diff --git a/gdb/inline-frame.h b/gdb/inline-frame.h
+--- a/gdb/inline-frame.h
++++ b/gdb/inline-frame.h
+@@ -22,16 +22,21 @@
+ 
+ struct frame_info;
+ struct frame_unwind;
++struct bpstats;
+ 
+ /* The inline frame unwinder.  */
+ 
+ extern const struct frame_unwind inline_frame_unwind;
+ 
+ /* Skip all inlined functions whose call sites are at the current PC.
+-   Frames for the hidden functions will not appear in the backtrace until the
+-   user steps into them.  */
+ 
+-void skip_inline_frames (ptid_t ptid);
++   If non-NULL, STOP_CHAIN is used to determine whether a stop was caused by
++   a user breakpoint.  In that case, do not skip that inlined frame.  This
++   allows the inlined frame to be treated as if it were non-inlined from the
++   user's perspective.  GDB will stop "in" the inlined frame instead of
++   the caller.  */
++
++void skip_inline_frames (ptid_t ptid, struct bpstats *stop_chain);
+ 
+ /* Forget about any hidden inlined functions in PTID, which is new or
+    about to be resumed.  If PTID is minus_one_ptid, forget about all
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func.exp b/gdb/testsuite/gdb.ada/bp_inlined_func.exp
+--- a/gdb/testsuite/gdb.ada/bp_inlined_func.exp
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func.exp
+@@ -38,21 +38,13 @@ gdb_test "break read_small" \
+ # We do not verify each breakpoint info, but use continue commands instead
+ # to verify that we properly stop on each expected breakpoint.
+ 
+-gdb_test "continue" \
+-         "Breakpoint $decimal, b\\.doit \\(\\).*" \
+-         "Hitting first call of read_small"
+-
+-gdb_test "continue" \
+-         "Breakpoint $decimal, foo \\(\\).*" \
+-         "Hitting second call of read_small"
+-
+-gdb_test "continue" \
+-         "Breakpoint $decimal, c\\.c_doit \\(\\).*" \
+-         "Hitting third call of read_small"
+-
+-gdb_test "continue" \
+-         "Breakpoint $decimal, c\\.c_doit2 \\(\\).*" \
+-         "Hitting fourth call of read_small"
++for {set i 0} {$i < 4} {incr i} {
++    with_test_prefix "iteration $i" {
++	gdb_test "continue" \
++	    "Breakpoint $decimal, b\\.read_small \\(\\).*" \
++	    "stopped in read_small"
++    }
++}
+ 
+ gdb_test "continue" \
+          "Continuing\..*$inferior_exited_re.*" \
+diff --git a/gdb/testsuite/gdb.dwarf2/implptr.exp b/gdb/testsuite/gdb.dwarf2/implptr.exp
+--- a/gdb/testsuite/gdb.dwarf2/implptr.exp
++++ b/gdb/testsuite/gdb.dwarf2/implptr.exp
+@@ -66,9 +66,13 @@ proc implptr_test_baz {} {
+     gdb_test "break implptr.c:$line" "Breakpoint 3.*" \
+ 	"set baz breakpoint for implptr"
+     gdb_continue_to_breakpoint "continue to baz breakpoint for implptr"
++
++    # We are breaking in an inlined function.  GDB should appear to
++    # have stopped "in" the inlined function.
++    gdb_test "up" "#1  foo .*"
+     gdb_test {p p[0].y} " = 92" "sanity check element 0"
+     gdb_test {p p[1].y} " = 46" "sanity check element 1"
+-    gdb_test "step" "\r\nadd \\(.*" "enter the inlined function"
++    gdb_test "down" "#0  add .*"
+     gdb_test "p a->y" " = 92" "check element 0 for the offset"
+     gdb_test "p b->y" " = 46" "check element 1 for the offset"
+     gdb_continue_to_breakpoint "ignore the second baz breakpoint"
+diff --git a/gdb/testsuite/gdb.opt/inline-break.c b/gdb/testsuite/gdb.opt/inline-break.c
+--- a/gdb/testsuite/gdb.opt/inline-break.c
++++ b/gdb/testsuite/gdb.opt/inline-break.c
+@@ -128,6 +128,54 @@ func8a (int x)
+   return func8b (x * 31);
+ }
+ 
++static inline ATTR int
++inline_func1 (int x)
++{
++  int y = 1;			/* inline_func1  */
++
++  return y + x;
++}
++
++static int
++not_inline_func1 (int x)
++{
++  int y = 2;			/* not_inline_func1  */
++
++  return y + inline_func1 (x);
++}
++
++inline ATTR int
++inline_func2 (int x)
++{
++  int y = 3;			/* inline_func2  */
++
++  return y + not_inline_func1 (x);
++}
++
++int
++not_inline_func2 (int x)
++{
++  int y = 4;			/* not_inline_func2  */
++
++  return y + inline_func2 (x);
++}
++
++static inline ATTR int
++inline_func3 (int x)
++{
++  int y = 5;			/* inline_func3  */
++
++  return y + not_inline_func2 (x);
++}
++
++static int
++not_inline_func3 (int x)
++{
++  int y = 6;			/* not_inline_func3  */
++
++  return y + inline_func3 (x);
++}
++
+ /* Entry point.  */
+ 
+ int
+@@ -155,5 +203,7 @@ main (int argc, char *argv[])
+ 
+   x = func8a (x) + func8b (x);
+ 
++  x = not_inline_func3 (-21);
++
+   return x;
+ }
+diff --git a/gdb/testsuite/gdb.opt/inline-break.exp b/gdb/testsuite/gdb.opt/inline-break.exp
+--- a/gdb/testsuite/gdb.opt/inline-break.exp
++++ b/gdb/testsuite/gdb.opt/inline-break.exp
+@@ -185,4 +185,50 @@ for {set i 1} {$i <= [array size results]} {incr i} {
+     gdb_test "info break $i" $results($i)
+ }
+ 
++# Test "permanent" and "temporary" breakpoints.
++foreach_with_prefix cmd [list "break" "tbreak"] {
++
++    # Start with a clean state.
++    delete_breakpoints
++    if {![runto main]} {
++	untested "could not run to main"
++	return -1
++    }
++
++    # Assemble flags to pass to gdb_breakpoint.  Lame but this is just
++    # a test suite!
++    set break_flags "message"
++    if {[string match $cmd "tbreak"]} {
++	lappend break_flags "temporary"
++    }
++
++    # Insert breakpoints for all inline_func? and not_inline_func? and check
++    # that we actually stop where we think we should.
++    for {set i 1} {$i < 4} {incr i} {
++	foreach inline {"not_inline" "inline"} {
++	    eval gdb_breakpoint "${inline}_func$i" $break_flags
++	}
++    }
++
++    set ws {[\r\n\t ]+}
++    set backtrace [list "(in|at)? main"]
++    for {set i 3} {$i > 0} {incr i -1} {
++
++	foreach inline {"not_inline" "inline"} {
++
++	    # Check that we stop at the correct location and print out
++	    # the (possibly) inlined frames.
++	    set num [gdb_get_line_number "/* ${inline}_func$i  */"]
++	    set pattern ".*$srcfile:$num${ws}.*$num${ws}int y = $decimal;"
++	    append pattern "${ws}/\\\* ${inline}_func$i  \\\*/"
++	    send_log "Expecting $pattern\n"
++	    gdb_continue_to_breakpoint "${inline}_func$i" $pattern
++
++	    # Also check for the correct backtrace.
++	    set backtrace [linsert $backtrace 0 "(in|at)?${ws}${inline}_func$i"]
++	    gdb_test_sequence "bt" "bt stopped in ${inline}_func$i" $backtrace
++	}
++    }
++}
++
+ unset -nocomplain results

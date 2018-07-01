@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 19%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1040,6 +1040,9 @@ fi
 %endif
 
 %changelog
+* Sun Jul  1 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-19.fc28
+- Show inlined function according to breakpoint (RH BZ 1228549).
+
 * Wed Jun 20 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1-18.fc28
 - Add BuildRequires: mpfr-devel (RH BZ 1593280).
 

@@ -1,0 +1,363 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Sat, 30 Jun 2018 21:45:23 +0200
+Subject: gdb-rhbz1228549-bpt-inline-frame-1of2.patch
+
+;; Show inlined function according to breakpoint (RH BZ 1228549).
+
+Fix breakpoint add on inlined function using function name.
+
+Using this Ada example:
+
+  package B is
+    procedure Read_Small with Inline_Always;
+  end B;
+
+  package body B is
+    Total : Natural := 0;
+    procedure Read_Small is
+    begin
+      Total := Total + 1;
+    end Read_Small;
+  end B;
+
+and
+
+  with B;
+
+  procedure M is
+  begin
+    B.Read_Small;
+  end M;
+
+% gnatmake -g -O0 -m m.adb -cargs -gnatn
+% gdb m
+
+Inserting a breakpoint on Read_Small inlined function does not work:
+
+(gdb) b read_small
+Breakpoint 1 at 0x40250e: file b.adb, line 5.
+(gdb) info b
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x000000000040250e in b.doit at b.adb:5
+(gdb)
+
+In this exemple we should have two breakpoints set, one in package B and
+the other one in the inlined instance inside procedure M), like below:
+
+(gdb) b read_small
+Breakpoint 1 at 0x40250e: b.adb:5. (2 locations)
+(gdb) info b
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   <MULTIPLE>
+1.1                         y     0x000000000040250e in b.doit at b.adb:5
+1.2                         y     0x0000000000402540 in m at b.adb:5
+(gdb)
+
+Looking at the DWARF info for inlined instance of Read_Small:
+
+<1><1526>: Abbrev Number: 2 (DW_TAG_subprogram)
+    <1527>   DW_AT_name        : ([...], offset: 0x1e82): b__read_small
+    <152b>   DW_AT_decl_file   : 2
+    <152c>   DW_AT_decl_line   : 3
+    <152d>   DW_AT_inline      : 3      (declared as inline and inlined)
+[...]
+ <2><1547>: Abbrev Number: 4 (DW_TAG_inlined_subroutine)
+    <1548>   DW_AT_abstract_origin: <0x1526>
+    <154c>   DW_AT_low_pc      : 0x402552
+    <1554>   DW_AT_high_pc     : 0x2b
+    <155c>   DW_AT_call_file   : 1
+    <155d>   DW_AT_call_line   : 5
+ <2><155e>: Abbrev Number: 0
+
+During the parsing of DWARF info in order to produce partial DIE linked
+list, the DW_TAG_inlined_subroutine were skipped thus not present in the
+final partial dies.
+Taking DW_TAG_inlined_subroutine in account during the parsing process
+fixes the problem.
+
+gdb/ChangeLog:
+
+	* dwarf2read.c (scan_partial_symbols, add_partial_symbol)
+	(add_partial_subprogram, load_partial_dies): Add
+	DW_TAG_inlined_subroutine handling.
+
+gdb/testsuite/ChangeLog:
+
+	* gdb.ada/bp_inlined_func: New testcase.
+
+diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
+--- a/gdb/dwarf2read.c
++++ b/gdb/dwarf2read.c
+@@ -8974,11 +8974,13 @@ scan_partial_symbols (struct partial_die_info *first_die, CORE_ADDR *lowpc,
+ 
+       if (pdi->name != NULL || pdi->tag == DW_TAG_namespace
+ 	  || pdi->tag == DW_TAG_module || pdi->tag == DW_TAG_enumeration_type
+-	  || pdi->tag == DW_TAG_imported_unit)
++	  || pdi->tag == DW_TAG_imported_unit
++	  || pdi->tag == DW_TAG_inlined_subroutine)
+ 	{
+ 	  switch (pdi->tag)
+ 	    {
+ 	    case DW_TAG_subprogram:
++	    case DW_TAG_inlined_subroutine:
+ 	      add_partial_subprogram (pdi, lowpc, highpc, set_addrmap, cu);
+ 	      break;
+ 	    case DW_TAG_constant:
+@@ -9211,6 +9213,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
+ 
+   switch (pdi->tag)
+     {
++    case DW_TAG_inlined_subroutine:
+     case DW_TAG_subprogram:
+       addr = gdbarch_adjust_dwarf2_addr (gdbarch, pdi->lowpc + baseaddr);
+       if (pdi->is_external || cu->language == language_ada)
+@@ -9408,12 +9411,12 @@ add_partial_module (struct partial_die_info *pdi, CORE_ADDR *lowpc,
+     scan_partial_symbols (pdi->die_child, lowpc, highpc, set_addrmap, cu);
+ }
+ 
+-/* Read a partial die corresponding to a subprogram and create a partial
+-   symbol for that subprogram.  When the CU language allows it, this
+-   routine also defines a partial symbol for each nested subprogram
+-   that this subprogram contains.  If SET_ADDRMAP is true, record the
+-   covered ranges in the addrmap.  Set *LOWPC and *HIGHPC to the lowest
+-   and highest PC values found in PDI.
++/* Read a partial die corresponding to a subprogram or an inlined
++   subprogram and create a partial symbol for that subprogram.
++   When the CU language allows it, this routine also defines a partial
++   symbol for each nested subprogram that this subprogram contains.
++   If SET_ADDRMAP is true, record the covered ranges in the addrmap.
++   Set *LOWPC and *HIGHPC to the lowest and highest PC values found in PDI.
+ 
+    PDI may also be a lexical block, in which case we simply search
+    recursively for subprograms defined inside that lexical block.
+@@ -9425,7 +9428,7 @@ add_partial_subprogram (struct partial_die_info *pdi,
+ 			CORE_ADDR *lowpc, CORE_ADDR *highpc,
+ 			int set_addrmap, struct dwarf2_cu *cu)
+ {
+-  if (pdi->tag == DW_TAG_subprogram)
++  if (pdi->tag == DW_TAG_subprogram || pdi->tag == DW_TAG_inlined_subroutine)
+     {
+       if (pdi->has_pc_info)
+         {
+@@ -9473,6 +9476,7 @@ add_partial_subprogram (struct partial_die_info *pdi,
+ 	{
+ 	  fixup_partial_die (pdi, cu);
+ 	  if (pdi->tag == DW_TAG_subprogram
++	      || pdi->tag == DW_TAG_inlined_subroutine
+ 	      || pdi->tag == DW_TAG_lexical_block)
+ 	    add_partial_subprogram (pdi, lowpc, highpc, set_addrmap, cu);
+ 	  pdi = pdi->die_sibling;
+@@ -18383,6 +18387,7 @@ load_partial_dies (const struct die_reader_specs *reader,
+ 	  && abbrev->tag != DW_TAG_constant
+ 	  && abbrev->tag != DW_TAG_enumerator
+ 	  && abbrev->tag != DW_TAG_subprogram
++	  && abbrev->tag != DW_TAG_inlined_subroutine
+ 	  && abbrev->tag != DW_TAG_lexical_block
+ 	  && abbrev->tag != DW_TAG_variable
+ 	  && abbrev->tag != DW_TAG_namespace
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func.exp b/gdb/testsuite/gdb.ada/bp_inlined_func.exp
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func.exp
+@@ -0,0 +1,59 @@
++# Copyright 2017-2018 Free Software Foundation, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++load_lib "ada.exp"
++
++standard_ada_testfile foo
++
++if {[gdb_compile_ada "${srcfile}" "${binfile}" executable [list debug ]] != "" } {
++  return -1
++}
++
++clean_restart ${testfile}
++
++if ![runto_main] then {
++   fail "Cannot run to main, testcase aborted"
++   return 0
++}
++
++# Check that inserting breakpoint on read_small inlined function inserts
++# 4 breakpoints.
++
++gdb_test "break read_small" \
++         "Breakpoint $decimal at $hex: read_small\\. \\(4 locations\\)" \
++         "set breakpoint at read_small"
++
++# We do not verify each breakpoint info, but use continue commands instead
++# to verify that we properly stop on each expected breakpoint.
++
++gdb_test "continue" \
++         "Breakpoint $decimal, b\\.doit \\(\\).*" \
++         "Hitting first call of read_small"
++
++gdb_test "continue" \
++         "Breakpoint $decimal, foo \\(\\).*" \
++         "Hitting second call of read_small"
++
++gdb_test "continue" \
++         "Breakpoint $decimal, c\\.c_doit \\(\\).*" \
++         "Hitting third call of read_small"
++
++gdb_test "continue" \
++         "Breakpoint $decimal, c\\.c_doit2 \\(\\).*" \
++         "Hitting fourth call of read_small"
++
++gdb_test "continue" \
++         "Continuing\..*$inferior_exited_re.*" \
++         "continuing to program completion"
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func/b.adb b/gdb/testsuite/gdb.ada/bp_inlined_func/b.adb
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func/b.adb
+@@ -0,0 +1,28 @@
++--  Copyright 2017-2018 Free Software Foundation, Inc.
++--
++--  This program is free software; you can redistribute it and/or modify
++--  it under the terms of the GNU General Public License as published by
++--  the Free Software Foundation; either version 3 of the License, or
++--  (at your option) any later version.
++--
++--  This program is distributed in the hope that it will be useful,
++--  but WITHOUT ANY WARRANTY; without even the implied warranty of
++--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++--  GNU General Public License for more details.
++--
++--  You should have received a copy of the GNU General Public License
++--  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++package body B is
++  Total : Natural := 0;
++  procedure Read_Small is
++  begin
++    Total := Total + 1; -- BREAK
++  end Read_Small;
++
++  procedure Doit is
++  begin
++     Read_Small;
++     null;
++  end Doit;
++end B;
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func/b.ads b/gdb/testsuite/gdb.ada/bp_inlined_func/b.ads
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func/b.ads
+@@ -0,0 +1,19 @@
++--  Copyright 2017-2018 Free Software Foundation, Inc.
++--
++--  This program is free software; you can redistribute it and/or modify
++--  it under the terms of the GNU General Public License as published by
++--  the Free Software Foundation; either version 3 of the License, or
++--  (at your option) any later version.
++--
++--  This program is distributed in the hope that it will be useful,
++--  but WITHOUT ANY WARRANTY; without even the implied warranty of
++--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++--  GNU General Public License for more details.
++--
++--  You should have received a copy of the GNU General Public License
++--  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++package B is
++  procedure Read_Small with Inline_Always;
++  procedure Doit;
++end B;
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func/c.adb b/gdb/testsuite/gdb.ada/bp_inlined_func/c.adb
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func/c.adb
+@@ -0,0 +1,27 @@
++--  Copyright 2017-2018 Free Software Foundation, Inc.
++--
++--  This program is free software; you can redistribute it and/or modify
++--  it under the terms of the GNU General Public License as published by
++--  the Free Software Foundation; either version 3 of the License, or
++--  (at your option) any later version.
++--
++--  This program is distributed in the hope that it will be useful,
++--  but WITHOUT ANY WARRANTY; without even the implied warranty of
++--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++--  GNU General Public License for more details.
++--
++--  You should have received a copy of the GNU General Public License
++--  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++with B;
++package body C is
++  procedure C_Doit is
++  begin
++    B.Read_Small;
++    C_Doit2;
++  end;
++  procedure C_Doit2 is
++  begin
++    B.Read_Small;
++  end;
++end C;
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func/c.ads b/gdb/testsuite/gdb.ada/bp_inlined_func/c.ads
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func/c.ads
+@@ -0,0 +1,19 @@
++--  Copyright 2017-2018 Free Software Foundation, Inc.
++--
++--  This program is free software; you can redistribute it and/or modify
++--  it under the terms of the GNU General Public License as published by
++--  the Free Software Foundation; either version 3 of the License, or
++--  (at your option) any later version.
++--
++--  This program is distributed in the hope that it will be useful,
++--  but WITHOUT ANY WARRANTY; without even the implied warranty of
++--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++--  GNU General Public License for more details.
++--
++--  You should have received a copy of the GNU General Public License
++--  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++package C is
++  procedure C_Doit;
++  procedure C_Doit2;
++end C;
+diff --git a/gdb/testsuite/gdb.ada/bp_inlined_func/foo.adb b/gdb/testsuite/gdb.ada/bp_inlined_func/foo.adb
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.ada/bp_inlined_func/foo.adb
+@@ -0,0 +1,23 @@
++--  Copyright 2017-2018 Free Software Foundation, Inc.
++--
++--  This program is free software; you can redistribute it and/or modify
++--  it under the terms of the GNU General Public License as published by
++--  the Free Software Foundation; either version 3 of the License, or
++--  (at your option) any later version.
++--
++--  This program is distributed in the hope that it will be useful,
++--  but WITHOUT ANY WARRANTY; without even the implied warranty of
++--  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++--  GNU General Public License for more details.
++--
++--  You should have received a copy of the GNU General Public License
++--  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++with B; use B;
++with C;
++procedure FOO is
++begin
++  Doit;
++  B.Read_Small;
++  C.C_Doit;
++end FOO;
