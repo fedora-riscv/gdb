@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1040,6 +1040,9 @@ fi
 %endif
 
 %changelog
+* Mon Jul 02 2018 Miro Hrončok <mhroncok@redhat.com>
+- Rebuilt for Python 3.7
+
 * Fri Jun 29 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180629-26.fc29
 - Rebase to FSF GDB 8.1.50.20180629 (8.2pre).
 - Remove pahole.py.
