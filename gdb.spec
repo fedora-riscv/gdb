@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180629
+%global snapsrc    20180704
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.1.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -937,7 +937,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 %endif
 
 %files
-%defattr(-,root,root)
 # File must begin with "/": {GFDL,COPYING3,COPYING,COPYING.LIB,COPYING3.LIB}
 %if 0%{!?el6:1}
 %license COPYING3 COPYING COPYING.LIB COPYING3.LIB
@@ -957,7 +956,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 %{_includedir}/gdb
 %if 0%{!?scl:1}
 %files headless
-%defattr(-,root,root)
 %{_prefix}/libexec/gdb
 %endif
 %config(noreplace) %{_sysconfdir}/gdbinit
@@ -980,7 +978,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 
 %ifnarch sparc sparcv9
 %files gdbserver
-%defattr(-,root,root)
 %{_bindir}/gdbserver
 %{_mandir}/*/gdbserver.1*
 %if %{have_inproctrace}
@@ -1007,7 +1004,6 @@ done
 
 %files doc
 %doc %{gdb_build}/gdb/doc/{gdb,annotate}.{html,pdf}
-%defattr(-,root,root)
 %{_infodir}/annotate.info*
 %{_infodir}/gdb.info*
 
@@ -1040,6 +1036,10 @@ fi
 %endif
 
 %changelog
+* Wed Jul  4 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.50.20180704-28.fc29
+- Rebase to FSF GDB 8.1.50.20180704 (8.2pre).
+- Remove defattr directives from specfile.
+
 * Mon Jul 02 2018 Miro Hrončok <mhroncok@redhat.com>
 - Rebuilt for Python 3.7
 
