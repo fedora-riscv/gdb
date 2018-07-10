@@ -34,7 +34,6 @@ Group: Development/Debuggers
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
 Source: %{tarname}.tar.xz
 #Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
-Buildroot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
