@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 20%{?dist}
+Release: 21%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -161,7 +161,7 @@ Source3: gdb-gstack.man
 Source4: gdbinit
 
 # libstdc++ pretty printers from GCC SVN.
-%global libstdcxxpython gdb-libstdc++-v3-python-7.1.1-20170526
+%global libstdcxxpython gdb-libstdc++-v3-python-8.1.1-20180626
 #=fedora
 Source5: %{libstdcxxpython}.tar.xz
 
@@ -1040,6 +1040,9 @@ fi
 %endif
 
 %changelog
+* Thu Jul 12 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-21.fc28
+- [dts] Upgrade libstdc++-v3-python to 8.1.1-20180626.
+
 * Thu Jul 12 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-20.fc28
 - Implement IPv6 support for GDB/gdbserver (RH BZ 881849, Sergio Durigan Junior).
 
