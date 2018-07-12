@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 22%{?dist}
+Release: 23%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -245,8 +245,11 @@ BuildRequires: libipt-devel%{buildisa}
 %endif
 %endif
 %endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 # See https://bugzilla.redhat.com/show_bug.cgi?id=1593280
+# DTS RHEL-6 has mpfr-2 while GDB requires mpfr-3.
 BuildRequires: mpfr-devel%{buildisa}
+%endif
 
 %if 0%{?_with_testsuite:1}
 
@@ -628,7 +631,11 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-intel-pt					\
 %endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-mpfr						\
+%else
+	--without-mpfr						\
+%endif
 	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
@@ -1041,6 +1048,9 @@ fi
 %endif
 
 %changelog
+* Thu Jul 12 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-23.fc28
+- [dts] [rhel6] Do not use mpfr as rhel6 has mpfr-2 while GDB requires mpfr-3.
+
 * Thu Jul 12 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-22.fc28
 - [dts] [rhel6] Workaround gcc-8.0: -Wno-error=cast-function-type,stringop-truncation
 
