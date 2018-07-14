@@ -733,7 +733,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
     then
       continue
     fi
-    CHECK="$CHECK check//unix/$BI"
+    CHECK="$CHECK check//unix/$BI check//native-gdbserver/$BI check//native-extended-gdbserver/$BI"
   done
   # Do not try -m64 inferiors for -m32 GDB as it cannot handle inferiors larger
   # than itself.
@@ -742,7 +742,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   RPM_SIZE="$(file ./biarch|sed -n 's/^.*: ELF \(32\|64\)-bit .*$/\1/p')"
   if [ "$RPM_SIZE" != "64" ]
   then
-    CHECK="$(echo " $CHECK "|sed 's# check//unix/-m64 # #')"
+    CHECK="$(echo " $CHECK "|sed 's#check//unix/-m64 check//native-gdbserver/-m64 check//native-extended-gdbserver/-m64# #')"
   fi
 
   # Disable some problematic testcases.
@@ -765,7 +765,7 @@ for t in sum log
 do
   for file in testsuite*/gdb.$t
   do
-    suffix="${file#testsuite.unix.}"
+    suffix="${file#testsuite}"
     suffix="${suffix%/gdb.$t}"
     ln $file gdb-%{_target_platform}$suffix.$t || :
   done
