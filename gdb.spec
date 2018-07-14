@@ -26,7 +26,7 @@ Version: 8.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1048,6 +1048,9 @@ fi
 %endif
 
 %changelog
+* Sat Jul 14 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-24.fc28
+- Update IPv6 support for GDB/gdbserver (RH BZ 881849, Sergio Durigan Junior).
+
 * Thu Jul 12 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1-23.fc28
 - [dts] [rhel6] Do not use mpfr as rhel6 has mpfr-2 while GDB requires mpfr-3.
 

@@ -1,0 +1,50 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Jan Kratochvil <jan.kratochvil@redhat.com>
+Date: Sat, 14 Jul 2018 11:03:02 +0200
+Subject: gdb-rhbz881849-ipv6-3of3.patch
+
+;; Implement IPv6 support for GDB/gdbserver (RH BZ 881849, Sergio Durigan Junior).
+
+Expect for another variant of error message when gdbserver cannot resolve hostname
+
+I've noticed that on a few hosts, when given an invalid hostname,
+gdbserver fails with:
+
+  spawn /../../gdb/gdbserver/gdbserver --once tcp8:123:2353 /gdb/build/fedora-s390x/build/gdb/testsuite/outputs/gdb.server/server-connect/server-connect
+  tcp8:123:2353: cannot resolve name: No address associated with hostname
+				      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Exiting
+
+Unfortunately, this causes a fail on the new
+gdb.server/server-connect.exp test (introduced by the IPv6 patch):
+
+  FAIL: gdb.server/server-connect.exp: tcp8: start gdbserver: gdbserver should fail but did not
+
+This happens because we're expecting for another variant of this error
+message:
+
+  cannot resolve name: Name or service not known
+
+Therefore, this patch extends the helper function 'gdbserver_start' to
+also recognize the "No address associated with hostname" message.
+This "fixes" the testcase on the hosts that use this variant.
+
+gdb/testsuite/ChangeLog:
+2018-07-13  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* lib/gdbserver-support.exp (gdbserver_start): Expect for the
+	message "No address associated with hostname" when gdbserver
+	cannot resolve the hostname.
+
+diff --git a/gdb/testsuite/lib/gdbserver-support.exp b/gdb/testsuite/lib/gdbserver-support.exp
+--- a/gdb/testsuite/lib/gdbserver-support.exp
++++ b/gdb/testsuite/lib/gdbserver-support.exp
+@@ -326,7 +326,7 @@ proc gdbserver_start { options arguments } {
+ 		    continue
+ 		}
+ 	    }
+-	    -re ".*: cannot resolve name: Name or service not known\r\n" {
++	    -re ".*: cannot resolve name: \(No address associated with hostname|Name or service not known\)\r\n" {
+ 		error "gdbserver cannot resolve name."
+ 	    }
+ 	    timeout {
