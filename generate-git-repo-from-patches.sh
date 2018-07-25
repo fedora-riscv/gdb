@@ -35,8 +35,14 @@ test -f _git_upstream_commit || die "Cannot find _git_upstream_commit file."
 test -f _patch_order || die "Cannot find _patch_order file."
 
 last_ancestor_commit=`cat _git_upstream_commit`
+
 cd $1
+
+git name-rev $last_ancestor_commit
+test $? -eq 0 || die "Could not find $last_ancestor_commit in the repository $1.  Did you run 'git fetch'?"
+
 git checkout $last_ancestor_commit
 for p in `cat ../_patch_order` ; do
     git am ../$p
+    test $? -eq 0 || die "Could not apply patch '$p'."
 done
