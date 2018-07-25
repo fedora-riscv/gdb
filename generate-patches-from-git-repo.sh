@@ -51,6 +51,10 @@ for f in `cat _patch_order` ; do
 done
 
 cd $1
+
+git name-rev $commit_or_tag
+test $? -eq 0 || die "Could not find $commit_or_tag in the repository.  Did you run 'git fetch'?"
+
 idx=1
 common_ancestor=`git merge-base HEAD $commit_or_tag`
 
