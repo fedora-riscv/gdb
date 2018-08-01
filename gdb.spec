@@ -22,11 +22,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.1
+Version: 8.1.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 25%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1048,6 +1048,10 @@ fi
 %endif
 
 %changelog
+* Wed Aug  1 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.1-1.fc28
+- Rebase to FSF GDB 8.1.1.
+- Rebase gdb-rhbz881849-ipv6-3of3.patch.
+
 * Wed Jul 25 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1-25.fc28
 - Set CU language before processing any DIEs (RH BZ 1560010, Keith Seitz).
 
