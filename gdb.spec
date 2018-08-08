@@ -26,7 +26,7 @@ Version: 8.1.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 38%{?dist}
+Release: 39%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -178,9 +178,6 @@ Patch1142: v1.5-libipt-static.patch
 #=push+jan
 Patch1171: v1.6.1-implicit-fallthrough.patch
 
-## Fix the pahole command breakage due to its Python3 port (RH BZ 1264532).
-##=fedora
-Patch1044: gdb-pahole-python2.patch
 ## [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
 ##=fedoratest
 #Patch1075: gdb-testsuite-readline63-sigint.patch
@@ -448,7 +445,6 @@ done
 
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1119 -p1
-%patch1044 -p1
 %endif
 
 find -name "*.orig" | xargs rm -f
@@ -1030,6 +1026,10 @@ fi
 %endif
 
 %changelog
+* Wed Aug  8 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1.90.20180727-39.fc29
+- [dts] Fix build by removing a patch for already removed pahole.py .
+- [dts rhel6] Fix build by updating gdb-gnat-dwarf-crash-3of3.patch .
+
 * Mon Jul 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-38.fc29
 - Recompile to fix RH BZ 1609504 (due to RH BZ 1609577).
 
