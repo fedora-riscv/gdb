@@ -26,7 +26,7 @@ Version: 8.1.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 41%{?dist}
+Release: 42%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -234,7 +234,7 @@ BuildRequires: guile-devel%{buildisa}
 %if 0%{?el7:1} && 0%{?scl:1}
 BuildRequires: cmake
 %else
-BuildRequires: libipt-devel%{buildisa}
+#BuildRequires: libipt-devel%{buildisa}
 %endif
 %endif
 %endif
@@ -604,7 +604,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--disable-inprocess-agent				\
 %endif
 	--with-system-zlib					\
-%if %{have_libipt}
+%if 0 && %{have_libipt}
 	--with-intel-pt						\
 %else
 	--without-intel-pt					\
@@ -1022,6 +1022,9 @@ fi
 %endif
 
 %changelog
+* Wed Aug  8 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-42.fc29
+- Again, temporarily disable libipt (needed to upgrade libipt to 2.0).
+
 * Wed Aug  8 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-41.fc29
 - Reenable libipt.
 - Rebuild due to new libipt release.
