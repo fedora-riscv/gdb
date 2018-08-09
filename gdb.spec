@@ -26,7 +26,7 @@ Version: 8.1.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 43%{?dist}
+Release: 44%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1022,6 +1022,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug  9 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1.90.20180727-44.fc29
+- Add GDB support to access/display POWER8 registers (IBM, RH BZ 1187581).
+
 * Thu Aug  9 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-43.fc29
 - Reenable libipt.
 
