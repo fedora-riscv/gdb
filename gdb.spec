@@ -26,7 +26,7 @@ Version: 8.1.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 44%{?dist}
+Release: 45%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -656,10 +656,10 @@ else
 fi
 
 # Prepare gdb/config.h first.
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" maybe-configure-gdb
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
 perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
 
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS"
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
 
 ! grep '_RELOCATABLE.*1' gdb/config.h
 grep '^#define HAVE_LIBSELINUX 1$' gdb/config.h
@@ -682,7 +682,7 @@ done	# fprofile
 cd %{gdb_build}
 
 make %{?_smp_mflags} \
-     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split
+     -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split V=1
 
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
 cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
@@ -1022,6 +1022,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug 21 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-45.fc29
+- Enable verbose output when running "make".
+
 * Thu Aug  9 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.1.90.20180727-44.fc29
 - Add GDB support to access/display POWER8 registers (IBM, RH BZ 1187581).
 
