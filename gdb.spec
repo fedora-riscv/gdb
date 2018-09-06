@@ -26,7 +26,7 @@ Version: 8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1022,8 +1022,14 @@ fi
 %endif
 
 %changelog
+* Thu Sep  6 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-2.fc29
+- Backport "Use pulongest in aarch64-linux-tdep.c" (Tom Tromey),
+  needed to unbreak the compilation on 32-bit architectures.
+
 * Wed Sep  5 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-1.fc29
 - Rebase to FSF GDB 8.2.
+- Backport "Indicate batch mode failures by exiting with nonzero status"
+  (Gary Benson, RH BZ 1491128).
 
 * Tue Aug 28 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180828-46.fc29
 - Rebase to FSF GDB 8.1.90.20180828 (8.2pre).
