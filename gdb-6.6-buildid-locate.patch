@@ -436,7 +436,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"),
-@@ -65,11 +463,50 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+@@ -65,11 +463,47 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    return retval;
  }
  
@@ -481,14 +481,11 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id,
 +		       char **link_return, int add_debug_suffix)
  {
-+  char *debugdir;
 +  std::string link, link_all;
-+  struct cleanup *back_to;
-+  int ix;
    gdb_bfd_ref_ptr abfd;
  
    /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
-@@ -82,63 +519,296 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+@@ -82,63 +516,296 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
      {
        const gdb_byte *data = build_id;
        size_t size = build_id_len;
@@ -807,7 +804,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        /* Prevent looping on a stripped .debug file.  */
        if (abfd != NULL
  	  && filename_cmp (bfd_get_filename (abfd.get ()),
-@@ -151,3 +821,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
+@@ -151,3 +818,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
  
    return std::string ();
  }
@@ -832,9 +829,9 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 diff --git a/gdb/build-id.h b/gdb/build-id.h
 --- a/gdb/build-id.h
 +++ b/gdb/build-id.h
-@@ -22,9 +22,10 @@
- 
+@@ -23,9 +23,10 @@
  #include "gdb_bfd.h"
+ #include "common/rsp-low.h"
  
 -/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
 +/* Separate debuginfo files have corrupted PHDR but SHDR is correct there.
@@ -845,7 +842,7 @@ diff --git a/gdb/build-id.h b/gdb/build-id.h
  
  /* Return true if ABFD has NT_GNU_BUILD_ID matching the CHECK value.
     Otherwise, issue a warning and return false.  */
-@@ -38,13 +39,18 @@ extern int build_id_verify (bfd *abfd,
+@@ -39,14 +40,19 @@ extern int build_id_verify (bfd *abfd,
     the caller.  */
  
  extern gdb_bfd_ref_ptr build_id_to_debug_bfd (size_t build_id_len,
@@ -866,11 +863,12 @@ diff --git a/gdb/build-id.h b/gdb/build-id.h
 +extern std::string find_separate_debug_file_by_buildid (struct objfile *objfile,
 +		       gdb::unique_xmalloc_ptr<char> *build_id_filename_return);
  
- #endif /* BUILD_ID_H */
+ /* Return an hex-string representation of BUILD_ID.  */
+ 
 diff --git a/gdb/coffread.c b/gdb/coffread.c
 --- a/gdb/coffread.c
 +++ b/gdb/coffread.c
-@@ -733,7 +733,8 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -734,7 +734,8 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
    /* Try to add separate debug file if no symbols table found.   */
    if (!objfile_has_partial_symbols (objfile))
      {
@@ -905,7 +903,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 +{
 +  CORE_ADDR at_entry;
 +  struct bfd_build_id *build_id;
-+  char *execfilename, *debug_filename;
++  char *execfilename;
 +  char *build_id_filename;
 +  struct cleanup *back_to;
 +
@@ -949,7 +947,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
  /* Issue a message saying we have no core to debug, if FROM_TTY.  */
  
  static void
-@@ -464,6 +516,14 @@ core_target_open (const char *arg, int from_tty)
+@@ -463,6 +515,14 @@ core_target_open (const char *arg, int from_tty)
  	switch_to_thread (thread);
      }
  
@@ -964,7 +962,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
    post_create_inferior (target, from_tty);
  
    /* Now go through the target stack looking for threads since there
-@@ -1066,4 +1126,11 @@ void
+@@ -1071,4 +1131,11 @@ void
  _initialize_corelow (void)
  {
    add_target (core_target_info, core_target_open, filename_completer);
@@ -979,7 +977,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -19570,6 +19570,27 @@ information files.
+@@ -19772,6 +19772,27 @@ information files.
  
  @end table
  
@@ -1007,10 +1005,22 @@ diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
  @cindex @code{.gnu_debuglink} sections
  @cindex debug link sections
  A debug link is a special section of the executable file named
+diff --git a/gdb/dwarf-index-cache.c b/gdb/dwarf-index-cache.c
+--- a/gdb/dwarf-index-cache.c
++++ b/gdb/dwarf-index-cache.c
+@@ -140,7 +140,7 @@ index_cache::store (struct dwarf2_per_objfile *dwarf2_per_objfile)
+   if (!enabled ())
+     return;
+ 
+-  const bfd_build_id *build_id = build_id_bfd_get (obj->obfd);
++  const bfd_build_id *build_id = build_id_bfd_shdr_get (obj->obfd);
+   if (build_id == nullptr)
+     {
+       if (debug_index_cache)
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -2683,7 +2683,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
+@@ -2693,7 +2693,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
      }
  
    if (dwz_bfd == NULL)
@@ -1019,10 +1029,28 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
    if (dwz_bfd == NULL)
      error (_("could not find '.gnu_debugaltlink' file for %s"),
+@@ -6198,7 +6198,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
+ static gdb::array_view<const gdb_byte>
+ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
+ {
+-  const bfd_build_id *build_id = build_id_bfd_get (obj->obfd);
++  const bfd_build_id *build_id = build_id_bfd_shdr_get (obj->obfd);
+   if (build_id == nullptr)
+     return {};
+ 
+@@ -6211,7 +6211,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
+ static gdb::array_view<const gdb_byte>
+ get_gdb_index_contents_from_cache_dwz (objfile *obj, dwz_file *dwz)
+ {
+-  const bfd_build_id *build_id = build_id_bfd_get (dwz->dwz_bfd.get ());
++  const bfd_build_id *build_id = build_id_bfd_shdr_get (dwz->dwz_bfd.get ());
+   if (build_id == nullptr)
+     return {};
+ 
 diff --git a/gdb/elfread.c b/gdb/elfread.c
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
-@@ -1290,7 +1290,9 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -1289,7 +1289,9 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
  	   && objfile->separate_debug_objfile == NULL
  	   && objfile->separate_debug_objfile_backlink == NULL)
      {
@@ -1033,7 +1061,7 @@ diff --git a/gdb/elfread.c b/gdb/elfread.c
  
        if (debugfile.empty ())
  	debugfile = find_separate_debug_file_by_debuglink (objfile);
-@@ -1302,6 +1304,10 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -1301,6 +1303,10 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
  	  symbol_file_add_separate (abfd.get (), debugfile.c_str (),
  				    symfile_flags, objfile);
  	}
@@ -1061,7 +1089,7 @@ diff --git a/gdb/objfiles.h b/gdb/objfiles.h
 diff --git a/gdb/python/py-objfile.c b/gdb/python/py-objfile.c
 --- a/gdb/python/py-objfile.c
 +++ b/gdb/python/py-objfile.c
-@@ -137,7 +137,7 @@ objfpy_get_build_id (PyObject *self, void *closure)
+@@ -132,7 +132,7 @@ objfpy_get_build_id (PyObject *self, void *closure)
  
    TRY
      {
@@ -1070,7 +1098,7 @@ diff --git a/gdb/python/py-objfile.c b/gdb/python/py-objfile.c
      }
    CATCH (except, RETURN_MASK_ALL)
      {
-@@ -544,7 +544,7 @@ objfpy_lookup_objfile_by_build_id (const char *build_id)
+@@ -549,7 +549,7 @@ objfpy_lookup_objfile_by_build_id (const char *build_id)
        /* Don't return separate debug files.  */
        if (objfile->separate_debug_objfile_backlink != NULL)
  	continue;
@@ -1090,7 +1118,7 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
  
  static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
  static int svr4_have_link_map_offsets (void);
-@@ -1356,9 +1357,51 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
+@@ -1341,9 +1342,51 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
  	  continue;
  	}
  
@@ -1148,7 +1176,7 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
 diff --git a/gdb/symfile.h b/gdb/symfile.h
 --- a/gdb/symfile.h
 +++ b/gdb/symfile.h
-@@ -537,6 +537,10 @@ void expand_symtabs_matching
+@@ -531,6 +531,10 @@ void expand_symtabs_matching
  void map_symbol_filenames (symbol_filename_ftype *fun, void *data,
  			   int need_fullname);
  

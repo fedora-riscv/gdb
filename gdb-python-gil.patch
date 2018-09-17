@@ -9,7 +9,7 @@ Subject: gdb-python-gil.patch
 diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
 --- a/gdb/doc/python.texi
 +++ b/gdb/doc/python.texi
-@@ -232,6 +232,14 @@ returned as a string.  The default is @code{False}, in which case the
+@@ -234,6 +234,14 @@ returned as a string.  The default is @code{False}, in which case the
  return value is @code{None}.  If @var{to_string} is @code{True}, the
  @value{GDBN} virtual terminal will be temporarily set to unlimited width
  and height, and its pagination will be disabled; @pxref{Screen Size}.
@@ -27,7 +27,7 @@ diff --git a/gdb/doc/python.texi b/gdb/doc/python.texi
 diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
 --- a/gdb/python/python-internal.h
 +++ b/gdb/python/python-internal.h
-@@ -148,6 +148,8 @@ typedef int Py_ssize_t;
+@@ -144,6 +144,8 @@ typedef int Py_ssize_t;
  #define PyGILState_Release(ARG) ((void)(ARG))
  #define PyEval_InitThreads()
  #define PyThreadState_Swap(ARG) ((void)(ARG))
@@ -39,7 +39,7 @@ diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
 diff --git a/gdb/python/python.c b/gdb/python/python.c
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
-@@ -556,12 +556,16 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+@@ -555,12 +555,16 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
  {
    const char *arg;
    PyObject *from_tty_obj = NULL, *to_string_obj = NULL;
@@ -60,7 +60,7 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
      return NULL;
  
    from_tty = 0;
-@@ -582,6 +586,15 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+@@ -581,6 +585,15 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
        to_string = cmp;
      }
  
@@ -76,7 +76,7 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
    std::string to_string_res;
  
    TRY
-@@ -602,6 +615,13 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+@@ -601,6 +614,13 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
  
        counted_command_line lines = read_command_lines_1 (reader, 1, nullptr);
  
@@ -87,17 +87,19 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
 +      if (release_gil)
 +	state = PyEval_SaveThread();
 +
-       scoped_restore save_async = make_scoped_restore (&current_ui->async, 0);
+       {
+ 	scoped_restore save_async = make_scoped_restore (&current_ui->async,
+ 							 0);
+@@ -620,12 +640,24 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
+ 	  execute_control_commands (lines.get (), from_tty);
+       }
  
-       scoped_restore save_uiout = make_scoped_restore (&current_uiout);
-@@ -617,10 +637,22 @@ execute_gdb_command (PyObject *self, PyObject *args, PyObject *kw)
- 							    from_tty);
-       else
- 	execute_control_commands (lines.get (), from_tty);
-+
 +      /* Reacquire the GIL if it was released earlier.  */
 +      if (release_gil)
 +	PyEval_RestoreThread (state);
++
+       /* Do any commands attached to breakpoint we stopped at.  */
+       bpstat_do_actions ();
      }
    CATCH (except, RETURN_MASK_ALL)
      {

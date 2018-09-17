@@ -18,15 +18,15 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20180727
+%global snapsrc    20180917
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.1.90.%{snapsrc}
+Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 45%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1022,6 +1022,10 @@ fi
 %endif
 
 %changelog
+* Mon Sep 17 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20180917-1.fc30
+- Rebase to FSF GDB 8.2.50.20180917 (8.3pre).
+- Add 'gdb-rhbz795424-bitpos-arrayview.patch'.
+
 * Tue Aug 21 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-45.fc30
 - Enable verbose output when running "make".
 
