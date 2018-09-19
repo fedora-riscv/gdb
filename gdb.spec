@@ -26,7 +26,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1022,9 +1022,23 @@ fi
 %endif
 
 %changelog
+* Wed Sep 19 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20180917-2.fc30
+- Remove 'gdb-6.5-bz203661-emit-relocs.patch'.
+- Update changelog entry for last release.
+
 * Mon Sep 17 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20180917-1.fc30
 - Rebase to FSF GDB 8.2.50.20180917 (8.3pre).
 - Add 'gdb-rhbz795424-bitpos-arrayview.patch'.
+- Remove 'gdb-rhbz881849-ipv6-1of3.patch'.
+- Remove 'gdb-rhbz881849-ipv6-2of3.patch'.
+- Remove 'gdb-rhbz881849-ipv6-3of3.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-1of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-2of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-3of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-4of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-5of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-6of7.patch'.
+- Remove 'gdb-rhbz1187581-power8-regs-7of7.patch'.
 
 * Tue Aug 21 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.90.20180727-45.fc30
 - Enable verbose output when running "make".
