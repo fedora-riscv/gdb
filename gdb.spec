@@ -18,7 +18,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20181010
+%global snapsrc    20181016
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -26,7 +26,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -693,6 +693,9 @@ cp $RPM_BUILD_DIR/%{gdb_src}/gdb/NEWS $RPM_BUILD_DIR/%{gdb_src}
 # Initially we're in the %{gdb_src} directory.
 cd %{gdb_build}
 
+# We always run the unittests.
+(cd gdb; make run GDBFLAGS='-batch -ex "maintenance selftest"')
+
 %if 0%{!?_with_testsuite:1}
 echo ====================TESTSUITE DISABLED=========================
 %else
@@ -1024,6 +1027,10 @@ fi
 %endif
 
 %changelog
+* Tue Oct 16 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181016-6.fc30
+- Rebase to FSF GDB 8.2.50.20181016 (8.3pre).
+- Enable and always run the unittests when building the package.
+
 * Wed Oct 10 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181010-5.fc30
 - Rebase to FSF GDB 8.2.50.20181010 (8.3pre).
 - Remove 'gdb-6.8-sparc64-silence-memcpy-check.patch'.
