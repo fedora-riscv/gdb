@@ -26,7 +26,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -616,6 +616,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-mpfr						\
 %endif
+	--enable-unit-tests					\
 	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
@@ -1027,6 +1028,9 @@ fi
 %endif
 
 %changelog
+* Thu Oct 18 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181016-7.fc30
+- Use "--enable-unit-tests" flag when compiling GDB.
+
 * Tue Oct 16 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181016-6.fc30
 - Rebase to FSF GDB 8.2.50.20181016 (8.3pre).
 - Enable and always run the unittests when building the package.
