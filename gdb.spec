@@ -26,7 +26,7 @@ Version: 8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1024,6 +1024,9 @@ fi
 %endif
 
 %changelog
+* Mon Nov 26 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-4.fc29
+- Fix 'GDB crashes when running from a deleted directory' (Tom Tromey, RHBZ 1653410).
+
 * Thu Oct  4 2018 Jan Kratochvil <jan.kratochvil@redhat.com> - 8.2-3.fc29
 - Fix annobin complaints (RH BZ 1630564):
   --without-stage1-ldflags: Disable static libstdc++ and libgcc linking.
