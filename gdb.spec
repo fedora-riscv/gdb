@@ -26,7 +26,7 @@ Version: 8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1024,6 +1024,9 @@ fi
 %endif
 
 %changelog
+* Fri Nov 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-5.fc29
+- Fix 'py-bt is broken, results in exception' (RHBZ 1639242).
+
 * Mon Nov 26 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-4.fc29
 - Fix 'GDB crashes when running from a deleted directory' (Tom Tromey, RHBZ 1653410).
 
