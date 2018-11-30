@@ -26,7 +26,7 @@ Version: 8.1.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1052,6 +1052,9 @@ fi
 %endif
 
 %changelog
+* Fri Nov 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.1-4.fc28
+- Fix 'py-bt is broken, results in exception' (RHBZ 1639242).
+
 * Fri Aug  3 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.1.1-3.fc28
 - Update IPv6 support for GDB/gdbserver (RH BZ 881849, Sergio Durigan Junior).
 
