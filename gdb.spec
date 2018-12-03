@@ -22,7 +22,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20181114
+%global snapsrc    20181130
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -30,7 +30,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1032,6 +1032,9 @@ fi
 %endif
 
 %changelog
+* Fri Nov 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181130-10.fc30
+- Rebase to FSF GDB 8.2.50.20181130 (8.3pre).
+
 * Tue Nov 20 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181114-9.fc30
 - Declare _python_bytecompile_extra.
 - Fix typo on gdb-x86_64-i386-syscall-restart.patch.
