@@ -171,7 +171,7 @@ diff --git a/gdb/testsuite/gdb.base/gstack.exp b/gdb/testsuite/gdb.base/gstack.e
 new file mode 100644
 --- /dev/null
 +++ b/gdb/testsuite/gdb.base/gstack.exp
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,84 @@
 +# Copyright (C) 2012 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -202,6 +202,10 @@ new file mode 100644
 +    fail $test
 +    return
 +}
++
++# The spawn id of the test inferior.
++set test_spawn_id $res
++
 +set use_gdb_stub 1
 +set pid [exp_pid -i $res]
 +gdb_expect {
@@ -217,7 +221,6 @@ new file mode 100644
 +	return
 +    }
 +}
-+gdb_exit
 +
 +# Testcase uses the most simple notification not to get caught by attach on
 +# exiting the function.  Still we could retry the gstack command if we fail.
@@ -229,12 +232,27 @@ new file mode 100644
 +    perror "Spawning $command failed."
 +    fail $test
 +}
-+set pid [exp_pid -i $res]
++
++set gdb_spawn_id $res
++
 +gdb_test_multiple "" $test {
 +    -re "^#0 +(0x\[0-9a-f\]+ in )?\\.?func \\(\\) at \[^\r\n\]*\r\n#1 +0x\[0-9a-f\]+ in \\.?main \\(\\) at \[^\r\n\]*\r\nGSTACK-END\r\n\$" {
 +	pass $test
 +    }
 +}
-+gdb_exit
 +
-+remote_exec host "kill -9 $pid"
++gdb_test_multiple "" "gstack exits" {
++    eof {
++	set result [wait -i $gdb_spawn_id]
++	verbose $result
++
++	gdb_assert { [lindex $result 2] == 0 } "gstack exits with no error"
++	gdb_assert { [lindex $result 3] == 0 } "gstack's exit status is 0"
++
++	remote_close host
++	clear_gdb_spawn_id
++    }
++}
++
++# Kill the test inferior.
++kill_wait_spawned_process $test_spawn_id

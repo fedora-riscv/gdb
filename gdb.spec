@@ -30,7 +30,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 11%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1032,6 +1032,11 @@ fi
 %endif
 
 %changelog
+* Tue Dec 11 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181130-11.fc30
+- Update gdb-6.3-gstack-20050411.patch (Pedro Alves).
+- Update gdb-archer-next-over-throw-cxx-exec.patch (Pedro Alves).
+- Update gdb-glibc-strstr-workaround.patch (Pedro Alves).
+
 * Fri Nov 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181130-10.fc30
 - Rebase to FSF GDB 8.2.50.20181130 (8.3pre).
 
