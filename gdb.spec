@@ -26,7 +26,7 @@ Version: 8.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1024,6 +1024,10 @@ fi
 %endif
 
 %changelog
+* Fri Jan 11 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-6.fc29
+- Fix 'Assertion `SYMBOL_LANGUAGE (sym) == DICT_LANGUAGE (dict)->la_language' failed.'
+  (Keith Seitz, RHBZ 1560010).
+
 * Fri Nov 30 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2-5.fc29
 - Fix 'py-bt is broken, results in exception' (RHBZ 1639242).
 
