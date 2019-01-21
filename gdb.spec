@@ -22,7 +22,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20181220
+%global snapsrc    20190120
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -30,7 +30,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 Group: Development/Debuggers
@@ -1032,6 +1032,11 @@ fi
 %endif
 
 %changelog
+* Mon Jan 21 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20190120-13.fc30
+- Rebase to FSF GDB 8.2.50.20190120 (8.3pre).
+- Fix 'gdb does crash randomly on loading symbols or setting a breakpoint'
+  (RHBZ 1638798, Keith Seitz).
+
 * Thu Dec 20 2018 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20181220-12.fc30
 - Rebase to FSF GDB 8.2.50.20181220 (8.3pre).
 
