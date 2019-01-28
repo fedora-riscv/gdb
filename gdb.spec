@@ -33,7 +33,6 @@ Version: 8.2.50.%{snapsrc}
 Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
-Group: Development/Debuggers
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
 Source: %{tarname}.tar.xz
@@ -69,7 +68,6 @@ Requires: gdb-headless%{?_isa} = %{version}-%{release}
 See package 'gdb-headless'.
 
 %package headless
-Group: Development/Debuggers
 %endif
 
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
@@ -373,7 +371,6 @@ and printing their data.
 
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
-Group: Development/Debuggers
 
 %description gdbserver
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -386,7 +383,6 @@ machine than the one which is running the program being debugged.
 %package doc
 Summary: Documentation for GDB (the GNU source-level debugger)
 License: GFDL
-Group: Documentation
 BuildArch: noarch
 %if 0%{?scl:1}
 # As of F-28, packages won't need to call /sbin/install-info by hand
