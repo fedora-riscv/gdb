@@ -30,7 +30,7 @@ Version: 8.2.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -227,7 +227,7 @@ BuildRequires: texlive-collection-latexrecommended
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
-BuildRequires: guile-devel%{buildisa}
+#BuildRequires: guile-devel%{buildisa}
 %endif
 %global have_libipt 0
 %if 0%{!?rhel:1} || 0%{?rhel} > 7 || (0%{?rhel} == 7 && 0%{?scl:1})
@@ -565,12 +565,11 @@ export CXXFLAGS="$CFLAGS"
 	--disable-rpath						\
 	--without-stage1-ldflags				\
 	--disable-libmcheck					\
+	--without-guile						\
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 	--with-babeltrace					\
-	--with-guile						\
 %else
 	--without-babeltrace					\
-	--without-guile						\
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
@@ -1025,7 +1024,10 @@ fi
 %endif
 
 %changelog
-* Sun Feb 17 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org>
+* Sun Feb 17 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 8.2.50.20190120-17
+- Disable temporarily guile support
+
+* Sun Feb 17 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 8.2.50.20190120-16
 - Rebuild for readline 8.0
 
 * Tue Feb  5 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20190120-15
