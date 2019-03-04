@@ -1028,6 +1028,7 @@ fi
 * Mon Mar  4 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.90.20190304-19
 - Rebase to FSF GDB 8.2.90.20190301 (8.3pre).
 - Rewrite gdb-6.6-buildid-locate.patch.
+- Add (temporarily) gdb-fix-aarch64-enable-unittests.patch.
 
 * Tue Feb 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20190219-18
 - Rebase to FSF GDB 8.2.50.20190219 (8.3pre).
