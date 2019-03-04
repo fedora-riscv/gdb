@@ -436,7 +436,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"),
-@@ -65,11 +463,47 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+@@ -65,62 +463,173 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    return retval;
  }
  
@@ -474,6 +474,160 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +  return retval;
 +}
 +
+ /* Helper for build_id_to_debug_bfd.  LINK is a path to a potential
+    build-id-based separate debug file, potentially a symlink to the real file.
+    If the file exists and matches BUILD_ID, return a BFD reference to it.  */
+ 
+ static gdb_bfd_ref_ptr
+-build_id_to_debug_bfd_1 (const std::string &link, size_t build_id_len,
+-			 const bfd_byte *build_id)
++build_id_to_debug_bfd_1 (const std::string &orig_link, size_t build_id_len,
++			 const bfd_byte *build_id, char **link_return,
++			 int add_debug_suffix)
+ {
++  gdb_bfd_ref_ptr ret_bfd = {};
++  std::string ret_link;
++
+   if (separate_debug_file_debug)
+     {
+-      printf_unfiltered (_("  Trying %s..."), link.c_str ());
++      printf_unfiltered (_("  Trying %s..."), orig_link.c_str ());
+       gdb_flush (gdb_stdout);
+     }
+ 
+-  /* lrealpath() is expensive even for the usually non-existent files.  */
+-  gdb::unique_xmalloc_ptr<char> filename;
+-  if (access (link.c_str (), F_OK) == 0)
+-    filename.reset (lrealpath (link.c_str ()));
+-
+-  if (filename == NULL)
++  for (unsigned seqno = 0;; seqno++)
+     {
+-      if (separate_debug_file_debug)
+-	printf_unfiltered (_(" no, unable to compute real path\n"));
++      std::string link = orig_link;
+ 
+-      return {};
+-    }
++      if (seqno > 0)
++	{
++	  /* There can be multiple build-id symlinks pointing to real files
++	     with the same build-id (such as hard links).  Some of the real
++	     files may not be installed.  */
+ 
+-  /* We expect to be silent on the non-existing files.  */
+-  gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget, -1);
++	  string_appendf (link, ".%u", seqno);
++	}
+ 
+-  if (debug_bfd == NULL)
+-    {
+-      if (separate_debug_file_debug)
+-	printf_unfiltered (_(" no, unable to open.\n"));
++      if (add_debug_suffix)
++	link += ".debug";
++
++      ret_link = link;
++
++      struct stat statbuf_trash;
++
++      /* `access' automatically dereferences LINK.  */
++      if (lstat (link.c_str (), &statbuf_trash) != 0)
++	{
++	  /* Stop increasing SEQNO.  */
++	  break;
++	}
++
++      /* lrealpath() is expensive even for the usually non-existent files.  */
++      gdb::unique_xmalloc_ptr<char> filename;
++
++      if (access (link.c_str (), F_OK) == 0)
++	filename.reset (lrealpath (link.c_str ()));
++
++      if (filename == NULL)
++	{
++	  if (separate_debug_file_debug)
++	    printf_unfiltered (_(" no, unable to compute real path\n"));
++
++	  continue;
++	}
++
++      /* We expect to be silent on the non-existing files.  */
++      gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget, -1);
++
++      if (debug_bfd == NULL)
++	{
++	  if (separate_debug_file_debug)
++	    printf_unfiltered (_(" no, unable to open.\n"));
++
++	  continue;
++	}
++
++      if (!build_id_verify (debug_bfd.get(), build_id_len, build_id))
++	{
++	  if (separate_debug_file_debug)
++	    printf_unfiltered (_(" no, build-id does not match.\n"));
++
++	  continue;
++	}
+ 
+-      return {};
++      ret_bfd = debug_bfd;
++      break;
+     }
+ 
+-  if (!build_id_verify (debug_bfd.get(), build_id_len, build_id))
++  std::string link_all;
++
++  if (ret_bfd != NULL)
+     {
+       if (separate_debug_file_debug)
+-	printf_unfiltered (_(" no, build-id does not match.\n"));
++	printf_unfiltered (_(" yes!\n"));
++    }
++  else
++    {
++      /* If none of the real files is found report as missing file
++	 always the non-.%u-suffixed file.  */
++      std::string link0 = orig_link;
++
++      if (add_debug_suffix)
++	link0 += ".debug";
++
++      /* If the symlink has target request to install the target.
++	 BASE-debuginfo.rpm contains the symlink but BASE.rpm may be missing.
++	 https://bugzilla.redhat.com/show_bug.cgi?id=981154  */
++      std::string link0_resolved (link_resolve (link0.c_str (), 0));
+ 
+-      return {};
++      if (link_all.empty ())
++	link_all = link0_resolved;
++      else
++	{
++	  /* Use whitespace instead of DIRNAME_SEPARATOR to be compatible with
++	     its possible use as an argument for installation command.  */
++	  link_all += " " + link0_resolved;
++	}
+     }
+ 
+-  if (separate_debug_file_debug)
+-    printf_unfiltered (_(" yes!\n"));
++  if (link_return != NULL)
++    {
++      if (ret_bfd != NULL)
++	{
++	  *link_return = xstrdup (ret_link.c_str ());
++	}
++      else
++	{
++	  *link_return = xstrdup (link_all.c_str ());
++	}
++    }
+ 
+-  return debug_bfd;
++  return ret_bfd;
+ }
+ 
  /* See build-id.h.  */
  
  gdb_bfd_ref_ptr
@@ -481,23 +635,9 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id,
 +		       char **link_return, int add_debug_suffix)
  {
-+  std::string link, link_all;
-   gdb_bfd_ref_ptr abfd;
- 
    /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
-@@ -82,86 +516,319 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
-     {
-       const gdb_byte *data = build_id;
-       size_t size = build_id_len;
-+      unsigned seqno;
-+      struct stat statbuf_trash;
-+      std::string link0;
-+      gdb::unique_xmalloc_ptr<char> filename;
- 
--      std::string link = debugdir.get ();
-+      link = debugdir.get ();
-       link += "/.build-id/";
- 
+      cause "/.build-id/..." lookups.  */
+@@ -143,16 +652,16 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
        if (size > 0)
  	{
  	  size--;
@@ -512,140 +652,25 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
 -      link += ".debug";
 -
-       if (separate_debug_file_debug)
+       gdb_bfd_ref_ptr debug_bfd
+-	= build_id_to_debug_bfd_1 (link, build_id_len, build_id);
++	= build_id_to_debug_bfd_1 (link, build_id_len, build_id,
++				   link_return, add_debug_suffix);
+       if (debug_bfd != NULL)
+ 	return debug_bfd;
+ 
+@@ -166,7 +675,8 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+       if (strcmp (gdb_sysroot, TARGET_SYSROOT_PREFIX) != 0)
  	{
- 	  printf_unfiltered (_("  Trying %s..."), link.c_str ());
- 	  gdb_flush (gdb_stdout);
+ 	  link = gdb_sysroot + link;
+-	  debug_bfd = build_id_to_debug_bfd_1 (link, build_id_len, build_id);
++	  debug_bfd = build_id_to_debug_bfd_1 (link, build_id_len, build_id,
++					       link_return, add_debug_suffix);
+ 	  if (debug_bfd != NULL)
+ 	    return debug_bfd;
  	}
- 
--      /* lrealpath() is expensive even for the usually non-existent files.  */
--      gdb::unique_xmalloc_ptr<char> filename;
--      if (access (link.c_str (), F_OK) == 0)
--	filename.reset (lrealpath (link.c_str ()));
--
--      if (filename == NULL)
-+      for (seqno = 0;; seqno++)
- 	{
--	  if (separate_debug_file_debug)
--	    printf_unfiltered (_(" no, unable to compute real path\n"));
-+	  if (seqno)
-+	    {
-+	      /* There can be multiple build-id symlinks pointing to real files
-+		 with the same build-id (such as hard links).  Some of the real
-+		 files may not be installed.  */
-+
-+	      string_appendf (link, ".%u", seqno);
-+	    }
-+
-+	  if (add_debug_suffix)
-+	    link += ".debug";
-+
-+	  if (!seqno)
-+	    {
-+	      /* If none of the real files is found report as missing file
-+		 always the non-.%u-suffixed file.  */
-+	      link0 = link;
-+	    }
-+
-+	  /* `access' automatically dereferences LINK.  */
-+	  if (lstat (link.c_str (), &statbuf_trash) != 0)
-+	    {
-+	      /* Stop increasing SEQNO.  */
-+	      break;
-+	    }
-+
-+	  /* lrealpath() is expensive even for the usually non-existent files.  */
-+	  if (access (link.c_str (), F_OK) == 0)
-+	    filename.reset (lrealpath (link.c_str ()));
-+
-+	  if (filename == NULL)
-+	    {
-+	      if (separate_debug_file_debug)
-+		printf_unfiltered (_(" no, unable to compute real path\n"));
-+
-+	      continue;
-+	    }
-+
-+	  /* We expect to be silent on the non-existing files.  */
-+	  abfd = gdb_bfd_open (filename.get (), gnutarget, -1);
-+
-+	  if (abfd == NULL)
-+	    {
-+	      if (separate_debug_file_debug)
-+		printf_unfiltered (_(" no, unable to open.\n"));
-+
-+	      continue;
-+	    }
-+
-+	  if (build_id_verify (abfd.get(), build_id_len, build_id))
-+	    {
-+	      if (separate_debug_file_debug)
-+		printf_unfiltered (_(" yes!\n"));
-+
-+	      break;
-+	    }
-+	  else
-+	    {
-+	      if (separate_debug_file_debug)
-+		printf_unfiltered (_(" no, build-id does not match.\n"));
-+	    }
-+
-+	  abfd.release ();
-+
-+	  filename.reset (nullptr);
-+	}
- 
--	  continue;
-+      if (filename != NULL)
-+	{
-+	  /* LINK_ALL is not used below in this non-NULL FILENAME case.  */
-+	  break;
- 	}
- 
--      /* We expect to be silent on the non-existing files.  */
--      abfd = gdb_bfd_open (filename.get (), gnutarget, -1);
-+      /* If the symlink has target request to install the target.
-+         BASE-debuginfo.rpm contains the symlink but BASE.rpm may be missing.
-+         https://bugzilla.redhat.com/show_bug.cgi?id=981154  */
-+      std::string link0_resolved (link_resolve (link0.c_str (), 0));
- 
--      if (abfd == NULL)
-+      if (link_all.empty ())
-+	link_all = link0_resolved;
-+      else
- 	{
--	  if (separate_debug_file_debug)
--	    printf_unfiltered (_(" no, unable to open.\n"));
--
--	  continue;
-+	  /* Use whitespace instead of DIRNAME_SEPARATOR to be compatible with
-+	     its possible use as an argument for installation command.  */
-+	  link_all += " " + link0_resolved;
- 	}
-+    }
- 
--      if (build_id_verify (abfd.get(), build_id_len, build_id))
-+  if (link_return != NULL)
-+    {
-+      if (abfd != NULL)
- 	{
--	  if (separate_debug_file_debug)
--	    printf_unfiltered (_(" yes!\n"));
--
--	  break;
-+	  *link_return = xstrdup (link.c_str ());
- 	}
-       else
- 	{
--	  if (separate_debug_file_debug)
--	    printf_unfiltered (_(" no, build-id does not match.\n"));
-+	  *link_return = xstrdup (link_all.c_str ());
- 	}
--
--      abfd.release ();
-     }
- 
-   return abfd;
+@@ -175,22 +685,190 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+   return {};
  }
  
 +char *
@@ -838,7 +863,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        /* Prevent looping on a stripped .debug file.  */
        if (abfd != NULL
  	  && filename_cmp (bfd_get_filename (abfd.get ()),
-@@ -174,3 +841,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
+@@ -203,3 +881,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
  
    return std::string ();
  }
