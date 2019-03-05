@@ -22,15 +22,15 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190219
+%global snapsrc    20190304
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.2.50.%{snapsrc}
+Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 18%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1025,6 +1025,14 @@ fi
 %endif
 
 %changelog
+* Mon Mar  4 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190304-1
+- Rebase to FSF GDB 8.3.50.20190304 (8.4pre).
+- Rewrite gdb-6.6-buildid-locate.patch.
+- Remove gdb-python-gil.patch.
+
+* Fri Feb 22 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20190222-19
+- Rebase to FSF GDB 8.2.50.20190222 (8.3pre).
+
 * Tue Feb 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.50.20190219-18
 - Rebase to FSF GDB 8.2.50.20190219 (8.3pre).
 - BuildRequire on 'source-highlight-devel' and enable styled output.
