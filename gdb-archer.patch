@@ -112,7 +112,7 @@ diff --git a/gdb/main.c b/gdb/main.c
  #include "source.h"
  #include "cli/cli-cmds.h"
  #include "objfiles.h"
-@@ -478,7 +479,7 @@ exec_or_core_file_attach (const char *filename, int from_tty)
+@@ -470,7 +471,7 @@ exec_or_core_file_attach (const char *filename, int from_tty)
  }
  
  static void
@@ -121,7 +121,7 @@ diff --git a/gdb/main.c b/gdb/main.c
  {
    int argc = context->argc;
    char **argv = context->argv;
-@@ -698,10 +699,14 @@ captured_main_1 (struct captured_main_args *context)
+@@ -690,10 +691,14 @@ captured_main_1 (struct captured_main_args *context)
        {"args", no_argument, &set_args, 1},
        {"l", required_argument, 0, 'l'},
        {"return-child-result", no_argument, &return_child_result, 1},
@@ -137,7 +137,7 @@ diff --git a/gdb/main.c b/gdb/main.c
        {
  	int option_index;
  
-@@ -719,6 +724,9 @@ captured_main_1 (struct captured_main_args *context)
+@@ -711,6 +716,9 @@ captured_main_1 (struct captured_main_args *context)
  	  case 0:
  	    /* Long option that just sets a flag.  */
  	    break;
@@ -147,7 +147,7 @@ diff --git a/gdb/main.c b/gdb/main.c
  	  case OPT_SE:
  	    symarg = optarg;
  	    execarg = optarg;
-@@ -898,7 +906,31 @@ captured_main_1 (struct captured_main_args *context)
+@@ -890,7 +898,31 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Now that gdb_init has created the initial inferior, we're in
       position to set args for that inferior.  */
@@ -180,7 +180,7 @@ diff --git a/gdb/main.c b/gdb/main.c
      {
        /* The remaining options are the command-line options for the
  	 inferior.  The first one is the sym/exec file, and the rest
-@@ -1199,7 +1231,8 @@ captured_main_1 (struct captured_main_args *context)
+@@ -1191,7 +1223,8 @@ captured_main_1 (struct captured_main_args *context)
  
    /* Read in the old history after all the command files have been
       read.  */
@@ -190,7 +190,7 @@ diff --git a/gdb/main.c b/gdb/main.c
  
    if (batch_flag)
      {
-@@ -1215,24 +1248,37 @@ static void
+@@ -1207,24 +1240,37 @@ static void
  captured_main (void *data)
  {
    struct captured_main_args *context = (struct captured_main_args *) data;
@@ -241,7 +241,7 @@ diff --git a/gdb/main.c b/gdb/main.c
      }
    /* No exit -- exit is through quit_command.  */
  }
-@@ -1275,6 +1321,12 @@ print_gdb_help (struct ui_file *stream)
+@@ -1267,6 +1313,12 @@ print_gdb_help (struct ui_file *stream)
    fputs_unfiltered (_("\
  This is the GNU debugger.  Usage:\n\n\
      gdb [options] [executable-file [core-file or process-id]]\n\
@@ -254,7 +254,7 @@ diff --git a/gdb/main.c b/gdb/main.c
      gdb [options] --args executable-file [inferior-arguments ...]\n\n\
  "), stream);
    fputs_unfiltered (_("\
-@@ -1320,6 +1372,13 @@ Output and user interface control:\n\n\
+@@ -1312,6 +1364,13 @@ Output and user interface control:\n\n\
  #endif
    fputs_unfiltered (_("\
    --dbx              DBX compatibility mode.\n\
@@ -362,19 +362,6 @@ new file mode 100644
 +        return wanted == found
 +
 +InScope ()
-diff --git a/gdb/python/python-internal.h b/gdb/python/python-internal.h
---- a/gdb/python/python-internal.h
-+++ b/gdb/python/python-internal.h
-@@ -658,6 +658,9 @@ private:
-   PyThreadState *m_save;
- };
- 
-+struct cleanup *ensure_python_env (struct gdbarch *gdbarch,
-+				   const struct language_defn *language);
-+
- extern struct gdbarch *python_gdbarch;
- extern const struct language_defn *python_language;
- 
 diff --git a/gdb/python/python.c b/gdb/python/python.c
 --- a/gdb/python/python.c
 +++ b/gdb/python/python.c
@@ -387,37 +374,7 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
  #include "target.h"
  #include "gdbthread.h"
  #include "interps.h"
-@@ -235,6 +237,29 @@ gdbpy_enter::~gdbpy_enter ()
-   restore_active_ext_lang (m_previous_active);
- }
- 
-+static void
-+restore_python_env (void *p)
-+{
-+  gdbpy_enter *env = (gdbpy_enter *) p;
-+
-+  delete env;
-+}
-+
-+/* Called before entering the Python interpreter to install the
-+   current language and architecture to be used for Python values.
-+   Also set the active extension language for GDB so that SIGINT's
-+   are directed our way, and if necessary install the right SIGINT
-+   handler.  */
-+
-+struct cleanup *
-+ensure_python_env (struct gdbarch *gdbarch,
-+                   const struct language_defn *language)
-+{
-+  gdbpy_enter *env = new gdbpy_enter (gdbarch, language);
-+
-+  return make_cleanup (restore_python_env, env);
-+}
-+
- /* Set the quit flag.  */
- 
- static void
-@@ -1283,6 +1308,92 @@ gdbpy_print_stack_or_quit ()
+@@ -1283,6 +1285,94 @@ gdbpy_print_stack_or_quit ()
  
  
  
@@ -461,7 +418,9 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
 +  FILE *input;
 +
 +  /* We never free this, since we plan to exit at the end.  */
-+  ensure_python_env (get_current_arch (), current_language);
++  gdbpy_enter *env = new gdbpy_enter (get_current_arch (), current_language);
++  /* "Use" env, to suppress GCC warnings.  */
++  (void) env;
 +
 +  running_python_script = 1;
 +
@@ -510,7 +469,7 @@ diff --git a/gdb/python/python.c b/gdb/python/python.c
  /* Return a sequence holding all the Progspaces.  */
  
  static PyObject *
-@@ -1935,6 +2046,8 @@ PyMethodDef python_GdbMethods[] =
+@@ -1935,6 +2025,8 @@ PyMethodDef python_GdbMethods[] =
  Evaluate command, a string, as a gdb CLI command.  Optionally returns\n\
  a Python String containing the output of the command if to_string is\n\
  set to True." },
@@ -575,30 +534,11 @@ diff --git a/gdb/testsuite/gdb.python/py-value.exp b/gdb/testsuite/gdb.python/py
 diff --git a/gdb/varobj.c b/gdb/varobj.c
 --- a/gdb/varobj.c
 +++ b/gdb/varobj.c
-@@ -217,6 +217,14 @@ is_root_p (const struct varobj *var)
+@@ -217,7 +217,6 @@ is_root_p (const struct varobj *var)
  }
  
  #ifdef HAVE_PYTHON
-+/* Helper function to install a Python environment suitable for
-+   use during operations on VAR.  */
-+struct cleanup *
-+varobj_ensure_python_env (const struct varobj *var)
-+{
-+  return ensure_python_env (var->root->exp->gdbarch,
-+			    var->root->exp->language_defn);
-+}
- 
+-
  /* See python-internal.h.  */
  gdbpy_enter_varobj::gdbpy_enter_varobj (const struct varobj *var)
-diff --git a/gdb/varobj.h b/gdb/varobj.h
---- a/gdb/varobj.h
-+++ b/gdb/varobj.h
-@@ -328,6 +328,8 @@ extern bool varobj_has_more (const struct varobj *var, int to);
- 
- extern bool varobj_is_dynamic_p (const struct varobj *var);
- 
-+extern struct cleanup *varobj_ensure_python_env (const struct varobj *var);
-+
- extern bool varobj_default_value_is_changeable_p (const struct varobj *var);
- extern bool varobj_value_is_changeable_p (const struct varobj *var);
- 
+ : gdbpy_enter (var->root->exp->gdbarch, var->root->exp->language_defn)

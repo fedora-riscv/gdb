@@ -244,7 +244,11 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
  #define BUILD_ID_VERBOSE_NONE 0
  #define BUILD_ID_VERBOSE_FILENAMES 1
-@@ -700,8 +702,366 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
+@@ -696,12 +698,362 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
+     return NULL;
+ 
+   result = xstrdup (bfd_get_filename (abfd));
+-  abfd.release ();
    return result;
  }
  
@@ -513,10 +517,10 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +  return count;
 +}
 +
-+static int
-+missing_rpm_list_compar (const char *const *ap, const char *const *bp)
++static bool
++missing_rpm_list_compar (const char *ap, const char *bp)
 +{
-+  return strcoll (*ap, *bp);
++  return strcoll (ap, bp);
 +}
 +
 +/* It returns a NULL-terminated array of strings needing to be FREEd.  It may
@@ -525,37 +529,32 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +static void
 +missing_rpm_list_print (void)
 +{
-+  char **array, **array_iter;
 +  struct missing_rpm *list_iter;
-+  struct cleanup *cleanups;
 +
 +  if (missing_rpm_list_entries == 0)
 +    return;
 +
-+  array = (char **) xmalloc (sizeof (*array) * missing_rpm_list_entries);
-+  cleanups = make_cleanup (xfree, array);
++  std::vector<const char *> array (missing_rpm_list_entries);
++  size_t idx = 0;
 +
-+  array_iter = array;
 +  for (list_iter = missing_rpm_list; list_iter != NULL;
 +       list_iter = list_iter->next)
 +    {
-+      *array_iter++ = list_iter->rpm;
++      array[idx++] = list_iter->rpm;
 +    }
-+  gdb_assert (array_iter == array + missing_rpm_list_entries);
++  gdb_assert (idx == missing_rpm_list_entries);
 +
-+  qsort (array, missing_rpm_list_entries, sizeof (*array),
-+	 (int (*) (const void *, const void *)) missing_rpm_list_compar);
++  std::sort (array.begin (), array.end (), missing_rpm_list_compar);
 +
 +  printf_unfiltered (_("Missing separate debuginfos, use: %s"),
 +#ifdef DNF_DEBUGINFO_INSTALL
 +		     "dnf "
 +#endif
 +		     "debuginfo-install");
-+  for (array_iter = array; array_iter < array + missing_rpm_list_entries;
-+       array_iter++)
++  for (const char *el : array)
 +    {
 +      putchar_unfiltered (' ');
-+      puts_unfiltered (*array_iter);
++      puts_unfiltered (el);
 +    }
 +  putchar_unfiltered ('\n');
 +
@@ -566,8 +565,6 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +      xfree (list_iter);
 +    }
 +  missing_rpm_list_entries = 0;
-+
-+  do_cleanups (cleanups);
 +}
 +
 +static void
@@ -612,7 +609,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
     avoidance.  */
  
  struct missing_filepair
-@@ -755,11 +1115,17 @@ missing_filepair_change (void)
+@@ -755,11 +1107,17 @@ missing_filepair_change (void)
        /* All their memory came just from missing_filepair_OBSTACK.  */
        missing_filepair_hash = NULL;
      }
@@ -630,7 +627,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
    missing_filepair_change ();
  }
  
-@@ -826,14 +1192,39 @@ debug_print_missing (const char *binary, const char *debug)
+@@ -826,14 +1184,39 @@ debug_print_missing (const char *binary, const char *debug)
  
    *slot = missing_filepair;
  
@@ -1459,15 +1456,59 @@ diff --git a/gdb/configure.ac b/gdb/configure.ac
 diff --git a/gdb/corelow.c b/gdb/corelow.c
 --- a/gdb/corelow.c
 +++ b/gdb/corelow.c
-@@ -365,7 +365,7 @@ build_id_locate_exec (int from_tty)
+@@ -330,10 +330,9 @@ static void
+ build_id_locate_exec (int from_tty)
+ {
+   CORE_ADDR at_entry;
+-  struct bfd_build_id *build_id;
+-  char *execfilename;
++  gdb::unique_xmalloc_ptr<struct bfd_build_id> build_id;
++  gdb::unique_xmalloc_ptr<char> execfilename;
+   char *build_id_filename;
+-  struct cleanup *back_to;
+ 
+   if (exec_bfd != NULL || symfile_objfile != NULL)
+     return;
+@@ -341,10 +340,9 @@ build_id_locate_exec (int from_tty)
+   if (target_auxv_search (current_top_target (), AT_ENTRY, &at_entry) <= 0)
+     return;
+ 
+-  build_id = build_id_addr_get (at_entry);
++  build_id.reset (build_id_addr_get (at_entry));
+   if (build_id == NULL)
+     return;
+-  back_to = make_cleanup (xfree, build_id);
+ 
+   /* SYMFILE_OBJFILE should refer to the main executable (not only to its
+      separate debug info file).  gcc44+ keeps .eh_frame only in the main
+@@ -352,22 +350,19 @@ build_id_locate_exec (int from_tty)
+      file - such .eh_frame would not be found if SYMFILE_OBJFILE would refer
+      directly to the separate debug info file.  */
+ 
+-  execfilename = build_id_to_filename (build_id, &build_id_filename);
+-  make_cleanup (xfree, build_id_filename);
++  execfilename.reset (build_id_to_filename (build_id.get (),
++					    &build_id_filename));
+ 
+   if (execfilename != NULL)
+     {
+-      make_cleanup (xfree, execfilename);
+-      exec_file_attach (execfilename, from_tty);
+-      symbol_file_add_main (execfilename,
++      exec_file_attach (execfilename.get (), from_tty);
++      symbol_file_add_main (execfilename.get (),
+ 			    symfile_add_flag (!from_tty ? 0 : SYMFILE_VERBOSE));
+       if (symfile_objfile != NULL)
          symfile_objfile->flags |= OBJF_BUILD_ID_CORE_LOADED;
      }
    else
 -    debug_print_missing (_("the main executable file"), build_id_filename);
+-
+-  do_cleanups (back_to);
 +    debug_print_missing (BUILD_ID_MAIN_EXECUTABLE_FILENAME, build_id_filename);
  
-   do_cleanups (back_to);
- 
+   /* No automatic SOLIB_ADD as the libraries would get read twice.  */
+ }
 diff --git a/gdb/event-top.c b/gdb/event-top.c
 --- a/gdb/event-top.c
 +++ b/gdb/event-top.c
