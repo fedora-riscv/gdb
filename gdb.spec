@@ -1027,6 +1027,7 @@ fi
 %changelog
 * Tue Mar 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190319-2
 - Rebase to FSF GDB 8.3.50.20190319 (8.4pre).
+- Temporarily add gdb-temporary-fix-arm-build-error.patch.
 
 * Mon Mar  4 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190304-1
 - Rebase to FSF GDB 8.3.50.20190304 (8.4pre).
