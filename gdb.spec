@@ -22,7 +22,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190319
+%global snapsrc    20190321
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -30,7 +30,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1025,6 +1025,11 @@ fi
 %endif
 
 %changelog
+* Thu Mar 21 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190321-3
+- Rebase to FSF GDB 8.3.50.20190321 (8.4pre).
+- Remove gdb-temporary-fix-arm-build-error.patch.
+- Fix "GDB crashes when using Python xmethods" (RH BZ 1690120).
+
 * Tue Mar 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190319-2
 - Rebase to FSF GDB 8.3.50.20190319 (8.4pre).
 - Temporarily add gdb-temporary-fix-arm-build-error.patch.
