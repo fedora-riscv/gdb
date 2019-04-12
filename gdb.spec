@@ -22,7 +22,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190321
+%global snapsrc    20190412
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -30,7 +30,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1025,6 +1025,20 @@ fi
 %endif
 
 %changelog
+* Fri Apr 12 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190412-5
+- Rebase to FSF GDB 8.3.50.20190412 (8.4pre).
+- Adjust 'gdb-6.3-rh-testversion-20041202.patch'.
+- Remove 'gdb-follow-child-stale-parent.patch'.
+- Remove 'gdb-rhbz795424-bitpos-20of25.patch'.
+- Remove 'gdb-rhbz795424-bitpos-21of25.patch'.
+- Remove 'gdb-rhbz795424-bitpos-22of25.patch'.
+- Remove 'gdb-rhbz795424-bitpos-23of25.patch'.
+- Remove 'gdb-rhbz795424-bitpos-25of25.patch'.
+- Remove 'gdb-rhbz795424-bitpos-25of25-test.patch'.
+- Remove 'gdb-rhbz795424-bitpos-arrayview.patch'.
+- Remove 'gdb-rhbz795424-bitpos-lazyvalue.patch'.
+- Remove 'gdb-bz541866-rwatch-before-run.patch'.
+
 * Fri Mar 29 2019 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.3.50.20190321-4
 - Fix 'gdb-8.3.50.20190321-3.fc31.x86_64: crashing' (by fixing
   gdb-6.6-buildid-locate-rpm.patch) (RH BZ 1694091).

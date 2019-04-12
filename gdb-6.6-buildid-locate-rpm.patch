@@ -235,20 +235,15 @@ diff --git a/gdb/aclocal.m4 b/gdb/aclocal.m4
 diff --git a/gdb/build-id.c b/gdb/build-id.c
 --- a/gdb/build-id.c
 +++ b/gdb/build-id.c
-@@ -35,6 +35,8 @@
- #include "elf/common.h"
- #include "elf-bfd.h"
- #include <sys/stat.h>
-+#include "elf/external.h"
+@@ -31,6 +31,7 @@
+ #include "gdb_bfd.h"
+ #include "gdbcmd.h"
+ #include "gdbcore.h"
 +#include "inferior.h"
- 
- #define BUILD_ID_VERBOSE_NONE 0
- #define BUILD_ID_VERBOSE_FILENAMES 1
-@@ -696,12 +698,362 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
-     return NULL;
- 
-   result = xstrdup (bfd_get_filename (abfd));
--  abfd.release ();
+ #include "libbfd.h"
+ #include "objfiles.h"
+ #include "observable.h"
+@@ -699,8 +700,359 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
    return result;
  }
  
@@ -609,7 +604,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
     avoidance.  */
  
  struct missing_filepair
-@@ -755,11 +1107,17 @@ missing_filepair_change (void)
+@@ -754,11 +1106,17 @@ missing_filepair_change (void)
        /* All their memory came just from missing_filepair_OBSTACK.  */
        missing_filepair_hash = NULL;
      }
@@ -627,7 +622,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
    missing_filepair_change ();
  }
  
-@@ -826,14 +1184,39 @@ debug_print_missing (const char *binary, const char *debug)
+@@ -825,14 +1183,39 @@ debug_print_missing (const char *binary, const char *debug)
  
    *slot = missing_filepair;
  
@@ -1456,55 +1451,11 @@ diff --git a/gdb/configure.ac b/gdb/configure.ac
 diff --git a/gdb/corelow.c b/gdb/corelow.c
 --- a/gdb/corelow.c
 +++ b/gdb/corelow.c
-@@ -330,10 +330,9 @@ static void
- build_id_locate_exec (int from_tty)
- {
-   CORE_ADDR at_entry;
--  struct bfd_build_id *build_id;
--  char *execfilename;
-+  gdb::unique_xmalloc_ptr<struct bfd_build_id> build_id;
-+  gdb::unique_xmalloc_ptr<char> execfilename;
-   char *build_id_filename;
--  struct cleanup *back_to;
- 
-   if (exec_bfd != NULL || symfile_objfile != NULL)
-     return;
-@@ -341,10 +340,9 @@ build_id_locate_exec (int from_tty)
-   if (target_auxv_search (current_top_target (), AT_ENTRY, &at_entry) <= 0)
-     return;
- 
--  build_id = build_id_addr_get (at_entry);
-+  build_id.reset (build_id_addr_get (at_entry));
-   if (build_id == NULL)
-     return;
--  back_to = make_cleanup (xfree, build_id);
- 
-   /* SYMFILE_OBJFILE should refer to the main executable (not only to its
-      separate debug info file).  gcc44+ keeps .eh_frame only in the main
-@@ -352,22 +350,19 @@ build_id_locate_exec (int from_tty)
-      file - such .eh_frame would not be found if SYMFILE_OBJFILE would refer
-      directly to the separate debug info file.  */
- 
--  execfilename = build_id_to_filename (build_id, &build_id_filename);
--  make_cleanup (xfree, build_id_filename);
-+  execfilename.reset (build_id_to_filename (build_id.get (),
-+					    &build_id_filename));
- 
-   if (execfilename != NULL)
-     {
--      make_cleanup (xfree, execfilename);
--      exec_file_attach (execfilename, from_tty);
--      symbol_file_add_main (execfilename,
-+      exec_file_attach (execfilename.get (), from_tty);
-+      symbol_file_add_main (execfilename.get (),
- 			    symfile_add_flag (!from_tty ? 0 : SYMFILE_VERBOSE));
-       if (symfile_objfile != NULL)
+@@ -362,7 +362,7 @@ build_id_locate_exec (int from_tty)
          symfile_objfile->flags |= OBJF_BUILD_ID_CORE_LOADED;
      }
    else
 -    debug_print_missing (_("the main executable file"), build_id_filename);
--
--  do_cleanups (back_to);
 +    debug_print_missing (BUILD_ID_MAIN_EXECUTABLE_FILENAME, build_id_filename);
  
    /* No automatic SOLIB_ADD as the libraries would get read twice.  */
@@ -1520,7 +1471,7 @@ diff --git a/gdb/event-top.c b/gdb/event-top.c
  
  /* readline include files.  */
  #include "readline/readline.h"
-@@ -359,6 +360,8 @@ display_gdb_prompt (const char *new_prompt)
+@@ -358,6 +359,8 @@ display_gdb_prompt (const char *new_prompt)
    /* Reset the nesting depth used when trace-commands is set.  */
    reset_command_nest_depth ();
  
@@ -1529,7 +1480,7 @@ diff --git a/gdb/event-top.c b/gdb/event-top.c
    /* Do not call the python hook on an explicit prompt change as
       passed to this function, as this forms a secondary/local prompt,
       IE, displayed but not set.  */
-@@ -770,7 +773,10 @@ command_line_handler (gdb::unique_xmalloc_ptr<char> &&rl)
+@@ -769,7 +772,10 @@ command_line_handler (gdb::unique_xmalloc_ptr<char> &&rl)
        command_handler (cmd);
  
        if (ui->prompt_state != PROMPTED)
