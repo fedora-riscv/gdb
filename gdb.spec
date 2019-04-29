@@ -378,6 +378,9 @@ and printing their data.
 %if 0%{?_build_minimal}
 %package minimal
 Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages (minimal version)
+# gdb-add-index is shared with gdb-headless and it must be from same version
+Conflicts: %{name}-headless < %{version}-%{release}
+Conflicts: %{name}-headless > %{version}-%{release}
 
 %description minimal
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
@@ -1065,6 +1068,7 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 %if 0%{?_build_minimal}
 %files minimal
 %{_bindir}/gdb.minimal
+%{_bindir}/gdb-add-index
 %endif # 0%{?_build_minimal}
 
 %ifnarch sparc sparcv9
