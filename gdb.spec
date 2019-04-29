@@ -19,6 +19,11 @@
  %global _root_libdir %{_libdir}
 }
 
+# If we're on Fedora, we will build the gdb-minimal package.
+%if 0%{?fedora}
+%global _build_minimal 1
+%endif
+
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
@@ -30,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -42,6 +47,9 @@ URL: http://gnu.org/software/gdb/
 # For our convenience
 %global gdb_src %{tarname}
 %global gdb_build build-%{_target_platform}
+%if 0%{?_build_minimal}
+%global gdb_build_minimal %{gdb_build}-minimal
+%endif # 0%{?_build_minimal}
 
 # error: Installed (but unpackaged) file(s) found: /usr/lib/debug/usr/bin/gdb-gdb.py
 # https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/message/PBOJDOFMWTRV3ZOKNV5HN7IBX5EPHDHF/
@@ -367,6 +375,19 @@ Java, and other languages, by executing them in a controlled fashion
 and printing their data.
 %endif
 
+%if 0%{?_build_minimal}
+%package minimal
+Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages (minimal version)
+
+%description minimal
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+Java, and other languages, by executing them in a controlled fashion
+and printing their data.
+
+This package provides a minimal version of GDB, tailored to be used by
+the Fedora buildroot.  It should probably not be used by end users.
+%endif # 0%{?_build_minimal}
+
 %package gdbserver
 Summary: A standalone server for GDB (the GNU source-level debugger)
 
@@ -482,6 +503,52 @@ test -e %{_root_libdir}/librpm.so.%{librpmver}
 %{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
 %endif
 
+# A set of common GDB configure flags, which are used for both minimal
+# and non-minimal compilations.
+COMMON_GDB_CONFIGURE_FLAGS="\
+	--prefix=%{_prefix}					\
+	--libdir=%{_libdir}					\
+	--sysconfdir=%{_sysconfdir}				\
+	--mandir=%{_mandir}					\
+	--infodir=%{_infodir}					\
+	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
+	--with-gdb-datadir=%{_datadir}/gdb			\
+	--enable-gdb-build-warnings=,-Wno-unused		\
+	--enable-build-with-cxx					\
+%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
+	--disable-werror					\
+%else
+	--enable-werror						\
+%endif
+	--with-separate-debug-dir=/usr/lib/debug		\
+	--disable-sim						\
+	--disable-rpath						\
+	--without-stage1-ldflags				\
+	--disable-libmcheck					\
+	--without-guile						\
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+	--with-system-readline					\
+%else
+	--without-system-readline				\
+%endif
+	--without-libunwind					\
+%ifarch sparc sparcv9 sparc64
+	--without-mmap						\
+%endif
+	--enable-64-bit-bfd					\
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+	--with-mpfr						\
+%else
+	--without-mpfr						\
+%endif
+	--with-system-zlib					\
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
+	--with-lzma						\
+%else
+	--without-lzma						\
+%endif
+"
+
 # Identify the build directory with the version of gdb as well as the
 # architecture, to allow for mutliple versions to be installed and
 # built.
@@ -490,6 +557,50 @@ test -e %{_root_libdir}/librpm.so.%{librpmver}
 for fprofile in %{?_with_profile:-fprofile} ""
 do
 
+# We will first build the minimal version of GDB.
+%if 0%{?_build_minimal}
+mkdir %{gdb_build_minimal}$fprofile
+cd %{gdb_build_minimal}$fprofile
+
+# The configure flags we will use when building gdb-minimal.
+GDB_MINIMAL_CONFIGURE_FLAGS="\
+    --without-babeltrace \
+    --without-expat \
+    --disable-tui \
+    --without-python \
+    --disable-inprocess-agent \
+    --without-intel-pt \
+    --disable-unit-tests \
+    --disable-source-highlight"
+
+export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
+export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
+
+export CXXFLAGS="$CFLAGS"
+
+# --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
+../configure							\
+	${COMMON_GDB_CONFIGURE_FLAGS}				\
+	${GDB_MINIMAL_CONFIGURE_FLAGS}				\
+	--with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
+	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
+%ifarch sparc sparcv9
+	sparc-%{_vendor}-%{_target_os}%{?_gnu}
+%else
+	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu	\
+	%{_target_platform}
+%endif
+
+# Prepare gdb/config.h first.
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
+perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
+
+make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
+
+cd ..
+%endif # 0%{?_build_minimal}
+
+# Now we build the full GDB.
 mkdir %{gdb_build}$fprofile
 cd %{gdb_build}$fprofile
 
@@ -545,37 +656,12 @@ LDFLAGS="$LDFLAGS -L$PWD/processor-trace-%{libipt_version}-root%{_libdir}"
 
 export CXXFLAGS="$CFLAGS"
 
-# --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
-../configure							\
-	--prefix=%{_prefix}					\
-	--libdir=%{_libdir}					\
-	--sysconfdir=%{_sysconfdir}				\
-	--mandir=%{_mandir}					\
-	--infodir=%{_infodir}					\
-	--with-system-gdbinit=%{_sysconfdir}/gdbinit		\
-	--with-gdb-datadir=%{_datadir}/gdb			\
-	--enable-gdb-build-warnings=,-Wno-unused		\
-	--enable-build-with-cxx					\
-%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
-	--disable-werror					\
-%else
-	--enable-werror						\
-%endif
-	--with-separate-debug-dir=/usr/lib/debug		\
-	--disable-sim						\
-	--disable-rpath						\
-	--without-stage1-ldflags				\
-	--disable-libmcheck					\
-	--without-guile						\
+# The configure flags we will use when building the full GDB.
+GDB_FULL_CONFIGURE_FLAGS="\
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 	--with-babeltrace					\
 %else
 	--without-babeltrace					\
-%endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-	--with-system-readline					\
-%else
-	--without-system-readline				\
 %endif
 	--with-expat						\
 $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
@@ -586,35 +672,24 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-python					\
 %endif
-	--with-rpm=librpm.so.%{librpmver}			\
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-	--with-lzma						\
-%else
-	--without-lzma						\
-%endif
-	--without-libunwind					\
-%ifarch sparc sparcv9 sparc64
-	--without-mmap						\
-%endif
-	--enable-64-bit-bfd					\
 %if %{have_inproctrace}
 	--enable-inprocess-agent				\
 %else
 	--disable-inprocess-agent				\
 %endif
-	--with-system-zlib					\
 %if %{have_libipt}
 	--with-intel-pt						\
 %else
 	--without-intel-pt					\
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-	--with-mpfr						\
-%else
-	--without-mpfr						\
-%endif
-	--enable-unit-tests					\
-	      --with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
+	--with-rpm=librpm.so.%{librpmver}			\
+	--enable-unit-tests"
+
+# --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
+../configure							\
+	${COMMON_GDB_CONFIGURE_FLAGS}				\
+	${GDB_FULL_CONFIGURE_FLAGS}				\
+	--with-auto-load-dir='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 	--with-auto-load-safe-path='$debugdir:$datadir/auto-load%{?scl::%{_root_datadir}/gdb/auto-load}'	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
@@ -643,12 +718,12 @@ elif [ -z "%{!?_with_profile:no}" ]
 then
   FPROFILE_CFLAGS='-fprofile-use'
   # We cannot use -fprofile-dir as the bare filenames clash.
-  (cd ../%{gdb_build}-fprofile;
+  (cd ../${builddir}-fprofile;
    # It was 333 on x86_64.
    test $(find -name "*.gcda"|wc -l) -gt 300
    find -name "*.gcda" | while read -r i
    do
-     ln $i ../%{gdb_build}/$i
+     ln $i ../${builddir}/$i
    done
   )
 else
@@ -774,8 +849,30 @@ echo ====================TESTING END=====================
 
 %install
 # Initially we're in the %{gdb_src} directory.
-cd %{gdb_build}
+%if 0%{?_build_minimal}
+cd %{gdb_build_minimal}
 rm -rf $RPM_BUILD_ROOT
+
+make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
+
+# Delete everything except the 'gdb' binary, and then rename it to
+# 'gdb.minimal'.
+rm -rfv $RPM_BUILD_ROOT%{_prefix}/{include,lib*,share}
+rm -fv $RPM_BUILD_ROOT%{_bindir}/{gcore,gdbserver,gstack,gdb-add-index}
+mv $RPM_BUILD_ROOT%{_bindir}/gdb $RPM_BUILD_ROOT%{_bindir}/gdb.minimal
+
+cd ..
+%endif # 0%{?_build_minimal}
+
+# Install the full build.
+
+cd %{gdb_build}
+
+# We must remove the $RPM_BUILD_ROOT directory ourselves if we're not
+# building gdb-minimal.
+%if 0%{!?_build_minimal}
+rm -rf $RPM_BUILD_ROOT
+%endif # 0%{!?_build_minimal}
 
 %if 0%{?el6:1}
 # GDB C++11 requires devtoolset gcc.
@@ -965,6 +1062,11 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
 
 # don't include the files in include, they are part of binutils
 
+%if 0%{?_build_minimal}
+%files minimal
+%{_bindir}/gdb.minimal
+%endif # 0%{?_build_minimal}
+
 %ifnarch sparc sparcv9
 %files gdbserver
 %{_bindir}/gdbserver
@@ -1025,6 +1127,10 @@ fi
 %endif
 
 %changelog
+* Mon Apr 29 2019 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.3.50.20190425-9
+- Provide 'gdb-minimal' package, specific for the buildroot (RHBZ 1695015).
+- Adjust 'gdb-libexec-add-index.patch' for the gdb-minimal case.
+
 * Thu Apr 25 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190425-8
 - Rebase to FSF GDB 8.3.50.20190425 (8.4pre), and fix build breakage.
 
