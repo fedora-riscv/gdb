@@ -1133,6 +1133,9 @@ fi
 %changelog
 * Wed May  1 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190501-11
 - Rebase to FSF GDB 8.3.50.20190501 (8.4pre).
+- Adjust VLA testcases.
+- Fix "gcore does not support COREFILTER_ELF_HEADERS" (RH BZ 1371380,
+  Sergio Durigan Junior).
 
 * Mon Apr 29 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190425-10
 - Share '/usr/bin/gdb-add-index' between gdb-minimal and gdb-headless
