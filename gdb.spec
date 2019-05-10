@@ -27,7 +27,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190501
+%global snapsrc    20190510
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1131,6 +1131,9 @@ fi
 %endif
 
 %changelog
+* Fri May 10 2019 Sergio Durigan Junior <sergiodj@fedoraproject.org> - 8.3.50.20190510-12
+- Rebase to FSF GDB 8.3.50.20190510 (8.4pre).
+
 * Wed May  1 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190501-11
 - Rebase to FSF GDB 8.3.50.20190501 (8.4pre).
 - Adjust VLA testcases.
