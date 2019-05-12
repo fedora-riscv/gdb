@@ -26,17 +26,17 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.2.91.%{snapsrc}
+Version: 8.3
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 24%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
-Source: %{tarname}.tar.xz
-#Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+#Source: %{tarname}.tar.xz
+Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 URL: http://gnu.org/software/gdb/
 
 # For our convenience
@@ -1025,6 +1025,11 @@ fi
 %endif
 
 %changelog
+* Sun May 12 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3-1
+- Release GDB 8.3.
+- Fix 'gcore does not support COREFILTER_ELF_HEADERS' (Sergio Durigan
+  Junior, RH BZ 1371380).
+
 * Tue Apr 23 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.2.91.20190424-24
 - Rebase to FSF GDB 8.2.91.20190424 (8.3pre).
 
