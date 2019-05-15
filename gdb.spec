@@ -30,7 +30,7 @@ Version: 8.3
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1025,6 +1025,11 @@ fi
 %endif
 
 %changelog
+* Wed May 15 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3-2
+- "Fix" segfault that happens on parse_macro_definition because
+  debugedit corrupts the .debug_macro section (Sergio Durigan Junior,
+  RH BZ 1708192).
+
 * Sun May 12 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3-1
 - Release GDB 8.3.
 - Fix 'gcore does not support COREFILTER_ELF_HEADERS' (Sergio Durigan
