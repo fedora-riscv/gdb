@@ -261,7 +261,9 @@ BuildRequires: source-highlight-devel
 %global bits_local %{?_isa}
 %global bits_other %{?_isa}
 %ifarch s390x
+%if 0%{!?rhel:1} || 0%{?rhel} < 8
 %global bits_other (%{__isa_name}-32)
+%endif
 %else #!s390x
 %ifarch ppc
 %global bits_other (%{__isa_name}-64)
@@ -274,7 +276,10 @@ BuildRequires: source-highlight-devel
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran gcc-objc
+BuildRequires: gcc gcc-c++ gcc-gfortran
+%if 0%{!?rhel:1} || 0%{?rhel} < 8
+BuildRequires: gcc-objc
+%endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: gcc-gdb-plugin%{?_isa}
 %endif
@@ -285,12 +290,12 @@ BuildRequires: zlib-devel%{bits_local} zlib-devel%{bits_other}
 %endif
 # Exception for RHEL<=7
 %ifarch aarch64
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%if 0%{!?rhel:1}
 BuildRequires: gcc-go
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
 %else
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{!?rhel:1} || 0%{?rhel} == 7
 BuildRequires: gcc-go
 BuildRequires: libgo-devel%{bits_local} libgo-devel%{bits_other}
 %endif
@@ -310,7 +315,7 @@ BuildRequires: prelink
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%if 0%{!?rhel:1}
 # Fedora arm+ppc64le do not yet have fpc built.
 %ifnarch %{arm} ppc64le
 BuildRequires: fpc
@@ -319,14 +324,16 @@ BuildRequires: fpc
 # Copied from: gcc-6.2.1-1.fc26
 # Exception for RHEL<=7
 %ifarch s390x
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%if 0%{!?rhel:1}
 BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
 %endif
 %else
 %ifarch %{ix86} x86_64 ia64 ppc %{power64} alpha s390x %{arm} aarch64
+%if 0%{!?rhel:1}
 BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
+%endif
 %endif
 %endif
 BuildRequires: glibc-devel%{bits_local} glibc-devel%{bits_other}
