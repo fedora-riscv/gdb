@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 16%{?dist}
+Release: 17%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -128,6 +128,9 @@ Recommends: default-yama-scope
 %global librpmver 8
 %else
 %global librpmver 7
+%endif
+%if 0%{?fedora} >= 31
+%global librpmver 9
 %endif
 %endif
 %endif
@@ -1138,6 +1141,9 @@ fi
 %endif
 
 %changelog
+* Fri Jun 21 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190610-17
+- Rebuild for librpm9 (RH BZ 1720305).
+
 * Mon Jun 10 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190610-16
 - Rebase to FSF GDB 8.3.50.20190610 (8.4pre).
 
