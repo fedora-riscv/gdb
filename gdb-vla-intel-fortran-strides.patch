@@ -143,7 +143,7 @@ diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -17839,7 +17839,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17763,7 +17763,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type, *orig_base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -152,7 +152,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
    int low_default_is_valid;
    int high_bound_is_count = 0;
    const char *name;
-@@ -17859,7 +17859,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17783,7 +17783,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    low.kind = PROP_CONST;
    high.kind = PROP_CONST;
@@ -162,7 +162,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
    /* Set LOW_DEFAULT_IS_VALID if current language and DWARF version allow
       omitting DW_AT_lower_bound.  */
-@@ -17892,6 +17894,14 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17816,6 +17818,14 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
@@ -177,7 +177,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
    attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
    if (attr)
      attr_to_dynamic_prop (attr, die, cu, &low);
-@@ -17984,7 +17994,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17908,7 +17918,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        && !TYPE_UNSIGNED (base_type) && (high.data.const_val & negative_mask))
      high.data.const_val |= negative_mask;
  
@@ -1672,7 +1672,7 @@ new file mode 100644
 diff --git a/gdb/testsuite/gdb.fortran/vla-ptype.exp b/gdb/testsuite/gdb.fortran/vla-ptype.exp
 --- a/gdb/testsuite/gdb.fortran/vla-ptype.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-ptype.exp
-@@ -98,3 +98,7 @@ gdb_test "ptype vla2" "type = <not allocated>" "ptype vla2 not allocated"
+@@ -98,3 +98,7 @@ gdb_test "ptype vla2" "type = $real, allocatable \\(:,:,:\\)" "ptype vla2 not al
  gdb_test "ptype vla2(5, 45, 20)" \
    "no such vector element \\\(vector not allocated\\\)" \
    "ptype vla2(5, 45, 20) not allocated"
@@ -1687,7 +1687,7 @@ diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortra
  gdb_test "print sizeof(vla1(3,2,1))" \
      "no such vector element \\(vector not allocated\\)" \
      "print sizeof non-allocated indexed vla1"
--gdb_test "print sizeof(vla1(3:4,2,1))" "slice out of range" \
+-gdb_test "print sizeof(vla1(3:4,2,1))" "array not allocated" \
 +gdb_test "print sizeof(vla1(3:4,2,1))" \
 +    "provided bound\\(s\\) outside array bound\\(s\\)" \
      "print sizeof non-allocated sliced vla1"
@@ -1706,7 +1706,7 @@ diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortra
  gdb_test "print sizeof(pvla(3,2,1))" \
      "no such vector element \\(vector not associated\\)" \
      "print sizeof non-associated indexed pvla"
--gdb_test "print sizeof(pvla(3:4,2,1))" "slice out of range" \
+-gdb_test "print sizeof(pvla(3:4,2,1))" "array not associated" \
 +gdb_test "print sizeof(pvla(3:4,2,1))" \
 +    "provided bound\\(s\\) outside array bound\\(s\\)" \
      "print sizeof non-associated sliced pvla"
@@ -1849,7 +1849,7 @@ diff --git a/gdb/valarith.c b/gdb/valarith.c
 diff --git a/gdb/valops.c b/gdb/valops.c
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
-@@ -3790,56 +3790,195 @@ value_of_this_silent (const struct language_defn *lang)
+@@ -3790,13 +3790,42 @@ value_of_this_silent (const struct language_defn *lang)
  
  struct value *
  value_slice (struct value *array, int lowbound, int length)
@@ -1896,6 +1896,9 @@ diff --git a/gdb/valops.c b/gdb/valops.c
    if (TYPE_CODE (array_type) != TYPE_CODE_ARRAY
        && TYPE_CODE (array_type) != TYPE_CODE_STRING)
      error (_("cannot take slice of non-array"));
+@@ -3806,45 +3835,155 @@ value_slice (struct value *array, int lowbound, int length)
+   if (type_not_associated (array_type))
+     error (_("array not associated"));
  
 -  range_type = TYPE_INDEX_TYPE (array_type);
 -  if (get_discrete_bounds (range_type, &lowerbound, &upperbound) < 0)
@@ -1963,7 +1966,7 @@ diff --git a/gdb/valops.c b/gdb/valops.c
  
    /* FIXME-type-allocation: need a way to free this type when we are
 -     done with it.  */
--  slice_range_type = create_static_range_type ((struct type *) NULL,
+-  slice_range_type = create_static_range_type (NULL,
 -					       TYPE_TARGET_TYPE (range_type),
 -					       lowbound,
 -					       lowbound + length - 1);
@@ -1985,7 +1988,7 @@ diff --git a/gdb/valops.c b/gdb/valops.c
 +
 +	slice_type = create_array_type (NULL, element_type, slice_range_type);
  
--    slice_type = create_array_type ((struct type *) NULL,
+-    slice_type = create_array_type (NULL,
 -				    element_type,
 -				    slice_range_type);
 -    TYPE_CODE (slice_type) = TYPE_CODE (array_type);
