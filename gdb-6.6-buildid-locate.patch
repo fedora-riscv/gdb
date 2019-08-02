@@ -9,12 +9,10 @@ Subject: gdb-6.6-buildid-locate.patch
 diff --git a/gdb/build-id.c b/gdb/build-id.c
 --- a/gdb/build-id.c
 +++ b/gdb/build-id.c
-@@ -22,15 +22,71 @@
- #include "gdb_bfd.h"
- #include "build-id.h"
- #include "common/gdb_vecs.h"
--#include "symfile.h"
--#include "objfiles.h"
+@@ -24,13 +24,71 @@
+ #include "gdbsupport/gdb_vecs.h"
+ #include "symfile.h"
+ #include "objfiles.h"
 +#include <sys/stat.h>
 +#include "elf-bfd.h"
 +#include "elf/common.h"
@@ -84,7 +82,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  {
    if (!bfd_check_format (abfd, bfd_object))
      return NULL;
-@@ -42,6 +98,348 @@ build_id_bfd_get (bfd *abfd)
+@@ -42,6 +100,348 @@ build_id_bfd_get (bfd *abfd)
    return NULL;
  }
  
@@ -433,7 +431,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  /* See build-id.h.  */
  
  int
-@@ -50,7 +448,7 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+@@ -50,7 +450,7 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    const struct bfd_build_id *found;
    int retval = 0;
  
@@ -442,7 +440,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"),
-@@ -65,62 +463,173 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+@@ -65,62 +465,173 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    return retval;
  }
  
@@ -532,7 +530,8 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 -	printf_unfiltered (_(" no, unable to open.\n"));
 +      if (add_debug_suffix)
 +	link += ".debug";
-+
+ 
+-      return {};
 +      ret_link = link;
 +
 +      struct stat statbuf_trash;
@@ -560,8 +559,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
 +      /* We expect to be silent on the non-existing files.  */
 +      gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget, -1);
- 
--      return {};
++
 +      if (debug_bfd == NULL)
 +	{
 +	  if (separate_debug_file_debug)
@@ -599,13 +597,13 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
 +      if (add_debug_suffix)
 +	link0 += ".debug";
- 
--      return {};
++
 +      /* If the symlink has target request to install the target.
 +	 BASE-debuginfo.rpm contains the symlink but BASE.rpm may be missing.
 +	 https://bugzilla.redhat.com/show_bug.cgi?id=981154  */
 +      std::string link0_resolved (link_resolve (link0.c_str (), 0));
-+
+ 
+-      return {};
 +      if (link_all.empty ())
 +	link_all = link0_resolved;
 +      else
@@ -643,7 +641,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  {
    /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
       cause "/.build-id/..." lookups.  */
-@@ -143,16 +652,16 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+@@ -143,16 +654,16 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
        if (size > 0)
  	{
  	  size--;
@@ -665,7 +663,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        if (debug_bfd != NULL)
  	return debug_bfd;
  
-@@ -166,7 +675,8 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+@@ -166,7 +677,8 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
        if (strcmp (gdb_sysroot, TARGET_SYSROOT_PREFIX) != 0)
  	{
  	  link = gdb_sysroot + link;
@@ -675,7 +673,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  	  if (debug_bfd != NULL)
  	    return debug_bfd;
  	}
-@@ -175,22 +685,189 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+@@ -175,22 +687,189 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
    return {};
  }
  
@@ -868,7 +866,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        /* Prevent looping on a stripped .debug file.  */
        if (abfd != NULL
  	  && filename_cmp (bfd_get_filename (abfd.get ()),
-@@ -203,3 +880,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
+@@ -203,3 +882,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
  
    return std::string ();
  }
@@ -895,7 +893,7 @@ diff --git a/gdb/build-id.h b/gdb/build-id.h
 +++ b/gdb/build-id.h
 @@ -23,9 +23,10 @@
  #include "gdb_bfd.h"
- #include "common/rsp-low.h"
+ #include "gdbsupport/rsp-low.h"
  
 -/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
 +/* Separate debuginfo files have corrupted PHDR but SHDR is correct there.
@@ -1036,7 +1034,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -20427,6 +20427,27 @@ information files.
+@@ -20581,6 +20581,27 @@ information files.
  
  @end table
  
@@ -1089,7 +1087,7 @@ diff --git a/gdb/dwarf-index-cache.c b/gdb/dwarf-index-cache.c
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -2677,7 +2677,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
+@@ -2683,7 +2683,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
      }
  
    if (dwz_bfd == NULL)
@@ -1098,7 +1096,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
    if (dwz_bfd == NULL)
      error (_("could not find '.gnu_debugaltlink' file for %s"),
-@@ -6186,7 +6186,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
+@@ -6192,7 +6192,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
  {
@@ -1107,7 +1105,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
    if (build_id == nullptr)
      return {};
  
-@@ -6199,7 +6199,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
+@@ -6205,7 +6205,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache_dwz (objfile *obj, dwz_file *dwz)
  {
@@ -1144,7 +1142,7 @@ diff --git a/gdb/elfread.c b/gdb/elfread.c
 diff --git a/gdb/objfiles.h b/gdb/objfiles.h
 --- a/gdb/objfiles.h
 +++ b/gdb/objfiles.h
-@@ -618,6 +618,10 @@ struct objfile
+@@ -619,6 +619,10 @@ struct objfile
    htab_up static_links;
  };
  
@@ -1167,7 +1165,7 @@ diff --git a/gdb/python/py-objfile.c b/gdb/python/py-objfile.c
      }
    catch (const gdb_exception &except)
      {
-@@ -533,7 +533,7 @@ objfpy_lookup_objfile_by_build_id (const char *build_id)
+@@ -601,7 +601,7 @@ objfpy_lookup_objfile_by_build_id (const char *build_id)
        /* Don't return separate debug files.  */
        if (objfile->separate_debug_objfile_backlink != NULL)
  	continue;
@@ -1245,9 +1243,16 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
 diff --git a/gdb/symfile.h b/gdb/symfile.h
 --- a/gdb/symfile.h
 +++ b/gdb/symfile.h
-@@ -532,6 +532,10 @@ void expand_symtabs_matching
+@@ -532,12 +532,17 @@ void expand_symtabs_matching
  void map_symbol_filenames (symbol_filename_ftype *fun, void *data,
  			   int need_fullname);
+ 
++
+ /* Target-agnostic function to load the sections of an executable into memory.
+ 
+    ARGS should be in the form "EXECUTABLE [OFFSET]", where OFFSET is an
+    optional offset to apply to each section.  */
+ extern void generic_load (const char *args, int from_tty);
  
 +/* build-id support.  */
 +extern struct bfd_build_id *build_id_addr_get (CORE_ADDR addr);
@@ -1307,7 +1312,7 @@ diff --git a/gdb/testsuite/gdb.base/new-ui-pending-input.exp b/gdb/testsuite/gdb
 diff --git a/gdb/testsuite/lib/gdb.exp b/gdb/testsuite/lib/gdb.exp
 --- a/gdb/testsuite/lib/gdb.exp
 +++ b/gdb/testsuite/lib/gdb.exp
-@@ -1755,6 +1755,17 @@ proc default_gdb_start { } {
+@@ -1793,6 +1793,17 @@ proc default_gdb_start { } {
  	}
      }
  

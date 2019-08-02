@@ -34,116 +34,10 @@ dbfd7140bf4c0500d1f5d192be781f83f78f7922
  gdb/value.h                                 |   2 +
  23 files changed, 1242 insertions(+), 183 deletions(-)
 
-diff --git a/gdb/dwarf2loc.c b/gdb/dwarf2loc.c
---- a/gdb/dwarf2loc.c
-+++ b/gdb/dwarf2loc.c
-@@ -2426,11 +2426,14 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
- /* See dwarf2loc.h.  */
- 
- int
--dwarf2_evaluate_property (const struct dynamic_prop *prop,
-+dwarf2_evaluate_property_signed (const struct dynamic_prop *prop,
- 			  struct frame_info *frame,
- 			  struct property_addr_info *addr_stack,
--			  CORE_ADDR *value)
-+			  CORE_ADDR *value,
-+			  int is_signed)
- {
-+  int rc = 0;
-+
-   if (prop == NULL)
-     return 0;
- 
-@@ -2454,7 +2457,7 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
- 
- 		*value = value_as_address (val);
- 	      }
--	    return 1;
-+	    rc = 1;
- 	  }
-       }
-       break;
-@@ -2476,7 +2479,7 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
- 	    if (!value_optimized_out (val))
- 	      {
- 		*value = value_as_address (val);
--		return 1;
-+		rc = 1;
- 	      }
- 	  }
-       }
-@@ -2484,8 +2487,8 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
- 
-     case PROP_CONST:
-       *value = prop->data.const_val;
--      return 1;
--
-+      rc = 1;
-+      break;
-     case PROP_ADDR_OFFSET:
-       {
- 	struct dwarf2_property_baton *baton
-@@ -2510,11 +2513,38 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
- 	  val = value_at (baton->offset_info.type,
- 			  pinfo->addr + baton->offset_info.offset);
- 	*value = value_as_address (val);
--	return 1;
-+	rc = 1;
-       }
-+      break;
-     }
- 
--  return 0;
-+  if (rc == 1 && is_signed == 1)
-+    {
-+      /* If we have a valid return candidate and it's value is signed,
-+         we have to sign-extend the value because CORE_ADDR on 64bit machine has
-+         8 bytes but address size of an 32bit application is 4 bytes.  */
-+      struct gdbarch * gdbarch = target_gdbarch ();
-+      const int addr_bit = gdbarch_addr_bit (gdbarch);
-+      const CORE_ADDR neg_mask = ((~0) <<  (addr_bit - 1));
-+
-+      /* Check if signed bit is set and sign-extend values.  */
-+      if (*value & (neg_mask))
-+	*value |= (neg_mask );
-+    }
-+  return rc;
-+}
-+
-+int
-+dwarf2_evaluate_property (const struct dynamic_prop *prop,
-+			  struct frame_info *frame,
-+			  struct property_addr_info *addr_stack,
-+			  CORE_ADDR *value)
-+{
-+  return dwarf2_evaluate_property_signed (prop,
-+				   frame,
-+				   addr_stack,
-+				   value,
-+				   0);
- }
- 
- /* See dwarf2loc.h.  */
-diff --git a/gdb/dwarf2loc.h b/gdb/dwarf2loc.h
---- a/gdb/dwarf2loc.h
-+++ b/gdb/dwarf2loc.h
-@@ -143,6 +143,12 @@ int dwarf2_evaluate_property (const struct dynamic_prop *prop,
- 			      struct property_addr_info *addr_stack,
- 			      CORE_ADDR *value);
- 
-+int dwarf2_evaluate_property_signed (const struct dynamic_prop *prop,
-+			      struct frame_info *frame,
-+			      struct property_addr_info *addr_stack,
-+			      CORE_ADDR *value,
-+			      int is_signed);
-+
- /* A helper for the compiler interface that compiles a single dynamic
-    property to C code.
- 
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -17760,7 +17760,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17831,7 +17831,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
    struct type *base_type, *orig_base_type;
    struct type *range_type;
    struct attribute *attr;
@@ -152,7 +46,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
    int low_default_is_valid;
    int high_bound_is_count = 0;
    const char *name;
-@@ -17780,7 +17780,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17852,7 +17852,9 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    low.kind = PROP_CONST;
    high.kind = PROP_CONST;
@@ -162,13 +56,13 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
    /* Set LOW_DEFAULT_IS_VALID if current language and DWARF version allow
       omitting DW_AT_lower_bound.  */
-@@ -17813,6 +17815,14 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17885,6 +17887,14 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        break;
      }
  
 +  attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
 +  if (attr)
-+    if (!attr_to_dynamic_prop (attr, die, cu, &stride))
++    if (!attr_to_dynamic_prop (attr, die, cu, &stride, base_type))
 +        complaint (_("Missing DW_AT_byte_stride "
 +		     "- DIE at 0x%s [in module %s]"),
 +		   sect_offset_str (die->sect_off),
@@ -176,8 +70,8 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 +
    attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
    if (attr)
-     attr_to_dynamic_prop (attr, die, cu, &low);
-@@ -17905,7 +17915,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+     attr_to_dynamic_prop (attr, die, cu, &low, base_type);
+@@ -17938,7 +17948,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
        && !TYPE_UNSIGNED (base_type) && (high.data.const_val & negative_mask))
      high.data.const_val |= negative_mask;
  
@@ -723,7 +617,7 @@ diff --git a/gdb/expprint.c b/gdb/expprint.c
 diff --git a/gdb/expression.h b/gdb/expression.h
 --- a/gdb/expression.h
 +++ b/gdb/expression.h
-@@ -165,28 +165,27 @@ extern void dump_raw_expression (struct expression *,
+@@ -167,28 +167,27 @@ extern void dump_raw_expression (struct expression *,
  				 struct ui_file *, const char *);
  extern void dump_prefix_expression (struct expression *, struct ui_file *);
  
@@ -874,9 +768,9 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
 +		   const struct dynamic_prop *high_bound,
 +		   const struct dynamic_prop *stride)
  {
-   if (result_type == NULL)
-     result_type = alloc_type_copy (index_type);
-@@ -927,6 +928,7 @@ create_range_type (struct type *result_type, struct type *index_type,
+   /* The INDEX_TYPE should be a type capable of holding the upper and lower
+      bounds, as such a zero sized, or void type makes no sense.  */
+@@ -932,6 +933,7 @@ create_range_type (struct type *result_type, struct type *index_type,
      TYPE_ZALLOC (result_type, sizeof (struct range_bounds));
    TYPE_RANGE_DATA (result_type)->low = *low_bound;
    TYPE_RANGE_DATA (result_type)->high = *high_bound;
@@ -884,7 +778,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
  
    if (low_bound->kind == PROP_CONST && low_bound->data.const_val >= 0)
      TYPE_UNSIGNED (result_type) = 1;
-@@ -955,7 +957,7 @@ struct type *
+@@ -960,7 +962,7 @@ struct type *
  create_static_range_type (struct type *result_type, struct type *index_type,
  			  LONGEST low_bound, LONGEST high_bound)
  {
@@ -893,7 +787,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
  
    low.kind = PROP_CONST;
    low.data.const_val = low_bound;
-@@ -963,7 +965,11 @@ create_static_range_type (struct type *result_type, struct type *index_type,
+@@ -968,7 +970,11 @@ create_static_range_type (struct type *result_type, struct type *index_type,
    high.kind = PROP_CONST;
    high.data.const_val = high_bound;
  
@@ -906,7 +800,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
  
    return result_type;
  }
-@@ -1181,16 +1187,20 @@ create_array_type_with_stride (struct type *result_type,
+@@ -1186,16 +1192,20 @@ create_array_type_with_stride (struct type *result_type,
        && (!type_not_associated (result_type)
  	  && !type_not_allocated (result_type)))
      {
@@ -928,7 +822,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
        else if (bit_stride > 0)
  	TYPE_LENGTH (result_type) =
  	  (bit_stride * (high_bound - low_bound + 1) + 7) / 8;
-@@ -1975,12 +1985,12 @@ resolve_dynamic_range (struct type *dyn_range_type,
+@@ -1980,7 +1990,7 @@ resolve_dynamic_range (struct type *dyn_range_type,
    CORE_ADDR value;
    struct type *static_range_type, *static_target_type;
    const struct dynamic_prop *prop;
@@ -937,27 +831,12 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
  
    gdb_assert (TYPE_CODE (dyn_range_type) == TYPE_CODE_RANGE);
  
-   prop = &TYPE_RANGE_DATA (dyn_range_type)->low;
--  if (dwarf2_evaluate_property (prop, NULL, addr_stack, &value))
-+  if (dwarf2_evaluate_property_signed (prop, NULL, addr_stack, &value, 1))
-     {
-       low_bound.kind = PROP_CONST;
-       low_bound.data.const_val = value;
-@@ -1992,7 +2002,7 @@ resolve_dynamic_range (struct type *dyn_range_type,
-     }
- 
-   prop = &TYPE_RANGE_DATA (dyn_range_type)->high;
--  if (dwarf2_evaluate_property (prop, NULL, addr_stack, &value))
-+  if (dwarf2_evaluate_property_signed (prop, NULL, addr_stack, &value, 1))
-     {
-       high_bound.kind = PROP_CONST;
-       high_bound.data.const_val = value;
-@@ -2007,12 +2017,20 @@ resolve_dynamic_range (struct type *dyn_range_type,
+@@ -2012,12 +2022,20 @@ resolve_dynamic_range (struct type *dyn_range_type,
        high_bound.data.const_val = 0;
      }
  
 +  prop = &TYPE_RANGE_DATA (dyn_range_type)->stride;
-+  if (dwarf2_evaluate_property_signed (prop, NULL, addr_stack, &value, 1))
++  if (dwarf2_evaluate_property (prop, NULL, addr_stack, &value))
 +    {
 +      stride.kind = PROP_CONST;
 +      stride.data.const_val = value;
@@ -977,7 +856,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
 diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
 --- a/gdb/gdbtypes.h
 +++ b/gdb/gdbtypes.h
-@@ -618,6 +618,10 @@ struct range_bounds
+@@ -617,6 +617,10 @@ struct range_bounds
  
    struct dynamic_prop high;
  
@@ -988,7 +867,7 @@ diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
    /* True if HIGH range bound contains the number of elements in the
       subrange.  This affects how the final high bound is computed.  */
  
-@@ -782,7 +786,6 @@ struct main_type
+@@ -781,7 +785,6 @@ struct main_type
      /* * Union member used for range types.  */
  
      struct range_bounds *bounds;
@@ -996,7 +875,7 @@ diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
    } flds_bnds;
  
    /* * Slot to point to additional language-specific fields of this
-@@ -1341,6 +1344,15 @@ extern bool set_type_align (struct type *, ULONGEST);
+@@ -1340,6 +1343,15 @@ extern bool set_type_align (struct type *, ULONGEST);
    TYPE_RANGE_DATA(range_type)->high.kind
  #define TYPE_LOW_BOUND_KIND(range_type) \
    TYPE_RANGE_DATA(range_type)->low.kind
@@ -1012,7 +891,7 @@ diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
  
  /* Property accessors for the type data location.  */
  #define TYPE_DATA_LOCATION(thistype) \
-@@ -1376,6 +1388,9 @@ extern bool set_type_align (struct type *, ULONGEST);
+@@ -1375,6 +1387,9 @@ extern bool set_type_align (struct type *, ULONGEST);
     TYPE_HIGH_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
  #define TYPE_ARRAY_LOWER_BOUND_IS_UNDEFINED(arraytype) \
     TYPE_LOW_BOUND_UNDEFINED(TYPE_INDEX_TYPE(arraytype))
@@ -1022,7 +901,7 @@ diff --git a/gdb/gdbtypes.h b/gdb/gdbtypes.h
  
  #define TYPE_ARRAY_UPPER_BOUND_VALUE(arraytype) \
     (TYPE_HIGH_BOUND(TYPE_INDEX_TYPE((arraytype))))
-@@ -1951,6 +1966,7 @@ extern struct type *create_array_type_with_stride
+@@ -1950,6 +1965,7 @@ extern struct type *create_array_type_with_stride
     struct dynamic_prop *, unsigned int);
  
  extern struct type *create_range_type (struct type *, struct type *,
@@ -1072,7 +951,7 @@ diff --git a/gdb/parse.c b/gdb/parse.c
 diff --git a/gdb/rust-exp.y b/gdb/rust-exp.y
 --- a/gdb/rust-exp.y
 +++ b/gdb/rust-exp.y
-@@ -2492,24 +2492,28 @@ rust_parser::convert_ast_to_expression (const struct rust_op *operation,
+@@ -2493,24 +2493,28 @@ rust_parser::convert_ast_to_expression (const struct rust_op *operation,
  
      case OP_RANGE:
        {
@@ -1669,17 +1548,6 @@ new file mode 100644
 +program testprog
 +  call sub
 +end
-diff --git a/gdb/testsuite/gdb.fortran/vla-ptype.exp b/gdb/testsuite/gdb.fortran/vla-ptype.exp
---- a/gdb/testsuite/gdb.fortran/vla-ptype.exp
-+++ b/gdb/testsuite/gdb.fortran/vla-ptype.exp
-@@ -98,3 +98,7 @@ gdb_test "ptype vla2" "type = $real, allocatable \\(:,:,:\\)" "ptype vla2 not al
- gdb_test "ptype vla2(5, 45, 20)" \
-   "no such vector element \\\(vector not allocated\\\)" \
-   "ptype vla2(5, 45, 20) not allocated"
-+
-+gdb_breakpoint [gdb_get_line_number "vla1-neg-bounds"]
-+gdb_continue_to_breakpoint "vla1-neg-bounds"
-+gdb_test "ptype vla1" "type = $real \\(-2:1,-5:4,-3:-1\\)" "ptype vla1 negative bounds"
 diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 --- a/gdb/testsuite/gdb.fortran/vla-sizeof.exp
 +++ b/gdb/testsuite/gdb.fortran/vla-sizeof.exp
@@ -1712,16 +1580,16 @@ diff --git a/gdb/testsuite/gdb.fortran/vla-sizeof.exp b/gdb/testsuite/gdb.fortra
      "print sizeof non-associated sliced pvla"
  
  # Try to access values in pointer to VLA and compare them
-@@ -58,4 +60,8 @@ gdb_continue_to_breakpoint "pvla-associated"
+@@ -58,7 +60,8 @@ gdb_continue_to_breakpoint "pvla-associated"
  gdb_test "print sizeof(pvla)" " = 4000" "print sizeof associated pvla"
  gdb_test "print sizeof(pvla(3,2,1))" "4" \
      "print sizeof element from associated pvla"
 -gdb_test "print sizeof(pvla(3:4,2,1))" "800" "print sizeof sliced pvla"
-+gdb_test "print sizeof(pvla(3:4,2,1))" "8" "print sizeof sliced pvla"
 +
-+gdb_breakpoint [gdb_get_line_number "vla1-neg-bounds"]
-+gdb_continue_to_breakpoint "vla1-neg-bounds"
-+gdb_test "print sizeof(vla1)" " = 480" "print sizeof vla1 negative bounds"
++gdb_test "print sizeof(pvla(3:4,2,1))" "8" "print sizeof sliced pvla"
+ 
+ gdb_breakpoint [gdb_get_line_number "vla1-neg-bounds-v1"]
+ gdb_continue_to_breakpoint "vla1-neg-bounds-v1"
 diff --git a/gdb/testsuite/gdb.fortran/vla-stride.exp b/gdb/testsuite/gdb.fortran/vla-stride.exp
 new file mode 100644
 --- /dev/null
@@ -1805,28 +1673,10 @@ new file mode 100644
 +
 +  pvla => null()        ! single-element
 +end program vla_stride
-diff --git a/gdb/testsuite/gdb.fortran/vla.f90 b/gdb/testsuite/gdb.fortran/vla.f90
---- a/gdb/testsuite/gdb.fortran/vla.f90
-+++ b/gdb/testsuite/gdb.fortran/vla.f90
-@@ -54,4 +54,14 @@ program vla
- 
-   allocate (vla3 (2,2))               ! vla2-deallocated
-   vla3(:,:) = 13
-+
-+  allocate (vla1 (-2:1, -5:4, -3:-1))
-+  l = allocated(vla1)
-+
-+  vla1(:, :, :) = 1
-+  vla1(-2, -3, -1) = -231
-+
-+  deallocate (vla1)                   ! vla1-neg-bounds
-+  l = allocated(vla1)
-+
- end program vla
 diff --git a/gdb/valarith.c b/gdb/valarith.c
 --- a/gdb/valarith.c
 +++ b/gdb/valarith.c
-@@ -187,11 +187,17 @@ value_subscripted_rvalue (struct value *array, LONGEST index, int lowerbound)
+@@ -188,11 +188,17 @@ value_subscripted_rvalue (struct value *array, LONGEST index, LONGEST lowerbound
    struct type *array_type = check_typedef (value_type (array));
    struct type *elt_type = check_typedef (TYPE_TARGET_TYPE (array_type));
    ULONGEST elt_size = type_length_units (elt_type);
@@ -2081,7 +1931,7 @@ diff --git a/gdb/valops.c b/gdb/valops.c
 diff --git a/gdb/value.h b/gdb/value.h
 --- a/gdb/value.h
 +++ b/gdb/value.h
-@@ -1140,6 +1140,8 @@ extern struct value *varying_to_slice (struct value *);
+@@ -1143,6 +1143,8 @@ extern struct value *varying_to_slice (struct value *);
  
  extern struct value *value_slice (struct value *, int, int);
  
