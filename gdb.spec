@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 21%{?dist}
+Release: 22%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1141,6 +1141,9 @@ fi
 %endif
 
 %changelog
+* Wed Aug 14 2019 Miro Hrončok <mhroncok@redhat.com>
+- Rebuilt for Python 3.8
+
 * Fri Aug  2 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190802-21
 - Rebase to FSF GDB 8.3.50.20190802 (8.4pre).
 
