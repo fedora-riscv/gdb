@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 23%{?dist}
+Release: 24%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -182,7 +182,7 @@ Source5: %{libstdcxxpython}.tar.xz
 Source6: gdbtui
 
 # libipt: Intel Processor Trace Decoder Library
-%global libipt_version 2.0
+%global libipt_version 2.0.1
 #=fedora
 Source7: v%{libipt_version}.tar.gz
 #=fedora
@@ -442,7 +442,7 @@ tar xJf %{SOURCE5}
 %if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
 tar xzf %{SOURCE7}
 (
- cd processor-trace-%{libipt_version}
+ cd libipt-%{libipt_version}
 %patch1142 -p1
 )
 %endif
@@ -649,21 +649,21 @@ CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
 
 %if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
 (
- mkdir processor-trace-%{libipt_version}-root
- mkdir processor-trace-%{libipt_version}-build
- cd    processor-trace-%{libipt_version}-build
+ mkdir libipt-%{libipt_version}-root
+ mkdir libipt-%{libipt_version}-build
+ cd    libipt-%{libipt_version}-build
  # -DPTUNIT:BOOL=ON has no effect on ctest.
  %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	-DPTUNIT:BOOL=OFF \
 	-DDEVBUILD:BOOL=ON \
-	../../processor-trace-%{libipt_version}
+	../../libipt-%{libipt_version}
  make VERBOSE=1 %{?_smp_mflags}
  ctest -V %{?_smp_mflags}
- make install DESTDIR=../processor-trace-%{libipt_version}-root
+ make install DESTDIR=../libipt-%{libipt_version}-root
 )
 # There is also: --with-libipt-prefix
-CFLAGS="$CFLAGS -I$PWD/processor-trace-%{libipt_version}-root%{_includedir}"
-LDFLAGS="$LDFLAGS -L$PWD/processor-trace-%{libipt_version}-root%{_libdir}"
+CFLAGS="$CFLAGS -I$PWD/libipt-%{libipt_version}-root%{_includedir}"
+LDFLAGS="$LDFLAGS -L$PWD/libipt-%{libipt_version}-root%{_libdir}"
 %endif
 
 export CXXFLAGS="$CFLAGS"
@@ -1141,6 +1141,9 @@ fi
 %endif
 
 %changelog
+* Sun Aug 18 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190816-24
+- Update bundled libipt copy to v2.0.1.
+
 * Fri Aug 16 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190816-23
 - Rebase to FSF GDB 8.3.50.20190816 (8.4pre).
 - Drop 'gdb-testsuite-readline63-sigint.patch'.
