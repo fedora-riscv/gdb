@@ -6,6 +6,30 @@ Subject: gdb-6.6-buildid-locate.patch
 ;; New locating of the matching binaries from the pure core file (build-id).
 ;;=push+jan
 
+diff --git a/bfd/libbfd-in.h b/bfd/libbfd-in.h
+--- a/bfd/libbfd-in.h
++++ b/bfd/libbfd-in.h
+@@ -127,7 +127,7 @@ static inline char *
+ bfd_strdup (const char *str)
+ {
+   size_t len = strlen (str) + 1;
+-  char *buf = bfd_malloc (len);
++  char *buf = (char *) bfd_malloc (len);
+   if (buf != NULL)
+     memcpy (buf, str, len);
+   return buf;
+diff --git a/bfd/libbfd.h b/bfd/libbfd.h
+--- a/bfd/libbfd.h
++++ b/bfd/libbfd.h
+@@ -132,7 +132,7 @@ static inline char *
+ bfd_strdup (const char *str)
+ {
+   size_t len = strlen (str) + 1;
+-  char *buf = bfd_malloc (len);
++  char *buf = (char *) bfd_malloc (len);
+   if (buf != NULL)
+     memcpy (buf, str, len);
+   return buf;
 diff --git a/gdb/build-id.c b/gdb/build-id.c
 --- a/gdb/build-id.c
 +++ b/gdb/build-id.c
@@ -371,7 +395,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
 +static void build_id_addr_candidate (bfd *abfd, asection *sect, void *obj)
 +{
-+  if (build_id_addr >= bfd_section_vma (abfd, sect))
++  if (build_id_addr >= bfd_section_vma (sect))
 +    {
 +      struct build_id_addr_sect *candidate;
 +
@@ -406,7 +430,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +       candidate = candidate->next)
 +    {
 +      i_phdr = elf_get_phdr (core_bfd,
-+			     bfd_section_vma (core_bfd, candidate->sect),
++			     bfd_section_vma (candidate->sect),
 +			     &e_phnum, &loadbase);
 +      if (i_phdr != NULL)
 +	break;
@@ -687,7 +711,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +  if (abfd == NULL)
 +    return NULL;
 +
-+  result = xstrdup (bfd_get_filename (abfd));
++  result = xstrdup (bfd_get_filename (abfd.get ()));
 +  return result;
 +}
 +
@@ -958,7 +982,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
      inferior_ptid = ptid;			/* Yes, make it current.  */
  }
  
-+static int build_id_core_loads = 1;
++static bool build_id_core_loads = true;
 +
 +static void
 +build_id_locate_exec (int from_tty)
@@ -1013,13 +1037,13 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 +     loaded VDSO symbols.  If it gets executed before bfd_map_over_sections
 +     INFERIOR_PTID is still not set and libthread_db initialization crashes on
 +     PID == 0 in ps_pglobal_lookup.  */
-+  if (build_id_core_loads != 0)
++  if (build_id_core_loads != false)
 +    build_id_locate_exec (from_tty);
 +
    post_create_inferior (target, from_tty);
  
    /* Now go through the target stack looking for threads since there
-@@ -1062,4 +1117,11 @@ void
+@@ -973,4 +1028,11 @@ void
  _initialize_corelow (void)
  {
    add_target (core_target_info, core_target_open, filename_completer);
@@ -1034,7 +1058,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -20591,6 +20591,27 @@ information files.
+@@ -20679,6 +20679,27 @@ information files.
  
  @end table
  
@@ -1087,7 +1111,7 @@ diff --git a/gdb/dwarf-index-cache.c b/gdb/dwarf-index-cache.c
 diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 --- a/gdb/dwarf2read.c
 +++ b/gdb/dwarf2read.c
-@@ -2683,7 +2683,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
+@@ -2691,7 +2691,7 @@ dwarf2_get_dwz_file (struct dwarf2_per_objfile *dwarf2_per_objfile)
      }
  
    if (dwz_bfd == NULL)
@@ -1096,7 +1120,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
    if (dwz_bfd == NULL)
      error (_("could not find '.gnu_debugaltlink' file for %s"),
-@@ -6175,7 +6175,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
+@@ -6225,7 +6225,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
  {
@@ -1105,7 +1129,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
    if (build_id == nullptr)
      return {};
  
-@@ -6188,7 +6188,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
+@@ -6238,7 +6238,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_objfile *dwarf2_obj)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache_dwz (objfile *obj, dwz_file *dwz)
  {
@@ -1185,7 +1209,7 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
  
  static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
  static int svr4_have_link_map_offsets (void);
-@@ -1340,9 +1341,51 @@ svr4_read_so_list (svr4_info *info, CORE_ADDR lm, CORE_ADDR prev_lm,
+@@ -1344,9 +1345,51 @@ svr4_read_so_list (svr4_info *info, CORE_ADDR lm, CORE_ADDR prev_lm,
  	  continue;
  	}
  
@@ -1312,7 +1336,7 @@ diff --git a/gdb/testsuite/gdb.base/new-ui-pending-input.exp b/gdb/testsuite/gdb
 diff --git a/gdb/testsuite/lib/gdb.exp b/gdb/testsuite/lib/gdb.exp
 --- a/gdb/testsuite/lib/gdb.exp
 +++ b/gdb/testsuite/lib/gdb.exp
-@@ -1799,6 +1799,17 @@ proc default_gdb_start { } {
+@@ -1803,6 +1803,17 @@ proc default_gdb_start { } {
  	}
      }
  

@@ -27,7 +27,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190824
+%global snapsrc    20190924
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 26%{?dist}
+Release: 27%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1142,6 +1142,10 @@ fi
 %endif
 
 %changelog
+* Wed Sep 25 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190924-27
+- Rebase to FSF GDB 8.3.50.20190924 (8.4pre).
+- Update 'gdb-6.6-buildid-locate.patch'.
+
 * Sat Aug 24 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190824-26
 - Rebase to FSF GDB 8.3.50.20190824 (8.4pre).
 - Update 'v1.5-libipt-static.patch'.
