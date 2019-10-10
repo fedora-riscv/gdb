@@ -35,7 +35,7 @@ Version: 8.3.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 27%{?dist}
+Release: 28%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -253,7 +253,8 @@ BuildRequires: libipt-devel%{buildisa}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # See https://bugzilla.redhat.com/show_bug.cgi?id=1593280
-# DTS RHEL-6 has mpfr-2 while GDB requires mpfr-3.
+# DTS RHEL-6 has mpfr-2 while GDB requires mpfr-3 on RHEL-7, RHEL-8, and
+# Fedora < 32, and mpfr-4 on Fedora 32+ and RHEL-9+.
 BuildRequires: mpfr-devel%{buildisa}
 %endif
 BuildRequires: source-highlight-devel
@@ -1142,6 +1143,9 @@ fi
 %endif
 
 %changelog
+* Wed Oct  9 2019 Jerry James <loganjerry@gmail.com> - 8.3.50.20190924-28
+- Rebuild for mpfr 4
+
 * Wed Sep 25 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 8.3.50.20190924-27
 - Rebase to FSF GDB 8.3.50.20190924 (8.4pre).
 - Update 'gdb-6.6-buildid-locate.patch'.
