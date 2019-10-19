@@ -27,15 +27,15 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20190924
+%global snapsrc    20191018
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
-Version: 8.3.50.%{snapsrc}
+Version: 9.0.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 28%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -101,6 +101,9 @@ Conflicts: elfutils < 0.149
 # https://fedorahosted.org/fpc/ticket/43 https://fedorahosted.org/fpc/ticket/109
 Provides: bundled(libiberty) = %{snapsrc}
 Provides: bundled(gnulib) = %{snapgnulib}
+# The libraries in the top-level directory (libbfd, libopcodes,
+# libctf) are covered by the "bundled(binutils)" below.  See ticket
+# #109, as mentioned above.
 Provides: bundled(binutils) = %{snapsrc}
 # https://fedorahosted.org/fpc/ticket/130
 Provides: bundled(md5-gcc) = %{snapsrc}
@@ -988,7 +991,7 @@ rm -f $RPM_BUILD_ROOT%{_infodir}/configure*
 # Just exclude the header files in the top directory, and don't exclude
 # the gdb/ directory, as it contains jit-reader.h.
 rm -rf $RPM_BUILD_ROOT%{_includedir}/*.h
-rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*}
+rm -rf $RPM_BUILD_ROOT/%{_libdir}/lib{bfd*,opcodes*,iberty*,ctf*}
 
 # pstack obsoletion
 
@@ -1143,6 +1146,11 @@ fi
 %endif
 
 %changelog
+* Fri Oct 18 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.50.20191018-1
+- Rebase to FSF GDB 9.0.50.20191018 (9.1pre).
+- Expand comment on "bundled(binutils)".
+- Remove libctf's files from RPM_BUILD_ROOT.
+
 * Wed Oct  9 2019 Jerry James <loganjerry@gmail.com> - 8.3.50.20190924-28
 - Rebuild for mpfr 4
 
