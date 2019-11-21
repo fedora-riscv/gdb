@@ -1,0 +1,191 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Sergio Durigan Junior <sergiodj@redhat.com>
+Date: Thu, 21 Nov 2019 12:15:08 -0500
+Subject: gdb-rhbz1765117-fix-core-tui-run.patch
+
+;; Fix '[abrt] gdb-headless: target_ops::shortname(): gdb killed by SIGSEGV'
+;; Sergio Durigan Junior, RHBZ 1765117.
+
+Fix crash with core + TUI + run
+
+Ref.: https://bugzilla.redhat.com/show_bug.cgi?id=1765117
+
+A segfault can happen in a specific scenario when using TUI + a
+corefile, as explained in the bug mentioned above.  The problem
+happens when opening a corefile on GDB:
+
+  $ gdb ./core program
+
+entering TUI (C-x a), and then issuing a "run" command.  GDB segfaults
+with the following stack trace:
+
+  (top-gdb) bt
+  #0  0x00000000004cd5da in target_ops::shortname (this=0x0) at ../../binutils-gdb/gdb/target.h:449
+  #1  0x0000000000ac08fb in target_shortname () at ../../binutils-gdb/gdb/target.h:1323
+  #2  0x0000000000ac09ae in tui_locator_window::make_status_line[abi:cxx11]() const (this=0x23e1fa0 <_locator>) at ../../binutils-gdb/gdb/tui/tui-stack.c:86
+  #3  0x0000000000ac1043 in tui_locator_window::rerender (this=0x23e1fa0 <_locator>) at ../../binutils-gdb/gdb/tui/tui-stack.c:231
+  #4  0x0000000000ac1632 in tui_show_locator_content () at ../../binutils-gdb/gdb/tui/tui-stack.c:369
+  #5  0x0000000000ac63b6 in tui_set_key_mode (mode=TUI_COMMAND_MODE) at ../../binutils-gdb/gdb/tui/tui.c:321
+  #6  0x0000000000aaf9be in tui_inferior_exit (inf=0x2d446a0) at ../../binutils-gdb/gdb/tui/tui-hooks.c:181
+  #7  0x000000000044cddf in std::_Function_handler<void (inferior*), void (*)(inferior*)>::_M_invoke(std::_Any_data const&, inferior*&&) (__functor=..., __args#0=@0x7fffffffd650: 0x2d446a0)
+      at /usr/include/c++/9/bits/std_function.h:300
+  #8  0x0000000000757db9 in std::function<void (inferior*)>::operator()(inferior*) const (this=0x2cf3168, __args#0=0x2d446a0) at /usr/include/c++/9/bits/std_function.h:690
+  #9  0x0000000000757876 in gdb::observers::observable<inferior*>::notify (this=0x23de0c0 <gdb::observers::inferior_exit>, args#0=0x2d446a0)
+      at ../../binutils-gdb/gdb/gdbsupport/observable.h:106
+  #10 0x000000000075532d in exit_inferior_1 (inftoex=0x2d446a0, silent=1) at ../../binutils-gdb/gdb/inferior.c:191
+  #11 0x0000000000755460 in exit_inferior_silent (inf=0x2d446a0) at ../../binutils-gdb/gdb/inferior.c:234
+  #12 0x000000000059f47c in core_target::close (this=0x2d68590) at ../../binutils-gdb/gdb/corelow.c:265
+  #13 0x0000000000a7688c in target_close (targ=0x2d68590) at ../../binutils-gdb/gdb/target.c:3293
+  #14 0x0000000000a63d74 in target_stack::push (this=0x23e1800 <g_target_stack>, t=0x23c38c8 <the_amd64_linux_nat_target>) at ../../binutils-gdb/gdb/target.c:568
+  #15 0x0000000000a63dbf in push_target (t=0x23c38c8 <the_amd64_linux_nat_target>) at ../../binutils-gdb/gdb/target.c:583
+  #16 0x0000000000748088 in inf_ptrace_target::create_inferior (this=0x23c38c8 <the_amd64_linux_nat_target>, exec_file=0x2d58d30 "/usr/bin/cat", allargs="", env=0x25f12b0, from_tty=1)
+      at ../../binutils-gdb/gdb/inf-ptrace.c:128
+  #17 0x0000000000795ccb in linux_nat_target::create_inferior (this=0x23c38c8 <the_amd64_linux_nat_target>, exec_file=0x2d58d30 "/usr/bin/cat", allargs="", env=0x25f12b0, from_tty=1)
+      at ../../binutils-gdb/gdb/linux-nat.c:1094
+  #18 0x000000000074eae9 in run_command_1 (args=0x0, from_tty=1, run_how=RUN_NORMAL) at ../../binutils-gdb/gdb/infcmd.c:639
+  ...
+
+The problem happens because 'tui_locator_window::make_status_line'
+needs the value of 'target_shortname' in order to update the status
+line.  'target_shortname' is a macro which expands to:
+
+  #define	target_shortname	(current_top_target ()->shortname ())
+
+and, in our scenario, 'current_top_target ()' returns NULL, which
+obviously causes a segfault.  But why does it return NULL, since,
+according to its comment on target.h, it should never do that?
+
+What is happening is that we're being caught in the middle of a
+"target switch".  We had the 'core_target' on top, because we were
+inspecting a corefile, but when the user decided to invoke "run" GDB
+had to actually create the inferior, which ends up detecting that we
+have a target already, and tries to close it (from target.c):
+
+  /* See target.h.  */
+
+  void
+  target_stack::push (target_ops *t)
+  {
+    /* If there's already a target at this stratum, remove it.  */
+    strata stratum = t->stratum ();
+
+    if (m_stack[stratum] != NULL)
+      {
+	target_ops *prev = m_stack[stratum];
+	m_stack[stratum] = NULL;
+	target_close (prev); // <-- here
+      }
+  ...
+
+When the current target ('core_target') is being closed, it checks for
+possible observers registered with it and calls them.  TUI is one of
+those observers, it gets called, tries to update the status line, and
+GDB crashes.
+
+The real problem is that we are clearing 'm_stack[stratum]', but
+forgetting to adjust 'm_top'.  Interestingly, this scenario is covered
+in 'target_stack::unpush', but Pedro said he forgot to call it here..
+The fix, therefore, is to call '::unpush' if there's a target on the
+stack.
+
+This patch has been tested on the Buildbot and no regressions have
+been found.  I'm also submitting a testcase for it.
+
+gdb/ChangeLog:
+2019-11-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1765117
+	* target.c (target_stack::push): Call 'unpush' if there's a
+	target on top of the stack.
+
+gdb/testsuite/ChangeLog:
+2019-11-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1765117
+	* gdb.tui/corefile-run.exp: New file.
+
+Change-Id: I39e2f8b538c580c8ea5bf1d657ee877e47746c8f
+
+diff --git a/gdb/target.c b/gdb/target.c
+--- a/gdb/target.c
++++ b/gdb/target.c
+@@ -564,11 +564,7 @@ target_stack::push (target_ops *t)
+   strata stratum = t->stratum ();
+ 
+   if (m_stack[stratum] != NULL)
+-    {
+-      target_ops *prev = m_stack[stratum];
+-      m_stack[stratum] = NULL;
+-      target_close (prev);
+-    }
++    unpush (m_stack[stratum]);
+ 
+   /* Now add the new one.  */
+   m_stack[stratum] = t;
+diff --git a/gdb/testsuite/gdb.tui/corefile-run.exp b/gdb/testsuite/gdb.tui/corefile-run.exp
+new file mode 100644
+--- /dev/null
++++ b/gdb/testsuite/gdb.tui/corefile-run.exp
+@@ -0,0 +1,61 @@
++# Copyright 2019 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Test whether we can load a corefile, enable TUI and then invoke
++# "run" without having a segfault.
++#
++# Ref.: https://bugzilla.redhat.com/show_bug.cgi?id=1765117
++
++load_lib "tuiterm.exp"
++
++standard_testfile tui-layout.c
++
++set core "${testfile}.core"
++
++if { [prepare_for_testing "failed to prepare" $testfile $srcfile debug] } {
++    return -1
++}
++
++# Only run on native boards.
++if { [use_gdb_stub] || [target_info gdb_protocol] == "extended-remote" } {
++    untested "not supported"
++    return
++}
++
++if { ![runto_main] } {
++    untested "could not run to main"
++    return -1
++}
++
++if { ![gdb_gcore_cmd "$core" "save a corefile"] } {
++    untested "could not generate a corefile"
++    return -1
++}
++
++Term::clean_restart 24 80 $testfile
++if {![Term::enter_tui]} {
++    unsupported "TUI not supported"
++}
++
++set text [Term::get_all_lines]
++gdb_assert {![string match "No Source Available" $text]} \
++    "initial source listing"
++
++Term::command "core-file $core"
++Term::check_contents "load corefile" "21 *return 0"
++
++Term::command "run"
++Term::check_contents "run until the end" \
++    "\\\[Inferior $decimal \\\(process $decimal\\\) exited normally\\]"
