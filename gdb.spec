@@ -27,7 +27,7 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20191018
+%global snapsrc    20191119
 # See timestamp of source gnulib installed into gdb/gnulib/ .
 %global snapgnulib 20161115
 %global tarname gdb-%{version}
@@ -35,7 +35,7 @@ Version: 9.0.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -503,9 +503,9 @@ rm -f gdb/doc/*.info-*
 # RL_STATE_FEDORA_GDB would not be found for:
 # Patch642: gdb-readline62-ask-more-rh.patch
 # --with-system-readline
-mv -f readline/doc readline-doc
-rm -rf readline/*
-mv -f readline-doc readline/doc
+mv -f readline/readline/doc readline-doc
+rm -rf readline/readline/*
+mv -f readline-doc readline/readline/doc
 %endif # 0%{!?rhel:1} || 0%{?rhel} > 6
 
 rm -rf zlib texinfo
@@ -1146,6 +1146,12 @@ fi
 %endif
 
 %changelog
+* Tue Nov 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.50.20191119-2
+- Rebase to FSF GDB 9.0.50.20191119 (9.1pre).
+- Drop 'gdb-readline62-ask-more-rh.patch'.
+- Drop 'gdb-6.5-bz216711-clone-is-outermost.patch'.
+- Adjust 'gdb-archer-pie-addons-keep-disabled.patch'.
+
 * Fri Oct 18 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.50.20191018-1
 - Rebase to FSF GDB 9.0.50.20191018 (9.1pre).
 - Expand comment on "bundled(binutils)".
