@@ -1,0 +1,92 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Sergio Durigan Junior <sergiodj@redhat.com>
+Date: Fri, 20 Dec 2019 16:14:05 -0500
+Subject: gdb-rhbz1785768-path-breakpoints-resolved-eclipse-cdt.patch
+
+;; Fix for 'Paths for breakpoints are not resolved' (RHBZ 1785768).
+;; Reported directly to me (Sergio) by Jonah Graham from Eclipse CDT.
+;; Fixed upstream.
+
+[gdb/breakpoints] Fix fullname.exp when run from symlink dir
+
+I run into this error with gdb.base/fullname.exp:
+...
+(gdb) file /data/gdb_versions/devel/build/gdb/testsuite/outputs/\
+  gdb.base/fullname/fullname
+Reading symbols from /data/gdb_versions/devel/build/gdb/testsuite/outputs/\
+  gdb.base/fullname/fullname...
+(gdb) break /data/gdb_versions/devel/build/gdb/testsuite/\
+  outputs/gdb.base/fullname/tmp-fullname.c:21
+No source file named /data/gdb_versions/devel/build/gdb/testsuite/outputs/\
+  gdb.base/fullname/tmp-fullname.c.
+Make breakpoint pending on future shared library load? (y or [n]) n
+(gdb) FAIL: gdb.base/fullname.exp: set breakpoint by full path before loading symbols - built relative
+...
+
+The FAIL is due to this comparison in iterate_over_some_symtabs failing:
+...
+481                   if (FILENAME_CMP (real_path, fullname) == 0)
+(gdb) p real_path
+$2 = 0x1a201f0 "/data/gdb_versions/devel/build/gdb/testsuite/outputs/\
+  gdb.base/fullname/tmp-fullname.c"
+(gdb) p fullname
+$3 = 0x1a1de80 "/home/vries/gdb_versions/devel/build/gdb/testsuite/outputs/\
+  gdb.base/fullname/tmp-fullname.c"
+...
+
+The difference in pathnames is due to having a symlink dir:
+...
+$ ls -la /home/vries/gdb_versions
+lrwxrwxrwx 1 vries users 18 26 jun  2018 /home/vries/gdb_versions -> /data/gdb_versions
+...
+and the test passses when eliminating it:
+...
+$ ( cd $(pwd -P); make check RUNTESTFLAGS=gdb.base/fullname.exp )
+...
+
+The FAIL is a regression from commit a0c1ffedcf1 "Only compute realpath when
+basenames_may_differ is set".  Before, find_and_open_source was returning a
+real-path, resulting in variable 'fullname' being the same as varible
+'real_path' in the comparison listed above.  But after, that's no longer the
+case.
+
+Fix the FAIL by applying gdb_realpath on the fullname variable before the
+comparison.
+
+Tested on x86_64-linux.
+
+I wasn't able to write a test-case.  The FAIL starts at:
+...
+$ cd build/gdb
+$ mv testsuite testsuite.bla
+$ ln -s testsuite.bla testsuite
+...
+but already this doesn't trigger it anymore:
+...
+$ cd build/gdb/outputs
+$ mv outputs outputs.bla
+$ ln -s outputs.bla outputs
+...
+
+gdb/ChangeLog:
+
+2019-10-23  Tom de Vries  <tdevries@suse.de>
+
+	PR breakpoints/24687
+	* symtab.c (iterate_over_some_symtabs): Apply gdb_realpath on fullname.
+
+Change-Id: I1ace62a234458781e958980f3b425edf1490df27
+
+diff --git a/gdb/symtab.c b/gdb/symtab.c
+--- a/gdb/symtab.c
++++ b/gdb/symtab.c
+@@ -478,6 +478,9 @@ iterate_over_some_symtabs (const char *name,
+ 
+ 	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
+ 	      gdb_assert (IS_ABSOLUTE_PATH (name));
++	      gdb::unique_xmalloc_ptr<char> fullname_real_path
++		= gdb_realpath (fullname);
++	      fullname = fullname_real_path.get ();
+ 	      if (FILENAME_CMP (real_path, fullname) == 0)
+ 		{
+ 		  if (callback (s))
