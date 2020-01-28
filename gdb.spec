@@ -35,7 +35,7 @@ Version: 9.0.50.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1146,6 +1146,9 @@ fi
 %endif
 
 %changelog
+* Tue Jan 28 2020 Fedora Release Engineering <releng@fedoraproject.org>
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
+
 * Tue Nov 19 2019 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.50.20191119-2
 - Rebase to FSF GDB 9.0.50.20191119 (9.1pre).
 - Drop 'gdb-readline62-ask-more-rh.patch'.
