@@ -1,0 +1,242 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Sergio Durigan Junior <sergiodj@redhat.com>
+Date: Tue, 4 Feb 2020 16:26:49 -0500
+Subject: gdb-rhbz1728147-gdb-segfaults-if-working-dir-was-deleted.patch
+
+;; Fix for "gdb segfaults if working directory was deleted" (Sergio
+;; Durigan Junior, RHBZ 1728147).
+
+Guard against 'current_directory == NULL' on gdb_abspath (PR gdb/23613)
+
+Ref.: https://bugzilla.redhat.com/show_bug.cgi?id=1728147
+Ref.: https://sourceware.org/bugzilla/show_bug.cgi?id=23613
+
+Hi,
+
+This bug has been reported against Fedora GDB, but there's also an
+upstream bug.  The problem reported is that GDB segfaults when the
+working directory is deleted.  It's pretty use to reproduce it:
+
+  mkdir bla
+  cd bla
+  rmdir ../bla
+  gdb echo
+
+Debugging the problem is a bit tricky, because, since the current
+directory doesn't exist anymore, a corefile cannot be saved there.
+After a few attempts, I came up with the following:
+
+  gdb -ex 'shell mkdir bla' -ex 'cd bla' -ex 'shell rmdir ../bla' -ex 'r echo' ./gdb/gdb
+
+This assumes that you're inside a build directory which contains
+./gdb/gdb, of course.
+
+After investigating it, I found that the problem happens at
+gdb_abspath, where we're dereferencing 'current_directory' without
+checking if it's NULL:
+
+    ...
+    (concat (current_directory,
+	     IS_DIR_SEPARATOR (current_directory[strlen (current_directory) - 1])
+	     ? "" : SLASH_STRING,
+    ...
+
+So I fixed the problem with the patch below.  The idea is that, if
+'current_directory' is NULL, then the final string returned should be
+just the "path".
+
+After fixing the bug, I found a similar one reported against our
+bugzilla: PR gdb/23613.  The problem is the same, but the reproducer
+is a bit different.
+
+I really tried writing a testcase for this, but unfortunately it's
+apparently not possible to start GDB inside a non-existent directory
+with DejaGNU.
+
+I regression tested this patch on the BuildBot, and no regressions
+were found.
+
+gdb/ChangeLog:
+2019-12-14  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1728147
+	PR gdb/23613
+	* bsd-kvm.c (bsd_kvm_target_open): Use 'gdb_abspath'.
+	* corelow.c: Include 'gdbsupport/pathstuff.h'.
+	(core_target_open): Use 'gdb_abspath'.
+	* gdbsupport/pathstuff.c (gdb_abspath): Guard against
+	'current_directory == NULL' case.
+	* gdbsupport/pathstuff.h (gdb_abspath): Expand comment and
+	explain what happens when 'current_directory' is NULL.
+	* go32-nat.c (go32_nat_target::wait): Check if
+	'current_directory' is NULL before call to 'chdir'.
+	* source.c (add_path): Use 'gdb_abspath'.
+	* top.c: Include 'gdbsupport/pathstuff.h'.
+	(init_history): Use 'gdb_abspath'.
+	(set_history_filename): Likewise.
+	* tracefile-tfile.c: Include 'gdbsupport/pathstuff.h'.
+	(tfile_target_open): Use 'gdb_abspath'.
+
+Change-Id: Ibb0932fa25bc5c2d3ae4a7f64bd7f32885ca403b
+
+diff --git a/gdb/bsd-kvm.c b/gdb/bsd-kvm.c
+--- a/gdb/bsd-kvm.c
++++ b/gdb/bsd-kvm.c
+@@ -114,14 +114,13 @@ bsd_kvm_target_open (const char *arg, int from_tty)
+ 
+   if (arg)
+     {
+-      char *temp;
+-
+       filename = tilde_expand (arg);
+       if (filename[0] != '/')
+ 	{
+-	  temp = concat (current_directory, "/", filename, (char *)NULL);
++	  gdb::unique_xmalloc_ptr<char> temp (gdb_abspath (filename));
++
+ 	  xfree (filename);
+-	  filename = temp;
++	  filename = temp.release ();
+ 	}
+     }
+ 
+diff --git a/gdb/corelow.c b/gdb/corelow.c
+--- a/gdb/corelow.c
++++ b/gdb/corelow.c
+@@ -47,6 +47,8 @@
+ #include "gdb_bfd.h"
+ #include "completer.h"
+ #include "gdbsupport/filestuff.h"
++#include "build-id.h"
++#include "gdbsupport/pathstuff.h"
+ 
+ #ifndef O_LARGEFILE
+ #define O_LARGEFILE 0
+@@ -420,8 +422,7 @@ core_target_open (const char *arg, int from_tty)
+ 
+   gdb::unique_xmalloc_ptr<char> filename (tilde_expand (arg));
+   if (!IS_ABSOLUTE_PATH (filename.get ()))
+-    filename.reset (concat (current_directory, "/",
+-			    filename.get (), (char *) NULL));
++    filename = gdb_abspath (filename.get ());
+ 
+   flags = O_BINARY | O_LARGEFILE;
+   if (write_files)
+diff --git a/gdb/gdbsupport/pathstuff.c b/gdb/gdbsupport/pathstuff.c
+--- a/gdb/gdbsupport/pathstuff.c
++++ b/gdb/gdbsupport/pathstuff.c
+@@ -134,7 +134,7 @@ gdb_abspath (const char *path)
+   if (path[0] == '~')
+     return gdb_tilde_expand_up (path);
+ 
+-  if (IS_ABSOLUTE_PATH (path))
++  if (IS_ABSOLUTE_PATH (path) || current_directory == NULL)
+     return make_unique_xstrdup (path);
+ 
+   /* Beware the // my son, the Emacs barfs, the botch that catch...  */
+diff --git a/gdb/gdbsupport/pathstuff.h b/gdb/gdbsupport/pathstuff.h
+--- a/gdb/gdbsupport/pathstuff.h
++++ b/gdb/gdbsupport/pathstuff.h
+@@ -44,7 +44,10 @@ extern gdb::unique_xmalloc_ptr<char>
+ 
+    Contrary to "gdb_realpath", this function uses CURRENT_DIRECTORY
+    for the path expansion.  This may lead to scenarios the current
+-   working directory (CWD) is different than CURRENT_DIRECTORY.  */
++   working directory (CWD) is different than CURRENT_DIRECTORY.
++
++   If CURRENT_DIRECTORY is NULL, this function returns a copy of
++   PATH.  */
+ 
+ extern gdb::unique_xmalloc_ptr<char> gdb_abspath (const char *path);
+ 
+diff --git a/gdb/go32-nat.c b/gdb/go32-nat.c
+--- a/gdb/go32-nat.c
++++ b/gdb/go32-nat.c
+@@ -507,7 +507,8 @@ go32_nat_target::wait (ptid_t ptid, struct target_waitstatus *status,
+     }
+ 
+   getcwd (child_cwd, sizeof (child_cwd)); /* in case it has changed */
+-  chdir (current_directory);
++  if (current_directory != NULL)
++    chdir (current_directory);
+ 
+   if (a_tss.tss_irqn == 0x21)
+     {
+diff --git a/gdb/source.c b/gdb/source.c
+--- a/gdb/source.c
++++ b/gdb/source.c
+@@ -522,8 +522,7 @@ add_path (const char *dirname, char **which_path, int parse_separators)
+ 	new_name_holder.reset (concat (name, ".", (char *) NULL));
+ #endif
+       else if (!IS_ABSOLUTE_PATH (name) && name[0] != '$')
+-	new_name_holder.reset (concat (current_directory, SLASH_STRING, name,
+-				       (char *) NULL));
++	new_name_holder = gdb_abspath (name);
+       else
+ 	new_name_holder.reset (savestring (name, p - name));
+       name = new_name_holder.get ();
+diff --git a/gdb/top.c b/gdb/top.c
+--- a/gdb/top.c
++++ b/gdb/top.c
+@@ -54,6 +54,7 @@
+ #include "gdb_select.h"
+ #include "gdbsupport/scope-exit.h"
+ #include "gdbarch.h"
++#include "gdbsupport/pathstuff.h"
+ 
+ /* readline include files.  */
+ #include "readline/readline.h"
+@@ -1972,12 +1973,13 @@ init_history (void)
+          that was read.  */
+ #ifdef __MSDOS__
+       /* No leading dots in file names are allowed on MSDOS.  */
+-      history_filename = concat (current_directory, "/_gdb_history",
+-				 (char *)NULL);
++      const char *fname = "_gdb_history";
+ #else
+-      history_filename = concat (current_directory, "/.gdb_history",
+-				 (char *)NULL);
++      const char *fname = ".gdb_history";
+ #endif
++
++      gdb::unique_xmalloc_ptr<char> temp (gdb_abspath (fname));
++      history_filename = temp.release ();
+     }
+   read_history (history_filename);
+ }
+@@ -2055,8 +2057,12 @@ set_history_filename (const char *args,
+      directories the file written will be the same as the one
+      that was read.  */
+   if (!IS_ABSOLUTE_PATH (history_filename))
+-    history_filename = reconcat (history_filename, current_directory, "/", 
+-				 history_filename, (char *) NULL);
++    {
++      gdb::unique_xmalloc_ptr<char> temp (gdb_abspath (history_filename));
++
++      xfree (history_filename);
++      history_filename = temp.release ();
++    }
+ }
+ 
+ static void
+diff --git a/gdb/tracefile-tfile.c b/gdb/tracefile-tfile.c
+--- a/gdb/tracefile-tfile.c
++++ b/gdb/tracefile-tfile.c
+@@ -32,6 +32,7 @@
+ #include "xml-tdesc.h"
+ #include "target-descriptions.h"
+ #include "gdbsupport/buffer.h"
++#include "gdbsupport/pathstuff.h"
+ #include <algorithm>
+ 
+ #ifndef O_LARGEFILE
+@@ -470,8 +471,7 @@ tfile_target_open (const char *arg, int from_tty)
+ 
+   gdb::unique_xmalloc_ptr<char> filename (tilde_expand (arg));
+   if (!IS_ABSOLUTE_PATH (filename.get ()))
+-    filename.reset (concat (current_directory, "/", filename.get (),
+-			    (char *) NULL));
++    filename = gdb_abspath (filename.get ());
+ 
+   flags = O_BINARY | O_LARGEFILE;
+   flags |= O_RDONLY;
