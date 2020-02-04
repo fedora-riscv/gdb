@@ -27,22 +27,22 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20191119
-# See timestamp of source gnulib installed into gdb/gnulib/ .
-%global snapgnulib 20161115
+%global snapsrc    20200203
+# See timestamp of source gnulib installed into gnulib/ .
+%global snapgnulib 20191216
 %global tarname gdb-%{version}
-Version: 9.0.50.%{snapsrc}
+Version: 9.0.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
 Source: %{tarname}.tar.xz
 #Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
-URL: http://gnu.org/software/gdb/
+URL: https://gnu.org/software/gdb/
 
 # For our convenience
 %global gdb_src %{tarname}
@@ -1146,6 +1146,15 @@ fi
 %endif
 
 %changelog
+* Mon Feb  3 2020 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.90.20200203-4
+- Rebase to FSF GDB 9.0.90.20200203 (9.1pre).
+- Bump 'snapgnulib' date.
+- Update URL to 'https'.
+- Adjust build-id patchset.
+- Adjust VLA patchset.
+- Drop 'gdb-6.8-bz436037-reg-no-longer-active.patch'.
+- Drop 'gdb-6.6-scheduler_locking-step-is-default.patch'.
+
 * Tue Jan 28 2020 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
 

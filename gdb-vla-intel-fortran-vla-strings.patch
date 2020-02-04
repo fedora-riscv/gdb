@@ -33,7 +33,7 @@ git diff --stat -p gdb/master...gdb/users/bheckel/fortran-vla-strings
 diff --git a/gdb/NEWS b/gdb/NEWS
 --- a/gdb/NEWS
 +++ b/gdb/NEWS
-@@ -745,6 +745,8 @@ SH-5/SH64 running OpenBSD 	SH-5/SH64 support in sh*-*-openbsd*
+@@ -805,6 +805,8 @@ SH-5/SH64 running OpenBSD 	SH-5/SH64 support in sh*-*-openbsd*
  
  *** Changes in GDB 8.1
  
@@ -45,7 +45,7 @@ diff --git a/gdb/NEWS b/gdb/NEWS
 diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
 --- a/gdb/c-valprint.c
 +++ b/gdb/c-valprint.c
-@@ -651,6 +651,28 @@ c_value_print (struct value *val, struct ui_file *stream,
+@@ -649,6 +649,28 @@ c_value_print (struct value *val, struct ui_file *stream,
        else
  	{
  	  /* normal case */
@@ -89,7 +89,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  
  /* memory allocation interface */
  
-@@ -13793,7 +13796,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
+@@ -13799,7 +13802,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
        newobj->static_link
  	= XOBNEW (&objfile->objfile_obstack, struct dynamic_prop);
        attr_to_dynamic_prop (attr, die, cu, newobj->static_link,
@@ -98,7 +98,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
      }
  
    cu->list_in_scope = cu->get_builder ()->get_local_symbols ();
-@@ -16554,7 +16557,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -16565,7 +16568,7 @@ read_array_type (struct die_info *die, struct dwarf2_cu *cu)
        byte_stride_prop
  	= (struct dynamic_prop *) alloca (sizeof (struct dynamic_prop));
        stride_ok = attr_to_dynamic_prop (attr, die, cu, byte_stride_prop,
@@ -107,21 +107,38 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
        if (!stride_ok)
  	{
  	  complaint (_("unable to read array DW_AT_byte_stride "
-@@ -17312,29 +17315,90 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
-   struct gdbarch *gdbarch = get_objfile_arch (objfile);
-   struct type *type, *range_type, *index_type, *char_type;
+@@ -17325,7 +17328,7 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
    struct attribute *attr;
--  unsigned int length;
-+  unsigned int length = UINT_MAX;
-+
+   struct dynamic_prop prop;
+   bool length_is_constant = true;
+-  LONGEST length;
++  ULONGEST length = UINT_MAX;
+ 
+   /* There are a couple of places where bit sizes might be made use of
+      when parsing a DW_TAG_string_type, however, no producer that we know
+@@ -17346,6 +17349,10 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+ 	}
+     }
+ 
 +  index_type = objfile_type (objfile)->builtin_int;
 +  range_type = create_static_range_type (NULL, index_type, 1, length);
- 
++
 +  /* If DW_AT_string_length is defined, the length is stored in memory.  */
    attr = dwarf2_attr (die, DW_AT_string_length, cu);
-   if (attr)
+   if (attr != nullptr && !attr_form_is_constant (attr))
      {
--      length = DW_UNSND (attr);
+@@ -17372,13 +17379,71 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+ 	}
+ 
+       /* Convert the attribute into a dynamic property.  */
+-      if (!attr_to_dynamic_prop (attr, die, cu, &prop, prop_type))
++      if (!attr_to_dynamic_prop (attr, die, cu, &prop, prop_type, NULL, 0))
+ 	length = 1;
+       else
+ 	length_is_constant = false;
+     }
+   else if (attr != nullptr)
+     {
 +      if (attr_form_is_block (attr))
 +	{
 +	  struct attribute *byte_size, *bit_size;
@@ -179,37 +196,40 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
 +	  TYPE_HIGH_BOUND (range_type) = DW_UNSND(attr);
 +	  TYPE_HIGH_BOUND_KIND (range_type) = PROP_CONST;
 +	}
++
+       /* This DW_AT_string_length just contains the length with no
+ 	 indirection.  There's no need to create a dynamic property in this
+ 	 case.  Pass 0 for the default value as we know it will not be
+@@ -17392,6 +17457,20 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
      }
    else
      {
--      /* Check for the DW_AT_byte_size attribute.  */
 +      /* Check for the DW_AT_byte_size attribute, which represents the length
 +	 in this case.  */
-       attr = dwarf2_attr (die, DW_AT_byte_size, cu);
-       if (attr)
--        {
--          length = DW_UNSND (attr);
--        }
++      attr = dwarf2_attr (die, DW_AT_byte_size, cu);
++      if (attr)
 +	{
 +	  TYPE_HIGH_BOUND (range_type) = DW_UNSND(attr);
 +	  TYPE_HIGH_BOUND_KIND (range_type) = PROP_CONST;
 +	}
-       else
--        {
--          length = 1;
--        }
++      else
 +	{
 +	  TYPE_HIGH_BOUND (range_type) = 1;
 +	  TYPE_HIGH_BOUND_KIND (range_type) = PROP_CONST;
 +	}
++
+       /* Use 1 as a fallback length if we have nothing else.  */
+       length = 1;
      }
- 
--  index_type = objfile_type (objfile)->builtin_int;
--  range_type = create_static_range_type (NULL, index_type, 1, length);
+@@ -17407,6 +17486,7 @@ read_tag_string_type (struct die_info *die, struct dwarf2_cu *cu)
+       low_bound.data.const_val = 1;
+       range_type = create_range_type (NULL, index_type, &low_bound, &prop, 0);
+     }
++
    char_type = language_string_char_type (cu->language_defn, gdbarch);
    type = create_string_type (NULL, char_type, range_type);
  
-@@ -17767,7 +17831,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -17858,7 +17938,8 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
  static int
  attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  		      struct dwarf2_cu *cu, struct dynamic_prop *prop,
@@ -219,10 +239,10 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  {
    struct dwarf2_property_baton *baton;
    struct obstack *obstack
-@@ -17786,9 +17851,30 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
-       baton->locexpr.size = DW_BLOCK (attr)->size;
-       baton->locexpr.data = DW_BLOCK (attr)->data;
-       baton->locexpr.is_reference = false;
+@@ -17885,9 +17966,30 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+ 	  baton->locexpr.is_reference = false;
+ 	  break;
+ 	}
 +
 +      if (additional_data != NULL && additional_data_size > 0)
 +	{
@@ -251,7 +271,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
      }
    else if (attr_form_is_ref (attr))
      {
-@@ -17821,9 +17907,29 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
+@@ -17920,9 +18022,29 @@ attr_to_dynamic_prop (const struct attribute *attr, struct die_info *die,
  		baton = XOBNEW (obstack, struct dwarf2_property_baton);
  		baton->property_type = die_type (target_die, target_cu);
  		baton->locexpr.per_cu = cu->per_cu;
@@ -283,26 +303,18 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  		prop->data.baton = baton;
  		prop->kind = PROP_LOCEXPR;
  		gdb_assert (prop->data.baton != NULL);
-@@ -17993,7 +18099,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
- 
-   attr = dwarf2_attr (die, DW_AT_byte_stride, cu);
-   if (attr)
--    if (!attr_to_dynamic_prop (attr, die, cu, &stride, base_type))
-+    if (!attr_to_dynamic_prop (attr, die, cu, &stride, base_type,
-+			       NULL, 0))
-         complaint (_("Missing DW_AT_byte_stride "
- 		     "- DIE at 0x%s [in module %s]"),
- 		   sect_offset_str (die->sect_off),
-@@ -18001,7 +18108,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -18099,8 +18221,8 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+     }
  
    attr = dwarf2_attr (die, DW_AT_lower_bound, cu);
-   if (attr)
+-  if (attr != nullptr)
 -    attr_to_dynamic_prop (attr, die, cu, &low, base_type);
++  if (attr)
 +    attr_to_dynamic_prop (attr, die, cu, &low, base_type, NULL, 0);
    else if (!low_default_is_valid)
      complaint (_("Missing DW_AT_lower_bound "
  				      "- DIE at %s [in module %s]"),
-@@ -18010,10 +18117,10 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+@@ -18109,10 +18231,10 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
  
    struct attribute *attr_ub, *attr_count;
    attr = attr_ub = dwarf2_attr (die, DW_AT_upper_bound, cu);
@@ -315,7 +327,25 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
  	{
  	  /* If bounds are constant do the final calculation here.  */
  	  if (low.kind == PROP_CONST && high.kind == PROP_CONST)
-@@ -25736,7 +25843,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -18164,7 +18286,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+       struct type *prop_type
+ 	= dwarf2_per_cu_addr_sized_int_type (cu->per_cu, false);
+       attr_to_dynamic_prop (attr_byte_stride, die, cu, &byte_stride_prop,
+-			    prop_type);
++			    prop_type, NULL, 0);
+     }
+ 
+   struct dynamic_prop bit_stride_prop;
+@@ -18185,7 +18307,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
+ 	  struct type *prop_type
+ 	    = dwarf2_per_cu_addr_sized_int_type (cu->per_cu, false);
+ 	  attr_to_dynamic_prop (attr_bit_stride, die, cu, &bit_stride_prop,
+-				prop_type);
++				prop_type, NULL, 0);
+ 	}
+     }
+ 
+@@ -25879,7 +26001,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
      {
        struct type *prop_type
  	= dwarf2_per_cu_addr_sized_int_type (cu->per_cu, false);
@@ -324,7 +354,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
          add_dyn_prop (DYN_PROP_ALLOCATED, prop, type);
      }
    else if (attr != NULL)
-@@ -25752,7 +25859,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25895,7 +26017,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
      {
        struct type *prop_type
  	= dwarf2_per_cu_addr_sized_int_type (cu->per_cu, false);
@@ -333,7 +363,7 @@ diff --git a/gdb/dwarf2read.c b/gdb/dwarf2read.c
          add_dyn_prop (DYN_PROP_ASSOCIATED, prop, type);
      }
    else if (attr != NULL)
-@@ -25765,7 +25872,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
+@@ -25908,7 +26030,7 @@ set_die_type (struct die_info *die, struct type *type, struct dwarf2_cu *cu)
    /* Read DW_AT_data_location and set in type.  */
    attr = dwarf2_attr (die, DW_AT_data_location, cu);
    if (attr_to_dynamic_prop (attr, die, cu, &prop,
@@ -401,7 +431,7 @@ diff --git a/gdb/f-typeprint.c b/gdb/f-typeprint.c
 diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
 --- a/gdb/gdbtypes.c
 +++ b/gdb/gdbtypes.c
-@@ -1905,7 +1905,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1939,7 +1939,8 @@ is_dynamic_type_internal (struct type *type, int top_level)
    type = check_typedef (type);
  
    /* We only want to recognize references at the outermost level.  */
@@ -411,32 +441,26 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
      type = check_typedef (TYPE_TARGET_TYPE (type));
  
    /* Types that have a dynamic TYPE_DATA_LOCATION are considered
-@@ -1939,6 +1940,7 @@ is_dynamic_type_internal (struct type *type, int top_level)
+@@ -1972,10 +1973,10 @@ is_dynamic_type_internal (struct type *type, int top_level)
+ 		|| is_dynamic_type_internal (TYPE_TARGET_TYPE (type), 0));
        }
  
+-    case TYPE_CODE_STRING:
+       /* Strings are very much like an array of characters, and can be
+ 	 treated as one here.  */
      case TYPE_CODE_ARRAY:
 +    case TYPE_CODE_STRING:
        {
  	gdb_assert (TYPE_NFIELDS (type) == 1);
  
-@@ -2058,7 +2060,8 @@ resolve_dynamic_array (struct type *type,
-   struct dynamic_prop *prop;
-   unsigned int bit_stride = 0;
- 
--  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY);
-+  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY
-+	      || TYPE_CODE (type) == TYPE_CODE_STRING);
- 
-   type = copy_type (type);
- 
-@@ -2083,11 +2086,15 @@ resolve_dynamic_array (struct type *type,
+@@ -2139,11 +2140,15 @@ resolve_dynamic_array_or_string (struct type *type,
  
    ary_dim = check_typedef (TYPE_TARGET_TYPE (elt_type));
  
 -  if (ary_dim != NULL && TYPE_CODE (ary_dim) == TYPE_CODE_ARRAY)
 +  if (ary_dim != NULL && (TYPE_CODE (ary_dim) == TYPE_CODE_ARRAY
 +      || TYPE_CODE (ary_dim) == TYPE_CODE_STRING))
-     elt_type = resolve_dynamic_array (ary_dim, addr_stack);
+     elt_type = resolve_dynamic_array_or_string (ary_dim, addr_stack);
    else
      elt_type = TYPE_TARGET_TYPE (type);
  
@@ -446,7 +470,7 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
    prop = get_dyn_prop (DYN_PROP_BYTE_STRIDE, type);
    if (prop != NULL)
      {
-@@ -2239,6 +2246,28 @@ resolve_dynamic_struct (struct type *type,
+@@ -2295,6 +2300,28 @@ resolve_dynamic_struct (struct type *type,
    return resolved_type;
  }
  
@@ -475,19 +499,16 @@ diff --git a/gdb/gdbtypes.c b/gdb/gdbtypes.c
  /* Worker for resolved_dynamic_type.  */
  
  static struct type *
-@@ -2287,7 +2316,12 @@ resolve_dynamic_type_internal (struct type *type,
- 	    break;
- 	  }
- 
+@@ -2349,6 +2376,9 @@ resolve_dynamic_type_internal (struct type *type,
+ 	case TYPE_CODE_ARRAY:
+ 	  resolved_type = resolve_dynamic_array_or_string (type, addr_stack);
+ 	  break;
 +        case TYPE_CODE_PTR:
 + 	  resolved_type = resolve_dynamic_pointer (type, addr_stack);
 + 	  break;
-+
- 	case TYPE_CODE_ARRAY:
-+	case TYPE_CODE_STRING:
- 	  resolved_type = resolve_dynamic_array (type, addr_stack);
- 	  break;
  
+ 	case TYPE_CODE_RANGE:
+ 	  resolved_type = resolve_dynamic_range (type, addr_stack);
 diff --git a/gdb/testsuite/gdb.cp/vla-cxx.cc b/gdb/testsuite/gdb.cp/vla-cxx.cc
 --- a/gdb/testsuite/gdb.cp/vla-cxx.cc
 +++ b/gdb/testsuite/gdb.cp/vla-cxx.cc
@@ -777,7 +798,7 @@ diff --git a/gdb/testsuite/gdb.fortran/print_type.exp b/gdb/testsuite/gdb.fortra
 --- a/gdb/testsuite/gdb.fortran/print_type.exp
 +++ b/gdb/testsuite/gdb.fortran/print_type.exp
 @@ -1,5 +1,6 @@
- # Copyright 2019 Free Software Foundation, Inc.
+ # Copyright 2019-2020 Free Software Foundation, Inc.
  #
 +
  # This program is free software; you can redistribute it and/or modify

@@ -243,7 +243,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  #include "libbfd.h"
  #include "objfiles.h"
  #include "observable.h"
-@@ -701,8 +702,359 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
+@@ -698,8 +699,359 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
    return result;
  }
  
@@ -604,7 +604,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
     avoidance.  */
  
  struct missing_filepair
-@@ -756,11 +1108,17 @@ missing_filepair_change (void)
+@@ -753,11 +1105,17 @@ missing_filepair_change (void)
        /* All their memory came just from missing_filepair_OBSTACK.  */
        missing_filepair_hash = NULL;
      }
@@ -622,7 +622,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
    missing_filepair_change ();
  }
  
-@@ -827,14 +1185,39 @@ debug_print_missing (const char *binary, const char *debug)
+@@ -824,14 +1182,38 @@ debug_print_missing (const char *binary, const char *debug)
  
    *slot = missing_filepair;
  
@@ -631,14 +631,13 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +#ifdef HAVE_LIBRPM
 +  if (missing_exec == MISSING_EXEC_NOT_TRIED)
 +    {
-+      char *execfilename;
++      const char *execfilename = get_exec_file (0);
  
 -  fprintf_unfiltered (gdb_stdlog,
 -		      _("Missing separate debuginfo for %s\n"), binary);
 -  if (debug != NULL)
 -    fprintf_unfiltered (gdb_stdlog, _("Try to install the hash file %s\n"),
 -			debug);
-+      execfilename = get_exec_file (0);
 +      if (execfilename != NULL)
 +	{
 +	  if (missing_rpm_enlist (execfilename) == 0)
@@ -672,7 +671,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 diff --git a/gdb/config.in b/gdb/config.in
 --- a/gdb/config.in
 +++ b/gdb/config.in
-@@ -33,6 +33,9 @@
+@@ -36,6 +36,9 @@
  /* Define to BFD's default target vector. */
  #undef DEFAULT_BFD_VEC
  
@@ -682,7 +681,7 @@ diff --git a/gdb/config.in b/gdb/config.in
  /* Define to 1 if translation of program messages to the user's native
     language is requested. */
  #undef ENABLE_NLS
-@@ -246,6 +249,9 @@
+@@ -245,6 +248,9 @@
  /* Define if you have the mpfr library. */
  #undef HAVE_LIBMPFR
  
@@ -695,7 +694,7 @@ diff --git a/gdb/config.in b/gdb/config.in
 diff --git a/gdb/configure b/gdb/configure
 --- a/gdb/configure
 +++ b/gdb/configure
-@@ -756,6 +756,11 @@ CODESIGN_CERT
+@@ -761,6 +761,11 @@ CODESIGN_CERT
  HAVE_NATIVE_GCORE_TARGET
  TARGET_OBS
  subdirs
@@ -707,7 +706,7 @@ diff --git a/gdb/configure b/gdb/configure
  GDB_DATADIR
  DEBUGDIR
  MAKEINFO_EXTRA_FLAGS
-@@ -859,6 +864,7 @@ with_gdb_datadir
+@@ -864,6 +869,7 @@ with_gdb_datadir
  with_relocated_sources
  with_auto_load_dir
  with_auto_load_safe_path
@@ -715,7 +714,7 @@ diff --git a/gdb/configure b/gdb/configure
  enable_targets
  enable_64_bit_bfd
  enable_gdbmi
-@@ -921,6 +927,11 @@ CCC
+@@ -926,6 +932,11 @@ CCC
  CPP
  MAKEINFO
  MAKEINFOFLAGS
@@ -727,7 +726,7 @@ diff --git a/gdb/configure b/gdb/configure
  YACC
  YFLAGS
  XMKMF'
-@@ -1593,6 +1604,8 @@ Optional Packages:
+@@ -1598,6 +1609,8 @@ Optional Packages:
                            [--with-auto-load-dir]
    --without-auto-load-safe-path
                            do not restrict auto-loaded files locations
@@ -736,7 +735,7 @@ diff --git a/gdb/configure b/gdb/configure
    --with-libunwind-ia64   use libunwind frame unwinding for ia64 targets
    --with-curses           use the curses library instead of the termcap
                            library
-@@ -1656,6 +1669,13 @@ Some influential environment variables:
+@@ -1661,6 +1674,13 @@ Some influential environment variables:
    MAKEINFO    Parent configure detects if it is of sufficient version.
    MAKEINFOFLAGS
                Parameters for MAKEINFO.
@@ -750,7 +749,7 @@ diff --git a/gdb/configure b/gdb/configure
    YACC        The `Yet Another Compiler Compiler' implementation to use.
                Defaults to the first program found out of: `bison -y', `byacc',
                `yacc'.
-@@ -6515,6 +6535,494 @@ _ACEOF
+@@ -6587,6 +6607,494 @@ _ACEOF
  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_auto_load_safe_path" >&5
  $as_echo "$with_auto_load_safe_path" >&6; }
  
@@ -1448,30 +1447,18 @@ diff --git a/gdb/configure.ac b/gdb/configure.ac
  AC_CONFIG_SUBDIRS(testsuite)
  
  # Check whether to support alternative target configurations
-diff --git a/gdb/corelow.c b/gdb/corelow.c
---- a/gdb/corelow.c
-+++ b/gdb/corelow.c
-@@ -363,7 +363,7 @@ build_id_locate_exec (int from_tty)
-         symfile_objfile->flags |= OBJF_BUILD_ID_CORE_LOADED;
-     }
-   else
--    debug_print_missing (_("the main executable file"), build_id_filename);
-+    debug_print_missing (BUILD_ID_MAIN_EXECUTABLE_FILENAME, build_id_filename);
- 
-   /* No automatic SOLIB_ADD as the libraries would get read twice.  */
- }
 diff --git a/gdb/event-top.c b/gdb/event-top.c
 --- a/gdb/event-top.c
 +++ b/gdb/event-top.c
-@@ -40,6 +40,7 @@
- #include "gdbsupport/buffer.h"
+@@ -41,6 +41,7 @@
  #include "ser-event.h"
  #include "gdb_select.h"
+ #include "gdbsupport/gdb-sigmask.h"
 +#include "symfile.h"
  
  /* readline include files.  */
  #include "readline/readline.h"
-@@ -362,6 +363,8 @@ display_gdb_prompt (const char *new_prompt)
+@@ -363,6 +364,8 @@ display_gdb_prompt (const char *new_prompt)
    /* Reset the nesting depth used when trace-commands is set.  */
    reset_command_nest_depth ();
  
@@ -1480,7 +1467,7 @@ diff --git a/gdb/event-top.c b/gdb/event-top.c
    /* Do not call the python hook on an explicit prompt change as
       passed to this function, as this forms a secondary/local prompt,
       IE, displayed but not set.  */
-@@ -771,7 +774,10 @@ command_line_handler (gdb::unique_xmalloc_ptr<char> &&rl)
+@@ -772,7 +775,10 @@ command_line_handler (gdb::unique_xmalloc_ptr<char> &&rl)
        command_handler (cmd);
  
        if (ui->prompt_state != PROMPTED)
