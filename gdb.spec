@@ -35,7 +35,7 @@ Version: 9.0.90.%{snapsrc}
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -241,7 +241,7 @@ BuildRequires: texlive-collection-latexrecommended
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
-#BuildRequires: guile-devel%{buildisa}
+BuildRequires: guile-devel%{buildisa}
 %endif
 %global have_libipt 0
 %if 0%{!?rhel:1} || 0%{?rhel} > 7 || (0%{?rhel} == 7 && 0%{?scl:1})
@@ -541,7 +541,6 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--disable-rpath						\
 	--without-stage1-ldflags				\
 	--disable-libmcheck					\
-	--without-guile						\
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 	--with-system-readline					\
 %else
@@ -689,6 +688,11 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--with-python=%{__python}				\
 %else
 	--without-python					\
+%endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+	--with-guile						\
+%else
+	--without-guile						\
 %endif
 %if %{have_inproctrace}
 	--enable-inprocess-agent				\
@@ -1146,6 +1150,9 @@ fi
 %endif
 
 %changelog
+* Tue Feb  4 2020 Dan Čermák <dan.cermak@cgc-instruments.com> - 9.0.90.20200203-5
+- Re-enable guile support.
+
 * Mon Feb  3 2020 Sergio Durigan Junior <sergiodj@redhat.com> - 9.0.90.20200203-4
 - Rebase to FSF GDB 9.0.90.20200203 (9.1pre).
 - Bump 'snapgnulib' date.
