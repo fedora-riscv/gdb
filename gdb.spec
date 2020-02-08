@@ -27,21 +27,21 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20200203
+%global snapsrc    20200208
 # See timestamp of source gnulib installed into gnulib/ .
 %global snapgnulib 20191216
 %global tarname gdb-%{version}
-Version: 9.0.90.%{snapsrc}
+Version: 9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
 # ftp://sourceware.org/pub/gdb/releases/FIXME{tarname}.tar.xz
-Source: %{tarname}.tar.xz
-#Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
+#Source: %{tarname}.tar.xz
+Source: ftp://sourceware.org/pub/gdb/releases/%{tarname}.tar.xz
 URL: https://gnu.org/software/gdb/
 
 # For our convenience
@@ -1150,6 +1150,9 @@ fi
 %endif
 
 %changelog
+* Sat Feb  8 2020 Sergio Durigan Junior <sergiodj@redhat.com> - 9.1-1
+- Rebase to FSF GDB 9.1.
+
 * Tue Feb  4 2020 Dan Čermák <dan.cermak@cgc-instruments.com> - 9.0.90.20200203-5
 - Re-enable guile support.
 
