@@ -35,7 +35,7 @@ Version: 9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -261,6 +261,7 @@ BuildRequires: libipt-devel%{buildisa}
 BuildRequires: mpfr-devel%{buildisa}
 %endif
 BuildRequires: source-highlight-devel
+BuildRequires: xxhash-devel
 
 %if 0%{?_with_testsuite:1}
 
@@ -703,6 +704,9 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 	--with-intel-pt						\
 %else
 	--without-intel-pt					\
+%endif
+%if 0%{!?rhel:1} || 0%{?rhel} > 8
+	--with-xxhash						\
 %endif
 	--with-rpm=librpm.so.%{librpmver}			\
 	--enable-unit-tests"
@@ -1150,6 +1154,9 @@ fi
 %endif
 
 %changelog
+* Mon Feb 10 2020 Sergio Durigan Junior <sergiodj@redhat.com> - 9.1-2
+- Enable libxxhash during build.
+
 * Sat Feb  8 2020 Sergio Durigan Junior <sergiodj@redhat.com> - 9.1-1
 - Rebase to FSF GDB 9.1.
 
