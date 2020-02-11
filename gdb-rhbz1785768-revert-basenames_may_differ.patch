@@ -1,0 +1,81 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Tom Tromey <tom@tromey.com>
+Date: Mon, 10 Feb 2020 16:04:30 -0500
+Subject: gdb-rhbz1785768-revert-basenames_may_differ.patch
+
+;; "Fix" "Paths for breakpoints are not resolved" (Tom Tromey, RHBZ
+;; 1785768).
+
+commit 76f5096cd444948843f5bf65eee33c32881d6332
+Author: Tom Tromey <tromey@adacore.com>
+Date:   Wed Feb 5 10:53:44 2020 +0100
+
+    Revert basenames_may_differ patch
+
+    Commit a0c1ffedc regressed certain cases coming from Eclipse.
+    See PR breakpoints/24915.
+
+    This patch reverts the commit for the gdb 9 release.
+
+    gdb/ChangeLog
+    2020-02-07  Tom Tromey  <tromey@adacore.com>
+
+            PR breakpoints/24915:
+            * source.c (find_and_open_source): Do not check basenames_may_differ.
+
+    gdb/testsuite/ChangeLog
+    2020-02-07  Tom Tromey  <tromey@adacore.com>
+
+            PR breakpoints/24915:
+            * gdb.base/annotate-symlink.exp: Use setup_xfail.
+
+    Change-Id: Iadbf42f35eb40c95ad32b2108ae25d8f199998bd
+
+diff --git a/gdb/source.c b/gdb/source.c
+--- a/gdb/source.c
++++ b/gdb/source.c
+@@ -982,10 +982,7 @@ find_and_open_source (const char *filename,
+       result = gdb_open_cloexec (fullname->get (), OPEN_MODE, 0);
+       if (result >= 0)
+ 	{
+-	  if (basenames_may_differ)
+-	    *fullname = gdb_realpath (fullname->get ());
+-	  else
+-	    *fullname = gdb_abspath (fullname->get ());
++	  *fullname = gdb_realpath (fullname->get ());
+ 	  return scoped_fd (result);
+ 	}
+ 
+@@ -1029,16 +1026,15 @@ find_and_open_source (const char *filename,
+   if (rewritten_filename != NULL)
+     filename = rewritten_filename.get ();
+ 
+-  openp_flags flags = OPF_SEARCH_IN_PATH;
+-  if (basenames_may_differ)
+-    flags |= OPF_RETURN_REALPATH;
+-  result = openp (path, flags, filename, OPEN_MODE, fullname);
++  result = openp (path, OPF_SEARCH_IN_PATH | OPF_RETURN_REALPATH, filename,
++		  OPEN_MODE, fullname);
+   if (result < 0)
+     {
+       /* Didn't work.  Try using just the basename.  */
+       p = lbasename (filename);
+       if (p != filename)
+-	result = openp (path, flags, p, OPEN_MODE, fullname);
++	result = openp (path, OPF_SEARCH_IN_PATH | OPF_RETURN_REALPATH, p,
++			OPEN_MODE, fullname);
+     }
+ 
+   return scoped_fd (result);
+diff --git a/gdb/testsuite/gdb.base/annotate-symlink.exp b/gdb/testsuite/gdb.base/annotate-symlink.exp
+--- a/gdb/testsuite/gdb.base/annotate-symlink.exp
++++ b/gdb/testsuite/gdb.base/annotate-symlink.exp
+@@ -47,5 +47,8 @@ gdb_breakpoint func message
+ 
+ gdb_test_no_output "set annotate 1"
+ 
++# The patch to cause this output was reverted.
++# See PR breakpoints/24915.
++setup_xfail *-*-* 24915
+ gdb_test "continue" \
+     "Breakpoint .* func .*realname-expand-link.c:$decimal\r\n\032\032.*realname-expand-link.c:.*"
