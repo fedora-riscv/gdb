@@ -243,7 +243,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  #include "libbfd.h"
  #include "objfiles.h"
  #include "observable.h"
-@@ -698,8 +699,359 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
+@@ -698,8 +699,374 @@ build_id_to_filename (const struct bfd_build_id *build_id, char **link_return)
    return result;
  }
  
@@ -541,6 +541,22 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
 +  std::sort (array.begin (), array.end (), missing_rpm_list_compar);
 +
++  /* We zero out the number of missing RPMs here because of a nasty
++     bug (see RHBZ 1801974).
++
++     When we call 'puts_unfiltered' below, if pagination is on and if
++     the number of missing RPMs is big enough to trigger pagination,
++     we will end up in an infinite recursion.  The call chain looks
++     like this:
++
++     missing_rpm_list_print -> puts_unfiltered -> fputs_maybe_filtered
++     -> prompt_for_continue -> display_gdb_prompt ->
++     debug_flush_missing -> missing_rpm_list_print ...
++
++     For this reason, we make sure MISSING_RPM_LIST_ENTRIES is zero
++     *before* calling any print function.  */
++  missing_rpm_list_entries = 0;
++
 +  printf_unfiltered (_("Missing separate debuginfos, use: %s"),
 +#ifdef DNF_DEBUGINFO_INSTALL
 +		     "dnf "
@@ -548,10 +564,10 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +		     "debuginfo-install");
 +  for (const char *el : array)
 +    {
-+      putchar_unfiltered (' ');
++      puts_unfiltered (" ");
 +      puts_unfiltered (el);
 +    }
-+  putchar_unfiltered ('\n');
++  puts_unfiltered ("\n");
 +
 +  while (missing_rpm_list != NULL)
 +    {
@@ -559,7 +575,6 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +      missing_rpm_list = list_iter->next;
 +      xfree (list_iter);
 +    }
-+  missing_rpm_list_entries = 0;
 +}
 +
 +static void
@@ -604,7 +619,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
     avoidance.  */
  
  struct missing_filepair
-@@ -753,11 +1105,17 @@ missing_filepair_change (void)
+@@ -753,11 +1120,17 @@ missing_filepair_change (void)
        /* All their memory came just from missing_filepair_OBSTACK.  */
        missing_filepair_hash = NULL;
      }
@@ -622,7 +637,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
    missing_filepair_change ();
  }
  
-@@ -824,14 +1182,38 @@ debug_print_missing (const char *binary, const char *debug)
+@@ -824,14 +1197,38 @@ debug_print_missing (const char *binary, const char *debug)
  
    *slot = missing_filepair;
  
