@@ -584,7 +584,7 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
     --without-expat \
     --disable-tui \
     --without-python \
-    --wihout-guile \
+    --without-guile \
     --disable-inprocess-agent \
     --without-intel-pt \
     --disable-unit-tests \
