@@ -11,9 +11,6 @@
 #                 workload gets run it decreases the general performance now.
 # --define 'scl somepkgname': Independent packages by scl-utils-build.
 
-# https://bugzilla.redhat.com/show_bug.cgi?id=1829702
-%global _without_python 1
-
 %{?scl:%scl_package gdb}
 %{!?scl:
  %global pkg_name %{name}
@@ -38,7 +35,7 @@ Version: 9.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1158,6 +1155,10 @@ fi
 %endif
 
 %changelog
+* Fri Jun  5 2020 Keith Seitz <keiths@redhat.com> - 9.1-8
+- Add patch for Python 3.9 and re-enable python.
+- Update generate-*.sh to include stgit support.
+
 * Thu May 21 2020 Miro Hrončok <mhroncok@redhat.com> - 9.1-7
 - Disable Python support to workaround problems with Python 3.9 (RHBZ 1829702)
 

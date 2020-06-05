@@ -52,6 +52,13 @@ done
 
 cd $1
 
+# If patches were uncommitted when the patches were applied,
+# make sure that we're sitting at the top-most patch.  Otherwise
+# we'll only add patches up to the current top patch.
+# It's safe to just assume stgit was used -- the push will simply
+# fail.
+stg push --all > /dev/null 2>&1
+
 git name-rev $commit_or_tag
 test $? -eq 0 || die "Could not find $commit_or_tag in the repository.  Did you run 'git fetch'?"
 
