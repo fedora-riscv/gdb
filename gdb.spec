@@ -11,6 +11,9 @@
 #                 workload gets run it decreases the general performance now.
 # --define 'scl somepkgname': Independent packages by scl-utils-build.
 
+# Turn off the brp-python-bytecompile automagic
+%global _python_bytecompile_extra 0
+
 %{?scl:%scl_package gdb}
 %{!?scl:
  %global pkg_name %{name}
@@ -31,11 +34,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gnulib/ .
 %global snapgnulib 20191216
 %global tarname gdb-%{version}
-Version: 9.1
+Version: 9.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -199,9 +202,9 @@ Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
-Source8: _gdb.spec.Patch.include
-Source9: _gdb.spec.patch.include
-%include %{SOURCE8}
+Patch9998: _gdb.spec.Patch.include
+Patch9999: _gdb.spec.patch.include
+%include %{PATCH9998}
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # RL_STATE_FEDORA_GDB would not be found for:
@@ -463,7 +466,7 @@ find -name "*.info*"|xargs rm -f
 
 # Include the auto-generated "%patch" directives.
 # See README.local-patches for more details.
-%include %{SOURCE9}
+%include %{PATCH9999}
 
 %if 0%{!?el6:1}
 for i in \
@@ -950,6 +953,11 @@ for pyo in "" "-O";do
 done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
+# Compile python files
+%if 0%{!?_without_python:1}
+%py_byte_compile %{__python3} %{buildroot}%{_datadir}/gdb/python/gdb
+%endif
+
 %if 0%{!?_without_python:1}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 # BZ 999645: /usr/share/gdb/auto-load/ needs filesystem symlinks
@@ -1155,6 +1163,12 @@ fi
 %endif
 
 %changelog
+* Tue Jun  9 2020 Keith Seitz <keiths@redhat.com> - 9.2-1
+- Rebase to FSF GDB 9.2.
+- Add explicit python bytecode compilation.
+- Change included files to patches to quell error from rpminspect.
+- Fix attach-32.exp from gdb-6.3-inferior-notification-20050721.patch.
+
 * Fri Jun  5 2020 Keith Seitz <keiths@redhat.com> - 9.1-8
 - Add patch for Python 3.9 and re-enable python.
 - Update generate-*.sh to include stgit support.

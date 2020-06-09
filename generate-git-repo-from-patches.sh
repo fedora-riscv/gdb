@@ -55,11 +55,18 @@ cd $1
 git name-rev $last_ancestor_commit
 test $? -eq 0 || die "Could not find $last_ancestor_commit in the repository $1.  Did you run 'git fetch'?"
 
-# Create a branch for the checkout; use the distro name in
-# the name of this branch.
 f=`cd .. && pwd`
-name=devel-`basename $f`
-git checkout -b $name $last_ancestor_commit
+
+# Create a branch for the checkout if using stgit; use the distro name in
+# the name of this branch.
+if (($uncommit)); then
+    name=devel-`basename $f`
+    branch="-b $name"
+else
+    branch=""
+fi
+git checkout $branch $last_ancestor_commit
+
 echo "Applying patches..."
 for p in `cat ../_patch_order` ; do
     git am ../$p
