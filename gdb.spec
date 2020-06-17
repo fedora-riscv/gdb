@@ -1,7 +1,3 @@
-# This package depends on automagic byte compilation
-# https://fedoraproject.org/wiki/Changes/No_more_automagic_Python_bytecompilation_phase_2
-%global _python_bytecompile_extra 1
-
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
 # --with buildisa: Use %%{?_isa} for BuildRequires
@@ -38,7 +34,7 @@ Version: 9.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -264,7 +260,10 @@ BuildRequires: libipt-devel%{buildisa}
 BuildRequires: mpfr-devel%{buildisa}
 %endif
 BuildRequires: source-highlight-devel
+%if 0%{!?rhel:1} || 0%{?rhel} > 8
 BuildRequires: xxhash-devel
+%endif
+BuildRequires: elfutils-debuginfod-client-devel
 
 %if 0%{?_with_testsuite:1}
 
@@ -376,6 +375,7 @@ BuildRequires: xz
 BuildRequires: rust
 %endif
 
+BuildRequires: %{?scl_prefix}elfutils-debuginfod
 %endif # 0%{?_with_testsuite:1}
 
 %{?scl:Requires:%scl_runtime}
@@ -565,7 +565,8 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--with-lzma						\
 %else
 	--without-lzma						\
-%endif
+%endif                                                          \
+        --with-debuginfod
 "
 
 # Identify the build directory with the version of gdb as well as the
@@ -1163,6 +1164,9 @@ fi
 %endif
 
 %changelog
+* Wed  Jun 17 2020 Keith Seitz <keiths@redhat.com> - 9.2-2
+- Backport debuginfod support.
+
 * Tue Jun  9 2020 Keith Seitz <keiths@redhat.com> - 9.2-1
 - Rebase to FSF GDB 9.2.
 - Add explicit python bytecode compilation.
