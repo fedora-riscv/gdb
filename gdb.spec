@@ -131,7 +131,7 @@ Recommends: default-yama-scope
 %else
 %global librpmver 7
 %endif
-%if 0%{?fedora} >= 31
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
 %global librpmver 9
 %endif
 %endif
