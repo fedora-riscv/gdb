@@ -34,7 +34,7 @@ Version: 9.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -154,6 +154,8 @@ Recommends: %{librpmname}
 BuildRequires: %{?scl_prefix}gcc-c++
 %endif
 
+BuildRequires: autoconf
+
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
 
@@ -195,6 +197,14 @@ Patch1142: v1.5-libipt-static.patch
 #Patch1075: gdb-testsuite-readline63-sigint.patch
 ##=fedoratest
 Patch1119: gdb-testsuite-readline63-sigint-revert.patch
+
+# Fix broken configure tests compromised by LTO
+#push=Should be pushed upstream.
+Patch2000: gdb-config.patch
+
+# Fix type mismatch issue exposed by LTO
+#push=Should be pushed upstream.
+Patch2001: gdb-ltofix.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
@@ -482,6 +492,18 @@ done
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 %patch1119 -p1
 %endif
+
+%patch2000 -p1
+%patch2001 -p1
+
+# The above patches twiddle a .m4 file for configure, so update the affected
+# configure files
+pushd libiberty
+autoconf -f
+popd
+pushd intl
+autoconf -f
+popd
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1164,6 +1186,10 @@ fi
 %endif
 
 %changelog
+* Mon Jul 20 2020 Jeff Law <lawb@redhat.com> - 9.2-3
+- Fix broken configure tests compromised by LTO
+- Add BuildRequires: autoconf
+
 * Wed  Jun 17 2020 Keith Seitz <keiths@redhat.com> - 9.2-2
 - Backport debuginfod support.
 
