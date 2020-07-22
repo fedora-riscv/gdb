@@ -34,7 +34,7 @@ Version: 9.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -635,10 +635,10 @@ export CXXFLAGS="$CFLAGS"
 %endif
 
 # Prepare gdb/config.h first.
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
+%make_build CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
 perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
 
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
+%make_build CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
 
 cd ..
 %endif # 0%{?_build_minimal}
@@ -754,12 +754,12 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 if [ -z "%{!?_with_profile:no}" ]
 then
   # Run all the configure tests being incompatible with $FPROFILE_CFLAGS.
-  make %{?_smp_mflags} configure-host configure-target
-  make %{?_smp_mflags} clean
+  %make_build configure-host configure-target
+  %make_build clean
 
   # Workaround -fprofile-use:
   # linux-x86-low.c:2225: Error: symbol `start_i386_goto' is already defined
-  make %{?_smp_mflags} -C gdb/gdbserver linux-x86-low.o
+  %make_build -C gdb/gdbserver linux-x86-low.o
 fi
 
 # Global CFLAGS would fail on:
@@ -784,10 +784,10 @@ else
 fi
 
 # Prepare gdb/config.h first.
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
+%make_build CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1 maybe-configure-gdb
 perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config.status
 
-make %{?_smp_mflags} CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
+%make_build CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
 
 ! grep '_RELOCATABLE.*1' gdb/config.h
 grep '^#define HAVE_LIBSELINUX 1$' gdb/config.h
@@ -809,7 +809,7 @@ done	# fprofile
 
 cd %{gdb_build}
 
-make %{?_smp_mflags} \
+%make_build \
      -C gdb/doc {gdb,annotate}{.info,/index.html,.pdf} MAKEHTMLFLAGS=--no-split MAKEINFOFLAGS=--no-split V=1
 
 # Copy the <sourcetree>/gdb/NEWS file to the directory above it.
@@ -882,7 +882,7 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   # See also: gdb-runtest-pie-override.exp
   ###CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
 
-  ./orphanripper make %{?_smp_mflags} -k $CHECK || :
+  ./orphanripper %make_build -k $CHECK || :
 )
 for t in sum log
 do
@@ -906,7 +906,7 @@ echo ====================TESTING END=====================
 cd %{gdb_build_minimal}
 rm -rf $RPM_BUILD_ROOT
 
-make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
+%make_install %{?_smp_mflags}
 
 # Delete everything except the 'gdb' binary, and then rename it to
 # 'gdb.minimal'.
@@ -932,7 +932,7 @@ rm -rf $RPM_BUILD_ROOT
 %{?scl:PATH=%{_bindir}${PATH:+:${PATH}}}
 %endif
 
-make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
+%make_install %{?_smp_mflags}
 
 %if 0%{!?scl:1}
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/libexec
@@ -1186,6 +1186,10 @@ fi
 %endif
 
 %changelog
+* Wed Jul 22 2020 Tom Stellard <tstellar@redhat.com>
+- Use make macros
+- https://fedoraproject.org/wiki/Changes/UseMakeBuildInstallMacro
+
 * Mon Jul 20 2020 Jeff Law <lawb@redhat.com> - 9.2-3
 - Fix broken configure tests compromised by LTO
 - Add BuildRequires: autoconf
