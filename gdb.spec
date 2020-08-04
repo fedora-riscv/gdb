@@ -186,7 +186,7 @@ Source5: %{libstdcxxpython}.tar.xz
 Source6: gdbtui
 
 # libipt: Intel Processor Trace Decoder Library
-%global libipt_version 2.0.1
+%global libipt_version 2.0.2
 #=fedora
 Source7: v%{libipt_version}.tar.gz
 #=fedora
@@ -1186,6 +1186,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug 04 2020 Keith Seitz <keiths@redhat.com>
+- Update libipt to v2.0.2.
+
 * Sat Aug 01 2020 Fedora Release Engineering <releng@fedoraproject.org>
 - Second attempt - Rebuilt for
   https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
