@@ -10,6 +10,9 @@
 # Turn off the brp-python-bytecompile automagic
 %global _python_bytecompile_extra 0
 
+# Disable LTO until upstream fixes GDB's ODR woes.
+#%define _lto_cflags %{nil}
+
 %{?scl:%scl_package gdb}
 %{!?scl:
  %global pkg_name %{name}
@@ -1186,6 +1189,9 @@ fi
 %endif
 
 %changelog
+* Mon Aug 10 2020 Keith Seitz <keiths@redhat.com>
+- Disable LTO until upstream sorts out ODR problems.
+
 * Tue Aug 04 2020 Keith Seitz <keiths@redhat.com>
 - Update libipt to v2.0.2.
 
