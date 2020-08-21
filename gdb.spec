@@ -37,7 +37,7 @@ Version: 9.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 7%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1189,6 +1189,10 @@ fi
 %endif
 
 %changelog
+* Thu Aug 20 2020 Kevin Buettner <kevinb@redhat.com> - 9.1-6
+- Backport patches fixing abort when working directory is deleted.
+  (RHBZ 1869484, Sergio Durigan Junior)
+
 * Mon Aug 10 2020 Keith Seitz <keiths@redhat.com>
 - Disable LTO until upstream sorts out ODR problems.
 
