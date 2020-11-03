@@ -1184,7 +1184,7 @@ fi
 %endif
 
 %changelog
-* Fri Oct 30 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-1
+* Tue Nov 03 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-1
 - Rebase to FSF GDB 10.1.
 - Bump 'snapgnulib' date.
 - Drop gdb-rhbz1818011-bfd-gcc10-error.patch.
@@ -1195,6 +1195,9 @@ fi
 - Drop gdb-rhbz1869484-deleted-working-directory.
 - Adjust build-id related patches.
 - Ajust VLA patches.
+
+* Mon Nov  2 2020 Keith Seitz <keiths@redhat.com> - 9.2-8
+ - Fix missing debuginfo messages. (RH BZ 1887025)
 
 * Thu Aug 20 2020 Kevin Buettner <kevinb@redhat.com> - 9.1-6
 - Backport patches fixing abort when working directory is deleted.
