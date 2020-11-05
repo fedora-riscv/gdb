@@ -31,13 +31,13 @@ Name: %{?scl_prefix}gdb
 # Freeze it when GDB gets branched
 %global snapsrc    20200208
 # See timestamp of source gnulib installed into gnulib/ .
-%global snapgnulib 20191216
+%global snapgnulib 20200630
 %global tarname gdb-%{version}
-Version: 9.2
+Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -204,10 +204,6 @@ Patch1119: gdb-testsuite-readline63-sigint-revert.patch
 # Fix broken configure tests compromised by LTO
 #push=Should be pushed upstream.
 Patch2000: gdb-config.patch
-
-# Fix type mismatch issue exposed by LTO
-#push=Should be pushed upstream.
-Patch2001: gdb-ltofix.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
@@ -497,7 +493,6 @@ done
 %endif
 
 %patch2000 -p1
-%patch2001 -p1
 
 # The above patches twiddle a .m4 file for configure, so update the affected
 # configure files
@@ -1189,6 +1184,18 @@ fi
 %endif
 
 %changelog
+* Wed Nov 04 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-1
+- Rebase to FSF GDB 10.1.
+- Bump 'snapgnulib' date.
+- Drop gdb-rhbz1818011-bfd-gcc10-error.patch.
+- Drop gdb-rhbz1822715-fix-python-deprecation.patch.
+- Drop gdb-rhbz1829702-fix-python39.patch.
+- Drop gdb-rhbz1838777-debuginfod.patch.
+- Drop gdb-rhbz1844458-use-fputX_unfiltered.patch.
+- Drop gdb-rhbz1869484-deleted-working-directory.
+- Adjust build-id related patches.
+- Ajust VLA patches.
+
 * Mon Nov  2 2020 Kevin Buettner <kevinb@redhat.com> - 9.2-8
 - Backport patches fixing abort when working directory is deleted.
   (RHBZ 1869484, Sergio Durigan Junior)
