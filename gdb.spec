@@ -1184,9 +1184,8 @@ fi
 %endif
 
 %changelog
-* Mon Dec 07 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-2
-- Bump release number to avoid lower NVR (for rawhide) than that of F33.
-  (RHBZ 1894912)
+* Wed Dec 09 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-2
+- Fix off-by-one error in ada_fold_name. (RHBZ 1905996, Kevin Buettner)
 
 * Wed Nov 04 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-1
 - Rebase to FSF GDB 10.1.
