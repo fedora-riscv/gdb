@@ -386,6 +386,7 @@ BuildRequires: rust
 
 BuildRequires: %{?scl_prefix}elfutils-debuginfod
 %endif # 0%{?_with_testsuite:1}
+BuildRequires: make
 
 %{?scl:Requires:%scl_runtime}
 
