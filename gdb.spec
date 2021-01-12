@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -269,7 +269,7 @@ BuildRequires: libipt-devel%{buildisa}
 BuildRequires: mpfr-devel%{buildisa}
 %endif
 BuildRequires: source-highlight-devel
-%if 0%{!?rhel:1} || 0%{?rhel} > 8
+%if 0%{!?rhel:1}
 BuildRequires: xxhash-devel
 %endif
 BuildRequires: elfutils-debuginfod-client-devel
@@ -731,7 +731,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-intel-pt					\
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 8
+%if 0%{!?rhel:1}
 	--with-xxhash						\
 %endif
 	--with-rpm=librpm.so.%{librpmver}			\
@@ -1185,6 +1185,9 @@ fi
 %endif
 
 %changelog
+* Tue Jan 12 2021 Keith Seitz <keiths@redhat.com> - 10.1-3
+- Disable xxhash support for RHEL.
+
 * Wed Dec 09 2020 Kevin Buettner <kevinb@redhat.com> - 10.1-2
 - Fix off-by-one error in ada_fold_name. (RHBZ 1905996, Kevin Buettner)
 
