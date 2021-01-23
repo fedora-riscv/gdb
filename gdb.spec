@@ -618,6 +618,10 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 
+# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1912913
+# Take this out when fixed in gcc/g++.
+CFLAGS="$CFLAGS -Wno-stringop-overread"
+
 export CXXFLAGS="$CFLAGS"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
@@ -648,6 +652,10 @@ cd %{gdb_build}$fprofile
 
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
+
+# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1912913
+# Take this out when fixed in gcc/g++.
+CFLAGS="$CFLAGS -Wno-stringop-overread"
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
@@ -1185,6 +1193,10 @@ fi
 %endif
 
 %changelog
+* Sat Jan 23 2021 Kevin Buettner <kevinb@redhat.com>
+- Add -Wno-stringop-overread to CFLAGS to work around gcc
+  bug (RH BZ 1912913)
+
 * Tue Jan 12 2021 Keith Seitz <keiths@redhat.com> - 10.1-3
 - Disable xxhash support for RHEL.
 
