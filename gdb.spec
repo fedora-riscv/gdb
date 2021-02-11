@@ -249,7 +249,9 @@ BuildRequires: texlive-collection-latexrecommended
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
+%if 0%{?rhel} < 9
 BuildRequires: guile-devel%{buildisa}
+%endif
 %endif
 %global have_libipt 0
 %if 0%{!?rhel:1} || 0%{?rhel} > 7 || (0%{?rhel} == 7 && 0%{?scl:1})
@@ -724,7 +726,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %else
 	--without-python					\
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%if 0%{!?rhel:1} || 0%{?rhel} == 8
 	--with-guile						\
 %else
 	--without-guile						\
@@ -1193,6 +1195,9 @@ fi
 %endif
 
 %changelog
+* Thu Feb 11 2021 Keith Seitz
+- Disable Guile support for RHEL9+.
+
 * Tue Jan 26 2021 Stephen Gallagher <sgallagh@redhat.com> - 10.1-5
 - Build gdb-minimal for ELN
 
