@@ -32,8 +32,7 @@
 # but in fact, it doesn't have to.  It should not fail either way.
 
 # Include Beaker environment
-. /usr/bin/rhts-environment.sh || exit 1
-. /usr/lib/beakerlib/beakerlib.sh || exit 1
+. /usr/share/beakerlib/beakerlib.sh || exit 1
 
 CMD="gdb"
 BIN="$(which $CMD)"
