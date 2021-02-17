@@ -1195,7 +1195,7 @@ fi
 %endif
 
 %changelog
-* Wed Feb 17 20201 Keith Seitz <keiths@redhat.com> - 10.1-6
+* Wed Feb 17 2021 Keith Seitz <keiths@redhat.com> - 10.1-6
 - NVR bump to disable guile support.
 
 * Thu Feb 11 2021 Keith Seitz
