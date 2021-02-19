@@ -45,18 +45,14 @@ diff --git a/gdb/NEWS b/gdb/NEWS
 diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
 --- a/gdb/c-valprint.c
 +++ b/gdb/c-valprint.c
-@@ -572,6 +572,28 @@ c_value_print (struct value *val, struct ui_file *stream,
+@@ -572,6 +572,24 @@ c_value_print (struct value *val, struct ui_file *stream,
        else
  	{
  	  /* normal case */
 +	  if (type->code () == TYPE_CODE_PTR
 +	      && 1 == is_dynamic_type (type))
 +	    {
-+	      CORE_ADDR addr;
-+	      if (NULL != TYPE_DATA_LOCATION (TYPE_TARGET_TYPE (type)))
-+		addr = value_address (val);
-+	      else
-+		addr = value_as_address (val);
++	      CORE_ADDR addr = value_as_address (val);
 +
 +	      /* We resolve the target-type only when the
 +	         pointer is associated.  */
@@ -1009,7 +1005,7 @@ diff --git a/gdb/testsuite/gdb.fortran/vla-value.exp b/gdb/testsuite/gdb.fortran
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
-@@ -565,6 +565,25 @@ whatis_exp (const char *exp, int show)
+@@ -565,6 +565,21 @@ whatis_exp (const char *exp, int show)
        printf_filtered (" */\n");    
      }
  
@@ -1020,11 +1016,7 @@ diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 +  if (type->code () == TYPE_CODE_PTR
 +      && is_dynamic_type (type) == 1)
 +    {
-+      CORE_ADDR addr;
-+      if (NULL != TYPE_DATA_LOCATION (TYPE_TARGET_TYPE(type)))
-+	addr = value_address (val);
-+      else
-+	addr = value_as_address (val);
++      CORE_ADDR addr = value_as_address (val);
 +
 +      if (addr != 0
 +	  && type_not_associated (type) == 0)
@@ -1038,19 +1030,15 @@ diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 diff --git a/gdb/valops.c b/gdb/valops.c
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
-@@ -1553,6 +1553,19 @@ value_ind (struct value *arg1)
+@@ -1553,6 +1553,15 @@ value_ind (struct value *arg1)
    if (base_type->code () == TYPE_CODE_PTR)
      {
        struct type *enc_type;
-+      CORE_ADDR addr;
 +
 +      if (type_not_associated (base_type))
 +        error (_("Attempt to take contents of a not associated pointer."));
 +
-+      if (NULL != TYPE_DATA_LOCATION (TYPE_TARGET_TYPE (base_type)))
-+	addr = value_address (arg1);
-+      else
-+	addr = value_as_address (arg1);
++      CORE_ADDR addr = value_as_address (arg1);
 +
 +      if (addr != 0)
 +	TYPE_TARGET_TYPE (base_type) =
