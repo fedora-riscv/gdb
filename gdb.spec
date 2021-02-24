@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1195,6 +1195,9 @@ fi
 %endif
 
 %changelog
+* Wed Feb 24 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-9
+- Fix aarch64 build problem (RHBZ 1932645, Kevin Buettner).
+
 * Fri Feb 19 2021 Jan Kratochvil <jan.kratochvil@redhat.com> - 10.1-8
 - Fix gdb-vla-intel-fortran-vla-strings.patch for compatiblity with GraalVM.
 
