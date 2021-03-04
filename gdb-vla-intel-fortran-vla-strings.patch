@@ -45,7 +45,7 @@ diff --git a/gdb/NEWS b/gdb/NEWS
 diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
 --- a/gdb/c-valprint.c
 +++ b/gdb/c-valprint.c
-@@ -572,6 +572,24 @@ c_value_print (struct value *val, struct ui_file *stream,
+@@ -572,6 +572,27 @@ c_value_print (struct value *val, struct ui_file *stream,
        else
  	{
  	  /* normal case */
@@ -58,9 +58,12 @@ diff --git a/gdb/c-valprint.c b/gdb/c-valprint.c
 +	         pointer is associated.  */
 +	      if ((addr != 0)
 +		  && (0 == type_not_associated (type)))
++		{
++		  type = copy_type (type);
 +		  TYPE_TARGET_TYPE (type) =
 +		      resolve_dynamic_type (TYPE_TARGET_TYPE (type),
 +					    {}, addr);
++		}
 +	    }
 +	  else
 +	    {
@@ -915,7 +918,7 @@ new file mode 100644
 diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 --- a/gdb/typeprint.c
 +++ b/gdb/typeprint.c
-@@ -565,6 +565,21 @@ whatis_exp (const char *exp, int show)
+@@ -565,6 +565,24 @@ whatis_exp (const char *exp, int show)
        printf_filtered (" */\n");    
      }
  
@@ -930,8 +933,11 @@ diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 +
 +      if (addr != 0
 +	  && type_not_associated (type) == 0)
-+	TYPE_TARGET_TYPE (type) = resolve_dynamic_type (TYPE_TARGET_TYPE (type),
-+							{}, addr);
++	{
++	  type = copy_type (type);
++	  TYPE_TARGET_TYPE (type) = resolve_dynamic_type (TYPE_TARGET_TYPE (type),
++							  {}, addr);
++	}
 +    }
 +
    LA_PRINT_TYPE (type, "", gdb_stdout, show, 0, &flags);
@@ -940,23 +946,26 @@ diff --git a/gdb/typeprint.c b/gdb/typeprint.c
 diff --git a/gdb/valops.c b/gdb/valops.c
 --- a/gdb/valops.c
 +++ b/gdb/valops.c
-@@ -1553,6 +1553,15 @@ value_ind (struct value *arg1)
-   if (base_type->code () == TYPE_CODE_PTR)
+@@ -1554,6 +1554,18 @@ value_ind (struct value *arg1)
      {
        struct type *enc_type;
-+
+ 
 +      if (type_not_associated (base_type))
 +        error (_("Attempt to take contents of a not associated pointer."));
 +
 +      CORE_ADDR addr = value_as_address (arg1);
 +
-+      if (addr != 0)
-+	TYPE_TARGET_TYPE (base_type) =
-+	    resolve_dynamic_type (TYPE_TARGET_TYPE (base_type), {}, addr);
- 
++      if (addr != 0 && is_dynamic_type (base_type))
++	{
++	  base_type = copy_type (base_type);
++	  TYPE_TARGET_TYPE (base_type) =
++	      resolve_dynamic_type (TYPE_TARGET_TYPE (base_type), {}, addr);
++	}
++
        /* We may be pointing to something embedded in a larger object.
           Get the real type of the enclosing object.  */
-@@ -1570,8 +1583,7 @@ value_ind (struct value *arg1)
+       enc_type = check_typedef (value_enclosing_type (arg1));
+@@ -1570,8 +1582,7 @@ value_ind (struct value *arg1)
        else
  	{
  	  /* Retrieve the enclosing object pointed to.  */
