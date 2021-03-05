@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 12%{?dist}
+Release: 13%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1195,6 +1195,10 @@ fi
 %endif
 
 %changelog
+* Fri Mar  5 2021 Jan Kratochvil <jan.kratochvil@redhat.com> - 10.1-13
+- Drop gdb-vla-intel-fortran-vla-strings.patch as it was still regressing the
+  testsuite.
+
 * Thu Mar  4 2021 Jan Kratochvil <jan.kratochvil@redhat.com> - 10.1-12
 - Fix gdb-vla-intel-fortran-vla-strings.patch to no longer modify cached
   inferior types.
