@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -189,7 +189,7 @@ Source5: %{libstdcxxpython}.tar.xz
 Source6: gdbtui
 
 # libipt: Intel Processor Trace Decoder Library
-%global libipt_version 2.0.2
+%global libipt_version 2.0.4
 #=fedora
 Source7: v%{libipt_version}.tar.gz
 #=fedora
@@ -1195,6 +1195,9 @@ fi
 %endif
 
 %changelog
+* Thu Mar 11 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-10
+- Update libipt to version 2.0.4.
+
 * Fri Mar 05 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-9
 - Backport patches which fix frame_id_p assertion failure (RHBZ 1909902,
   Pedro Alves).
