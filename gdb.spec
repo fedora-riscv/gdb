@@ -588,8 +588,11 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--with-lzma						\
 %else
 	--without-lzma						\
-%endif                                                          \
-        --with-debuginfod
+%endif
+        --with-debuginfod					\
+%if 0%{?rhel:1}
+	--disable-libctf
+%endif
 "
 
 # Identify the build directory with the version of gdb as well as the
@@ -1195,6 +1198,9 @@ fi
 %endif
 
 %changelog
+* Thu Mar 18 2021 Keith Seitz <keiths@redhat.com>
+- Disable libctf on RHEL (RHBZ 1935517).
+
 * Thu Mar 11 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-15
 - Update libipt to version 2.0.4.
 
