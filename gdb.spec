@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 11%{?dist}
+Release: 12%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1198,7 +1198,10 @@ fi
 %endif
 
 %changelog
-* The Mar 18 2021 Keith Seitz <keiths@redhat.com> - 10.1-11
+* Fri Mar 19 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-12
+- Fix potential hang during gdbserver testing (RHBZ 1941080, Kevin Buettner).
+
+* Thu Mar 18 2021 Keith Seitz <keiths@redhat.com> - 10.1-11
 - Disable libctf on RHEL (RHBZ 1935517).
 
 * Thu Mar 11 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-10
