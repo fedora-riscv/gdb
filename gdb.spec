@@ -623,10 +623,6 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
 
-# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1912913
-# Take this out when fixed in gcc/g++.
-CFLAGS="$CFLAGS -Wno-stringop-overread"
-
 export CXXFLAGS="$CFLAGS"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
@@ -657,10 +653,6 @@ cd %{gdb_build}$fprofile
 
 export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
 export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
-
-# Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1912913
-# Take this out when fixed in gcc/g++.
-CFLAGS="$CFLAGS -Wno-stringop-overread"
 
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
@@ -1198,6 +1190,9 @@ fi
 %endif
 
 %changelog
+* Tue Mar 23 2021 Kevin Buettner <kevinb@redhat.com>
+-  Remove spec file workaround for RHBZ 1912913.
+
 * Fri Mar 19 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-16
 - Fix potential hang during gdbserver testing (RHBZ 1941080, Kevin Buettner).
 
