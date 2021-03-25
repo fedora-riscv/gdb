@@ -150,7 +150,7 @@ diff --git a/gdb/linux-nat.c b/gdb/linux-nat.c
 diff --git a/gdb/testsuite/gdb.threads/attach-stopped.exp b/gdb/testsuite/gdb.threads/attach-stopped.exp
 --- a/gdb/testsuite/gdb.threads/attach-stopped.exp
 +++ b/gdb/testsuite/gdb.threads/attach-stopped.exp
-@@ -56,7 +56,65 @@ proc corefunc { threadtype } {
+@@ -56,7 +56,73 @@ proc corefunc { threadtype } {
      gdb_reinitialize_dir $srcdir/$subdir
      gdb_load ${binfile}
  
@@ -162,10 +162,10 @@ diff --git a/gdb/testsuite/gdb.threads/attach-stopped.exp b/gdb/testsuite/gdb.th
 +    set test "$threadtype: set file, before attach1 to stopped process"
 +    gdb_test_multiple "file $binfile" "$test" {
 +       -re "Load new symbol table from.*y or n. $" {
-+	    gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*done." \
++	    gdb_test "y" "Reading symbols from $escapedbinfile\.\.\.*" \
 +		    "$test (re-read)"
 +	}
-+	-re "Reading symbols from $escapedbinfile\.\.\.*done.*$gdb_prompt $" {
++	-re "Reading symbols from $escapedbinfile\.\.\.*$gdb_prompt $" {
 +	    pass "$test"
 +	}
 +    }
@@ -185,22 +185,30 @@ diff --git a/gdb/testsuite/gdb.threads/attach-stopped.exp b/gdb/testsuite/gdb.th
 +    }
 +
 +    # Exit and detach the process.
-+       
++
 +    gdb_exit
 +
 +    # Avoid some race:
 +    sleep 2
 +
 +    if [catch {open /proc/${testpid}/status r} fileid] {
-+	set line2 "NOTFOUND"
++	set line "NOTFOUND"
 +    } else {
-+	gets $fileid line1;
-+	gets $fileid line2;
++	while { 1 } {
++	    if { [gets $fileid line] < 0 } {
++		set line "EOF"
++		break
++	    }
++	    if {[string match "State:*" $line]} {
++		break
++	    }
++	}
 +	close $fileid;
 +    }
 +
 +    set test "$threadtype: attach1, exit leaves process stopped"
-+    if {[string match "*(stopped)*" $line2]} {
++    verbose -log "line: $line"
++    if {[string match "*(stopped)*" $line]} {
 +      pass $test
 +    } else {
 +      fail $test

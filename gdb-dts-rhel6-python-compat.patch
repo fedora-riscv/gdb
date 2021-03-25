@@ -159,7 +159,7 @@ diff --git a/gdb/python/lib/gdb/backtrace.py b/gdb/python/lib/gdb/backtrace.py
 new file mode 100644
 --- /dev/null
 +++ b/gdb/python/lib/gdb/backtrace.py
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,41 @@
 +# Filtering backtrace.
 +
 +# Copyright (C) 2008, 2011 Free Software Foundation, Inc.
@@ -201,12 +201,11 @@ new file mode 100644
 +    if old_frame_filter is None:
 +        return iter
 +    return old_frame_filter (iter)
-+
 diff --git a/gdb/python/lib/gdb/command/backtrace.py b/gdb/python/lib/gdb/command/backtrace.py
 new file mode 100644
 --- /dev/null
 +++ b/gdb/python/lib/gdb/command/backtrace.py
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,112 @@
 +# New backtrace command.
 +
 +# Copyright (C) 2008, 2009, 2011 Free Software Foundation, Inc.
@@ -290,13 +289,19 @@ new file mode 100644
 +        # FIXME: provide option to start at selected frame
 +        # However, should still number as if starting from newest
 +        newest_frame = gdb.newest_frame()
-+        iter = itertools.imap (FrameWrapper,
-+                               FrameIterator (newest_frame))
++        if sys.version_info.major >= 3:
++            iter = map (FrameWrapper, FrameIterator (newest_frame))
++        else:
++            iter = itertools.imap (FrameWrapper,
++                                   FrameIterator (newest_frame))
 +        if filter:
 +            iter = gdb.backtrace.create_frame_filter (iter)
 +
 +        # Now wrap in an iterator that numbers the frames.
-+        iter = itertools.izip (itertools.count (0), iter)
++        if sys.version_info.major >= 3:
++            iter = zip (itertools.count (0), iter)
++        else:
++            iter = itertools.izip (itertools.count (0), iter)
 +
 +        # Reverse if the user wanted that.
 +        if self.reverse.value:
@@ -313,3 +318,17 @@ new file mode 100644
 +            pair[1].describe (sys.stdout, full)
 +
 +FilteringBacktrace()
+diff --git a/gdb/testsuite/gdb.base/help.exp b/gdb/testsuite/gdb.base/help.exp
+--- a/gdb/testsuite/gdb.base/help.exp
++++ b/gdb/testsuite/gdb.base/help.exp
+@@ -129,7 +129,9 @@ gdb_test "apropos apropos" "apropos -- Search for commands matching a REGEXP.*"
+ 
+ # Test apropos for commands having aliases.
+ gdb_test "apropos Print backtrace of all stack frames, or innermost COUNT frames\." \
+-    "backtrace, where, bt -- Print backtrace of all stack frames, or innermost COUNT frames\."
++    [multi_line \
++	 "backtrace, where, bt -- Print backtrace of all stack frames, or innermost COUNT frames\." \
++	 "new-backtrace -- Print backtrace of all stack frames, or innermost COUNT frames\."]
+ 
+ # Test help for commands having aliases.
+ gdb_test "help bt" "backtrace, where, bt\[\r\n\]+Print backtrace of all stack frames, or innermost COUNT frames\..*"

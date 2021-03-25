@@ -540,18 +540,18 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +	  /* There can be multiple build-id symlinks pointing to real files
 +	     with the same build-id (such as hard links).  Some of the real
 +	     files may not be installed.  */
++
++	  string_appendf (link, ".%u", seqno);
++	}
  
 -  /* We expect to be silent on the non-existing files.  */
 -  gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget);
-+	  string_appendf (link, ".%u", seqno);
-+	}
++      ret_link = link;
  
 -  if (debug_bfd == NULL)
 -    {
 -      if (separate_debug_file_debug)
 -	printf_unfiltered (_(" no, unable to open.\n"));
-+      ret_link = link;
-+
 +      struct stat statbuf_trash;
 +
 +      /* `access' automatically dereferences LINK.  */
@@ -574,11 +574,11 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
 +	  continue;
 +	}
- 
--      return {};
++
 +      /* We expect to be silent on the non-existing files.  */
 +      gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget, -1);
-+
+ 
+-      return {};
 +      if (debug_bfd == NULL)
 +	{
 +	  if (separate_debug_file_debug)
@@ -699,7 +699,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +{
 +  gdb_bfd_ref_ptr abfd;
 +  char *result;
-+  
++
 +  abfd = build_id_to_exec_bfd (build_id->size, build_id->data, link_return);
 +  if (abfd == NULL)
 +    return NULL;
@@ -1361,6 +1361,19 @@ diff --git a/gdb/testsuite/gdb.base/corefile.exp b/gdb/testsuite/gdb.base/corefi
 +    gdb_test "info files" "Local exec file:\r\n\[ \t\]*`[string_to_regexp $debugdir/$buildid]', file type .*"
 +    pass $wholetest
 +}
+diff --git a/gdb/testsuite/gdb.base/gdbinit-history.exp b/gdb/testsuite/gdb.base/gdbinit-history.exp
+--- a/gdb/testsuite/gdb.base/gdbinit-history.exp
++++ b/gdb/testsuite/gdb.base/gdbinit-history.exp
+@@ -181,7 +181,8 @@ proc test_empty_history_filename { } {
+     global env
+     global gdb_prompt
+ 
+-    set common_history [list "set height 0" "set width 0"]
++    set common_history [list "set height 0" "set width 0" \
++			    "set build-id-verbose 0"]
+ 
+     set test_dir [standard_output_file history_test]
+     remote_exec host "mkdir -p $test_dir"
 diff --git a/gdb/testsuite/gdb.base/new-ui-pending-input.exp b/gdb/testsuite/gdb.base/new-ui-pending-input.exp
 --- a/gdb/testsuite/gdb.base/new-ui-pending-input.exp
 +++ b/gdb/testsuite/gdb.base/new-ui-pending-input.exp
