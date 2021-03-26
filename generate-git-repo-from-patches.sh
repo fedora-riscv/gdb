@@ -34,6 +34,8 @@ test "$1" = "-h" && usage
 
 uncommit=0
 if [ "$1" = "-u" ]; then
+    command -v stg > /dev/null 2>&1  \
+	|| die "Cannot find stg.  Is stgit installed?"
     uncommit=1
     shift
 fi
@@ -46,7 +48,6 @@ fi
 
 test -f _git_upstream_commit || die "Cannot find _git_upstream_commit file."
 test -f _patch_order || die "Cannot find _patch_order file."
-command -v stg > /dev/null 2>&1  || die "Cannot find stg.  Is stgit installed?"
 
 last_ancestor_commit=`cat _git_upstream_commit`
 
