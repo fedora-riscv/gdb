@@ -37,7 +37,7 @@ Version: 10.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 13%{?dist}
+Release: 14%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1190,7 +1190,11 @@ fi
 %endif
 
 %changelog
-* Tue Mar 30 2021 Jonathan Wakely <jwakely@redhat.com>
+* Wed Mar 31 2021 Keith Seitz <keiths@redhat.com> - 10.1-14
+- Backport "Save/restore file offset while reading notes in core file"
+  (Keith Seitz, RHBZ 1931344)
+
+* Tue Mar 30 2021 Jonathan Wakely <jwakely@redhat.com> - 10.1-13
 - Rebuilt for removed libstdc++ symbol (#1937698)
 
 * Tue Mar 23 2021 Kevin Buettner <kevinb@redhat.com>
