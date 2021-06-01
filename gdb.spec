@@ -37,7 +37,7 @@ Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1154,6 +1154,14 @@ fi
 %endif
 
 %changelog
+* Tue June 1 2021 Keith Seitz <keiths@redhat.com> - 10.2-2
+- Backport "Exclude debuginfo files from 'outside ELF segments' warning".
+  (Keith Seitz, RH BZ 1898252)
+- Backport "Fix crash when expanding partial symtab..."
+  (Tom Tromey. gdb/27743)
+- Backport "[gdb/server] Don't overwrite fs/gs_base with -m32"
+- (Tom de Vries)
+
 * Tue May 25 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-1
 - Rebase to FSF GDB 10.2.
 - Drop gdb-6.3-test-pie-20050107.patch.
