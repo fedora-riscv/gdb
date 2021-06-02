@@ -1154,7 +1154,7 @@ fi
 %endif
 
 %changelog
-* Tue June 1 2021 Keith Seitz <keiths@redhat.com> - 10.2-2
+* Tue June  1 2021 Keith Seitz <keiths@redhat.com> - 10.2-2
 - Backport "Exclude debuginfo files from 'outside ELF segments' warning".
   (Keith Seitz, RH BZ 1898252)
 - Backport "Fix crash when expanding partial symtab..."
