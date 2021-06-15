@@ -37,7 +37,7 @@ Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1154,6 +1154,10 @@ fi
 %endif
 
 %changelog
+* Mon Jun 14 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-4
+- Backport upstream patches which fix multi-threaded debugging for
+  glibc-2.34 (RHBZ 1971096, Simon Marchi, Kevin Buettner).
+
 * Fri Jun 11 2021 Keith Seitz <keiths@redhat.com> - 10.2-3
 - Backport "Exclude debuginfo files from 'outside ELF segments' warning".
   (Keith Seitz, RH BZ 1898252)
