@@ -33,11 +33,11 @@ Name: %{?scl_prefix}gdb
 # See timestamp of source gnulib installed into gnulib/ .
 %global snapgnulib 20200630
 %global tarname gdb-%{version}
-Version: 10.1
+Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -194,16 +194,6 @@ Source6: gdbtui
 Source7: v%{libipt_version}.tar.gz
 #=fedora
 Patch1142: v1.5-libipt-static.patch
-
-## [testsuite] Fix false selftest.exp FAIL from system readline-6.3+ (Patrick Palka).
-##=fedoratest
-#Patch1075: gdb-testsuite-readline63-sigint.patch
-##=fedoratest
-Patch1119: gdb-testsuite-readline63-sigint-revert.patch
-
-# Fix broken configure tests compromised by LTO
-#push=Should be pushed upstream.
-Patch2000: gdb-config.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
@@ -476,23 +466,6 @@ find -name "*.info*"|xargs rm -f
 # Include the auto-generated "%patch" directives.
 # See README.local-patches for more details.
 %include %{PATCH9999}
-
-%if 0%{!?el6:1}
-for i in \
-  gdb/python/lib/gdb/FrameWrapper.py \
-  gdb/python/lib/gdb/backtrace.py \
-  gdb/python/lib/gdb/command/backtrace.py \
-  ;do
-  test -e $i
-  : >$i
-done
-%endif
-
-%if 0%{?rhel:1} && 0%{?rhel} <= 7
-%patch1119 -p1
-%endif
-
-%patch2000 -p1
 
 # The above patches twiddle a .m4 file for configure, so update the affected
 # configure files
@@ -788,8 +761,6 @@ perl -i.relocatable -pe 's/^(D\[".*_RELOCATABLE"\]=" )1(")$/${1}0$2/' gdb/config
 %make_build CFLAGS="$CFLAGS $FPROFILE_CFLAGS" LDFLAGS="$LDFLAGS $FPROFILE_CFLAGS" V=1
 
 ! grep '_RELOCATABLE.*1' gdb/config.h
-grep '^#define HAVE_LIBSELINUX 1$' gdb/config.h
-grep '^#define HAVE_SELINUX_SELINUX_H 1$' gdb/config.h
 
 if [ "$fprofile" = "-fprofile" ]
 then
@@ -1071,13 +1042,6 @@ rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/elinos.py
 rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit/wrs-linux.py
 rmdir $RPM_BUILD_ROOT%{_datadir}/gdb/system-gdbinit
 
-# Patch848: gdb-dts-rhel6-python-compat.patch
-%if 0%{!?el6:1}
-rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/FrameWrapper.py
-rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/backtrace.py
-rm -f $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb/command/backtrace.py
-%endif
-
 %files
 # File must begin with "/": {GFDL,COPYING3,COPYING,COPYING.LIB,COPYING3.LIB}
 %if 0%{!?el6:1}
@@ -1184,6 +1148,49 @@ fi
 %endif
 
 %changelog
+* Thu Jun 24 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-1
+- Rebase to FSF GDB 10.2.
+- Drop gdb-6.3-test-pie-20050107.patch.
+- Drop gdb-6.3-test-self-20050110.patch.
+- Drop gdb-6.5-bz218379-ppc-solib-trampoline-test.patch.
+- Drop gdb-6.6-buildid-locate-core-as-arg.patch.
+- Drop gdb-6.8-quit-never-aborts.patch.
+- Drop gdb-archer-pie-addons-keep-disabled.patch.
+- Drop gdb-archer-pie-addons.patch.
+- Drop gdb-archer-vla-tests.patch.
+- Drop gdb-archer.patch.
+- Drop gdb-attach-fail-reasons-5of5.patch.
+- Drop gdb-btrobust.patch.
+- Drop gdb-bz1219747-attach-kills.patch.
+- Drop gdb-bz533176-fortran-omp-step.patch.
+- Drop gdb-dts-rhel6-python-compat.patch.
+- Drop gdb-gnat-dwarf-crash-3of3.patch.
+- Drop gdb-jit-reader-multilib.patch.
+- Drop gdb-moribund-utrace-workaround.patch.
+- Drop gdb-rhbz1930528-fix-gnulib-build-error.patch.
+- Drop gdb-rhbz1932645-aarch64-ptrace-header-order.patch.
+- Drop gdb-vla-intel-fix-print-char-array.patch.
+- Drop gdb-vla-intel-fortran-strides.patch.
+- Drop gdb-vla-intel-stringbt-fix.patch.
+- Drop gdb-vla-intel-tests.patch.
+- Drop process_psymtab_comp_unit-type-unit.patch.
+- Drop gdb-testsuite-readline63-sigint-revert.patch.
+- Drop gdb-config.patch.
+- Add following upstream patches for Fortran stride / slice support:
+  gdb-rhbz1964167-convert-enum-range_type.patch
+  gdb-rhbz1964167-fortran-array-slices-at-prompt.patch
+  gdb-rhbz1964167-fortran-array-strides-in-expressions.patch
+  gdb-rhbz1964167-fortran-clean-up-array-expression-evaluation.patch
+  gdb-rhbz1964167-fortran-range_type-to-range_flag.patch
+  gdb-rhbz1964167-fortran-whitespace_array.patch
+  gdb-rhbz1964167-move-fortran-expr-handling.patch
+- Backport "Exclude debuginfo files from 'outside ELF segments' warning".
+  (Keith Seitz, RH BZ 1898252)
+- Backport "Fix crash when expanding partial symtab..."
+  (Tom Tromey. gdb/27743)
+- Backport "[gdb/server] Don't overwrite fs/gs_base with -m32"
+- (Tom de Vries)
+
 * Thu Mar 11 2021 Kevin Buettner <kevinb@redhat.com> - 10.1-4
 - Update libipt to version 2.0.4.
 
