@@ -37,7 +37,7 @@ Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 4%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -156,8 +156,6 @@ Recommends: %{librpmname}
 # GDB C++11 requires devtoolset gcc.
 BuildRequires: %{?scl_prefix}gcc-c++
 %endif
-
-BuildRequires: autoconf
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
@@ -469,15 +467,6 @@ find -name "*.info*"|xargs rm -f
 # Include the auto-generated "%patch" directives.
 # See README.local-patches for more details.
 %include %{PATCH9999}
-
-# The above patches twiddle a .m4 file for configure, so update the affected
-# configure files
-pushd libiberty
-autoconf -f
-popd
-pushd intl
-autoconf -f
-popd
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1154,6 +1143,10 @@ fi
 %endif
 
 %changelog
+* Tue Jul 20 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-5
+- Remove autoconf invocations from spec file.
+- Remove BuildRequires: autoconf.
+
 * Mon Jun 14 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-4
 - Backport upstream patches which fix multi-threaded debugging for
   glibc-2.34 (RHBZ 1971096, Simon Marchi, Kevin Buettner).
