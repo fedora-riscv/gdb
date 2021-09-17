@@ -1,0 +1,67 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Bruno Larsen <blarsen@redhat.com>
+Date: Fri, 17 Sep 2021 11:39:31 -0300
+Subject: gdb-rhbz1916516-pathstuff.cc132-internal-error.patch
+
+;; Backport "[gdb/cli] Don't assert on empty string for core-file"
+;; (Tom de Vries)
+
+With current gdb we run into:
+...
+$ gdb -batch '' ''
+: No such file or directory.
+pathstuff.cc:132: internal-error: \
+  gdb::unique_xmalloc_ptr<char> gdb_abspath(const char*): \
+  Assertion `path != NULL && path[0] != '\0'' failed.
+...
+
+Fix this by skipping the call to gdb_abspath in core_target_open in the
+empty-string case, such that we have instead:
+...
+$ gdb -batch '' ''
+: No such file or directory.
+: No such file or directory.
+$
+...
+
+Tested on x86_64-linux.
+
+gdb/ChangeLog:
+
+2021-08-30  Tom de Vries  <tdevries@suse.de>
+
+	PR cli/28290
+	* gdb/corelow.c (core_target_open): Skip call to gdb_abspath in the
+	empty-string case.
+
+gdb/testsuite/ChangeLog:
+
+2021-08-30  Tom de Vries  <tdevries@suse.de>
+
+	PR cli/28290
+	* gdb.base/batch-exit-status.exp: Add gdb '' and gdb '' '' tests.
+
+diff --git a/gdb/corelow.c b/gdb/corelow.c
+--- a/gdb/corelow.c
++++ b/gdb/corelow.c
+@@ -446,7 +446,8 @@ core_target_open (const char *arg, int from_tty)
+     }
+ 
+   gdb::unique_xmalloc_ptr<char> filename (tilde_expand (arg));
+-  if (!IS_ABSOLUTE_PATH (filename.get ()))
++  if (strlen (filename.get ()) != 0
++      && !IS_ABSOLUTE_PATH (filename.get ()))
+     filename = gdb_abspath (filename.get ());
+ 
+   flags = O_BINARY | O_LARGEFILE;
+diff --git a/gdb/testsuite/gdb.base/batch-exit-status.exp b/gdb/testsuite/gdb.base/batch-exit-status.exp
+--- a/gdb/testsuite/gdb.base/batch-exit-status.exp
++++ b/gdb/testsuite/gdb.base/batch-exit-status.exp
+@@ -76,3 +76,7 @@ test_exit_status 1 "-batch -x $good_commands -x $bad_commands" \
+     "-batch -x good-commands -x bad-commands"
+ test_exit_status 1 "-batch -x $good_commands -ex \"set not-a-thing 4\"" \
+     "-batch -x good-commands -ex \"set not-a-thing 4\""
++
++set no_such_re ": No such file or directory\\."
++test_exit_status 1 "-batch \"\"" $no_such_re
++test_exit_status 1 "-batch \"\" \"\"" [multi_line $no_such_re $no_such_re]
