@@ -37,7 +37,7 @@ Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 7%{?dist}
+Release: 8%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,10 +1143,14 @@ fi
 %endif
 
 %changelog
+* Wed Sep 22 2021 Bruno Larsen <blarsen@redhat.com> - 10.2-8
+- Backport "[gdb/cli] Don't assert on empty string for core-file"
+  (Tom de Vries)
+
 * Tue Sep 21 2021 Peter Robinson <pbrobinson@fedoraproject.org> 10.2-7
 - Use guile 2.2 (rhbz #1901353)
 
-* Wed Jul 21 2021 Fedora Release Engineering <releng@fedoraproject.org> 10.2-6
+* Wed Jul 21 2021 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
 
 * Tue Jul 20 2021 Kevin Buettner <kevinb@redhat.com> - 10.2-5
