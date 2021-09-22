@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Wed Sep 22 2021 Bruno Larsen <blarsen@redhat.com> - 10.2-8
+- Backport "[gdb] Improve early exits for env var in debuginfod-support.c"
+  (Tom de Vries)
+
+* Wed Sep 22 2021 Bruno Larsen <blarsen@redhat.com> - 10.2-8
 - Backport "[gdb/cli] Don't assert on empty string for core-file"
   (Tom de Vries)
 
