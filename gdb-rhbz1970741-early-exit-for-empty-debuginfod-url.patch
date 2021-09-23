@@ -1,0 +1,51 @@
+From FEDORA_PATCHES Mon Sep 17 00:00:00 2001
+From: Bruno Larsen <blarsen@redhat.com>
+Date: Thu, 23 Sep 2021 11:19:09 -0300
+Subject: gdb-rhbz1970741-early-exit-for-empty-debuginfod-url.patch
+
+;;[gdb] Improve early exits for env var in debuginfod-support.c
+;;(Tom de Vries)
+
+There's an early exit in libdebuginfod's debuginfod_query_server, which checks
+both for:
+- getenv (DEBUGINFOD_URLS_ENV_VAR) == NULL, and
+- (getenv (DEBUGINFOD_URLS_ENV_VAR))[0] == '\0'.
+
+In debuginfod_source_query and debuginfod_debuginfo_query (which both
+end up calling debuginfod_query_server) there are also early exits checking
+the same env var, but those just check for NULL.
+
+Make the early exit tests in debuginfod-support.c match those in
+libdebuginfod.
+
+gdb/ChangeLog:
+
+2020-11-18  Tom de Vries  <tdevries@suse.de>
+
+	* debuginfod-support.c (debuginfod_source_query)
+	(debuginfod_debuginfo_query): Also do early exit if
+	"(getenv (DEBUGINFOD_URLS_ENV_VAR))[0] == '\0'".
+
+diff --git a/gdb/debuginfod-support.c b/gdb/debuginfod-support.c
+--- a/gdb/debuginfod-support.c
++++ b/gdb/debuginfod-support.c
+@@ -98,7 +98,8 @@ debuginfod_source_query (const unsigned char *build_id,
+ 			 const char *srcpath,
+ 			 gdb::unique_xmalloc_ptr<char> *destname)
+ {
+-  if (getenv (DEBUGINFOD_URLS_ENV_VAR) == NULL)
++  const char *urls_env_var = getenv (DEBUGINFOD_URLS_ENV_VAR);
++  if (urls_env_var == NULL || urls_env_var[0] == '\0')
+     return scoped_fd (-ENOSYS);
+ 
+   debuginfod_client *c = debuginfod_init ();
+@@ -135,7 +136,8 @@ debuginfod_debuginfo_query (const unsigned char *build_id,
+ 			    const char *filename,
+ 			    gdb::unique_xmalloc_ptr<char> *destname)
+ {
+-  if (getenv (DEBUGINFOD_URLS_ENV_VAR) == NULL)
++  const char *urls_env_var = getenv (DEBUGINFOD_URLS_ENV_VAR);
++  if (urls_env_var == NULL || urls_env_var[0] == '\0')
+     return scoped_fd (-ENOSYS);
+ 
+   debuginfod_client *c = debuginfod_init ();
