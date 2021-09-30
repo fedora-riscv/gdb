@@ -1144,6 +1144,9 @@ fi
 
 %changelog
 * Thu Sep 30 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
+- Backport test for RHBZ 1976887 (Kevin Buettner).
+
+* Thu Sep 30 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
 - Backport upstream patch which fixes internal-error: Unexpected
   type field location kind (RHBZ 1976887, Alexandra Hájková).
 
