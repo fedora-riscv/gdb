@@ -37,7 +37,7 @@ Version: 10.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 8%{?dist}
+Release: 9%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,6 +1143,10 @@ fi
 %endif
 
 %changelog
+* Thu Sep 30 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
+- Backport upstream patch which fixes internal-error: Unexpected
+  type field location kind (RHBZ 1976887, Alexandra Hájková).
+
 * Wed Sep 22 2021 Bruno Larsen <blarsen@redhat.com> - 10.2-8
 - Backport "[gdb] Improve early exits for env var in debuginfod-support.c"
   (Tom de Vries)
