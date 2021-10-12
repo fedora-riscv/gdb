@@ -31,13 +31,13 @@ Name: %{?scl_prefix}gdb
 # Freeze it when GDB gets branched
 %global snapsrc    20200208
 # See timestamp of source gnulib installed into gnulib/ .
-%global snapgnulib 20200630
+%global snapgnulib 20210105
 %global tarname gdb-%{version}
-Version: 10.2
+Version: 11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,7 +1143,17 @@ fi
 %endif
 
 %changelog
-* Wed Sep 24 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
+* Mon Oct 11 2021 Kevin Buettner - 11.1-2
+- Backport upstream patch which papers over Fortran lexical analyzer
+  bug (RHBZ 2012976, Tom de Vries).
+
+* Mon Oct 04 2021 Kevin Buettner - 11.1-1
+- Rebase to FSF GDB 11.1.
+- Adjust build-id related patches.
+- Drop backported patches which are no longer relevant.
+- Bump 'snapgnulib' date.
+
+* Wed Sep 29 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
 - Backport test for RHBZ 1976887 (Kevin Buettner).
 
 * Wed Sep 29 2021 Alexandra Hájková <ahajkova@redhat.com> - 10.2-9
