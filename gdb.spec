@@ -31,13 +31,13 @@ Name: %{?scl_prefix}gdb
 # Freeze it when GDB gets branched
 %global snapsrc    20200208
 # See timestamp of source gnulib installed into gnulib/ .
-%global snapgnulib 20200630
+%global snapgnulib 20210105
 %global tarname gdb-%{version}
-Version: 10.2
+Version: 11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -157,8 +157,6 @@ Recommends: %{librpmname}
 BuildRequires: %{?scl_prefix}gcc-c++
 %endif
 
-BuildRequires: autoconf
-
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
 # They should be created using patch level 1: diff -up ./gdb (or gdb-6.3/gdb).
 
@@ -240,7 +238,7 @@ BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
 %if 0%{?rhel} < 9
-BuildRequires: guile-devel%{buildisa}
+BuildRequires: guile22-devel%{buildisa}
 %endif
 %endif
 %global have_libipt 0
@@ -469,15 +467,6 @@ find -name "*.info*"|xargs rm -f
 # Include the auto-generated "%patch" directives.
 # See README.local-patches for more details.
 %include %{PATCH9999}
-
-# The above patches twiddle a .m4 file for configure, so update the affected
-# configure files
-pushd libiberty
-autoconf -f
-popd
-pushd intl
-autoconf -f
-popd
 
 find -name "*.orig" | xargs rm -f
 ! find -name "*.rej" # Should not happen.
@@ -1154,6 +1143,16 @@ fi
 %endif
 
 %changelog
+* Mon Oct 18 2021 Kevin Buettner - 11.1-2
+- Backport upstream patch which papers over Fortran lexical analyzer
+  bug (RHBZ 2012976, Tom de Vries).
+
+* Mon Oct 18 2021 Kevin Buettner - 11.1-1
+- Rebase to FSF GDB 11.1.
+- Adjust build-id related patches.
+- Drop backported patches which are no longer relevant.
+- Bump 'snapgnulib' date.
+
 * Wed Sep 29 2021 Michal Kolar <mkolar@redhat.com> - 10.2-6
 -  init FMF CI gating (Michal Kolar).
 
