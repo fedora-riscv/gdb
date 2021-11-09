@@ -37,7 +37,7 @@ Version: 11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 4%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,6 +1143,9 @@ fi
 %endif
 
 %changelog
+* Tue Nov 9 2021 Bruno Larsen - 11.1-4
+- Backport manpage update to be closer to -help (RHBZ 853071)
+
 * Wed Nov 3 2021 Kevin Buettner - 11.1-3
 - Make adjustments to gdb-6.6-buildid-locate.patch, provided by Tom de Vries.
 
