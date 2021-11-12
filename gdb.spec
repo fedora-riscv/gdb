@@ -37,7 +37,7 @@ Version: 11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 5%{?dist}
+Release: 6%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -582,10 +582,11 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
     --disable-unit-tests \
     --disable-source-highlight"
 
-export CFLAGS="$RPM_OPT_FLAGS %{?_with_asan:-fsanitize=address}"
-export LDFLAGS="%{?__global_ldflags} %{?_with_asan:-fsanitize=address}"
-
-export CXXFLAGS="$CFLAGS"
+# Populate CFLAGS, LDFLAGS, CC, CXX, etc.
+%set_build_flags
+CFLAGS="$CFLAGS %{?_with_asan:-fsanitize=address}"
+LDFLAGS="$LDFLAGS {?_with_asan:-fsanitize=address}"
+CXXFLAGS="$CXXFLAGS %{?_with_asan:-fsanitize=address}"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
@@ -1143,6 +1144,9 @@ fi
 %endif
 
 %changelog
+* Fri Nov 12 2021 Timm Bäder <tbaeder@redhat.com> - 11.1-6
+- Use %%set_build_flags to populate all relevant build flags
+
 * Wed Nov 10 2021 Kevin Buettner - 11.1-5
 - Backport upstream fix and test case for a dprintf bug (RHBZ 2022177, Kevin
   Buettner).
