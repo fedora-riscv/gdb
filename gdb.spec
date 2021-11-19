@@ -585,7 +585,7 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
 # Populate CFLAGS, LDFLAGS, CC, CXX, etc.
 %set_build_flags
 CFLAGS="$CFLAGS %{?_with_asan:-fsanitize=address}"
-LDFLAGS="$LDFLAGS {?_with_asan:-fsanitize=address}"
+LDFLAGS="$LDFLAGS %{?_with_asan:-fsanitize=address}"
 CXXFLAGS="$CXXFLAGS %{?_with_asan:-fsanitize=address}"
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
