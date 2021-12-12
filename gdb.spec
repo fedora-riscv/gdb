@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "gdb: Introduce setting construct within cmd_list_element"
+  (RHBZ 2024875, Lancelot SIX).
+
+* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: remove cmd_list_element::function::sfunc"
   (RHBZ 2024875, Simon Marchi).
 
