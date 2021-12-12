@@ -1143,44 +1143,48 @@ fi
 %endif
 
 %changelog
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "gdb.texinfo: Expand documentation for debuginfod"
+  (RHBZ 2024875, Aaron Merey).
+
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add set/show commands for managing debuginfod"
   (RHBZ 2024875, Aaron Merey).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add add_setshow_prefix_cmd"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: Have setter and getter callbacks for settings"
   (RHBZ 2024875, Lancelot SIX).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: make string-like set show commands use
   std::string variable"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: make inferior::m_terminal an std::string"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: make inferior::m_args an std::string"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add setter/getter for inferior arguments"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: Introduce setting construct within cmd_list_element"
   (RHBZ 2024875, Lancelot SIX).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: remove cmd_list_element::function::sfunc"
   (RHBZ 2024875, Simon Marchi).
 
-* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: rename cfunc to simple_func" (RHBZ 2024875,
   Simon Marchi).
 
