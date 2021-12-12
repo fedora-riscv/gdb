@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "gdb: make inferior::m_args an std::string"
+  (RHBZ 2024875, Simon Marchi).
+
+* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add setter/getter for inferior arguments"
   (RHBZ 2024875, Simon Marchi).
 
