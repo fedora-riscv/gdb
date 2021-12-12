@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Nov 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "gdb: add set/show commands for managing debuginfod"
+  (RHBZ 2024875, Aaron Merey).
+
+* Fri Nov 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add add_setshow_prefix_cmd"
   (RHBZ 2024875, Simon Marchi).
 
