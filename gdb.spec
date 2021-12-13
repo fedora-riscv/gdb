@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Dec 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "Fix unittest.exp failure due to 'set debuginfod' addition"
+  (RHBZ 2024875, Tom Tromey).
+
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb.texinfo: Expand documentation for debuginfod"
   (RHBZ 2024875, Aaron Merey).
 
