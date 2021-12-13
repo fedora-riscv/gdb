@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Dec 10 2021 Alexandra Hájková - 11.1-6
+- Backport upstream patch "rework "set debuginfod" commands"
+  (RHBZ 2024875, Simon Marchi).
+
+* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: pass/return setting setter/getter
   scalar values by value" (RHBZ 2024875, Simon Marchi).
 
