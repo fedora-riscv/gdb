@@ -75,8 +75,9 @@ rlJournalStart
       rlRun "su -c 'bash ./configure &>$TmpDir/configure-gnulib.log' $BUILD_USER"
       rlRun "rlFileSubmit $TmpDir/configure-gnulib.log configure-gnulib.log"
     fi
+    rlRun "configure_flags=\$(rpmspec -D \"_topdir $TmpDir\" -P $TmpDir/SPECS/*.spec | grep -o -E '\-\-(prefix|with\-gdb\-datadir|with\-separate\-debug\-dir|with\-python)=\S+' | tr '\n' ' ')"
     rlRun "cd $TmpDir/BUILD/gdb-*/gdb"
-    rlRun "su -c './configure &>$TmpDir/configure.log' $BUILD_USER"
+    rlRun "su -c './configure $configure_flags &>$TmpDir/configure.log' $BUILD_USER"
     rlRun "rlFileSubmit $TmpDir/configure.log configure.log"
     rlRun "DATADIR=`gdb -ex 'show data-directory' -batch | grep -o -E '/[^\"]+'`"
     rlRun "mv data-directory data-directory.orig"
