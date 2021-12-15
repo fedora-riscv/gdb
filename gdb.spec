@@ -518,7 +518,7 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--mandir=%{_mandir}					\
 	--infodir=%{_infodir}					\
 	--with-gdb-datadir=%{_datadir}/gdb			\
-	--enable-gdb-build-warnings=,-Wno-unused,-Wno-deprecated-declarations \
+	--enable-gdb-build-warnings=,-Wno-unused,-Wno-deprecated-declarations,-Wno-unused-function\
 	--enable-build-with-cxx					\
 %ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
@@ -526,7 +526,7 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--enable-werror						\
 %endif
 	--with-separate-debug-dir=/usr/lib/debug		\
-	--disable-sim						\
+	--disable-sim			                	\
 	--disable-rpath						\
 	--without-stage1-ldflags				\
 	--disable-libmcheck					\
@@ -1144,6 +1144,11 @@ fi
 %endif
 
 %changelog
+* Mon Jan 10 2021 Alexandra Hájková - 11.1-8
+- Add -Wno-unused-function to --enable-gdb-build-warnings to prevent the build failure:
+  "../../gdb/c-exp.y:3455:1: error: 'void c_print_token(FILE*, int, YYSTYPE)'
+  defined but not used [-Werror=unused-function]"
+
 * Mon Jan 10 2022 Alexandra Hájková - 11.1-8
 - Backport upstream patch "gdb: add set/show commands for managing debuginfod"
   (RHBZ 2024875, Aaron Merey).
