@@ -1143,11 +1143,15 @@ fi
 %endif
 
 %changelog
-* Fri Jan 5 2022 Alexandra Hájková - 11.1-6
+* Wed Jan 5 2022 Alexandra Hájková - 11.1-6
+- Backport upstream patch "Fix unittest.exp failure due to 'set debuginfod' addition"
+  (RHBZ 2024875, Tom Tromey).
+
+* Wed Jan 5 2022 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb: add set/show commands for managing debuginfod"
   (RHBZ 2024875, Aaron Merey).
 
-* Fri Jan 5 2022 Alexandra Hájková - 11.1-6
+* Wed Jan 5 2022 Alexandra Hájková - 11.1-6
 - Backport upstream patch "gdb.texinfo: Expand documentation for debuginfod"
   (RHBZ 2024875, Aaron Merey).
 
