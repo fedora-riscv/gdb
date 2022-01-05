@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Wed Jan 5 2022 Alexandra Hájková - 11.1-6
+-Backport upstream patch "[PR gdb/27026] CTRL-C is ignored
+ when debug info is downloaded" (RHBZ 2024875, Aaron Merey).
+
+* Wed Jan 5 2022 Alexandra Hájková - 11.1-6
 - Backport upstream patch "rework "set debuginfod" commands"
   (RHBZ 2024875, Simon Marchi).
 
