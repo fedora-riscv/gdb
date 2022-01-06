@@ -37,7 +37,7 @@ Version: 11.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 6%{?dist}
+Release: 5%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,67 +1143,6 @@ fi
 %endif
 
 %changelog
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "[PR gdb/27026] CTRL-C is ignored
-  when debug info is downloaded" (RHBZ 2024875, Aaron Merey).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "rework "set debuginfod" commands"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: pass/return setting setter/getter
-  scalar values by value" (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "Fix unittest.exp failure due to 'set debuginfod' addition"
-  (RHBZ 2024875, Tom Tromey).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb.texinfo: Expand documentation for debuginfod"
-  (RHBZ 2024875, Aaron Merey).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: add set/show commands for managing debuginfod"
-  (RHBZ 2024875, Aaron Merey).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: add add_setshow_prefix_cmd"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: Have setter and getter callbacks for settings"
-  (RHBZ 2024875, Lancelot SIX).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: make string-like set show commands use
-  std::string variable"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: make inferior::m_terminal an std::string"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: make inferior::m_args an std::string"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: add setter/getter for inferior arguments"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: Introduce setting construct within cmd_list_element"
-  (RHBZ 2024875, Lancelot SIX).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: remove cmd_list_element::function::sfunc"
-  (RHBZ 2024875, Simon Marchi).
-
-* Fri Dec 10 2021 Alexandra Hájková - 11.1-6
-- Backport upstream patch "gdb: rename cfunc to simple_func" (RHBZ 2024875,
-  Simon Marchi).
-
 * Wed Nov 10 2021 Kevin Buettner - 11.1-5
 - Backport upstream fix and test case for a dprintf bug (RHBZ 2022177, Kevin
   Buettner).
