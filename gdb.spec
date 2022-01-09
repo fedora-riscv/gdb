@@ -1144,6 +1144,10 @@ fi
 
 %changelog
 * Fri Jan 7 2022 Alexandra Hájková - 11.1-6
+- Backport upstream patch "rework "set debuginfod" commands"
+  (RHBZ 2024875, Simon Marchi).
+
+* Fri Jan 7 2022 Alexandra Hájková - 11.1-6
 - Backport upstream patch "Fix unittest.exp failure due to 'set debuginfod' addition"
   (RHBZ 2024875, Tom Tromey).
 
