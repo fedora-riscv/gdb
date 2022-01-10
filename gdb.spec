@@ -1145,6 +1145,10 @@ fi
 
 %changelog
 * Mon Jan 10 2022 Alexandra Hájková - 11.1-8
+- Backport upstream patch "gdb: add set/show commands for managing debuginfod"
+  (RHBZ 2024875, Aaron Merey).
+
+* Mon Jan 10 2022 Alexandra Hájková - 11.1-8
 - Backport upstream patch "gdb.texinfo: Expand documentation for debuginfod"
   (RHBZ 2024875, Aaron Merey).
 
