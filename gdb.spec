@@ -1144,6 +1144,10 @@ fi
 %endif
 
 %changelog
+* Tue Jan 11 2021 Alexandra Hájková - 11.1-8
+- Backport upstream patch "Fix unittest.exp failure due to 'set debuginfod' addition"
+  (RHBZ 2024875, Tom Tromey).
+
 * Mon Jan 10 2021 Alexandra Hájková - 11.1-8
 - Add -Wno-unused-function to --enable-gdb-build-warnings to prevent the build failure:
   "../../gdb/c-exp.y:3455:1: error: 'void c_print_token(FILE*, int, YYSTYPE)'
