@@ -187,7 +187,7 @@ Source5: %{libstdcxxpython}.tar.xz
 Source6: gdbtui
 
 # libipt: Intel Processor Trace Decoder Library
-%global libipt_version 2.0.4
+%global libipt_version 2.0.5
 #=fedora
 Source7: v%{libipt_version}.tar.gz
 #=fedora
@@ -1144,8 +1144,9 @@ fi
 %endif
 
 %changelog
-* Wed Jan 26 2022 Keith Seitz <keiths@redhat.com> - 11.1-11
+* Mon Jan 31 2022 Keith Seitz <keiths@redhat.com> - 11.1-11
 - Fix buld issues. (RHBZ 2042257, Keith Seitz, Andrew Burgess)
+- Update libipt to 2.0.5.
 
 * Thu Jan 20 2022 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
