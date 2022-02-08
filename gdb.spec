@@ -1144,7 +1144,7 @@ fi
 %endif
 
 %changelog
-* Mon Jan 31, 2022 Kevin Buettner <kevinb@redhat.com> - 11.1-12
+* Mon Jan 31 2022 Kevin Buettner <kevinb@redhat.com> - 11.1-12
 - Fix "sect_index_data not initialized" internal error. (RHBZ 2042664,
   Kevin Buettner).
 
