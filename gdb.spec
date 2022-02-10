@@ -37,7 +37,7 @@ Version: 11.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -519,6 +519,9 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--infodir=%{_infodir}					\
 	--with-gdb-datadir=%{_datadir}/gdb			\
 	--enable-gdb-build-warnings=,-Wno-unused,-Wno-deprecated-declarations,-Wno-unused-function\
+%ifarch %{ix86}
+,-Wno-format-overflow\
+%endif
 	--enable-build-with-cxx					\
 %ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
 	--disable-werror					\
@@ -1144,6 +1147,13 @@ fi
 %endif
 
 %changelog
+* Wed Feb 9 2022 Kevin Buettner - 11.2-2
+- On ix86, add -Wno-format-overflow to --enable-gdb-build-warnings. 
+  (This is a workaround for the bogus warning/error that we now see
+  on i686 regarding a "may write a terminating nul past the end of
+  the destination" message for the sprintf() call in
+  global_symbol_searcher::search() in gdb/symtab.c.)
+
 * Wed Feb 9 2022 Kevin Buettner - 11.2-1
 - Rebase to FSF GDB 11.2.
 
