@@ -37,7 +37,7 @@ Version: 11.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1143,6 +1143,10 @@ fi
 %endif
 
 %changelog
+* Fri Mar 25 2022 Kevin Buettner - 11.2-2
+- Backport upstream patch which removes sizes from debuginfod download
+  messages when the size is not available (RHBZ 2068280, Aaron Merey).
+
 * Tue Feb 8 2022 Kevin Buettner - 11.2-1
 - Rebase to FSF GDB 11.2.
 
