@@ -37,7 +37,7 @@ Version: 11.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1147,6 +1147,10 @@ fi
 %endif
 
 %changelog
+* Wed Mar 30 2022 Kevin Buettner - 11.2-3
+- Backport upstream patch which removes sizes from debuginfod download
+  messages when the size is not available (RHBZ 2068280, Aaron Merey).
+
 * Wed Feb 9 2022 Kevin Buettner - 11.2-2
 - On ix86, add -Wno-format-overflow to --enable-gdb-build-warnings. 
   (This is a workaround for the bogus warning/error that we now see
