@@ -463,14 +463,15 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  
    if (found == NULL)
      warning (_("File \"%s\" has no build-id, file skipped"),
-@@ -66,56 +465,159 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+@@ -66,63 +465,166 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    return retval;
  }
  
 +static char *
 +link_resolve (const char *symlink, int level)
 +{
-+  char buf[PATH_MAX + 1], *target, *retval;
++  char buf[PATH_MAX + 1], *retval;
++  gdb::unique_xmalloc_ptr<char> target;
 +  ssize_t got;
 +
 +  if (level > 10)
@@ -482,7 +483,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +  buf[got] = '\0';
 +
 +  if (IS_ABSOLUTE_PATH (buf))
-+    target = xstrdup (buf);
++    target = make_unique_xstrdup (buf);
 +  else
 +    {
 +      const std::string dir (ldirname (symlink));
@@ -496,8 +497,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +			   "%s", dir.c_str(), buf);
 +    }
 +
-+  retval = link_resolve (target, level + 1);
-+  xfree (target);
++  retval = link_resolve (target.get (), level + 1);
 +  return retval;
 +}
 +
@@ -516,42 +516,49 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +
    if (separate_debug_file_debug)
      {
--      printf_unfiltered (_("  Trying %s..."), link.c_str ());
-+      printf_unfiltered (_("  Trying %s..."), orig_link.c_str ());
-       gdb_flush (gdb_stdout);
+-      fprintf_unfiltered (gdb_stdlog, _("  Trying %s..."), link.c_str ());
+-      gdb_flush (gdb_stdlog);
++      fprintf_unfiltered (gdb_stdlog, _("  Trying %s..."), orig_link.c_str ());
++      gdb_flush (gdb_stdout);
      }
  
 -  /* lrealpath() is expensive even for the usually non-existent files.  */
--  gdb::unique_xmalloc_ptr<char> filename;
--  if (access (link.c_str (), F_OK) == 0)
--    filename.reset (lrealpath (link.c_str ()));
--
--  if (filename == NULL)
+-  gdb::unique_xmalloc_ptr<char> filename_holder;
+-  const char *filename = nullptr;
+-  if (startswith (link, TARGET_SYSROOT_PREFIX))
+-    filename = link.c_str ();
+-  else if (access (link.c_str (), F_OK) == 0)
 +  for (unsigned seqno = 0;; seqno++)
      {
--      if (separate_debug_file_debug)
--	printf_unfiltered (_(" no, unable to compute real path\n"));
+-      filename_holder.reset (lrealpath (link.c_str ()));
+-      filename = filename_holder.get ();
+-    }
 +      std::string link = orig_link;
  
--      return {};
--    }
+-  if (filename == NULL)
+-    {
+-      if (separate_debug_file_debug)
+-	fprintf_unfiltered (gdb_stdlog,
+-			    _(" no, unable to compute real path\n"));
 +      if (seqno > 0)
 +	{
 +	  /* There can be multiple build-id symlinks pointing to real files
 +	     with the same build-id (such as hard links).  Some of the real
 +	     files may not be installed.  */
-+
+ 
+-      return {};
+-    }
 +	  string_appendf (link, ".%u", seqno);
 +	}
  
 -  /* We expect to be silent on the non-existing files.  */
--  gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget);
+-  gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename, gnutarget);
 +      ret_link = link;
  
 -  if (debug_bfd == NULL)
 -    {
 -      if (separate_debug_file_debug)
--	printf_unfiltered (_(" no, unable to open.\n"));
+-	fprintf_unfiltered (gdb_stdlog, _(" no, unable to open.\n"));
 +      struct stat statbuf_trash;
 +
 +      /* `access' automatically dereferences LINK.  */
@@ -562,27 +569,33 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +	}
 +
 +      /* lrealpath() is expensive even for the usually non-existent files.  */
-+      gdb::unique_xmalloc_ptr<char> filename;
-+
-+      if (access (link.c_str (), F_OK) == 0)
-+	filename.reset (lrealpath (link.c_str ()));
++      gdb::unique_xmalloc_ptr<char> filename_holder;
++      const char *filename = nullptr;
++      if (startswith (link, TARGET_SYSROOT_PREFIX))
++	filename = link.c_str ();
++      else if (access (link.c_str (), F_OK) == 0)
++	{
++	  filename_holder.reset (lrealpath (link.c_str ()));
++	  filename = filename_holder.get ();
++	}
 +
 +      if (filename == NULL)
 +	{
 +	  if (separate_debug_file_debug)
-+	    printf_unfiltered (_(" no, unable to compute real path\n"));
++	    fprintf_unfiltered (gdb_stdlog,
++	                       _(" no, unable to compute real path\n"));
 +
 +	  continue;
 +	}
 +
 +      /* We expect to be silent on the non-existing files.  */
-+      gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename.get (), gnutarget, -1);
++      gdb_bfd_ref_ptr debug_bfd = gdb_bfd_open (filename, gnutarget);
  
 -      return {};
 +      if (debug_bfd == NULL)
 +	{
 +	  if (separate_debug_file_debug)
-+	    printf_unfiltered (_(" no, unable to open.\n"));
++	    fprintf_unfiltered (gdb_stdlog, _(" no, unable to open.\n"));
 +
 +	  continue;
 +	}
@@ -590,7 +603,8 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +      if (!build_id_verify (debug_bfd.get(), build_id_len, build_id))
 +	{
 +	  if (separate_debug_file_debug)
-+	    printf_unfiltered (_(" no, build-id does not match.\n"));
++	    fprintf_unfiltered (gdb_stdlog,
++	                        _(" no, build-id does not match.\n"));
 +
 +	  continue;
 +	}
@@ -605,10 +619,10 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
 +  if (ret_bfd != NULL)
      {
        if (separate_debug_file_debug)
--	printf_unfiltered (_(" no, build-id does not match.\n"));
+-	fprintf_unfiltered (gdb_stdlog, _(" no, build-id does not match.\n"));
 -
 -      return {};
-+	printf_unfiltered (_(" yes!\n"));
++	fprintf_unfiltered (gdb_stdlog, _(" yes!\n"));
 +    }
 +  else
 +    {
@@ -632,7 +646,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
      }
  
 -  if (separate_debug_file_debug)
--    printf_unfiltered (_(" yes!\n"));
+-    fprintf_unfiltered (gdb_stdlog, _(" yes!\n"));
 +  if (link_return != NULL)
 +    {
 +      if (ret_bfd != NULL)
@@ -650,7 +664,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  }
  
  /* Common code for finding BFDs of a given build-id.  This function
-@@ -124,7 +626,7 @@ build_id_to_debug_bfd_1 (const std::string &link, size_t build_id_len,
+@@ -131,7 +633,7 @@ build_id_to_debug_bfd_1 (const std::string &link, size_t build_id_len,
  
  static gdb_bfd_ref_ptr
  build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
@@ -659,7 +673,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  {
    /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
       cause "/.build-id/..." lookups.  */
-@@ -147,16 +649,17 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
+@@ -154,16 +656,17 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
        if (size > 0)
  	{
  	  size--;
@@ -680,8 +694,8 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        if (debug_bfd != NULL)
  	return debug_bfd;
  
-@@ -170,7 +673,8 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
-       if (strcmp (gdb_sysroot, TARGET_SYSROOT_PREFIX) != 0)
+@@ -174,7 +677,8 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
+       if (!gdb_sysroot.empty ())
  	{
  	  link = gdb_sysroot + link;
 -	  debug_bfd = build_id_to_debug_bfd_1 (link, build_id_len, build_id);
@@ -690,7 +704,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
  	  if (debug_bfd != NULL)
  	    return debug_bfd;
  	}
-@@ -179,38 +683,208 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
+@@ -183,30 +687,187 @@ build_id_to_bfd_suffix (size_t build_id_len, const bfd_byte *build_id,
    return {};
  }
  
@@ -884,8 +898,9 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
    if (build_id != NULL)
      {
        if (separate_debug_file_debug)
- 	printf_unfiltered (_("\nLooking for separate debug info (build-id) for "
- 			     "%s\n"), objfile_name (objfile));
+@@ -214,8 +875,21 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
+ 			    _("\nLooking for separate debug info (build-id) for "
+ 			      "%s\n"), objfile_name (objfile));
  
 +      char *build_id_filename_cstr = NULL;
        gdb_bfd_ref_ptr abfd (build_id_to_debug_bfd (build_id->size,
@@ -906,7 +921,7 @@ diff --git a/gdb/build-id.c b/gdb/build-id.c
        /* Prevent looping on a stripped .debug file.  */
        if (abfd != NULL
  	  && filename_cmp (bfd_get_filename (abfd.get ()),
-@@ -223,3 +897,22 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
+@@ -228,3 +902,22 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
  
    return std::string ();
  }
@@ -1056,7 +1071,7 @@ diff --git a/gdb/corelow.c b/gdb/corelow.c
 diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
 --- a/gdb/doc/gdb.texinfo
 +++ b/gdb/doc/gdb.texinfo
-@@ -21415,6 +21415,27 @@ information files.
+@@ -21524,6 +21524,27 @@ information files.
  
  @end table
  
@@ -1087,7 +1102,7 @@ diff --git a/gdb/doc/gdb.texinfo b/gdb/doc/gdb.texinfo
 diff --git a/gdb/dwarf2/index-cache.c b/gdb/dwarf2/index-cache.c
 --- a/gdb/dwarf2/index-cache.c
 +++ b/gdb/dwarf2/index-cache.c
-@@ -95,7 +95,7 @@ index_cache::store (dwarf2_per_objfile *per_objfile)
+@@ -97,7 +97,7 @@ index_cache::store (dwarf2_per_objfile *per_objfile)
      return;
  
    /* Get build id of objfile.  */
@@ -1095,8 +1110,8 @@ diff --git a/gdb/dwarf2/index-cache.c b/gdb/dwarf2/index-cache.c
 +  const bfd_build_id *build_id = build_id_bfd_shdr_get (obj->obfd);
    if (build_id == nullptr)
      {
-       if (debug_index_cache)
-@@ -113,7 +113,8 @@ index_cache::store (dwarf2_per_objfile *per_objfile)
+       index_cache_debug ("objfile %s has no build id",
+@@ -114,7 +114,8 @@ index_cache::store (dwarf2_per_objfile *per_objfile)
  
    if (dwz != nullptr)
      {
@@ -1109,7 +1124,7 @@ diff --git a/gdb/dwarf2/index-cache.c b/gdb/dwarf2/index-cache.c
 diff --git a/gdb/dwarf2/read.c b/gdb/dwarf2/read.c
 --- a/gdb/dwarf2/read.c
 +++ b/gdb/dwarf2/read.c
-@@ -5447,7 +5447,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
+@@ -5476,7 +5476,7 @@ get_gdb_index_contents_from_section (objfile *obj, T *section_owner)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_bfd *dwarf2_per_bfd)
  {
@@ -1118,7 +1133,7 @@ diff --git a/gdb/dwarf2/read.c b/gdb/dwarf2/read.c
    if (build_id == nullptr)
      return {};
  
-@@ -5460,7 +5460,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_bfd *dwarf2_per_bfd)
+@@ -5489,7 +5489,7 @@ get_gdb_index_contents_from_cache (objfile *obj, dwarf2_per_bfd *dwarf2_per_bfd)
  static gdb::array_view<const gdb_byte>
  get_gdb_index_contents_from_cache_dwz (objfile *obj, dwz_file *dwz)
  {
@@ -1130,7 +1145,7 @@ diff --git a/gdb/dwarf2/read.c b/gdb/dwarf2/read.c
 diff --git a/gdb/elfread.c b/gdb/elfread.c
 --- a/gdb/elfread.c
 +++ b/gdb/elfread.c
-@@ -1272,7 +1272,9 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -1270,7 +1270,9 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
  	   && objfile->separate_debug_objfile == NULL
  	   && objfile->separate_debug_objfile_backlink == NULL)
      {
@@ -1141,7 +1156,7 @@ diff --git a/gdb/elfread.c b/gdb/elfread.c
  
        if (debugfile.empty ())
  	debugfile = find_separate_debug_file_by_debuglink (objfile);
-@@ -1287,7 +1289,7 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -1285,7 +1287,7 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
        else
  	{
  	  has_dwarf2 = false;
@@ -1150,7 +1165,7 @@ diff --git a/gdb/elfread.c b/gdb/elfread.c
  
  	  if (build_id != nullptr)
  	    {
-@@ -1312,6 +1314,10 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
+@@ -1310,6 +1312,10 @@ elf_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
  		      has_dwarf2 = true;
  		    }
  		}
@@ -1164,7 +1179,7 @@ diff --git a/gdb/elfread.c b/gdb/elfread.c
 diff --git a/gdb/exec.c b/gdb/exec.c
 --- a/gdb/exec.c
 +++ b/gdb/exec.c
-@@ -237,7 +237,7 @@ validate_exec_file (int from_tty)
+@@ -238,7 +238,7 @@ validate_exec_file (int from_tty)
    current_exec_file = get_exec_file (0);
  
    const bfd_build_id *exec_file_build_id
@@ -1173,7 +1188,7 @@ diff --git a/gdb/exec.c b/gdb/exec.c
    if (exec_file_build_id != nullptr)
      {
        /* Prepend the target prefix, to force gdb_bfd_open to open the
-@@ -250,7 +250,7 @@ validate_exec_file (int from_tty)
+@@ -251,7 +251,7 @@ validate_exec_file (int from_tty)
        if (abfd != nullptr)
  	{
  	  const bfd_build_id *target_exec_file_build_id
@@ -1185,7 +1200,7 @@ diff --git a/gdb/exec.c b/gdb/exec.c
 diff --git a/gdb/objfiles.h b/gdb/objfiles.h
 --- a/gdb/objfiles.h
 +++ b/gdb/objfiles.h
-@@ -812,6 +812,10 @@ struct objfile
+@@ -769,6 +769,10 @@ struct objfile
    bool skip_jit_symbol_lookup = false;
  };
  
@@ -1228,7 +1243,7 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
  
  static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
  static int svr4_have_link_map_offsets (void);
-@@ -1348,9 +1349,51 @@ svr4_read_so_list (svr4_info *info, CORE_ADDR lm, CORE_ADDR prev_lm,
+@@ -1248,9 +1249,51 @@ svr4_read_so_list (svr4_info *info, CORE_ADDR lm, CORE_ADDR prev_lm,
  	  continue;
  	}
  
@@ -1286,7 +1301,7 @@ diff --git a/gdb/solib-svr4.c b/gdb/solib-svr4.c
 diff --git a/gdb/source.c b/gdb/source.c
 --- a/gdb/source.c
 +++ b/gdb/source.c
-@@ -1178,7 +1178,7 @@ open_source_file (struct symtab *s)
+@@ -1199,7 +1199,7 @@ open_source_file (struct symtab *s)
  	      srcpath += s->filename;
  	    }
  
@@ -1381,7 +1396,7 @@ diff --git a/gdb/testsuite/gdb.base/new-ui-pending-input.exp b/gdb/testsuite/gdb
 diff --git a/gdb/testsuite/lib/gdb.exp b/gdb/testsuite/lib/gdb.exp
 --- a/gdb/testsuite/lib/gdb.exp
 +++ b/gdb/testsuite/lib/gdb.exp
-@@ -130,7 +130,8 @@ if ![info exists INTERNAL_GDBFLAGS] {
+@@ -141,7 +141,8 @@ if ![info exists INTERNAL_GDBFLAGS] {
  		   "-nx" \
  		   "-data-directory $BUILD_DATA_DIRECTORY" \
  		   {-iex "set height 0"} \
@@ -1391,7 +1406,7 @@ diff --git a/gdb/testsuite/lib/gdb.exp b/gdb/testsuite/lib/gdb.exp
  }
  
  # The variable gdb_prompt is a regexp which matches the gdb prompt.
-@@ -2130,6 +2131,17 @@ proc default_gdb_start { } {
+@@ -2200,6 +2201,17 @@ proc default_gdb_start { } {
  	}
      }
  
