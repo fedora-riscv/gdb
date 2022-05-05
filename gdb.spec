@@ -325,8 +325,8 @@ BuildRequires: prelink
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1}
-# Fedora arm+ppc64le do not yet have fpc built.
-%ifnarch %{arm} ppc64le
+# Fedora s390x does not have fpc.
+%ifnarch s390x
 BuildRequires: fpc
 %endif
 %endif
