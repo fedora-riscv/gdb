@@ -270,18 +270,16 @@ BuildRequires: elfutils-debuginfod-client-devel
 %global bits_local %{?_isa}
 %global bits_other %{?_isa}
 %ifarch s390x
-%if 0%{!?rhel:1} || 0%{?rhel} < 8
+%if 0%{?rhel:1} && 0%{?rhel} < 8
 %global bits_other (%{__isa_name}-32)
 %endif
-%else #!s390x
+%endif
 %ifarch ppc
 %global bits_other (%{__isa_name}-64)
-%else #!ppc
-%ifarch sparc64 ppc64 s390x x86_64
+%endif
+%ifarch sparc64 ppc64 x86_64
 %global bits_other (%{__isa_name}-32)
-%endif #sparc64 ppc64 s390x x86_64
-%endif #!ppc
-%endif #!s390x
+%endif
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
@@ -325,8 +323,8 @@ BuildRequires: prelink
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1}
-# Fedora arm+ppc64le do not yet have fpc built.
-%ifnarch %{arm} ppc64le
+# Fedora s390x does not have fpc.
+%ifnarch s390x
 BuildRequires: fpc
 %endif
 %endif
