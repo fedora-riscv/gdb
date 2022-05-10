@@ -237,8 +237,12 @@ BuildRequires: texlive-collection-latexrecommended
 BuildRequires: /usr/bin/pod2man
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: libbabeltrace-devel%{buildisa}
-%if 0%{?rhel} < 9
+%if 0%{!?rhel:1}
 BuildRequires: guile22-devel%{buildisa}
+%endif
+# Guile is only supported prior to RHEL9, where it was called "guile".
+%if 0%{?rhel:1} && 0%{?rhel} < 9
+BuildRequires: guile-devel%{buildisa}
 %endif
 %endif
 %global have_libipt 0
