@@ -29,15 +29,15 @@
 Name: %{?scl_prefix}gdb
 
 # Freeze it when GDB gets branched
-%global snapsrc    20200208
+%global snapsrc    20220501
 # See timestamp of source gnulib installed into gnulib/ .
 %global snapgnulib 20210105
 %global tarname gdb-%{version}
-Version: 11.2
+Version: 12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 3%{?dist}
+Release: 1%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -934,7 +934,7 @@ touch -r %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit
 for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb/python/gdb -name "*.py"`
 do
   # Files could be also patched getting the current time.
-  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
+  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/version.in $i
 done
 
 %if 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
@@ -980,7 +980,7 @@ cp -a $RPM_BUILD_DIR/%{gdb_src}/%{libstdcxxpython}/libstdcxx	\
 %endif # 0%{?rhel:1} && 0%{?rhel} <= 7
 for i in `find $RPM_BUILD_ROOT%{_datadir}/gdb -name "*.py"`; do
   # Files are installed by install(1) not preserving the timestamps.
-  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/ChangeLog $i
+  touch -r $RPM_BUILD_DIR/%{gdb_src}/gdb/version.in $i
 done
 %endif # 0%{!?_without_python:1}
 
@@ -1026,6 +1026,7 @@ ln -s gstack $RPM_BUILD_ROOT%{_bindir}/pstack
 # Documentation only for development.
 rm -f $RPM_BUILD_ROOT%{_infodir}/gdbint*
 rm -f $RPM_BUILD_ROOT%{_infodir}/stabs*
+rm -f $RPM_BUILD_ROOT%{_infodir}/ctf-spec*
 
 # Delete this too because the dir file will be updated at rpm install time.
 # We don't want a gdb specific one overwriting the system wide one.
@@ -1149,6 +1150,12 @@ fi
 %endif
 
 %changelog
+* Thu May 12 2022 Kevin Buettner - 12.1-1
+- Rebase to FSF GDB 12.1.
+- Update gdb-6.6-buildid-locate.patch.
+- Update gdb-6.6-buildid-locate-rpm.patch.
+- Dropped backported patches from GDB 11.1 and 11.2.
+
 * Wed Mar 30 2022 Kevin Buettner - 11.2-3
 - Backport upstream patch which removes sizes from debuginfod download
   messages when the size is not available (RHBZ 2068280, Aaron Merey).
