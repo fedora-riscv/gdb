@@ -11,7 +11,19 @@
 %global _python_bytecompile_extra 0
 
 # Disable LTO until upstream fixes GDB's ODR woes.
-#%define _lto_cflags %{nil}
+%define _lto_cflags %{nil}
+
+# Only build on x86 for RHEL6 SCL, defining missing parallel make macros.
+%if 0%{?scl:1} && 0%{?el6:1}
+ExclusiveArch: %{ix86} x86_64
+%global make_build make %{?_smp_mflags}
+%global make_install make %{?_smp_mflags} install DESTDIR=$RPM_BUILD_ROOT
+%endif
+
+# Exclude aarch64 on RHEL7.
+%if 0%{?scl:1} && 0%{?el7:1}
+ExcludeArch: aarch64
+%endif
 
 %{?scl:%scl_package gdb}
 %{!?scl:
@@ -58,7 +70,8 @@ URL: https://gnu.org/software/gdb/
 %undefine _debuginfo_subpackages
 
 # For DTS RHEL<=7 GDB it is better to use none than a Requires dependency.
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
+# We don't support gcc-gdb-plugin on RHEL anymore.
+%if 0%{!?rhel:1}
 Recommends: %{?scl_prefix}gcc-gdb-plugin%{?_isa}
 Recommends: dnf-command(debuginfo-install)
 %endif
@@ -152,9 +165,11 @@ BuildRequires: %{librpmname}
 Recommends: %{librpmname}
 %endif
 
-%if 0%{?el6:1}
+%if 0%{?el6:1} || 0%{?el7:1}
 # GDB C++11 requires devtoolset gcc.
 BuildRequires: %{?scl_prefix}gcc-c++
+%else
+BuildRequires: gcc-c++
 %endif
 
 # GDB patches have the format `gdb-<version>-bz<red-hat-bz-#>-<desc>.patch'.
@@ -190,8 +205,6 @@ Source6: gdbtui
 %global libipt_version 2.0.5
 #=fedora
 Source7: v%{libipt_version}.tar.gz
-#=fedora
-Patch1142: v1.5-libipt-static.patch
 
 # Include the auto-generated file containing the "Patch:" directives.
 # See README.local-patches for more details.
@@ -199,14 +212,15 @@ Patch9998: _gdb.spec.Patch.include
 Patch9999: _gdb.spec.patch.include
 %include %{PATCH9998}
 
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-# RL_STATE_FEDORA_GDB would not be found for:
-# Patch642: gdb-readline62-ask-more-rh.patch
-# --with-system-readline
-BuildRequires: readline-devel%{buildisa} >= 6.2-4
-%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+# System readline is too old prior to RHEL8.
+%if 0%{!?rhel:1} || 0%{?rhel} > 7
+%global use_system_readline 1
+BuildRequires: readline-devel%{buildisa} >= 7.0
+%else
+%global use_system_readline 0
+%endif
 
-BuildRequires: gcc-c++ ncurses-devel%{buildisa} texinfo gettext flex bison
+BuildRequires: ncurses-devel%{buildisa} texinfo gettext flex bison
 BuildRequires: expat-devel%{buildisa}
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz-devel%{buildisa}
@@ -217,6 +231,7 @@ BuildRequires: zlib-devel%{buildisa} libselinux-devel%{buildisa}
 %if 0%{!?_without_python:1}
 %if 0%{?rhel:1} && 0%{?rhel} <= 7
 BuildRequires: python-devel%{buildisa}
+%global __python /usr/bin/python2
 %else
 %global __python %{__python3}
 BuildRequires: python3-devel%{buildisa}
@@ -262,11 +277,32 @@ BuildRequires: libipt-devel%{buildisa}
 # Fedora < 32, and mpfr-4 on Fedora 32+ and RHEL-9+.
 BuildRequires: mpfr-devel%{buildisa}
 %endif
+# RHEL6 doesn't have source-highlight.
+%if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: source-highlight-devel
+%endif
 %if 0%{!?rhel:1}
 BuildRequires: xxhash-devel
 %endif
+
+# Special case: on RHEL8, we simply require the system debuginfod.
+# Otherwise, we require the SCL version.  Except on RHEL6, where debuginfod
+# is not supported at all.
+%global have_debuginfod 0
+%global use_scl_for_debuginfod 0
+%if 0%{!?rhel:1} || 0%{?rhel} == 8
+%global have_debuginfod 1
 BuildRequires: elfutils-debuginfod-client-devel
+%else
+%if 0%{!?el6:1} && 0%{?scl:1}
+%global have_debuginfod 1
+%global use_scl_for_debuginfod 1
+BuildRequires: %{?scl_prefix}elfutils-debuginfod-client-devel
+%endif
+%endif
+
+# Workaround for missing boost-devel dependency (rhbz 1718480)
+BuildRequires: boost-devel
 
 %if 0%{?_with_testsuite:1}
 
@@ -274,25 +310,30 @@ BuildRequires: elfutils-debuginfod-client-devel
 %global bits_local %{?_isa}
 %global bits_other %{?_isa}
 %ifarch s390x
-%if 0%{?rhel:1} && 0%{?rhel} < 8
+%if 0%{!?rhel:1} || 0%{?rhel} < 8
 %global bits_other (%{__isa_name}-32)
 %endif
-%endif
+%else #!s390x
 %ifarch ppc
 %global bits_other (%{__isa_name}-64)
-%endif
-%ifarch sparc64 ppc64 x86_64
+%else #!ppc
+%ifarch sparc64 ppc64 s390x x86_64
 %global bits_other (%{__isa_name}-32)
-%endif
+%endif #sparc64 ppc64 s390x x86_64
+%endif #!ppc
+%endif #!s390x
 
 BuildRequires: sharutils dejagnu
 # gcc-objc++ is not covered by the GDB testsuite.
-BuildRequires: gcc gcc-c++ gcc-gfortran
+# Test supported SCL toolchain components.
+BuildRequires: %{?scl_prefix}gcc %{?scl_prefix}gcc-c++ %{?scl_prefix}gcc-gfortran
+
 %if 0%{!?rhel:1} || 0%{?rhel} < 8
 BuildRequires: gcc-objc
 %endif
-%if 0%{!?rhel:1} || 0%{?rhel} > 7
-BuildRequires: gcc-gdb-plugin%{?_isa}
+# We don't support gcc-gdb-plugin on RHEL anymore.
+%if 0%{!?rhel:1}
+BuildRequires: %{?scl_prefix}gcc-gdb-plugin%{?_isa}
 %endif
 %if 0%{?rhel:1} && 0%{?rhel} < 7
 BuildRequires: gcc-java libgcj%{bits_local} libgcj%{bits_other}
@@ -327,8 +368,8 @@ BuildRequires: prelink
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1}
-# Fedora s390x does not have fpc.
-%ifnarch s390x
+# Fedora arm+ppc64le do not yet have fpc built.
+%ifnarch %{arm} ppc64le
 BuildRequires: fpc
 %endif
 %endif
@@ -357,17 +398,17 @@ BuildRequires: libstdc++%{bits_local} libstdc++%{bits_other}
 BuildRequires: libquadmath%{bits_local} libquadmath%{bits_other}
 %endif
 %endif
-BuildRequires: glibc-static%{bits_local}
 # multilib glibc-static is open Bug 488472:
-#BuildRequires: glibc-static%{bits_other}
-# Exception for RHEL<=7
+%if 0%{?rhel} > 6
+BuildRequires: glibc-static%{bits_other}
+%endif
 %ifarch s390x
-BuildRequires: valgrind%{bits_local}
+BuildRequires: %{?scl_preifx}valgrind%{bits_local}
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
-BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
+BuildRequires: %{?scl_prefix}valgrind%{bits_local} valgrind%{bits_other}
 %endif
 %else
-BuildRequires: valgrind%{bits_local} valgrind%{bits_other}
+BuildRequires: %{?scl_prefix}valgrind%{bits_local} valgrind%{bits_other}
 %endif
 %if 0%{!?rhel:1} || 0%{?rhel} > 6
 BuildRequires: xz
@@ -375,8 +416,9 @@ BuildRequires: xz
 %if 0%{!?rhel:1} || 0%{?rhel} > 7
 BuildRequires: rust
 %endif
-
+%if 0%{!?el6:1}
 BuildRequires: %{?scl_prefix}elfutils-debuginfod
+%endif
 %endif # 0%{?_with_testsuite:1}
 BuildRequires: make
 
@@ -451,10 +493,6 @@ tar xJf %{SOURCE5}
 
 %if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
 tar xzf %{SOURCE7}
-(
- cd libipt-%{libipt_version}
-%patch1142 -p1
-)
 %endif
 
 # Files have `# <number> <file>' statements breaking VPATH / find-debuginfo.sh .
@@ -490,14 +528,11 @@ rm -f bfd/doc/*.info-*
 rm -f gdb/doc/*.info
 rm -f gdb/doc/*.info-*
 
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
-# RL_STATE_FEDORA_GDB would not be found for:
-# Patch642: gdb-readline62-ask-more-rh.patch
-# --with-system-readline
+%if 0%{use_system_readline}
 mv -f readline/readline/doc readline-doc
 rm -rf readline/readline/*
 mv -f readline-doc readline/readline/doc
-%endif # 0%{!?rhel:1} || 0%{?rhel} > 6
+%endif
 
 rm -rf zlib texinfo
 
@@ -535,7 +570,7 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 	--disable-rpath						\
 	--without-stage1-ldflags				\
 	--disable-libmcheck					\
-%if 0%{!?rhel:1} || 0%{?rhel} > 6
+%if 0%{use_system_readline}
 	--with-system-readline					\
 %else
 	--without-system-readline				\
@@ -556,7 +591,9 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 %else
 	--without-lzma						\
 %endif
+%if 0%{!?rhel:1} || 0%{?have_debuginfod}
         --with-debuginfod					\
+%endif
 %if 0%{?rhel:1}
 	--disable-libctf
 %endif
@@ -592,6 +629,11 @@ GDB_MINIMAL_CONFIGURE_FLAGS="\
 CFLAGS="$CFLAGS %{?_with_asan:-fsanitize=address}"
 LDFLAGS="$LDFLAGS %{?_with_asan:-fsanitize=address}"
 CXXFLAGS="$CXXFLAGS %{?_with_asan:-fsanitize=address}"
+
+# If using an SCL for debuginfod, add path to SCL's pkgconfig directory.
+%if 0%{?have_debuginfod} && 0%{?use_scl_for_debuginfod}
+export PKG_CONFIG_PATH=%{_libdir}/pkgconfig
+%endif
 
 # --htmldir and --pdfdir are not used as they are used from %{gdb_build}.
 ../configure							\
@@ -631,25 +673,6 @@ CFLAGS="$CFLAGS -DDNF_DEBUGINFO_INSTALL"
 CFLAGS="$CFLAGS -DGDB_INDEX_VERIFY_VENDOR"
 %endif
 
-# [dts+el7] [x86*] Bundle linux_perf.h for libipt (RH BZ 1256513).
-%if %{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
-CFLAGS="$CFLAGS -DPERF_ATTR_SIZE_VER5_BUNDLE"
-%endif
-
-# Patch642: gdb-readline62-ask-more-rh.patch
-%if 0%{?rhel} == 7
-CFLAGS="$CFLAGS -DNEED_RL_STATE_FEDORA_GDB"
-%else
-# FIXME: Why not just: ! grep -w ...
-if grep -w RL_STATE_FEDORA_GDB %{_includedir}/readline/readline.h;then false;fi
-%endif
-
-# Patch337: gdb-6.8-attach-signalled-detach-stopped.patch
-# Patch331: gdb-6.8-quit-never-aborts.patch
-%if 0%{?rhel:1} && 0%{?rhel} <= 6
-CFLAGS="$CFLAGS -DNEED_DETACH_SIGSTOP"
-%endif
-
 %if 0%{have_libipt} && 0%{?el7:1} && 0%{?scl:1}
 (
  mkdir libipt-%{libipt_version}-root
@@ -671,6 +694,13 @@ LDFLAGS="$LDFLAGS -L$PWD/libipt-%{libipt_version}-root%{_libdir}"
 %endif
 
 export CXXFLAGS="$CFLAGS"
+
+# For DTS11+, gcc defaults to c++17, causing issues with system-installed
+# headers, e.g., python. Force to c++11.  We coerce all builds to use c++11
+# to facilitate testing.
+%if 0%{?rhel:1} && 0%{?rhel} < 8
+export CXXFLAGS="$CXXFLAGS -std=gnu++11"
+%endif
 
 # The configure flags we will use when building the full GDB.
 GDB_FULL_CONFIGURE_FLAGS="\
@@ -844,6 +874,11 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   for test in				\
     gdb.base/readline-overflow.exp	\
     gdb.base/bigcore.exp		\
+%if 0%{?rhel} < 7 
+    gdb.base/gnu-debugdata.exp          \
+    gdb.base/access-mem-running.exp     \
+    gdb.threads/access-mem-running-thread-exit.exp \
+%endif
   ; do
     mv -f ../../gdb/testsuite/$test ../gdb/testsuite/$test-DISABLED || :
   done
@@ -947,7 +982,7 @@ done
 %endif # 0%{?_enable_debug_packages:1} && 0%{!?_without_python:1}
 
 # Compile python files
-%if 0%{!?_without_python:1}
+%if 0%{!?_without_python:1} && (0%{!?rhel:1} || 0%{?rhel} > 7)
 %py_byte_compile %{__python3} %{buildroot}%{_datadir}/gdb/python/gdb
 %endif
 
