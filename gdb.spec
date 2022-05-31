@@ -6,6 +6,7 @@
 # --with profile: gcc -fprofile-generate / -fprofile-use: Before better
 #                 workload gets run it decreases the general performance now.
 # --define 'scl somepkgname': Independent packages by scl-utils-build.
+# --define 'tests "TEST1 ... TESTN": Limit testing to specified tests.
 
 # Turn off the brp-python-bytecompile automagic
 %global _python_bytecompile_extra 0
@@ -887,7 +888,13 @@ gcc -o ./orphanripper %{SOURCE2} -Wall -lutil -ggdb2
   # See also: gdb-runtest-pie-override.exp
   ###CHECK="$(echo $CHECK|sed 's#check//unix/[^ ]*#& &/-fPIC/-pie#g')"
 
-  ./orphanripper %make_build -k $CHECK || :
+TESTS=""
+%if 0%{?tests:1}
+  for test in %{tests}; do
+    TESTS="${TESTS:+$TESTS }$test"
+  done
+%endif
+  ./orphanripper make %{?_smp_mflags} -k $CHECK TESTS="$TESTS" || :
 )
 for t in sum log
 do
