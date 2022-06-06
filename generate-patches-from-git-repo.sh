@@ -50,6 +50,7 @@ for f in `cat _patch_order` ; do
     git rm -f $f
 done
 
+orig_dir=`pwd`
 cd $1
 
 # If patches were uncommitted when the patches were applied,
@@ -82,8 +83,8 @@ for c in `git rev-list --reverse ${common_ancestor}..HEAD` ; do
     # before, even if nothing has changed.  This is bad, so we replace
     # the commit hash by something constant (the string
     # "FEDORA_PATCHES").
-    git format-patch --no-signature --no-stat --keep-subject -1 --stdout $c | sed -e '1 s/^From [0-9a-f]\+ \(.*\)/From FEDORA_PATCHES \1/' -e '/^index [0-9a-f]\+\.\.[0-9a-f]\+.*$/d' > ../$fname
-    (cd .. && git add $fname)
+    git format-patch --no-signature --no-stat --keep-subject -1 --stdout $c | sed -e '1 s/^From [0-9a-f]\+ \(.*\)/From FEDORA_PATCHES \1/' -e '/^index [0-9a-f]\+\.\.[0-9a-f]\+.*$/d' > $orig_dir/$fname
+    (cd $orig_dir && git add $fname)
 
     cat >> $temp_PATCH_file <<EOF
 `git log -1 --pretty='format:%b' $c | sed -n 's/^;;/#/p'`
@@ -94,7 +95,7 @@ EOF
     idx=`expr $idx + 1`
 done
 
-cd ..
+cd $orig_dir
 mv $temp_PATCH_file _gdb.spec.Patch.include
 mv $temp_patch_file _gdb.spec.patch.include
 mv $temp_patch_order_file _patch_order

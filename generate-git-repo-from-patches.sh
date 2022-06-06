@@ -51,12 +51,12 @@ test -f _patch_order || die "Cannot find _patch_order file."
 
 last_ancestor_commit=`cat _git_upstream_commit`
 
+f=`pwd`
 cd $1
 
 git name-rev $last_ancestor_commit
 test $? -eq 0 || die "Could not find $last_ancestor_commit in the repository $1.  Did you run 'git fetch'?"
 
-f=`cd .. && pwd`
 
 # Create a branch for the checkout if using stgit; use the distro name in
 # the name of this branch.
@@ -69,8 +69,8 @@ fi
 git checkout $branch $last_ancestor_commit
 
 echo "Applying patches..."
-for p in `cat ../_patch_order` ; do
-    git am ../$p
+for p in `cat $f/_patch_order` ; do
+    git am $f/$p
     test $? -eq 0 || die "Could not apply patch '$p'."
 done
 
