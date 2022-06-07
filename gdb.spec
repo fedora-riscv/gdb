@@ -420,7 +420,7 @@ BuildRequires: rust
 BuildRequires: %{?scl_prefix}elfutils-debuginfod
 %endif
 %endif # 0%{?_with_testsuite:1}
-BuildRequires: make
+BuildRequires: make gpm-devel
 
 %{?scl:Requires:%scl_runtime}
 
