@@ -1,3 +1,4 @@
+%global _without_python 1
 # rpmbuild parameters:
 # --with testsuite: Run the testsuite (biarch if possible).  Default is without.
 # --with buildisa: Use %%{?_isa} for BuildRequires
@@ -49,7 +50,7 @@ Version: 12.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 1%{?dist}
+Release: 2%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1185,6 +1186,9 @@ fi
 %endif
 
 %changelog
+* Mon Jun 13 2022 Python Maint <python-maint@redhat.com> - 12.1-2
+- Bootstrap for Python 3.11
+
 * Thu May 12 2022 Kevin Buettner - 12.1-1
 - Rebase to FSF GDB 12.1.
 - Update gdb-6.6-buildid-locate.patch.
