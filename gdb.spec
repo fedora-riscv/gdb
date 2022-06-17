@@ -286,12 +286,12 @@ BuildRequires: source-highlight-devel
 BuildRequires: xxhash-devel
 %endif
 
-# Special case: on RHEL8, we simply require the system debuginfod.
+# Special case: on RHEL8+, we simply require the system debuginfod.
 # Otherwise, we require the SCL version.  Except on RHEL6, where debuginfod
 # is not supported at all.
 %global have_debuginfod 0
 %global use_scl_for_debuginfod 0
-%if 0%{!?rhel:1} || 0%{?rhel} == 8
+%if 0%{!?rhel:1} || 0%{?rhel} >= 8
 %global have_debuginfod 1
 BuildRequires: elfutils-debuginfod-client-devel
 %else
