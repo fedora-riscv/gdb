@@ -35,7 +35,8 @@ ExcludeArch: aarch64
 }
 
 # If we're on Fedora or RHEL 9+, we will build the gdb-minimal package.
-%if 0%{?fedora} || 0%{?rhel} > 8
+# Never build the -minimal package on SCLs, since it's unneeded there.
+%if 0%{?fedora} || (0%{?rhel} > 8 && 0%{!?scl:1})
 %global _build_minimal 1
 %endif
 
