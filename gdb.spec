@@ -311,7 +311,7 @@ BuildRequires: boost-devel
 %global bits_local %{?_isa}
 %global bits_other %{?_isa}
 %ifarch s390x
-%if 0%{!?rhel:1} || 0%{?rhel} < 8
+%if 0%{?rhel:1} && 0%{?rhel} < 8
 %global bits_other (%{__isa_name}-32)
 %endif
 %else #!s390x
@@ -369,8 +369,8 @@ BuildRequires: prelink
 BuildRequires: opencl-headers ocl-icd-devel%{bits_local} ocl-icd-devel%{bits_other}
 %endif
 %if 0%{!?rhel:1}
-# Fedora arm+ppc64le do not yet have fpc built.
-%ifnarch %{arm} ppc64le
+# Fedora arm+ppc64le+s390x do not yet have fpc built.
+%ifnarch %{arm} ppc64le s390x
 BuildRequires: fpc
 %endif
 %endif
