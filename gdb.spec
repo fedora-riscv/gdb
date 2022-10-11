@@ -1189,7 +1189,7 @@ fi
 %endif
 
 %changelog
-* Tue Oct 13 2022 Alexandra Hájková - 12.1-6
+* Tue Oct 11 2022 Alexandra Hájková - 12.1-6
 - Backport upstream patch "Add support for readline 8.2". (Andreas Schwab)
 
 * Fri Oct 7 2022 Alexandra Hájková - 12.1-6
