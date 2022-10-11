@@ -1189,6 +1189,9 @@ fi
 %endif
 
 %changelog
+* Tue Oct 13 2022 Alexandra Hájková - 12.1-6
+- Backport upstream patch "Add support for readline 8.2". (Andreas Schwab)
+
 * Fri Oct 7 2022 Alexandra Hájková - 12.1-6
 - Update gdb-6.6-buildid-locate.patch to fix RHBZ 2122947.
 
