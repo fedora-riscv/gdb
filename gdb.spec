@@ -1189,6 +1189,10 @@ fi
 %endif
 
 %changelog
+* Wed Oct 18 2022 Bruno Larsen - 12.1-7
+- Remove patch gdb-6.3-test-dtorfix.
+  Was upstreamed, will be back in the next rebase.
+
 * Thu Oct 13 2022 Alexandra Hájková - 12.1-7
 - Bump the release number.
 
