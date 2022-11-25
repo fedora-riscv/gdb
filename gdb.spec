@@ -1196,6 +1196,10 @@ fi
 
 %changelog
 * Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
+- Remove gdb-fortran-frame-string.patch, a version of this test has
+  now been upstreamed.
+
+* Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
 - Remove gdb-bfd-aliasing.patch.
 
 * Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
