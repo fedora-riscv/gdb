@@ -1195,6 +1195,10 @@ fi
 %endif
 
 %changelog
+* Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
+- Remove gdb-entryval-crash-1of3.patch, gdb-entryval-crash-2of3.patch,
+  and gdb-entryval-crash-3of3.patch.
+
 * Wed Dec 7 2022 Keith Seitz <keiths@redhat.com> - 12.1-10
 - Disable Guile support for F38+, RHBZ 2151328.
 
