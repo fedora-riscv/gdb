@@ -1196,6 +1196,9 @@ fi
 
 %changelog
 * Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
+- Remove gdb-bfd-aliasing.patch.
+
+* Fri Dec 9 2022 Andrew Burgess <aburgess@redhat.com>
 - Remove gdb-entryval-crash-1of3.patch, gdb-entryval-crash-2of3.patch,
   and gdb-entryval-crash-3of3.patch.
 
