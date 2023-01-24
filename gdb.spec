@@ -1190,6 +1190,10 @@ fi
 %endif
 
 %changelog
+* Mon Jan 23 2023 Kevin Buettner <kevinb@redhat.com>
+- More tweaks to gdb-6.6-buildid-locate-rpm.patch, in which rpmTag
+  is replaced with rpmDbiTagVal.
+
 * Mon Jan 23 2023 Keith Seitz <keiths@redhat.com> - 12.1-14
   From Sergey Mende:
 - Backport upstream patch "gdb: call check_typedef at beginning of
