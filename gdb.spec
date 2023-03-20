@@ -1192,6 +1192,9 @@ fi
 %endif
 
 %changelog
+* Mon Mar 20 2023 Bruno Larsen <blarsen@redhat.com>
+- Remove gdb-rhbz1350436-type-printers-error.patch since it is upstreamed.
+
 * Wed Mar 8 2023 Kevin Buettner <kevinb@redhat.com> - 13.1-1
 - Rebase to FSF GDB 13.1.
 - Update gdb-6.3-rh-testversion-20041202.patch.
