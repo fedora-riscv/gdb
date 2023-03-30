@@ -89,12 +89,17 @@ Recommends: dnf-command(debuginfo-install)
 # below, but it cannot hurt either -- rdieter
 Conflicts: gdb-headless < 7.12-29
 
-Summary: A stub package for GNU source-level debugger
+Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Requires: gdb-headless%{?_isa} = %{version}-%{release}
 
 %description
-'gdb' package is only a stub to install gcc-gdb-plugin for 'compile' commands.
-See package 'gdb-headless'.
+GDB, the GNU debugger, allows you to debug programs written in C, C++,
+Fortran, Go, and other languages, by executing them in a controlled
+fashion and printing their data.
+
+If you want to use GDB for development purposes, you should install
+the 'gdb' package which will install 'gdb-headless' and possibly other
+useful packages too.
 
 %package headless
 %endif
@@ -455,8 +460,8 @@ Conflicts: %{name}-headless > %{version}-%{release}
 
 %description minimal
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
-Java, and other languages, by executing them in a controlled fashion
-and printing their data.
+Fortran, Go, and other languages, by executing them in a controlled
+fashion and printing their data.
 
 This package provides a minimal version of GDB, tailored to be used by
 the Fedora buildroot.  It should probably not be used by end users.
@@ -467,8 +472,8 @@ Summary: A standalone server for GDB (the GNU source-level debugger)
 
 %description gdbserver
 GDB, the GNU debugger, allows you to debug programs written in C, C++,
-Java, and other languages, by executing them in a controlled fashion
-and printing their data.
+Fortran, Go, and other languages, by executing them in a controlled
+fashion and printing their data.
 
 This package provides a program that allows you to run GDB on a different
 machine than the one which is running the program being debugged.
