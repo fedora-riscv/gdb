@@ -57,7 +57,7 @@ Version: 13.1
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 2%{?dist}
+Release: 3%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1244,6 +1244,9 @@ fi
 %endif
 
 %changelog
+* Thu Mar 30 2023 Alexandra Hájková <ahajkova@redhat.com> - 12.1-3
+- Update gdb-6.6-buildid-locate.patch to fix RHBZ 2181221.
+
 * Wed Mar 29 2023 Andrew Burgess <aburgess@redhat.com>
 - Used --with-pkgversion to place the distribution name in the version
   string rather than placing the string directly into the version.in
