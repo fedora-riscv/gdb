@@ -93,7 +93,7 @@ for c in `git rev-list --reverse ${common_ancestor}..HEAD` ; do
 `git log -1 --pretty='format:%b' $c | sed -n 's/^;;/#/p'`
 EOF
     printf "Patch%03d: %s\n\n" $idx $fname >> $temp_PATCH_file
-    printf "%%patch%03d -p1\n" $idx >> $temp_patch_file
+    printf "%%patch -p1 -P%03d\n" $idx >> $temp_patch_file
     echo $fname >> $temp_patch_order_file
     idx=`expr $idx + 1`
 done
