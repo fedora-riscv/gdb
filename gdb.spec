@@ -1249,6 +1249,11 @@ fi
 %endif
 
 %changelog
+* Thu May 4 2023 Andrew Burgess <aburgess@redhat.com>
+- Rewrite the changes to gdb-add-index.sh.  If the user has set the
+  GDB environment variable then use that value, otherwise find a
+  suitable GDB executable by looking in various places.
+
 * Wed May 3 2023 Kevin Buettner <kevinb@redhat.com> 13.1-5
 - Backport "Pass const frame_info_ptr reference for
   skip_[language_]trampoline". (Mark Wielaard, RHBZ 2192105, build/30413)
