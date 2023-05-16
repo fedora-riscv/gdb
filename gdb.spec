@@ -1249,6 +1249,10 @@ fi
 %endif
 
 %changelog
+* Tue May 16 2023 Andrew Burgess <aburgess@redhat.com>
+- Remove gdb-ppc-power7-test.patch, this patch is already covered by
+  upstream tests gdb.arch/powerpc-*.exp.
+
 * Sat May 6 2023 Alexandra Hájková <ahajkova@redhat.com>
 - Remove gdb-rhel5.9-testcase-xlf-var-inside-mod.patch, the patch adds
   gdb.fortran/xlf-variable.exp test, the test can only be run on
