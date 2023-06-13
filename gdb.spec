@@ -162,6 +162,9 @@ Recommends: default-yama-scope
 %if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
 %global librpmver 9
 %endif
+%if 0%{?fedora} >= 39 || 0%{?rhel} >= 10
+%global librpmver 10
+%endif
 %endif
 %endif
 %if 0%{?__isa_bits} == 64
