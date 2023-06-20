@@ -1252,6 +1252,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug  3 2023 Andrew Burgess <aburgess@redhat.com>
+- Backport upstream commit f3eee586174, which fixes RHBZ 2196395.
+
 * Wed Jul 19 2023 Fedora Release Engineering <releng@fedoraproject.org>
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_39_Mass_Rebuild
 
