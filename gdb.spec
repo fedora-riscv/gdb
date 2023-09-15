@@ -1252,6 +1252,9 @@ fi
 %endif
 
 %changelog
+* Wed Aug 15 2023 Andrew Burgess <aburgess@redhat.com>
+- Backport upstream commit f96328accde1e63, which fixes RHBZ 2237515.
+
 * Mon Aug  7 2023 Kevin Buettner <kevinb@redhat.com> - 13.2-7
 - Bump release.
 
