@@ -57,7 +57,7 @@ Version: 13.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 9%{?dist}
+Release: 10%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -1252,6 +1252,10 @@ fi
 %endif
 
 %changelog
+* Sun Oct 1 2023 Alexandra Hájková <ahajkova@redhat.com> - 13.2-10
+- Backport upstream commit d28fbc7197b which fixes RHBZ 2233965,
+  CVE-2022-48065 (Alan Modra).
+
 * Thu Sep 21 2023 Alexandra Hájková <ahajkova@redhat.com> - 13.2-9
 - Backport upstream commit 8f2c64de86b which fixes RHBZ 2233961,
   CVE-2022-48064, (Alan Modra).
