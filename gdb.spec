@@ -57,7 +57,7 @@ Version: 13.2
 
 # The release always contains a leading reserved number, start it at 1.
 # `upstream' is not a part of `name' to stay fully rpm dependencies compatible for the testing.
-Release: 10%{?dist}
+Release: 10.rv64%{?dist}
 
 License: GPLv3+ and GPLv3+ with exceptions and GPLv2+ and GPLv2+ with exceptions and GPL+ and LGPLv2+ and LGPLv3+ and BSD and Public Domain and GFDL
 # Do not provide URL for snapshots as the file lasts there only for 2 days.
@@ -112,7 +112,7 @@ Summary: A GNU source-level debugger for C, C++, Fortran, Go and other languages
 Obsoletes: gdb64 < 5.3.91
 %endif
 
-%ifarch %{arm}
+%ifarch %{arm} riscv64
 %global have_inproctrace 0
 %else
 %global have_inproctrace 1
@@ -398,7 +398,7 @@ BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
 %endif
 %else
-%ifarch %{ix86} x86_64 ia64 ppc %{power64} alpha s390x %{arm} aarch64
+%ifarch %{ix86} x86_64 ia64 ppc %{power64} alpha s390x %{arm} aarch64 riscv64
 %if 0%{!?rhel:1}
 BuildRequires: gcc-gnat
 BuildRequires: libgnat%{bits_local} libgnat%{bits_other}
@@ -619,7 +619,7 @@ COMMON_GDB_CONFIGURE_FLAGS="\
 ,-Wno-format-overflow\
 %endif
 	--enable-build-with-cxx					\
-%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64
+%ifnarch %{ix86} alpha ppc s390 s390x x86_64 ppc64 ppc64le sparc sparcv9 sparc64 %{arm} aarch64 riscv64
 	--disable-werror					\
 %else
 	--enable-werror						\
@@ -706,7 +706,7 @@ export PKG_CONFIG_PATH=%{_libdir}/pkgconfig
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
-	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu	\
+	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu,riscv64-linux-gnu	\
 	%{_target_platform}
 %endif
 
@@ -809,7 +809,7 @@ $(: ppc64 host build crashes on ppc variant of libexpat.so )	\
 %ifarch sparc sparcv9
 	sparc-%{_vendor}-%{_target_os}%{?_gnu}
 %else
-	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu	\
+	--enable-targets=s390-linux-gnu,powerpc-linux-gnu,arm-linux-gnu,aarch64-linux-gnu,riscv64-linux-gnu	\
 	%{_target_platform}
 %endif
 
@@ -1252,6 +1252,9 @@ fi
 %endif
 
 %changelog
+* Thu Nov 14 2023 Songsong Zhang <U2FsdGVkX1@gmail.com> - 13.2-10.rv64
+- Add riscv64 support
+
 * Sun Oct 1 2023 Alexandra Hájková <ahajkova@redhat.com> - 13.2-10
 - Backport upstream commit d28fbc7197b which fixes RHBZ 2233965,
   CVE-2022-48065 (Alan Modra).
